@@ -153,6 +153,8 @@ async def get_cluster(agent):
             "metrics": agent.metrics,
             "cache": agent.cache,
             "permissions": permissions,
+            "persistence": agent.persistence,
+            "node_metrics": agent.node_metrics,
         }
 
     return cluster
@@ -385,3 +387,17 @@ def ui_files(name="index.html"):
         return current_app.send_static_file(name)
     else:
         return current_app.send_static_file("index.html")
+
+
+@check_jwt
+@validate_cluster
+def jobs_history(cluster: str):
+    """Proxy job history query to the agent."""
+    return proxy_agent(cluster, "jobs/history", request.token)
+
+
+@check_jwt
+@validate_cluster
+def node_metrics(cluster: str, name: str):
+    """Proxy node real-time metrics query to the agent."""
+    return proxy_agent(cluster, f"node/{name}/metrics", request.token)

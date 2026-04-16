@@ -22,6 +22,8 @@ import SettingsCacheView from '@/views/settings/SettingsCache.vue'
 import ClustersView from '@/views/ClustersView.vue'
 import JobsView from '@/views/JobsView.vue'
 import JobView from '@/views/JobView.vue'
+import JobsHistoryView from '@/views/JobsHistoryView.vue'
+import JobHistoryView from '@/views/JobHistoryView.vue'
 import ResourcesView from '@/views/resources/ResourcesView.vue'
 import ResourcesDiagramNodesView from '@/views/resources/ResourcesDiagramNodesView.vue'
 import ResourcesDiagramCoresView from '@/views/resources/ResourcesDiagramCoresView.vue'
@@ -116,6 +118,21 @@ const router = createRouter({
           name: 'jobs',
           component: JobsView,
           props: true
+        },
+        {
+          path: 'jobs/history',
+          name: 'jobs-history',
+          component: JobsHistoryView,
+          props: true
+        },
+        {
+          path: 'jobs/history/:id',
+          name: 'job-history',
+          component: JobHistoryView,
+          props: (route: RouteLocation) => ({
+            cluster: route.params.cluster,
+            id: parseInt(route.params.id as string)
+          })
         },
         {
           path: 'job/:id',
@@ -234,6 +251,10 @@ router.beforeEach(async (to, from) => {
       console.log(
         `New cluster ${runtime.currentCluster?.name} permissions: ${runtime.currentCluster?.permissions.actions}`
       )
+    }
+    // Guard feature-gated routes
+    if (to.name === 'jobs-history' && !runtime.currentCluster?.persistence) {
+      return { name: 'jobs', params: { cluster: to.params.cluster } }
     }
   } else {
     console.log(`Unsetting current cluster`)

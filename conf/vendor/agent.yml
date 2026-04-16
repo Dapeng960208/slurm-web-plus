@@ -499,6 +499,63 @@ cache:
     default: 120
     doc: Expiration delay in seconds for associations in cache
 
+persistence:
+  enabled:
+    type: bool
+    default: false
+    doc: |
+      Determine if job history persistence to PostgreSQL is enabled.
+  host:
+    type: str
+    default: localhost
+    doc: Hostname of PostgreSQL server
+  port:
+    type: int
+    default: 5432
+    doc: TCP port of PostgreSQL server
+  database:
+    type: str
+    default: slurmweb
+    doc: PostgreSQL database name
+  user:
+    type: str
+    default: slurmweb
+    doc: PostgreSQL user name
+  password:
+    type: password
+    doc: PostgreSQL user password
+    ex: SECR3T
+  retention_days:
+    type: int
+    default: 180
+    doc: Number of days to retain job snapshot records
+  snapshot_interval:
+    type: int
+    default: 60
+    doc: Interval in seconds between active job snapshots
+
+node_metrics:
+  enabled:
+    type: bool
+    default: false
+    doc: |
+      Determine if node real-time resource monitoring via Prometheus
+      node_exporter is enabled.
+  prometheus_host:
+    type: uri
+    default: http://localhost:9090
+    doc: URL of Prometheus server to query node_exporter metrics.
+  node_exporter_job:
+    type: str
+    default: node
+    doc: Name of the Prometheus job that scrapes node_exporter.
+  node_hostname_label:
+    type: str
+    default: hostname
+    doc: |
+      Prometheus label name that contains the Slurm node hostname.
+      Typically "hostname" or "instance".
+
 metrics:
   enabled:
     type: bool

@@ -206,3 +206,44 @@ class SlurmwebMetricsDB:
                 f"{id.name}{filter}-{id.name}{filter} offset {resolution.step} {range}"
             )
         return id, params, (f"{params.endpoint}?query={_promql}")
+
+    def node_instant_metrics(self, node_name: str, hostname_label: str = "hostname"):
+        """
+        Query Prometheus for instant node_exporter metrics for a specific node.
+        Returns a dict with CPU, memory, and disk usage percentages.
+        """
+        queries = {
+            "cpu_usage": f'100 - (avg(rate(node_cpu_seconds_total{{mode="idle",{hostname_label}="{node_name}"}}[1m])) * 100)',
+            "memory_usage": f'100 * (1 - (node_memory_MemAvailable_bytes{{{hostname_label}="{node_name}"}} / node_memory_MemTotal_bytes{{{hostname_label}="{node_name}"}}))',
+            "disk_usage": f'100 - ((node_filesystem_avail_bytes{{mountpoint="/",{hostname_label}="{node_name}"}} / node_filesystem_size_bytes{{mountpoint="/",{hostname_label}="{node_name}"}}) * 100)',
+        }
+
+        async def _fetch_all():
+            results = {}
+            async with aiohttp.ClientSession() as session:
+                for key, promql in queries.items():
+                    url = f"{self.base_uri.geturl()}{self.REQUEST_BASE_PATH}query?query={promql}"
+                    logger.debug("Node metrics request: %s", url)
+                    try:
+                        async with session.get(url) as response:
+                            if response.status != 200:
+                                logger.warning(
+                                    "Metrics query %s returned status %d", key, response.status
+                                )
+                                results[key] = None
+                                continue
+                            json_data = await response.json()
+                            if (
+                                json_data.get("data", {}).get("result")
+                                and len(json_data["data"]["result"]) > 0
+                            ):
+                                value = float(json_data["data"]["result"][0]["value"][1])
+                                results[key] = round(value, 2)
+                            else:
+                                results[key] = None
+                    except Exception as err:
+                        logger.warning("Error fetching %s for node %s: %s", key, node_name, err)
+                        results[key] = None
+            return results
+
+        return asyncio_run(_fetch_all())

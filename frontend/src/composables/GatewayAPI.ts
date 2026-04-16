@@ -27,6 +27,8 @@ export interface ClusterDescription {
   versions?: ClusterVersions
   stats?: ClusterStats
   error?: boolean
+  persistence?: boolean
+  node_metrics?: boolean
 }
 
 interface ClusterPermissions {
@@ -668,6 +670,61 @@ export interface ClusterReservation {
   users: string
 }
 
+export interface JobHistoryRecord {
+  id: number
+  snapshot_time: string
+  job_id: number
+  job_name: string | null
+  job_state: string | null
+  state_reason: string | null
+  user_name: string | null
+  account: string | null
+  group: string | null
+  partition: string | null
+  qos: string | null
+  nodes: string | null
+  node_count: number | null
+  cpus: number | null
+  priority: number | null
+  tres_req_str: string | null
+  tres_per_job: string | null
+  tres_per_node: string | null
+  gres_detail: string | null
+  submit_time: string | null
+  start_time: string | null
+  end_time: string | null
+  time_limit_minutes: number | null
+  exit_code: string | null
+  working_directory: string | null
+  command: string | null
+}
+
+export interface JobHistoryResponse {
+  total: number
+  page: number
+  page_size: number
+  jobs: JobHistoryRecord[]
+}
+
+export interface JobHistoryFilters {
+  start?: string
+  end?: string
+  user?: string
+  account?: string
+  partition?: string
+  qos?: string
+  state?: string
+  job_id?: number
+  page?: number
+  page_size?: number
+}
+
+export interface NodeInstantMetrics {
+  cpu_usage: number | null
+  memory_usage: number | null
+  disk_usage: number | null
+}
+
 export interface CacheStatistics {
   hit: {
     keys: Record<string, number>
@@ -869,7 +926,14 @@ export function useGatewayAPI() {
   }
 
   async function clusters(): Promise<Array<ClusterDescription>> {
-    return await restAPI.get<ClusterDescription[]>(`/clusters`)
+    const result = await restAPI.get<ClusterDescription[]>(`/clusters`)
+    console.log('[GatewayAPI] 集群列表已加载:')
+    result.forEach((c) => {
+      console.log(
+        `[GatewayAPI]   集群 "${c.name}": persistence=${c.persistence ?? false}, node_metrics=${c.node_metrics ?? false}`
+      )
+    })
+    return result
   }
 
   async function users(): Promise<Array<UserDescription>> {
@@ -974,6 +1038,41 @@ export function useGatewayAPI() {
     )
   }
 
+  async function job_history_detail(cluster: string, id: number): Promise<JobHistoryRecord> {
+    return await restAPI.get<JobHistoryRecord>(`/agents/${cluster}/jobs/history/${id}`)
+  }
+
+  async function jobs_history(
+    cluster: string,
+    filters: JobHistoryFilters
+  ): Promise<JobHistoryResponse> {
+    const params = new URLSearchParams()
+    if (filters.start) params.append('start', filters.start)
+    if (filters.end) params.append('end', filters.end)
+    if (filters.user) params.append('user', filters.user)
+    if (filters.account) params.append('account', filters.account)
+    if (filters.partition) params.append('partition', filters.partition)
+    if (filters.qos) params.append('qos', filters.qos)
+    if (filters.state) params.append('state', filters.state)
+    if (filters.job_id) params.append('job_id', filters.job_id.toString())
+    if (filters.page) params.append('page', filters.page.toString())
+    if (filters.page_size) params.append('page_size', filters.page_size.toString())
+    const query = params.toString()
+    const url = `/agents/${cluster}/jobs/history${query ? '?' + query : ''}`
+    console.log('[GatewayAPI] jobs_history 请求 URL:', url)
+    const result = await restAPI.get<JobHistoryResponse>(url)
+    console.log('[GatewayAPI] jobs_history 响应: total=', result.total, 'jobs=', result.jobs.length)
+    return result
+  }
+
+  async function node_metrics(cluster: string, nodeName: string): Promise<NodeInstantMetrics> {
+    const url = `/agents/${cluster}/node/${nodeName}/metrics`
+    console.log('[GatewayAPI] node_metrics 请求 URL:', url)
+    const result = await restAPI.get<NodeInstantMetrics>(url)
+    console.log('[GatewayAPI] node_metrics 响应:', result)
+    return result
+  }
+
   async function infrastructureImagePng(
     cluster: string,
     infrastructure: string,
@@ -1069,6 +1168,9 @@ export function useGatewayAPI() {
     metrics_gpus,
     metrics_jobs,
     metrics_cache,
+    jobs_history,
+    job_history_detail,
+    node_metrics,
     infrastructureImagePng,
     abort,
     isValidGatewayGenericAPIKey,

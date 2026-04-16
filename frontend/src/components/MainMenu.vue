@@ -17,7 +17,8 @@ import {
   CpuChipIcon,
   SwatchIcon,
   XMarkIcon,
-  UserGroupIcon
+  UserGroupIcon,
+  ClockIcon
 } from '@heroicons/vue/24/outline'
 import { TagIcon } from '@heroicons/vue/16/solid'
 
@@ -33,23 +34,33 @@ const sidebarOpen = defineModel<boolean>()
 const runtimeStore = useRuntimeStore()
 const runtimeConfiguration = useRuntimeConfiguration()
 const navigation = [
-  { name: 'Dashboard', route: 'dashboard', icon: HomeIcon, permission: 'view-stats' },
-  { name: 'Jobs', route: 'jobs', icon: PlayCircleIcon, permission: 'view-jobs' },
-  { name: 'Resources', route: 'resources', icon: CpuChipIcon, permission: 'view-nodes' },
-  { name: 'QOS', route: 'qos', icon: SwatchIcon, permission: 'view-qos' },
+  { name: 'Dashboard', route: 'dashboard', icon: HomeIcon, permission: 'view-stats', feature: undefined },
+  { name: 'Jobs', route: 'jobs', icon: PlayCircleIcon, permission: 'view-jobs', feature: undefined },
+  { name: 'Jobs History', route: 'jobs-history', icon: ClockIcon, permission: 'view-jobs', feature: 'persistence' },
+  { name: 'Resources', route: 'resources', icon: CpuChipIcon, permission: 'view-nodes', feature: undefined },
+  { name: 'QOS', route: 'qos', icon: SwatchIcon, permission: 'view-qos', feature: undefined },
   {
     name: 'Reservations',
     route: 'reservations',
     icon: CalendarIcon,
-    permission: 'view-reservations'
+    permission: 'view-reservations',
+    feature: undefined
   },
   {
     name: 'Accounts',
     route: 'accounts',
     icon: UserGroupIcon,
-    permission: 'associations-view'
+    permission: 'associations-view',
+    feature: undefined
   }
 ]
+
+function isFeatureEnabled(feature: string | undefined): boolean {
+  if (!feature) return true
+  const cluster = runtimeStore.currentCluster
+  if (!cluster) return false
+  return !!(cluster as Record<string, unknown>)[feature]
+}
 </script>
 
 <template>
@@ -114,7 +125,7 @@ const navigation = [
                     <ul role="list" class="-mx-2 space-y-1">
                       <li v-for="item in navigation" :key="item.name">
                         <RouterLink
-                          v-if="runtimeStore.hasPermission(item.permission)"
+                          v-if="runtimeStore.hasPermission(item.permission) && isFeatureEnabled(item.feature)"
                           :to="{ name: item.route }"
                           :class="[
                             item.route == entry
@@ -177,7 +188,7 @@ const navigation = [
             <ul role="list" class="-mx-2 space-y-1">
               <li v-for="item in navigation" :key="item.name">
                 <RouterLink
-                  v-if="runtimeStore.hasPermission(item.permission)"
+                  v-if="runtimeStore.hasPermission(item.permission) && isFeatureEnabled(item.feature)"
                   :to="{ name: item.route }"
                   :class="[
                     item.route == entry

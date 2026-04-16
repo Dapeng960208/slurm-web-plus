@@ -51,6 +51,8 @@ class SlurmwebAgent:
         metrics: bool,
         cache: bool,
         url: str,
+        persistence: bool = False,
+        node_metrics: bool = False,
     ):
         self.version = version
         self.cluster = cluster
@@ -58,6 +60,8 @@ class SlurmwebAgent:
         self.cache = cache
         self.racksdb = racksdb
         self.url = url
+        self.persistence = persistence
+        self.node_metrics = node_metrics
 
     @classmethod
     def from_json(cls, url, data):
@@ -69,6 +73,8 @@ class SlurmwebAgent:
                 data["metrics"],
                 data["cache"],
                 url,
+                persistence=data.get("persistence", False),
+                node_metrics=data.get("node_metrics", False),
             )
         except KeyError as err:
             raise SlurmwebAgentError(
@@ -134,6 +140,10 @@ class SlurmwebAppGateway(SlurmwebWebApp, RFLTokenizedWebApp):
             "/api/agents/<cluster>/racksdb/<path:query>",
             views.racksdb,
             methods=["GET", "POST"],
+        ),
+        SlurmwebAppRoute("/api/agents/<cluster>/jobs/history", views.jobs_history),
+        SlurmwebAppRoute(
+            "/api/agents/<cluster>/node/<name>/metrics", views.node_metrics
         ),
     }
 

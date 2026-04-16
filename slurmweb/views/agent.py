@@ -50,6 +50,8 @@ def info():
             "version": racksdb_get_version(),
         },
         "version": get_version(),
+        "persistence": current_app.settings.persistence.enabled,
+        "node_metrics": current_app.settings.node_metrics.enabled,
     }
     return jsonify(data)
 
@@ -163,9 +165,16 @@ def stats():
 def jobs():
     node = request.args.get("node")
     if node:
-        return jsonify(slurmrest("jobs_by_node", node))
+        result = slurmrest("jobs_by_node", node)
     else:
-        return jsonify(slurmrest("jobs"))
+        result = slurmrest("jobs")
+    # Async submit to persistence store if enabled (non-blocking)
+    if current_app.jobs_store is not None:
+        try:
+            current_app.jobs_store.submit(result)
+        except Exception as err:
+            logger.warning("Failed to submit jobs to persistence store: %s", err)
+    return jsonify(result)
 
 
 @rbac_action("view-jobs")
@@ -282,4 +291,65 @@ def metrics(metric):
         )
     except SlurmwebMetricsDBError as err:
         logger.warning(str(err))
+        abort(500, str(err))
+
+
+@rbac_action("view-jobs")
+def jobs_history():
+    """Return paginated job history from PostgreSQL."""
+    if current_app.jobs_store is None:
+        error = "Job history persistence is disabled"
+        logger.warning(error)
+        abort(501, error)
+    filters = {
+        "start": request.args.get("start"),
+        "end": request.args.get("end"),
+        "user": request.args.get("user"),
+        "account": request.args.get("account"),
+        "partition": request.args.get("partition"),
+        "qos": request.args.get("qos"),
+        "state": request.args.get("state"),
+        "job_id": request.args.get("job_id"),
+        "page": request.args.get("page", 1),
+        "page_size": request.args.get("page_size", 100),
+    }
+    try:
+        return jsonify(current_app.jobs_store.query(filters))
+    except Exception as err:
+        logger.error("Job history query error: %s", err)
+        abort(500, str(err))
+
+
+@rbac_action("view-jobs")
+def job_history_detail(record_id: int):
+    """Return a single job history record by its DB primary key."""
+    if current_app.jobs_store is None:
+        error = "Job history persistence is disabled"
+        logger.warning(error)
+        abort(501, error)
+    try:
+        record = current_app.jobs_store.get_by_id(record_id)
+    except Exception as err:
+        logger.error("Job history detail query error: %s", err)
+        abort(500, str(err))
+    if record is None:
+        abort(404, f"Job history record {record_id} not found")
+    return jsonify(record)
+
+
+@rbac_action("view-nodes")
+def node_metrics(name: str):
+    """Return real-time resource metrics for a node from Prometheus."""
+    if current_app.node_metrics_db is None:
+        error = "Node real-time metrics is disabled"
+        logger.warning(error)
+        abort(501, error)
+    try:
+        result = current_app.node_metrics_db.node_instant_metrics(
+            name,
+            current_app.settings.node_metrics.node_hostname_label,
+        )
+        return jsonify(result)
+    except SlurmwebMetricsDBError as err:
+        logger.warning("Node metrics query error for %s: %s", name, err)
         abort(500, str(err))

@@ -53,6 +53,9 @@ class SlurmwebAppAgent(SlurmwebWebApp, RFLTokenizedRBACWebApp):
             f"/v{get_version()}/cache/reset", views.cache_reset, methods=["POST"]
         ),
         SlurmwebAppRoute(f"/v{get_version()}/metrics/<metric>", views.metrics),
+        SlurmwebAppRoute(f"/v{get_version()}/jobs/history", views.jobs_history),
+        SlurmwebAppRoute(f"/v{get_version()}/jobs/history/<int:record_id>", views.job_history_detail),
+        SlurmwebAppRoute(f"/v{get_version()}/node/<name>/metrics", views.node_metrics),
     }
 
     def __init__(self, seed):
@@ -178,3 +181,27 @@ class SlurmwebAppAgent(SlurmwebWebApp, RFLTokenizedRBACWebApp):
             self.metrics_db = SlurmwebMetricsDB(
                 self.settings.metrics.host, self.settings.metrics.job
             )
+
+        # Initialize job history persistence (new, optional)
+        self.jobs_store = None
+        if self.settings.persistence.enabled:
+            from ..persistence.jobs_store import JobsStore
+
+            self.jobs_store = JobsStore(self.settings.persistence, self.slurmrestd)
+            self.jobs_store.start()
+            logger.info("Job history persistence enabled")
+        else:
+            logger.debug("Job history persistence is disabled")
+
+        # Initialize node real-time metrics (new, optional)
+        self.node_metrics_db = None
+        if self.settings.node_metrics.enabled:
+            from ..metrics.db import SlurmwebMetricsDB as _MetricsDB
+
+            self.node_metrics_db = _MetricsDB(
+                self.settings.node_metrics.prometheus_host,
+                self.settings.node_metrics.node_exporter_job,
+            )
+            logger.info("Node real-time metrics enabled")
+        else:
+            logger.debug("Node real-time metrics is disabled")
