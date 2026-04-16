@@ -1,0 +1,16 @@
+{
+  "actions": [
+    "view-jobs",
+    "cache-view",
+    "view-reservations",
+    "view-stats",
+    "view-qos",
+    "view-partitions",
+    "view-accounts",
+    "view-nodes",
+    "cache-reset"
+  ],
+  "roles": [
+    "admin"
+  ]
+}

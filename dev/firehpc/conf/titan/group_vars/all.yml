@@ -1,0 +1,59 @@
+common_pkgs_derivatives:
+- main
+- slurmweb-5
+common_pkgs_priorities:
+  slurmweb-5: 900
+common_with_devs_repos: true
+common_hpckit_derivatives:
+- main
+- slurm24.05
+common_devs_derivatives:
+- main
+- slurmweb-5
+common_devs_priorities:
+  slurmweb-5: 900
+fhpc_slurm_with_jwt: true
+slurm_with_db_archive: false
+slurm_params:
+  PriorityType: priority/multifactor
+  PriorityWeightFairshare: 1000
+  PriorityWeightQOS: 100
+  SelectType: select/cons_tres
+slurm_partitions:
+- name: batch
+  nodes: cn[001-080,101-532]
+  default: yes
+  params:
+    MaxTime: INFINITE
+    State: UP
+    DefMemPerCPU: 512
+- name: debug
+  nodes: cn[081-099]
+  params:
+    MaxTime: "1:0:0"
+    State: UP
+    DefMemPerCPU: 512
+- name: interactive
+  nodes: cn100
+  params:
+    MaxTime: "10:00"
+    State: UP
+    DefMemPerCPU: 512
+slurm_gpus_models_map:
+  Nvidia H100: h100
+slurm_qos:
+- name: critical
+  args:
+  - GrpJobs=300
+  - MaxWall=2-00:00:00
+  - MaxJobsPU=10
+  - MaxSubmitJobsPU=20
+  - MaxSubmitJobsPA=30
+  - Priority=200
+slurmweb_enabled: true
+slurmweb_slurmrestd_jwt_mode: static
+slurmweb_agent_settings:
+  metrics:
+    enabled: true
+redis_enabled: true
+metrics_enabled: true

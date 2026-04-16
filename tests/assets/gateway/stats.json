@@ -1,0 +1,12 @@
+{
+  "jobs": {
+    "running": 1,
+    "total": 16
+  },
+  "resources": {
+    "cores": 384,
+    "gpus": 16,
+    "memory": 2621440,
+    "nodes": 8
+  }
+}
