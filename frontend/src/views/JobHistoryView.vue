@@ -8,6 +8,7 @@
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import { useGatewayAPI } from '@/composables/GatewayAPI'
 import type { JobHistoryRecord } from '@/composables/GatewayAPI'
 import ClusterMainLayout from '@/components/ClusterMainLayout.vue'
@@ -20,10 +21,38 @@ import { CheckIcon } from '@heroicons/vue/20/solid'
 
 const props = defineProps<{ cluster: string; id: number }>()
 
+const route = useRoute()
 const gateway = useGatewayAPI()
 const loading = ref(true)
 const error = ref<string | null>(null)
 const job = ref<JobHistoryRecord | null>(null)
+
+type HistoryField =
+  | 'job-id' | 'name' | 'state-reason' | 'user' | 'group' | 'account'
+  | 'partition' | 'qos' | 'priority' | 'nodes' | 'resources'
+  | 'tres-per-job' | 'tres-per-node' | 'gres' | 'time-limit' | 'exit-code'
+  | 'workdir' | 'command' | 'submit-time' | 'start-time' | 'end-time' | 'snapshot-time'
+
+const ALL_FIELDS: HistoryField[] = [
+  'job-id', 'name', 'state-reason', 'user', 'group', 'account',
+  'partition', 'qos', 'priority', 'nodes', 'resources',
+  'tres-per-job', 'tres-per-node', 'gres', 'time-limit', 'exit-code',
+  'workdir', 'command', 'submit-time', 'start-time', 'end-time', 'snapshot-time'
+]
+
+const displayTags = ref<Record<HistoryField, { show: boolean; highlight: boolean }>>(
+  Object.fromEntries(ALL_FIELDS.map((f) => [f, { show: false, highlight: false }])) as Record<
+    HistoryField,
+    { show: boolean; highlight: boolean }
+  >
+)
+
+function highlightField(field: HistoryField) {
+  displayTags.value[field].highlight = true
+  setTimeout(() => {
+    displayTags.value[field].highlight = false
+  }, 2000)
+}
 
 function fmt(v: string | null | undefined) {
   return v ?? '-'
@@ -94,6 +123,13 @@ const fields = (j: JobHistoryRecord) => [
 onMounted(async () => {
   try {
     job.value = await gateway.job_history_detail(props.cluster, props.id)
+    /* If a field id is in route hash, highlight it after load */
+    if (route.hash) {
+      const field = route.hash.slice(1) as HistoryField
+      if (ALL_FIELDS.includes(field)) {
+        highlightField(field)
+      }
+    }
   } catch (e: unknown) {
     error.value = e instanceof Error ? e.message : String(e)
   } finally {
@@ -206,12 +242,28 @@ onMounted(async () => {
                 v-for="field in fields(job)"
                 :key="field.id"
                 :id="field.id"
-                class="px-4 py-2 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0"
+                :class="[
+                  displayTags[field.id as HistoryField].highlight
+                    ? 'bg-slurmweb-light dark:bg-slurmweb-dark'
+                    : '',
+                  'px-4 py-2 transition-colors duration-700 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0'
+                ]"
+                @mouseenter="displayTags[field.id as HistoryField].show = true"
+                @mouseleave="displayTags[field.id as HistoryField].show = false"
               >
                 <dt class="text-sm leading-6 font-medium text-gray-900 dark:text-gray-100">
-                  <a :href="`#${field.id}`">
+                  <a
+                    :href="`#${field.id}`"
+                    @click.prevent="highlightField(field.id as HistoryField)"
+                  >
                     <span class="flex items-center">
-                      <HashtagIcon class="mr-2 -ml-5 h-3 w-3 text-gray-500 opacity-0 hover:opacity-100" aria-hidden="true" />
+                      <HashtagIcon
+                        :class="[
+                          displayTags[field.id as HistoryField].show ? 'opacity-100' : 'opacity-0',
+                          'mr-2 -ml-5 h-3 w-3 text-gray-500 transition-opacity'
+                        ]"
+                        aria-hidden="true"
+                      />
                       {{ field.label }}
                     </span>
                   </a>

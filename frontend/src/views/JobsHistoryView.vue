@@ -7,7 +7,7 @@
 -->
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import { useGatewayAPI } from '@/composables/GatewayAPI'
 import type { JobHistoryRecord, JobHistoryFilters } from '@/composables/GatewayAPI'
 import ClusterMainLayout from '@/components/ClusterMainLayout.vue'
@@ -15,8 +15,11 @@ import LoadingSpinner from '@/components/LoadingSpinner.vue'
 import ErrorAlert from '@/components/ErrorAlert.vue'
 import InfoAlert from '@/components/InfoAlert.vue'
 import JobStatusBadge from '@/components/job/JobStatusBadge.vue'
+import JobsHistoryFiltersPanel from '@/components/jobs/JobsHistoryFiltersPanel.vue'
+import JobsHistoryFiltersBar from '@/components/jobs/JobsHistoryFiltersBar.vue'
 import { WindowIcon } from '@heroicons/vue/24/outline'
 import { ChevronLeftIcon, ChevronRightIcon } from '@heroicons/vue/20/solid'
+import { PlusSmallIcon } from '@heroicons/vue/24/outline'
 
 const props = defineProps<{ cluster: string }>()
 
@@ -28,6 +31,7 @@ const jobs = ref<JobHistoryRecord[]>([])
 const total = ref(0)
 const page = ref(1)
 const pageSize = 50
+const filtersOpen = ref(false)
 
 const filters = reactive<JobHistoryFilters>({
   user: '',
@@ -36,47 +40,25 @@ const filters = reactive<JobHistoryFilters>({
   qos: '',
   state: '',
   job_id: undefined,
+  start: '',
+  end: '',
   page: 1,
   page_size: pageSize
 })
 
-const hasActiveFilters = computed(
-  () => !!(filters.user || filters.account || filters.partition || filters.qos || filters.state || filters.job_id)
-)
-
-function clearFilters() {
-  filters.user = ''
-  filters.account = ''
-  filters.partition = ''
-  filters.qos = ''
-  filters.state = ''
-  filters.job_id = undefined
-  applyFilters()
-}
-
 async function fetchHistory() {
   loading.value = true
   error.value = null
-  console.log('[JobsHistory] 开始获取作业历史数据...')
-  console.log('[JobsHistory] 集群:', props.cluster)
-
   try {
     const f: JobHistoryFilters = { ...filters, page: page.value, page_size: pageSize }
-    Object.keys(f).forEach((k) => {
-      const key = k as keyof JobHistoryFilters
-      if (f[key] === '' || f[key] === undefined) delete f[key]
+    // strip empty values
+    ;(Object.keys(f) as (keyof JobHistoryFilters)[]).forEach((k) => {
+      if (f[k] === '' || f[k] === undefined) delete f[k]
     })
-
     const resp = await gateway.jobs_history(props.cluster, f)
-
-    console.log('[JobsHistory] ✅ 成功获取数据')
-    console.log('[JobsHistory] 返回记录数:', resp.jobs.length)
-    console.log('[JobsHistory] 总记录数:', resp.total)
-
     jobs.value = resp.jobs
     total.value = resp.total
   } catch (e: unknown) {
-    console.error('[JobsHistory] ❌ 获取数据失败:', e)
     error.value = e instanceof Error ? e.message : String(e)
   } finally {
     loading.value = false
@@ -106,18 +88,7 @@ function jobsPages(): { id: number; ellipsis: boolean }[] {
   return result
 }
 
-onMounted(() => {
-  console.log('='.repeat(60))
-  console.log('[JobsHistory] 📊 作业历史页面已挂载')
-  console.log('[JobsHistory] 功能说明: 此功能需要后端启用 persistence 配置')
-  console.log('[JobsHistory] 检查项:')
-  console.log('[JobsHistory]   1. /etc/slurm-web/agent.ini 中 [persistence] enabled = true')
-  console.log('[JobsHistory]   2. PostgreSQL 数据库已安装并配置')
-  console.log('[JobsHistory]   3. 数据库表 job_snapshots 已创建')
-  console.log('[JobsHistory]   4. Agent 服务已重启')
-  console.log('='.repeat(60))
-  fetchHistory()
-})
+onMounted(() => fetchHistory())
 </script>
 
 <template>
@@ -127,6 +98,15 @@ onMounted(() => {
     :breadcrumb="[{ title: 'Jobs History' }]"
   >
     <div>
+      <!-- Filters side panel -->
+      <JobsHistoryFiltersPanel
+        :open="filtersOpen"
+        :filters="filters"
+        :total="total"
+        @close="filtersOpen = false"
+        @search="applyFilters"
+      />
+
       <!-- Header -->
       <div class="mx-auto flex items-center justify-between">
         <div class="px-4 py-16 sm:px-6 lg:px-8">
@@ -146,58 +126,24 @@ onMounted(() => {
         </div>
       </div>
 
-      <!-- Filters bar — same style as JobsView -->
+      <!-- Filter toolbar — same layout as JobsView -->
       <section aria-labelledby="history-filter-heading" class="-mx-4 -my-2 sm:-mx-6 lg:-mx-8">
         <h2 id="history-filter-heading" class="sr-only">Filters</h2>
-        <div class="border-b border-gray-200 dark:border-gray-700 pb-4">
-          <div class="mx-auto flex flex-wrap items-center gap-2 px-4 sm:px-6 lg:px-8">
-            <input
-              v-model="filters.user"
-              placeholder="User"
-              class="rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-1.5 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-slurmweb"
-            />
-            <input
-              v-model="filters.account"
-              placeholder="Account"
-              class="rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-1.5 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-slurmweb"
-            />
-            <input
-              v-model="filters.partition"
-              placeholder="Partition"
-              class="rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-1.5 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-slurmweb"
-            />
-            <input
-              v-model="filters.qos"
-              placeholder="QOS"
-              class="rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-1.5 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-slurmweb"
-            />
-            <input
-              v-model="filters.state"
-              placeholder="State"
-              class="rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-1.5 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-slurmweb"
-            />
-            <input
-              v-model.number="filters.job_id"
-              type="number"
-              placeholder="Job ID"
-              min="1"
-              class="rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-1.5 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-slurmweb w-28"
-            />
+        <div class="border-gray-200 pb-4">
+          <div class="mx-auto flex items-center justify-between px-4 sm:px-6 lg:px-8">
+            <!-- left side: intentionally empty (no sorter for history) -->
+            <div />
             <button
+              type="button"
               class="bg-slurmweb dark:bg-slurmweb-verydark hover:bg-slurmweb-darker focus-visible:outline-slurmweb inline-flex items-center gap-x-1.5 rounded-md px-3 py-2 text-sm font-semibold text-white shadow-xs focus-visible:outline-2 focus-visible:outline-offset-2"
-              @click="applyFilters"
+              @click="filtersOpen = true"
             >
-              Search
-            </button>
-            <button
-              v-if="hasActiveFilters"
-              class="inline-flex items-center gap-x-1.5 rounded-md px-3 py-2 text-sm font-semibold text-gray-600 dark:text-gray-300 ring-1 ring-gray-300 dark:ring-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800"
-              @click="clearFilters"
-            >
-              Clear
+              <PlusSmallIcon class="-ml-0.5 h-5 w-5" aria-hidden="true" />
+              Add filters
             </button>
           </div>
         </div>
+        <JobsHistoryFiltersBar :filters="filters" @search="applyFilters" />
       </section>
 
       <!-- Content -->
@@ -243,7 +189,9 @@ onMounted(() => {
                     {{ job.user_name ?? '-' }} ({{ job.account ?? '-' }})
                   </td>
                   <td class="hidden px-3 py-4 whitespace-nowrap sm:table-cell">
-                    <span v-if="job.node_count">{{ job.node_count }} node{{ job.node_count > 1 ? 's' : '' }}</span>
+                    <span v-if="job.node_count"
+                      >{{ job.node_count }} node{{ job.node_count > 1 ? 's' : '' }}</span
+                    >
                     <span v-if="job.node_count && job.cpus">, </span>
                     <span v-if="job.cpus">{{ job.cpus }} CPU{{ job.cpus > 1 ? 's' : '' }}</span>
                     <span v-if="!job.node_count && !job.cpus">-</span>

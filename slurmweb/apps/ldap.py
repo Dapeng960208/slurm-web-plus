@@ -45,7 +45,10 @@ class SlurmwebAppLDAPCheck(SlurmwebGenericApp):
             bind_dn=self.settings.ldap.bind_dn,
             bind_password=bind_password,
             restricted_groups=self.settings.ldap.restricted_groups,
-            lookup_as_user=self.settings.ldap.lookup_as_user,
+            # ldap-check runs as service account, never as user context,
+            # so force lookup_as_user=False to avoid anonymous bind fallback
+            # which AD rejects with error 000004DC.
+            lookup_as_user=False,
         )
         try:
             users = self.authentifier.users(with_groups=True)

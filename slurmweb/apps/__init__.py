@@ -37,7 +37,7 @@ def load_ldap_password_from_file(bind_password_file: Optional[Path]) -> Optional
             f"LDAP bind password file path {bind_password_file} is not a file"
         )
     try:
-        bind_password = bind_password_file.read_text()
+        bind_password = bind_password_file.read_text().strip()
     except PermissionError as err:
         raise SlurmwebConfigurationError(
             f"Permission error to access bind password file {bind_password_file}"

@@ -476,6 +476,11 @@ class SlurmrestdFiltered(SlurmrestdAdapter):
     def jobs(self):
         return SlurmrestdFiltered.filter_fields(super().jobs(), self.filters.jobs)
 
+    def jobs_unfiltered(self):
+        """Return full job fields from slurmrestd, bypassing field filtering.
+        Used by the persistence layer to capture all fields needed for storage."""
+        return super().jobs()
+
     def _ctldjob(self, job_id: int, **kwargs):
         return SlurmrestdFiltered.filter_fields(
             super()._ctldjob(job_id, **kwargs), self.filters.ctldjob
