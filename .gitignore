@@ -8,3 +8,6 @@ generated-doc
 node_modules
 /frontend/dist
 /docs/man/*.1
+frontend/node_modules
+Slurm_web.egg-info
+
