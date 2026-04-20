@@ -521,3 +521,23 @@ Agent /node/<name>/metrics
 - `users` 与 `job_snapshots` 分表后，历史查询不再依赖实时 LDAP 查询
 - 数据库生命周期统一交由 Alembic 管理
 - 即使数据库不可用，也不影响 agent 其他功能继续提供服务
+### 4.9 历史详情字段富化
+
+历史详情页需要比历史列表更多的数据。`job_snapshots` 在基础快照字段之外新增以下可空字段：
+
+- `eligible_time`：作业进入 eligible 的时间。
+- `last_sched_evaluation_time`：最后一次调度评估时间，历史时间线的 scheduling 阶段优先使用该字段。
+- `tres_requested`：单作业详情中的 `tres.requested`，JSONB 保存。
+- `tres_allocated`：单作业详情中的 `tres.allocated`，JSONB 保存。
+- `used_memory_gb`：已完成作业的实际使用内存，来源于 `steps[*].tres.consumed.total` 的 memory TRES，按 `bytes / 1024^3` 转为 GB。
+
+数据来源分为两层：
+
+- 列表快照 `_extract()` 只保持轻量写入，额外提取 `eligible_time` 和 `last_sched_evaluation_time`，不从列表接口硬拼结构化资源。
+- 单作业详情 `_extract_detail()` 负责提取结构化 TRES、完整时间字段和已完成作业内存。
+
+富化策略：
+
+- 后台缺失活动作业对账时，如果当前列表没有某个非终态历史记录，先调用 `job(job_id)` 补查；补查成功则按真实详情 UPSERT，补查不到再兜底写 `COMPLETED`。
+- 历史详情接口返回前，如果记录缺少详情字段，会按需调用 `job(job_id)` 补查一次；只有 `(job_id, submit_time)` 与当前记录一致时才允许回写。
+- 运行中作业通常没有完整 `steps[*].tres.consumed.total`，因此 `used_memory_gb` 为 `null` 是正常结果。

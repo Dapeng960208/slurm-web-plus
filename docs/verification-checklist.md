@@ -339,3 +339,42 @@ ps aux | grep slurm-web-agent | grep -v grep
 - [ ] 历史查询响应时间 < 1 秒
 - [ ] 数据库写入不影响 agent 响应速度
 - [ ] Prometheus 查询不阻塞页面加载
+### 1.5 历史详情增强字段验证
+
+启用 persistence 后，确认历史详情接口仍返回 JSON，并包含本次新增字段：
+
+```bash
+curl -s -H "Authorization: Bearer $TOKEN" \
+  "http://localhost:5012/v${VERSION}/jobs/history/1" \
+  | python3 -m json.tool
+```
+
+返回体应包含：
+
+- `eligible_time`
+- `last_sched_evaluation_time`
+- `tres_requested`
+- `tres_allocated`
+- `used_memory_gb`
+
+数据库字段验证：
+
+```sql
+SELECT column_name, data_type
+FROM information_schema.columns
+WHERE table_name = 'job_snapshots'
+  AND column_name IN (
+    'eligible_time',
+    'last_sched_evaluation_time',
+    'tres_requested',
+    'tres_allocated',
+    'used_memory_gb'
+  )
+ORDER BY column_name;
+```
+
+前端历史详情页应显示：
+
+- 六段式时间线：Submitted、Eligible、Scheduling、Running、Completed、Terminated。
+- `Requested` 和 `Allocated` 资源块。
+- 已完成作业有完整 steps 数据时显示 `Used Memory`，运行中或缺失 steps 时显示 `-`。

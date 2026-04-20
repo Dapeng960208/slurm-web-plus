@@ -154,3 +154,58 @@ psql -h 127.0.0.1 -U slurmweb -d slurmweb -c "\d job_snapshots"
 - `alembic_version`
 - `users`
 - `job_snapshots`
+
+## 7. 20260420_0002 历史作业详情字段迁移
+
+本次变更新增 migration `20260420_0002_job_history_detail_fields.py`，用于补全历史作业详情页需要的时间线、结构化资源和已完成作业实际内存字段。
+
+新增字段如下：
+
+- `eligible_time TIMESTAMPTZ NULL`
+- `last_sched_evaluation_time TIMESTAMPTZ NULL`
+- `tres_requested JSONB NULL`
+- `tres_allocated JSONB NULL`
+- `used_memory_gb DOUBLE PRECISION NULL`
+
+生产环境仍然只执行已经随版本发布的 migration，不要在生产服务器执行 `alembic revision --autogenerate`。
+
+推荐升级步骤：
+
+1. 备份 PostgreSQL 数据库，例如 `pg_dump -Fc slurmweb > slurmweb-before-20260420_0002.dump`。
+2. 部署包含 `slurmweb/alembic/versions/20260420_0002_job_history_detail_fields.py` 的新版本。
+3. 确认 `/etc/slurm-web/agent.ini` 中 `[database]` 连接配置正确。
+4. 迁移期间停止 `slurm-web-agent`，或临时设置 `[persistence] enabled = no`，避免历史写入线程与 DDL 并发。
+5. 执行 `alembic current` 确认当前版本。
+6. 执行 `alembic upgrade head`。
+7. 再次执行 `alembic current`，确认版本到达 `20260420_0002` 或更新版本。
+8. 验证新增字段存在后重启 agent，并按需恢复 `[persistence] enabled = yes`。
+
+验证新增字段：
+
+```sql
+SELECT column_name, data_type
+FROM information_schema.columns
+WHERE table_name = 'job_snapshots'
+  AND column_name IN (
+    'eligible_time',
+    'last_sched_evaluation_time',
+    'tres_requested',
+    'tres_allocated',
+    'used_memory_gb'
+  )
+ORDER BY column_name;
+```
+
+分区表说明：
+
+- `job_snapshots` 使用 PostgreSQL declarative partition，新增列在父表执行。
+- PostgreSQL 会将父表新增列传播到现有分区。
+- 迁移后如果环境中有手工创建的异常分区，需用 `\d+ job_snapshots` 和 `\d+ job_snapshots_YYYY_MM` 确认字段一致。
+
+回滚：
+
+```bash
+alembic downgrade 20260420_0001
+```
+
+回滚前必须先停止 agent 或关闭 `[persistence]`。该 downgrade 会删除本次新增的 5 个字段，历史详情富化数据会丢失；原有基础历史字段不受影响。

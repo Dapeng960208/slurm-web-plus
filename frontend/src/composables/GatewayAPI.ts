@@ -692,9 +692,14 @@ export interface JobHistoryRecord {
   tres_per_node: string | null
   gres_detail: string | null
   submit_time: string | null
+  eligible_time: string | null
   start_time: string | null
   end_time: string | null
+  last_sched_evaluation_time: string | null
   time_limit_minutes: number | null
+  tres_requested: ClusterTRES[] | null
+  tres_allocated: ClusterTRES[] | null
+  used_memory_gb: number | null
   exit_code: string | null
   working_directory: string | null
   command: string | null

@@ -490,3 +490,47 @@ enabled = yes
 - 观察数据库容量、写入性能和日志
 
 这种方式更适合生产首发。
+## 16. 历史详情字段升级补充
+
+如果本次发布包含历史作业详情补全功能，还需要执行并验证 `20260420_0002` 迁移。该迁移会在 `job_snapshots` 上新增以下字段：
+
+- `eligible_time`
+- `last_sched_evaluation_time`
+- `tres_requested`
+- `tres_allocated`
+- `used_memory_gb`
+
+推荐生产升级顺序：
+
+1. 备份数据库。
+2. 停止 `slurm-web-agent`，或先将 `[persistence] enabled = no`。
+3. 执行 `alembic current`。
+4. 执行 `alembic upgrade head`。
+5. 执行下面的 SQL 验证新增字段。
+6. 重启 `slurm-web-agent`。
+7. 验证 `/jobs/history/<id>` 返回 JSON 且包含新增字段。
+8. 最后再恢复 `[persistence] enabled = yes`。
+
+验证 SQL：
+
+```sql
+SELECT column_name, data_type
+FROM information_schema.columns
+WHERE table_name = 'job_snapshots'
+  AND column_name IN (
+    'eligible_time',
+    'last_sched_evaluation_time',
+    'tres_requested',
+    'tres_allocated',
+    'used_memory_gb'
+  )
+ORDER BY column_name;
+```
+
+如果需要回滚本次 schema 变更：
+
+```bash
+alembic downgrade 20260420_0001
+```
+
+回滚前同样先停止 agent 或关闭 `[persistence]`。该回滚会删除本次新增字段，因此不建议在新代码仍在线时单独回滚数据库。

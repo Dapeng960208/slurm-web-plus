@@ -47,7 +47,9 @@ INSERT INTO job_snapshots (
     user_id, account, "group", partition, qos,
     nodes, node_count, cpus, priority,
     tres_req_str, tres_per_job, tres_per_node, gres_detail,
-    start_time, end_time, time_limit_minutes,
+    tres_requested, tres_allocated,
+    start_time, end_time, eligible_time, last_sched_evaluation_time,
+    time_limit_minutes, used_memory_gb,
     exit_code, working_directory, command
 ) VALUES %s
 ON CONFLICT (job_id, submit_time) DO UPDATE SET
@@ -60,6 +62,14 @@ ON CONFLICT (job_id, submit_time) DO UPDATE SET
     priority           = EXCLUDED.priority,
     start_time         = EXCLUDED.start_time,
     end_time           = EXCLUDED.end_time,
+    eligible_time      = COALESCE(EXCLUDED.eligible_time, job_snapshots.eligible_time),
+    last_sched_evaluation_time = COALESCE(
+        EXCLUDED.last_sched_evaluation_time,
+        job_snapshots.last_sched_evaluation_time
+    ),
+    tres_requested     = COALESCE(EXCLUDED.tres_requested, job_snapshots.tres_requested),
+    tres_allocated     = COALESCE(EXCLUDED.tres_allocated, job_snapshots.tres_allocated),
+    used_memory_gb     = COALESCE(EXCLUDED.used_memory_gb, job_snapshots.used_memory_gb),
     exit_code          = EXCLUDED.exit_code,
     gres_detail        = EXCLUDED.gres_detail,
     partition          = EXCLUDED.partition,
@@ -74,9 +84,10 @@ _ROW_TEMPLATE = (
     "(%(job_id)s, %(submit_time)s, NOW(), NOW(), %(job_name)s, %(job_state)s, "
     "%(state_reason)s, %(user_id)s, %(account)s, %(group)s, %(partition)s, %(qos)s, "
     "%(nodes)s, %(node_count)s, %(cpus)s, %(priority)s, %(tres_req_str)s, "
-    "%(tres_per_job)s, %(tres_per_node)s, %(gres_detail)s, %(start_time)s, "
-    "%(end_time)s, %(time_limit_minutes)s, %(exit_code)s, %(working_directory)s, "
-    "%(command)s)"
+    "%(tres_per_job)s, %(tres_per_node)s, %(gres_detail)s, %(tres_requested)s, "
+    "%(tres_allocated)s, %(start_time)s, %(end_time)s, %(eligible_time)s, "
+    "%(last_sched_evaluation_time)s, %(time_limit_minutes)s, %(used_memory_gb)s, "
+    "%(exit_code)s, %(working_directory)s, %(command)s)"
 )
 
 _SELECT_COLUMNS = """
@@ -102,9 +113,14 @@ js.tres_req_str,
 js.tres_per_job,
 js.tres_per_node,
 js.gres_detail,
+js.tres_requested,
+js.tres_allocated,
 js.start_time,
 js.end_time,
+js.eligible_time,
+js.last_sched_evaluation_time,
 js.time_limit_minutes,
+js.used_memory_gb,
 js.exit_code,
 js.working_directory,
 js.command
@@ -156,6 +172,19 @@ def _int_field(value):
         return None
 
 
+def _float_field(value):
+    if isinstance(value, dict):
+        if not value.get("set", True):
+            return None
+        if value.get("infinite", False):
+            return None
+        value = value.get("number")
+    try:
+        return float(value) if value is not None else None
+    except (TypeError, ValueError):
+        return None
+
+
 def _state_values(value) -> list:
     state_str = _state_str(value)
     if state_str is None:
@@ -194,6 +223,50 @@ def _ts(value):
         return None
 
 
+def _tres_json(value):
+    return value if isinstance(value, list) else None
+
+
+def _time_value(time_data, key: str, fallback_value=None):
+    if isinstance(time_data, dict):
+        return time_data.get(key, fallback_value)
+    return fallback_value
+
+
+def _used_memory_gb(job: dict, job_state) -> Optional[float]:
+    if not _is_terminal_state(job_state):
+        return None
+
+    steps = job.get("steps")
+    if not isinstance(steps, list):
+        return None
+
+    for step in reversed(steps):
+        if not isinstance(step, dict):
+            continue
+        tres = step.get("tres")
+        consumed = tres.get("consumed") if isinstance(tres, dict) else None
+        total = consumed.get("total") if isinstance(consumed, dict) else None
+        if not isinstance(total, list) or not total:
+            continue
+
+        candidates = [
+            item
+            for item in total
+            if isinstance(item, dict)
+            and (item.get("type") == "mem" or item.get("id") == 2)
+        ]
+        if not candidates and len(total) > 1 and isinstance(total[1], dict):
+            candidates = [total[1]]
+
+        for item in candidates:
+            count = _float_field(item.get("count"))
+            if count is not None:
+                return round(count / 1024**3, 2)
+
+    return None
+
+
 def _extract(job: dict) -> dict:
     """Extract and normalize fields from a raw slurmrestd job dict."""
     return {
@@ -215,10 +288,15 @@ def _extract(job: dict) -> dict:
         "tres_per_job": _tres_str(job.get("tres_per_job")),
         "tres_per_node": _tres_str(job.get("tres_per_node")),
         "gres_detail": _gres_str(job.get("gres_detail")),
+        "tres_requested": None,
+        "tres_allocated": None,
         "submit_time": _ts(job.get("submit_time")),
         "start_time": _ts(job.get("start_time")),
         "end_time": _ts(job.get("end_time")),
+        "eligible_time": _ts(job.get("eligible_time")),
+        "last_sched_evaluation_time": _ts(job.get("last_sched_evaluation")),
         "time_limit_minutes": _int_field(job.get("time_limit")),
+        "used_memory_gb": None,
         "exit_code": _exit_str(job.get("exit_code")),
         "working_directory": job.get("current_working_directory"),
         "command": job.get("command"),
@@ -231,20 +309,24 @@ def _extract_detail(job: dict, fallback: Optional[dict] = None) -> dict:
     association = job.get("association", {})
     state = job.get("state", {})
     time_data = job.get("time", {})
+    tres = job.get("tres", {})
+    job_state = _state_str(
+        state.get("current", job.get("job_state"))
+        if isinstance(state, dict)
+        else job.get("job_state")
+    ) or fallback.get("job_state")
 
     row = {
         "job_id": job.get("job_id", fallback.get("job_id")),
         "job_name": job.get("name", fallback.get("job_name")),
-        "job_state": _state_str(
-            state.get("current", job.get("job_state")) if isinstance(state, dict) else job.get("job_state")
-        )
-        or fallback.get("job_state"),
+        "job_state": job_state,
         "state_reason": (
             state.get("reason") if isinstance(state, dict) else job.get("state_reason")
         )
         or fallback.get("state_reason"),
         "user_name": job.get("user")
         or job.get("user_name")
+        or (association.get("user") if isinstance(association, dict) else None)
         or fallback.get("user_name"),
         "user_id": fallback.get("user_id"),
         "account": association.get("account", job.get("account"))
@@ -264,17 +346,28 @@ def _extract_detail(job: dict, fallback: Optional[dict] = None) -> dict:
         "tres_per_node": _tres_str(job.get("tres_per_node")),
         "gres_detail": _gres_str(job.get("gres_detail")),
         "submit_time": _ts(
-            time_data.get("submission") if isinstance(time_data, dict) else job.get("submit_time")
+            _time_value(time_data, "submission", job.get("submit_time"))
         ),
         "start_time": _ts(
-            time_data.get("start") if isinstance(time_data, dict) else job.get("start_time")
+            _time_value(time_data, "start", job.get("start_time"))
         ),
         "end_time": _ts(
-            time_data.get("end") if isinstance(time_data, dict) else job.get("end_time")
+            _time_value(time_data, "end", job.get("end_time"))
+        ),
+        "eligible_time": _ts(
+            _time_value(time_data, "eligible", job.get("eligible_time"))
+        ),
+        "last_sched_evaluation_time": _ts(job.get("last_sched_evaluation")),
+        "tres_requested": _tres_json(
+            tres.get("requested") if isinstance(tres, dict) else None
+        ),
+        "tres_allocated": _tres_json(
+            tres.get("allocated") if isinstance(tres, dict) else None
         ),
         "time_limit_minutes": _int_field(
-            time_data.get("limit") if isinstance(time_data, dict) else job.get("time_limit")
+            _time_value(time_data, "limit", job.get("time_limit"))
         ),
+        "used_memory_gb": _used_memory_gb(job, job_state),
         "exit_code": _exit_str(job.get("exit_code") or job.get("derived_exit_code")),
         "working_directory": job.get("current_working_directory")
         or job.get("working_directory")
@@ -296,6 +389,11 @@ def _extract_detail(job: dict, fallback: Optional[dict] = None) -> dict:
         "tres_per_job",
         "tres_per_node",
         "gres_detail",
+        "eligible_time",
+        "last_sched_evaluation_time",
+        "tres_requested",
+        "tres_allocated",
+        "used_memory_gb",
         "time_limit_minutes",
     ):
         if row[key] is None:
@@ -320,6 +418,16 @@ def _serialize_datetimes(row: dict) -> dict:
     for key, value in data.items():
         if isinstance(value, datetime):
             data[key] = value.isoformat()
+    return data
+
+
+def _prepare_db_row(row: dict) -> dict:
+    from psycopg2.extras import Json
+
+    data = dict(row)
+    for key in ("tres_requested", "tres_allocated"):
+        if data.get(key) is not None:
+            data[key] = Json(data[key])
     return data
 
 
@@ -428,7 +536,7 @@ class JobsStore:
             "jobs": [_serialize_datetimes(row) for row in rows],
         }
 
-    def get_by_id(self, record_id: int) -> Optional[dict]:
+    def get_by_id(self, record_id: int, enrich: bool = True) -> Optional[dict]:
         import psycopg2.extras
 
         conn = self._get_conn()
@@ -448,6 +556,10 @@ class JobsStore:
 
         if row is None:
             return None
+        if enrich:
+            enriched = self._maybe_enrich_record(row)
+            if enriched is not None:
+                row = enriched
         return _serialize_datetimes(row)
 
     def _init_pool(self):
@@ -610,6 +722,53 @@ class JobsStore:
 
         return row
 
+    def _needs_detail_enrichment(self, record: dict) -> bool:
+        detail_fields = (
+            "eligible_time",
+            "last_sched_evaluation_time",
+            "tres_requested",
+            "tres_allocated",
+        )
+        if any(record.get(field) is None for field in detail_fields):
+            return True
+        return (
+            record.get("job_state") is not None
+            and "COMPLETED" in _state_values(record.get("job_state"))
+            and record.get("used_memory_gb") is None
+        )
+
+    def _maybe_enrich_record(self, record: dict) -> Optional[dict]:
+        if self._slurmrestd is None or not self._needs_detail_enrichment(record):
+            return None
+
+        try:
+            job = self._slurmrestd.job(record["job_id"])
+        except Exception as err:
+            if not _is_not_found_error(err):
+                logger.warning(
+                    "Unable to enrich history record %s for job %s: %s",
+                    record.get("id"),
+                    record.get("job_id"),
+                    err,
+                )
+            return None
+
+        row = _extract_detail(job, record)
+        if not row.get("job_id") or not row.get("submit_time"):
+            return None
+
+        if row.get("submit_time") != record.get("submit_time"):
+            logger.warning(
+                "Ignoring history detail enrichment for job %s due to submit_time mismatch",
+                record.get("job_id"),
+            )
+            return None
+
+        if self._flush_chunk([row]):
+            return None
+
+        return self.get_by_id(record["id"], enrich=False)
+
     def _complete_missing_job(self, record: dict, observed_at: datetime) -> dict:
         return {
             "job_id": record.get("job_id"),
@@ -631,10 +790,15 @@ class JobsStore:
             "tres_per_job": record.get("tres_per_job"),
             "tres_per_node": record.get("tres_per_node"),
             "gres_detail": record.get("gres_detail"),
+            "tres_requested": record.get("tres_requested"),
+            "tres_allocated": record.get("tres_allocated"),
             "submit_time": record.get("submit_time"),
             "start_time": record.get("start_time"),
             "end_time": record.get("end_time") or observed_at,
+            "eligible_time": record.get("eligible_time"),
+            "last_sched_evaluation_time": record.get("last_sched_evaluation_time"),
             "time_limit_minutes": record.get("time_limit_minutes"),
+            "used_memory_gb": record.get("used_memory_gb"),
             "exit_code": record.get("exit_code"),
             "working_directory": record.get("working_directory"),
             "command": record.get("command"),
@@ -742,13 +906,14 @@ class JobsStore:
         conn = self._get_conn()
         try:
             self._ensure_users(conn, chunk)
+            db_chunk = [_prepare_db_row(row) for row in chunk]
             with conn.cursor() as cur:
                 execute_values(
                     cur,
                     _UPSERT_SQL,
-                    chunk,
+                    db_chunk,
                     template=_ROW_TEMPLATE,
-                    page_size=len(chunk),
+                    page_size=len(db_chunk),
                 )
             conn.commit()
             return []
@@ -767,11 +932,12 @@ class JobsStore:
             for row in chunk:
                 try:
                     self._ensure_users(conn, [row])
+                    db_row = _prepare_db_row(row)
                     with conn.cursor() as cur:
                         execute_values(
                             cur,
                             _UPSERT_SQL,
-                            [row],
+                            [db_row],
                             template=_ROW_TEMPLATE,
                             page_size=1,
                         )

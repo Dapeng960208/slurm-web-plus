@@ -7,14 +7,15 @@
 -->
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { useGatewayAPI } from '@/composables/GatewayAPI'
-import type { JobHistoryRecord } from '@/composables/GatewayAPI'
+import type { ClusterTRES, JobHistoryRecord } from '@/composables/GatewayAPI'
 import { splitJobHistoryState } from '@/composables/GatewayAPI'
 import ClusterMainLayout from '@/components/ClusterMainLayout.vue'
 import JobStatusBadge from '@/components/job/JobStatusBadge.vue'
 import JobBackButton from '@/components/job/JobBackButton.vue'
+import JobResources from '@/components/job/JobResources.vue'
 import ErrorAlert from '@/components/ErrorAlert.vue'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
 import { HashtagIcon } from '@heroicons/vue/24/outline'
@@ -30,16 +31,45 @@ const job = ref<JobHistoryRecord | null>(null)
 
 type HistoryField =
   | 'job-id' | 'name' | 'state-reason' | 'user' | 'group' | 'account'
-  | 'partition' | 'qos' | 'priority' | 'nodes' | 'resources'
-  | 'tres-per-job' | 'tres-per-node' | 'gres' | 'time-limit' | 'exit-code'
-  | 'workdir' | 'command' | 'submit-time' | 'start-time' | 'end-time' | 'snapshot-time'
+  | 'partition' | 'qos' | 'priority' | 'nodes' | 'resources' | 'requested'
+  | 'allocated' | 'used-memory' | 'tres-per-job' | 'tres-per-node' | 'gres'
+  | 'time-limit' | 'exit-code' | 'workdir' | 'command' | 'submit-time'
+  | 'eligible-time' | 'start-time' | 'last-sched-evaluation-time' | 'end-time'
+  | 'snapshot-time'
 
 const ALL_FIELDS: HistoryField[] = [
   'job-id', 'name', 'state-reason', 'user', 'group', 'account',
-  'partition', 'qos', 'priority', 'nodes', 'resources',
-  'tres-per-job', 'tres-per-node', 'gres', 'time-limit', 'exit-code',
-  'workdir', 'command', 'submit-time', 'start-time', 'end-time', 'snapshot-time'
+  'partition', 'qos', 'priority', 'nodes', 'resources', 'requested',
+  'allocated', 'used-memory', 'tres-per-job', 'tres-per-node', 'gres',
+  'time-limit', 'exit-code', 'workdir', 'command', 'submit-time',
+  'eligible-time', 'start-time', 'last-sched-evaluation-time', 'end-time',
+  'snapshot-time'
 ]
+
+type TimelineStep = {
+  id: string
+  label: string
+  reached: boolean
+  time: string | null
+}
+
+type HistoryTextField = {
+  id: HistoryField
+  kind: 'text'
+  label: string
+  value: string
+  monospace?: boolean
+}
+
+type HistoryResourceField = {
+  id: HistoryField
+  kind: 'resource'
+  label: string
+  tres: ClusterTRES[] | null
+  gpu: { count: number; reliable: boolean }
+}
+
+type HistoryFieldRow = HistoryTextField | HistoryResourceField
 
 const displayTags = ref<Record<HistoryField, { show: boolean; highlight: boolean }>>(
   Object.fromEntries(ALL_FIELDS.map((f) => [f, { show: false, highlight: false }])) as Record<
@@ -53,6 +83,24 @@ function highlightField(field: HistoryField) {
   setTimeout(() => {
     displayTags.value[field].highlight = false
   }, 2000)
+}
+
+function textField(
+  id: HistoryField,
+  label: string,
+  value: string,
+  monospace = false
+): HistoryTextField {
+  return { id, kind: 'text', label, value, monospace }
+}
+
+function resourceField(
+  id: HistoryField,
+  label: string,
+  tres: ClusterTRES[] | null,
+  gpu: { count: number; reliable: boolean }
+): HistoryResourceField {
+  return { id, kind: 'resource', label, tres, gpu }
 }
 
 function fmt(v: string | null | undefined) {
@@ -75,60 +123,117 @@ function hasValue(value: number | null | undefined) {
   return value !== null && value !== undefined
 }
 
-/** Build a simple timeline from the history record timestamps */
-function timelineSteps(j: JobHistoryRecord) {
-  const steps = [
-    { label: 'Submitted', time: j.submit_time },
-    { label: 'Started', time: j.start_time },
-    { label: 'Terminated', time: j.end_time }
-  ]
-  const now = new Date()
-  let reached = 0
-  for (let i = 0; i < steps.length; i++) {
-    if (steps[i].time && new Date(steps[i].time as string) <= now) reached = i + 1
+function countGPUTRESRequest(tresRequest: string): number {
+  let total = 0
+  for (const rawTres of tresRequest.split(',')) {
+    let tres = rawTres.split('(')[0]
+    tres = tres.replace('=', ':')
+    const items = tres.split(':')
+    if (!['gpu', 'gres/gpu'].includes(items[0])) continue
+    const count = items.length === 2 ? parseInt(items[1]) : parseInt(items[2])
+    if (!Number.isNaN(count)) total += count
   }
-  return { steps, reached }
+  return total
 }
 
-const fields = (j: JobHistoryRecord) => [
-  { id: 'job-id', label: 'Job ID', value: String(j.job_id) },
-  { id: 'name', label: 'Name', value: fmt(j.job_name) },
-  { id: 'state-reason', label: 'State Reason', value: fmt(j.state_reason) },
-  { id: 'user', label: 'User', value: fmt(j.user_name) },
-  { id: 'group', label: 'Group', value: fmt(j.group) },
-  { id: 'account', label: 'Account', value: fmt(j.account) },
-  { id: 'partition', label: 'Partition', value: fmt(j.partition) },
-  { id: 'qos', label: 'QOS', value: fmt(j.qos) },
-  { id: 'priority', label: 'Priority', value: j.priority != null ? String(j.priority) : '-' },
-  { id: 'nodes', label: 'Nodes', value: fmt(j.nodes) },
-  {
-    id: 'resources',
-    label: 'Resources',
-    value: [
+function historyRequestedGPU(j: JobHistoryRecord): { count: number; reliable: boolean } {
+  if (j.tres_per_job) {
+    return { count: countGPUTRESRequest(j.tres_per_job), reliable: true }
+  }
+  if (j.tres_per_node && hasValue(j.node_count)) {
+    return { count: countGPUTRESRequest(j.tres_per_node) * (j.node_count ?? 0), reliable: true }
+  }
+  return { count: 0, reliable: true }
+}
+
+function historyAllocatedGPU(j: JobHistoryRecord): { count: number; reliable: boolean } {
+  if (!j.gres_detail) return { count: 0, reliable: true }
+  return { count: countGPUTRESRequest(j.gres_detail), reliable: true }
+}
+
+function fmtMemoryGB(value: number | null | undefined) {
+  if (value == null) return '-'
+  return `${value.toFixed(2)} GB`
+}
+
+function timelineSteps(j: JobHistoryRecord): TimelineStep[] {
+  const states = splitJobHistoryState(j.job_state)
+  const completed = states.includes('COMPLETED')
+  const terminated = !completed && j.end_time !== null
+  return [
+    { id: 'submitted', label: 'Submitted', time: j.submit_time, reached: !!j.submit_time },
+    { id: 'eligible', label: 'Eligible', time: j.eligible_time, reached: !!j.eligible_time },
+    {
+      id: 'scheduling',
+      label: 'Scheduling',
+      time: j.last_sched_evaluation_time ?? j.start_time,
+      reached: !!(j.last_sched_evaluation_time ?? j.start_time)
+    },
+    { id: 'running', label: 'Running', time: j.start_time, reached: !!j.start_time },
+    {
+      id: 'completed',
+      label: 'Completed',
+      time: completed ? j.end_time : null,
+      reached: completed && !!j.end_time
+    },
+    {
+      id: 'terminated',
+      label: 'Terminated',
+      time: terminated ? j.end_time : null,
+      reached: terminated && !!j.end_time
+    }
+  ]
+}
+
+const fields = (j: JobHistoryRecord): HistoryFieldRow[] => [
+  textField('job-id', 'Job ID', String(j.job_id)),
+  textField('name', 'Name', fmt(j.job_name)),
+  textField('state-reason', 'State Reason', fmt(j.state_reason)),
+  textField('user', 'User', fmt(j.user_name)),
+  textField('group', 'Group', fmt(j.group)),
+  textField('account', 'Account', fmt(j.account)),
+  textField('partition', 'Partition', fmt(j.partition)),
+  textField('qos', 'QOS', fmt(j.qos)),
+  textField('priority', 'Priority', j.priority != null ? String(j.priority) : '-'),
+  textField('nodes', 'Nodes', fmt(j.nodes)),
+  textField(
+    'resources',
+    'Resources',
+    [
       hasValue(j.node_count) ? `${j.node_count} node${j.node_count > 1 ? 's' : ''}` : null,
       hasValue(j.cpus) ? `${j.cpus} CPU${j.cpus > 1 ? 's' : ''}` : null,
       j.tres_req_str ?? null
     ]
       .filter(Boolean)
       .join(', ') || '-'
-  },
-  { id: 'tres-per-job', label: 'TRES/Job', value: fmt(j.tres_per_job) },
-  { id: 'tres-per-node', label: 'TRES/Node', value: fmt(j.tres_per_node) },
-  { id: 'gres', label: 'GRES', value: fmt(j.gres_detail) },
-  { id: 'time-limit', label: 'Time Limit', value: fmtDuration(j.time_limit_minutes) },
-  { id: 'exit-code', label: 'Exit Code', value: fmt(j.exit_code) },
-  { id: 'workdir', label: 'Working Directory', value: fmt(j.working_directory), monospace: true },
-  { id: 'command', label: 'Command', value: fmt(j.command), monospace: true },
-  { id: 'submit-time', label: 'Submit Time', value: fmtTime(j.submit_time) },
-  { id: 'start-time', label: 'Start Time', value: fmtTime(j.start_time) },
-  { id: 'end-time', label: 'End Time', value: fmtTime(j.end_time) },
-  { id: 'snapshot-time', label: 'Snapshot Time', value: fmtTime(j.snapshot_time) }
+  ),
+  resourceField('requested', 'Requested', j.tres_requested, historyRequestedGPU(j)),
+  resourceField('allocated', 'Allocated', j.tres_allocated, historyAllocatedGPU(j)),
+  textField('used-memory', 'Used Memory', fmtMemoryGB(j.used_memory_gb)),
+  textField('tres-per-job', 'TRES/Job', fmt(j.tres_per_job)),
+  textField('tres-per-node', 'TRES/Node', fmt(j.tres_per_node)),
+  textField('gres', 'GRES', fmt(j.gres_detail)),
+  textField('time-limit', 'Time Limit', fmtDuration(j.time_limit_minutes)),
+  textField('exit-code', 'Exit Code', fmt(j.exit_code)),
+  textField('workdir', 'Working Directory', fmt(j.working_directory), true),
+  textField('command', 'Command', fmt(j.command), true),
+  textField('submit-time', 'Submit Time', fmtTime(j.submit_time)),
+  textField('eligible-time', 'Eligible Time', fmtTime(j.eligible_time)),
+  textField('start-time', 'Start Time', fmtTime(j.start_time)),
+  textField(
+    'last-sched-evaluation-time',
+    'Last Scheduling Time',
+    fmtTime(j.last_sched_evaluation_time)
+  ),
+  textField('end-time', 'End Time', fmtTime(j.end_time)),
+  textField('snapshot-time', 'Snapshot Time', fmtTime(j.snapshot_time))
 ]
+
+const timeline = computed(() => (job.value ? timelineSteps(job.value) : []))
 
 onMounted(async () => {
   try {
     job.value = await gateway.job_history_detail(props.cluster, props.id)
-    /* If a field id is in route hash, highlight it after load */
     if (route.hash) {
       const field = route.hash.slice(1) as HistoryField
       if (ALL_FIELDS.includes(field)) {
@@ -158,11 +263,10 @@ onMounted(async () => {
 
     <div v-else-if="loading" class="text-gray-400 sm:pl-6 lg:pl-8">
       <LoadingSpinner :size="5" />
-      Loading job history record {{ id }}…
+      Loading job history record {{ id }}...
     </div>
 
     <div v-else-if="job">
-      <!-- Title row -->
       <div class="flex justify-between">
         <div class="px-4 pb-8 sm:px-0">
           <h3 class="text-base leading-7 font-semibold text-gray-900 dark:text-gray-100">
@@ -178,27 +282,24 @@ onMounted(async () => {
       </div>
 
       <div class="flex flex-wrap">
-        <!-- Timeline (left column) -->
         <div class="w-full lg:w-1/3">
           <ol role="list" class="overflow-hidden">
             <li
-              v-for="(step, idx) in timelineSteps(job).steps"
-              :key="step.label"
-              :class="[idx !== timelineSteps(job).steps.length - 1 ? 'pb-10' : '', 'relative']"
+              v-for="(step, idx) in timeline"
+              :key="step.id"
+              :class="[idx !== timeline.length - 1 ? 'pb-10' : '', 'relative']"
             >
-              <!-- connector line -->
               <div
-                v-if="idx !== timelineSteps(job).steps.length - 1"
+                v-if="idx !== timeline.length - 1"
                 :class="[
-                  idx < timelineSteps(job).reached
+                  step.reached
                     ? 'bg-slurmweb dark:bg-slurmweb-dark'
                     : 'bg-gray-300 dark:bg-gray-700',
                   'absolute top-4 left-4 mt-0.5 -ml-px h-full w-0.5'
                 ]"
                 aria-hidden="true"
               />
-              <!-- completed step -->
-              <template v-if="idx < timelineSteps(job).reached">
+              <template v-if="step.reached">
                 <div class="group relative flex items-start">
                   <span class="flex h-9 items-center">
                     <span
@@ -217,7 +318,6 @@ onMounted(async () => {
                   </span>
                 </div>
               </template>
-              <!-- future step -->
               <template v-else>
                 <div class="group relative flex items-start">
                   <span class="flex h-9 items-center" aria-hidden="true">
@@ -239,7 +339,6 @@ onMounted(async () => {
           </ol>
         </div>
 
-        <!-- Fields (right column) -->
         <div class="w-full lg:w-2/3">
           <div class="border-t border-gray-100 dark:border-gray-700">
             <dl class="divide-y divide-gray-100 dark:divide-gray-700">
@@ -273,7 +372,19 @@ onMounted(async () => {
                     </span>
                   </a>
                 </dt>
+                <JobResources
+                  v-if="field.kind === 'resource' && field.tres && field.tres.length > 0"
+                  :tres="field.tres"
+                  :gpu="field.gpu"
+                />
                 <dd
+                  v-else-if="field.kind === 'resource'"
+                  class="mt-1 text-sm leading-6 text-gray-700 sm:col-span-2 sm:mt-0 dark:text-gray-300"
+                >
+                  -
+                </dd>
+                <dd
+                  v-else
                   :class="[
                     field.monospace ? 'font-mono text-xs break-all' : 'text-sm',
                     'mt-1 leading-6 text-gray-700 sm:col-span-2 sm:mt-0 dark:text-gray-300'
