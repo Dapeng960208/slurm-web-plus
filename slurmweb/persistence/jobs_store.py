@@ -245,8 +245,12 @@ def _used_memory_gb(job: dict, job_state) -> Optional[float]:
         if not isinstance(step, dict):
             return None
         tres = step.get("tres")
-        consumed = tres.get("consumed") if isinstance(tres, dict) else None
-        total = consumed.get("total") if isinstance(consumed, dict) else None
+        if not isinstance(tres, dict):
+            return None
+        consumed = tres.get("consumed")
+        if not isinstance(consumed, dict):
+            return None
+        total = consumed.get("total")
 
         if isinstance(total, dict):
             return _float_field(total.get("count"))
@@ -254,34 +258,34 @@ def _used_memory_gb(job: dict, job_state) -> Optional[float]:
         if not isinstance(total, list) or not total:
             return None
 
-        candidates = [
-            item
-            for item in total
-            if isinstance(item, dict)
-            and (item.get("type") == "mem" or item.get("id") == 2)
-        ]
-        if not candidates and len(total) > 1 and isinstance(total[1], dict):
-            candidates = [total[1]]
+        if len(total) == 2 and isinstance(total[1], dict):
+            return _float_field(total[1].get("count"))
 
-        for item in candidates:
+        for item in total:
+            if not isinstance(item, dict):
+                continue
+            if item.get("type") != "mem" and item.get("id") != 2:
+                continue
             count = _float_field(item.get("count"))
             if count is not None:
                 return count
         return None
 
-    counts = []
+    max_count = None
     for index in (1, 2):
-        if len(steps) <= index:
+        if index >= len(steps):
             continue
         count = _step_memory_kb(steps[index])
-        if count is not None:
-            counts.append(count)
+        if count is None:
+            continue
+        if max_count is None or count > max_count:
+            max_count = count
 
-    if not counts:
+    if max_count is None:
         return None
 
     # Slurm reports consumed memory here in KB; persist GB.
-    return round(max(counts) / 1024**2, 2)
+    return round(max_count / 1024**2, 2)
 
 
 def _extract(job: dict) -> dict:
