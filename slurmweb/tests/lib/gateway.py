@@ -64,6 +64,7 @@ def fake_slurmweb_agent(cluster: str):
         ),
         metrics=True,
         cache=True,
+        database=True,
         url=f"http://{cluster}",
     )
 

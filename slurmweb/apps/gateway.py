@@ -50,6 +50,7 @@ class SlurmwebAgent:
         racksdb: SlurmwebAgentRacksDBSettings,
         metrics: bool,
         cache: bool,
+        database: bool,
         url: str,
         persistence: bool = False,
         node_metrics: bool = False,
@@ -60,6 +61,7 @@ class SlurmwebAgent:
         self.cache = cache
         self.racksdb = racksdb
         self.url = url
+        self.database = database
         self.persistence = persistence
         self.node_metrics = node_metrics
 
@@ -72,6 +74,7 @@ class SlurmwebAgent:
                 SlurmwebAgentRacksDBSettings(**data["racksdb"]),
                 data["metrics"],
                 data["cache"],
+                data["database"],
                 url,
                 persistence=data.get("persistence", False),
                 node_metrics=data.get("node_metrics", False),
@@ -127,6 +130,7 @@ class SlurmwebAppGateway(SlurmwebWebApp, RFLTokenizedWebApp):
         SlurmwebAppRoute(
             "/api/agents/<cluster>/cache/reset", views.cache_reset, methods=["POST"]
         ),
+        SlurmwebAppRoute("/api/agents/<cluster>/users/cache", views.ldap_cache_users),
         SlurmwebAppRoute("/api/agents/<cluster>/jobs", views.jobs),
         SlurmwebAppRoute("/api/agents/<cluster>/job/<int:job>", views.job),
         SlurmwebAppRoute("/api/agents/<cluster>/nodes", views.nodes),

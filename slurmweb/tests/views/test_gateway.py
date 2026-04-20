@@ -169,6 +169,26 @@ class TestGatewayViews(TestGatewayBase):
         self.assertEqual(mock_proxy_agent.call_args.args[:2], ("foo", "jobs/history/12"))
         self.assertTrue(mock_proxy_agent.call_args.args[2])
 
+    @mock.patch("slurmweb.views.gateway.proxy_agent")
+    def test_ldap_cache_users(self, mock_proxy_agent):
+        self.app_set_agents({"foo": fake_slurmweb_agent("foo")})
+        mock_proxy_agent.return_value = (
+            self.app.response_class(
+                response='[{"username": "alice", "fullname": "Alice Doe"}]',
+                status=200,
+                mimetype="application/json",
+            ),
+            200,
+        )
+        response = self.client.get("/api/agents/foo/users/cache")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.json, [{"username": "alice", "fullname": "Alice Doe"}]
+        )
+        mock_proxy_agent.assert_called_once()
+        self.assertEqual(mock_proxy_agent.call_args.args[:2], ("foo", "users/cache"))
+        self.assertTrue(mock_proxy_agent.call_args.args[2])
+
     @mock.patch("slurmweb.views.gateway.aiohttp.ClientSession.post")
     def test_cache_reset(self, mock_post):
         self.app_set_agents({"foo": fake_slurmweb_agent("foo")})

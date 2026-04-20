@@ -7,10 +7,19 @@
 -->
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import type { LocationQueryRaw } from 'vue-router'
+import { storeToRefs } from 'pinia'
 import { useGatewayAPI } from '@/composables/GatewayAPI'
-import type { JobHistoryRecord, JobHistoryFilters } from '@/composables/GatewayAPI'
+import type {
+  JobHistoryRecord,
+  JobHistoryFilters,
+  JobHistorySortCriterion,
+  JobHistorySortOrder
+} from '@/composables/GatewayAPI'
 import { splitJobHistoryState } from '@/composables/GatewayAPI'
+import { useRuntimeStore } from '@/stores/runtime'
 import ClusterMainLayout from '@/components/ClusterMainLayout.vue'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
 import ErrorAlert from '@/components/ErrorAlert.vue'
@@ -19,6 +28,7 @@ import JobStatusBadge from '@/components/job/JobStatusBadge.vue'
 import JobHistoryResources from '@/components/jobs/JobHistoryResources.vue'
 import JobsHistoryFiltersPanel from '@/components/jobs/JobsHistoryFiltersPanel.vue'
 import JobsHistoryFiltersBar from '@/components/jobs/JobsHistoryFiltersBar.vue'
+import JobsHistorySorter from '@/components/jobs/JobsHistorySorter.vue'
 import { WindowIcon } from '@heroicons/vue/24/outline'
 import { ChevronLeftIcon, ChevronRightIcon } from '@heroicons/vue/20/solid'
 import { PlusSmallIcon } from '@heroicons/vue/24/outline'
@@ -26,33 +36,30 @@ import { PlusSmallIcon } from '@heroicons/vue/24/outline'
 const props = defineProps<{ cluster: string }>()
 
 const gateway = useGatewayAPI()
+const router = useRouter()
+const route = useRoute()
+const runtimeStore = useRuntimeStore()
+const historyStore = runtimeStore.jobsHistory
+const { filters, page, sort, order } = storeToRefs(historyStore)
 
 const loading = ref(false)
 const error = ref<string | null>(null)
 const jobs = ref<JobHistoryRecord[]>([])
 const total = ref(0)
-const page = ref(1)
 const pageSize = 50
 const filtersOpen = ref(false)
-
-const filters = reactive<JobHistoryFilters>({
-  user: '',
-  account: '',
-  partition: '',
-  qos: '',
-  state: '',
-  job_id: undefined,
-  start: '',
-  end: '',
-  page: 1,
-  page_size: pageSize
-})
 
 async function fetchHistory() {
   loading.value = true
   error.value = null
   try {
-    const f: JobHistoryFilters = { ...filters, page: page.value, page_size: pageSize }
+    const f: JobHistoryFilters = {
+      ...filters.value,
+      page: page.value,
+      page_size: pageSize,
+      sort: sort.value,
+      order: order.value
+    }
     // strip empty values
     ;(Object.keys(f) as (keyof JobHistoryFilters)[]).forEach((k) => {
       if (f[k] === '' || f[k] === undefined) delete f[k]
@@ -69,7 +76,22 @@ async function fetchHistory() {
 
 function applyFilters() {
   page.value = 1
-  fetchHistory()
+  updateQueryParameters()
+}
+
+function updateQueryParameters() {
+  router.push({
+    name: 'jobs-history',
+    params: { cluster: props.cluster },
+    query: historyStore.query() as LocationQueryRaw
+  })
+}
+
+function sortHistory(newSort?: JobHistorySortCriterion, newOrder?: JobHistorySortOrder) {
+  if (newSort) sort.value = newSort
+  if (newOrder) order.value = newOrder
+  page.value = 1
+  updateQueryParameters()
 }
 
 const lastpage = () => Math.max(Math.ceil(total.value / pageSize), 1)
@@ -96,7 +118,21 @@ function jobsPages(): { id: number; ellipsis: boolean }[] {
   return result
 }
 
-onMounted(() => fetchHistory())
+watch(
+  () => route.query,
+  () => {
+    historyStore.hydrate(route.query)
+    fetchHistory()
+  },
+  { immediate: true }
+)
+
+watch(
+  () => props.cluster,
+  () => {
+    fetchHistory()
+  }
+)
 </script>
 
 <template>
@@ -139,8 +175,12 @@ onMounted(() => fetchHistory())
         <h2 id="history-filter-heading" class="sr-only">Filters</h2>
         <div class="border-gray-200 pb-4">
           <div class="mx-auto flex items-center justify-between px-4 sm:px-6 lg:px-8">
-            <!-- left side: intentionally empty (no sorter for history) -->
-            <div />
+            <JobsHistorySorter
+              :sort="sort"
+              :order="order"
+              @update:sort="sortHistory($event)"
+              @update:order="sortHistory(undefined, $event)"
+            />
             <button
               type="button"
               class="bg-slurmweb dark:bg-slurmweb-verydark hover:bg-slurmweb-darker focus-visible:outline-slurmweb inline-flex items-center gap-x-1.5 rounded-md px-3 py-2 text-sm font-semibold text-white shadow-xs focus-visible:outline-2 focus-visible:outline-offset-2"
@@ -261,7 +301,7 @@ onMounted(() => fetchHistory())
                           : 'text-gray-400 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 hover:dark:bg-gray-700',
                         'relative inline-flex items-center rounded-l-md px-2 py-2 ring-1 ring-gray-300 ring-inset focus:z-20 focus:outline-offset-0 dark:ring-gray-700'
                       ]"
-                      @click="page > 1 && (page--, fetchHistory())"
+                      @click="page > 1 && (page--, updateQueryParameters())"
                     >
                       <span class="sr-only">Previous</span>
                       <ChevronLeftIcon class="h-5 w-5" aria-hidden="true" />
@@ -281,7 +321,7 @@ onMounted(() => fetchHistory())
                             : 'bg-white text-black ring-1 ring-gray-300 ring-inset hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:ring-gray-700 hover:dark:bg-gray-700',
                           'relative z-10 inline-flex items-center px-4 py-2 text-sm font-semibold focus:z-20'
                         ]"
-                        @click="page = p.id; fetchHistory()"
+                        @click="page = p.id; updateQueryParameters()"
                       >
                         {{ p.id }}
                       </button>
@@ -293,7 +333,7 @@ onMounted(() => fetchHistory())
                           : 'text-gray-400 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 hover:dark:bg-gray-700',
                         'relative inline-flex items-center rounded-r-md px-2 py-2 ring-1 ring-gray-300 ring-inset focus:z-20 focus:outline-offset-0 dark:ring-gray-700'
                       ]"
-                      @click="page < lastpage() && (page++, fetchHistory())"
+                      @click="page < lastpage() && (page++, updateQueryParameters())"
                     >
                       <span class="sr-only">Next</span>
                       <ChevronRightIcon class="h-5 w-5" aria-hidden="true" />

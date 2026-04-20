@@ -128,6 +128,31 @@ js.command
 
 _CLEANUP_SQL = "DELETE FROM job_snapshots WHERE submit_time < NOW() - INTERVAL '%s days'"
 
+_HISTORY_SORT_FIELDS = {
+    "submit_time": ("js.submit_time",),
+    "id": ("js.job_id",),
+    "state": ("js.job_state",),
+    "user": ("u.username",),
+    "priority": ("js.priority",),
+    "resources": ("js.node_count", "js.cpus"),
+}
+
+
+def _history_sort_clause(sort: Optional[str], order: Optional[str]) -> str:
+    selected_sort = sort if sort in _HISTORY_SORT_FIELDS else "submit_time"
+    selected_order = "ASC" if order == "asc" else "DESC"
+    nulls = "FIRST" if selected_order == "ASC" else "LAST"
+
+    order_columns = [
+        f"{column} {selected_order} NULLS {nulls}"
+        for column in _HISTORY_SORT_FIELDS[selected_sort]
+    ]
+
+    if selected_sort != "id":
+        order_columns.append(f"js.job_id {selected_order}")
+
+    return ", ".join(order_columns)
+
 
 def _state_str(value) -> Optional[str]:
     if isinstance(value, list):
@@ -426,6 +451,7 @@ class JobsStore:
         page = max(1, int(filters.get("page", 1)))
         page_size = min(500, max(1, int(filters.get("page_size", 100))))
         offset = (page - 1) * page_size
+        order_by = _history_sort_clause(filters.get("sort"), filters.get("order"))
 
         where_clauses = []
         params = []
@@ -476,7 +502,7 @@ class JobsStore:
                     + " FROM job_snapshots js "
                     + "LEFT JOIN users u ON u.id = js.user_id "
                     + f"{where_sql} "
-                    + "ORDER BY js.submit_time DESC LIMIT %s OFFSET %s",
+                    + f"ORDER BY {order_by} LIMIT %s OFFSET %s",
                     params + [page_size, offset],
                 )
                 rows = cur.fetchall()

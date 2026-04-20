@@ -21,10 +21,7 @@ describe('JobsHistoryView.vue', () => {
   beforeEach(() => {
     init_plugins()
     vi.clearAllMocks()
-  })
-
-  test('renders split status and zero-value resources from history records', async () => {
-    mockGatewayAPI.jobs_history.mockResolvedValueOnce({
+    mockGatewayAPI.jobs_history.mockResolvedValue({
       total: 1,
       page: 1,
       page_size: 50,
@@ -65,14 +62,17 @@ describe('JobsHistoryView.vue', () => {
         }
       ]
     })
+  })
 
+  test('renders split status and keeps latest-first default sort', async () => {
     const wrapper = mount(JobsHistoryView, {
       props: { cluster: 'foo' },
       global: {
         stubs: {
           ClusterMainLayout: { template: '<div><slot /></div>' },
           JobsHistoryFiltersPanel: { template: '<div />' },
-          JobsHistoryFiltersBar: { template: '<div />' }
+          JobsHistoryFiltersBar: { template: '<div />' },
+          JobsHistorySorter: { template: '<div />' }
         }
       }
     })
@@ -88,5 +88,81 @@ describe('JobsHistoryView.vue', () => {
     expect(wrapper.text()).toContain('Reason')
     expect(wrapper.text()).toContain('debug')
     expect(wrapper.text()).toContain('-')
+    expect(mockGatewayAPI.jobs_history).toHaveBeenCalledWith(
+      'foo',
+      expect.objectContaining({
+        sort: 'submit_time',
+        order: 'desc',
+        page: 1,
+        page_size: 50
+      })
+    )
+  })
+
+  test('restores sort and filters from route query', async () => {
+    const router = init_plugins()
+    router.setQuery({
+      sort: 'user',
+      order: 'asc',
+      page: '3',
+      start: '2026-04-20T10:11:12'
+    })
+
+    mount(JobsHistoryView, {
+      props: { cluster: 'foo' },
+      global: {
+        stubs: {
+          ClusterMainLayout: { template: '<div><slot /></div>' },
+          JobsHistoryFiltersPanel: { template: '<div />' },
+          JobsHistoryFiltersBar: { template: '<div />' },
+          JobsHistorySorter: { template: '<div />' }
+        }
+      }
+    })
+
+    await flushPromises()
+
+    expect(mockGatewayAPI.jobs_history).toHaveBeenCalledWith(
+      'foo',
+      expect.objectContaining({
+        sort: 'user',
+        order: 'asc',
+        page: 3,
+        start: '2026-04-20T10:11:12'
+      })
+    )
+  })
+
+  test('updates route query when sorter changes', async () => {
+    const router = init_plugins()
+    const wrapper = mount(JobsHistoryView, {
+      props: { cluster: 'foo' },
+      global: {
+        stubs: {
+          ClusterMainLayout: { template: '<div><slot /></div>' },
+          JobsHistoryFiltersPanel: { template: '<div />' },
+          JobsHistoryFiltersBar: { template: '<div />' },
+          JobsHistorySorter: {
+            template: '<button class="sorter" @click="$emit(\'update:sort\', \'user\')" />'
+          }
+        }
+      }
+    })
+
+    await flushPromises()
+    vi.mocked(router.push).mockClear()
+
+    await wrapper.get('button.sorter').trigger('click')
+    await flushPromises()
+
+    expect(router.push).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'jobs-history',
+        params: { cluster: 'foo' },
+        query: expect.objectContaining({
+          sort: 'user'
+        })
+      })
+    )
   })
 })

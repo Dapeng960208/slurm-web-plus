@@ -23,6 +23,7 @@ export interface ClusterDescription {
   infrastructure: string
   metrics: boolean
   cache: boolean
+  database?: boolean
   permissions: ClusterPermissions
   versions?: ClusterVersions
   stats?: ClusterStats
@@ -705,6 +706,23 @@ export interface JobHistoryRecord {
   command: string | null
 }
 
+const JobHistorySortCriteria = [
+  'submit_time',
+  'id',
+  'user',
+  'state',
+  'priority',
+  'resources'
+] as const
+export type JobHistorySortCriterion = (typeof JobHistorySortCriteria)[number]
+const JobHistorySortOrders = ['asc', 'desc'] as const
+export type JobHistorySortOrder = (typeof JobHistorySortOrders)[number]
+
+export interface CachedLdapUser {
+  username: string
+  fullname: string | null
+}
+
 export function splitJobHistoryState(jobState: string | null | undefined): string[] {
   if (!jobState) return ['UNKNOWN']
 
@@ -734,6 +752,8 @@ export interface JobHistoryFilters {
   job_id?: number
   page?: number
   page_size?: number
+  sort?: JobHistorySortCriterion
+  order?: JobHistorySortOrder
 }
 
 export interface NodeInstantMetrics {
@@ -1006,6 +1026,10 @@ export function useGatewayAPI() {
     return await restAPI.get<CacheStatistics>(`/agents/${cluster}/cache/stats`)
   }
 
+  async function ldap_cache_users(cluster: string): Promise<CachedLdapUser[]> {
+    return await restAPI.get<CachedLdapUser[]>(`/agents/${cluster}/users/cache`)
+  }
+
   async function cache_reset(cluster: string): Promise<CacheStatistics> {
     return await restAPI.post<CacheStatistics>(`/agents/${cluster}/cache/reset`, {})
   }
@@ -1074,6 +1098,8 @@ export function useGatewayAPI() {
     if (filters.job_id) params.append('job_id', filters.job_id.toString())
     if (filters.page) params.append('page', filters.page.toString())
     if (filters.page_size) params.append('page_size', filters.page_size.toString())
+    if (filters.sort) params.append('sort', filters.sort)
+    if (filters.order) params.append('order', filters.order)
     const query = params.toString()
     const url = `/agents/${cluster}/jobs/history${query ? '?' + query : ''}`
     console.log('[GatewayAPI] jobs_history 请求 URL:', url)
@@ -1179,6 +1205,7 @@ export function useGatewayAPI() {
     accounts,
     associations,
     cache_stats,
+    ldap_cache_users,
     cache_reset,
     metrics_nodes,
     metrics_cores,

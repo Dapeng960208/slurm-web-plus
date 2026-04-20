@@ -52,7 +52,7 @@ class TestGatewayApp(TestGatewayBase):
         # Check SlurmwebAgent object is instanciated with all its attributes.
         agent = agents[agent_info["cluster"]]
         self.assertIsInstance(agent, SlurmwebAgent)
-        self.assertEqual(len(vars(agent)), 6)
+        self.assertEqual(len(vars(agent)), 9)
         self.assertEqual(agent.cluster, agent_info["cluster"])
         self.assertEqual(agent.racksdb.enabled, agent_info["racksdb"]["enabled"])
         self.assertEqual(agent.racksdb.version, agent_info["racksdb"]["version"])
@@ -61,6 +61,9 @@ class TestGatewayApp(TestGatewayBase):
         )
         self.assertEqual(agent.metrics, agent_info["metrics"])
         self.assertEqual(agent.cache, agent_info["cache"])
+        self.assertEqual(agent.database, agent_info["database"])
+        self.assertEqual(agent.persistence, agent_info["persistence"])
+        self.assertEqual(agent.node_metrics, agent_info["node_metrics"])
         self.assertEqual(agent.version, agent_info["version"])
         self.assertEqual(agent.url, self.app.settings.agents.url[0].geturl())
 

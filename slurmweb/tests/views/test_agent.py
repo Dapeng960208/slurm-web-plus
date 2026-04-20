@@ -39,7 +39,7 @@ class TestAgentViews(TestAgentBase):
         response = self.client.get("/info")
         self.assertEqual(response.status_code, 200)
         self.assertIsInstance(response.json, dict)
-        self.assertEqual(len(response.json.keys()), 7)
+        self.assertEqual(len(response.json.keys()), 8)
         self.assertIn("cluster", response.json)
         self.assertEqual(response.json["cluster"], "test")
         self.assertIn("racksdb", response.json)
@@ -52,6 +52,8 @@ class TestAgentViews(TestAgentBase):
         self.assertIsInstance(response.json["metrics"], bool)
         self.assertIn("cache", response.json)
         self.assertIsInstance(response.json["cache"], bool)
+        self.assertIn("database", response.json)
+        self.assertIsInstance(response.json["database"], bool)
         self.assertIn("version", response.json)
         self.assertIsInstance(response.json["version"], str)
         self.assertEqual(response.json["version"], get_version())
@@ -69,6 +71,41 @@ class TestAgentViews(TestAgentBase):
             self.user.login,
             self.user.fullname,
             self.user.groups,
+        )
+
+    def test_ldap_cache_users(self):
+        self.app.users_store = mock.Mock()
+        self.app.users_store.list_ldap_users.return_value = [
+            {"username": "alice", "fullname": "Alice Doe"},
+            {"username": "bob", "fullname": None},
+        ]
+        response = self.client.get(f"/v{get_version()}/users/cache")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.json,
+            [
+                {"username": "alice", "fullname": "Alice Doe"},
+                {"username": "bob", "fullname": None},
+            ],
+        )
+
+    def test_ldap_cache_users_disabled(self):
+        with self.assertLogs("slurmweb", level="WARNING") as cm:
+            response = self.client.get(f"/v{get_version()}/users/cache")
+        self.assertEqual(response.status_code, 501)
+        self.assertEqual(
+            response.json,
+            {
+                "code": 501,
+                "description": "User cache persistence is disabled",
+                "name": "Not Implemented",
+            },
+        )
+        self.assertEqual(
+            cm.output,
+            [
+                "WARNING:slurmweb.views.agent:User cache persistence is disabled",
+            ],
         )
 
     #

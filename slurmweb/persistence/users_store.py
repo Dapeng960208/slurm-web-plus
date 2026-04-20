@@ -78,3 +78,21 @@ class UsersStore:
             raise
         finally:
             self._release_conn(conn)
+
+    def list_ldap_users(self):
+        conn = self._get_conn()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT username, fullname
+                    FROM users
+                    ORDER BY username ASC
+                    """
+                )
+                return [
+                    {"username": username, "fullname": fullname}
+                    for username, fullname in cur.fetchall()
+                ]
+        finally:
+            self._release_conn(conn)

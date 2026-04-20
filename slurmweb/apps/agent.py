@@ -56,6 +56,7 @@ class SlurmwebAppAgent(SlurmwebWebApp, RFLTokenizedRBACWebApp):
         SlurmwebAppRoute(f"/v{get_version()}/metrics/<metric>", views.metrics),
         SlurmwebAppRoute(f"/v{get_version()}/jobs/history", views.jobs_history),
         SlurmwebAppRoute(f"/v{get_version()}/jobs/history/<int:record_id>", views.job_history_detail),
+        SlurmwebAppRoute(f"/v{get_version()}/users/cache", views.ldap_cache_users),
         SlurmwebAppRoute(
             f"/v{get_version()}/users/cache", views.cache_authenticated_user, methods=["POST"]
         ),

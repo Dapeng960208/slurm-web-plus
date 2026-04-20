@@ -7,15 +7,30 @@
 -->
 
 <script setup lang="ts">
+import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
+import { useRuntimeStore } from '@/stores/runtime'
+import { useRuntimeConfiguration } from '@/plugins/runtimeConfiguration'
 
 const { entry } = defineProps<{ entry: string }>()
-const tabs = [
-  { name: 'General', href: 'settings' },
-  { name: 'Errors', href: 'settings-errors' },
-  { name: 'Account', href: 'settings-account' },
-  { name: 'Cache', href: 'settings-cache' }
-]
+const runtimeStore = useRuntimeStore()
+const runtimeConfiguration = useRuntimeConfiguration()
+
+const tabs = computed(() => {
+  const result = [
+    { name: 'General', href: 'settings' },
+    { name: 'Errors', href: 'settings-errors' },
+    { name: 'Account', href: 'settings-account' },
+    { name: 'Cache', href: 'settings-cache' }
+  ]
+  if (
+    runtimeConfiguration.authentication &&
+    runtimeStore.availableClusters.some((cluster) => cluster.database)
+  ) {
+    result.push({ name: 'LDAP Cache', href: 'settings-ldap-cache' })
+  }
+  return result
+})
 </script>
 <template>
   <div class="border-b border-gray-200 dark:border-gray-700">

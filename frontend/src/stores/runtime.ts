@@ -12,6 +12,7 @@ import type { Ref } from 'vue'
 import type { RouteLocation } from 'vue-router'
 import type { ClusterDescription } from '@/composables/GatewayAPI'
 import { useDashboardRuntimeStore } from './runtime/dashboard'
+import { useJobsHistoryRuntimeStore } from './runtime/jobsHistory'
 import { useJobsRuntimeStore } from './runtime/jobs'
 import { useResourcesRuntimeStore } from './runtime/resources'
 
@@ -54,6 +55,7 @@ export const useRuntimeStore = defineStore('runtime', () => {
   const beforeSettingsRoute: Ref<RouteLocation | undefined> = ref(undefined)
 
   const dashboard = useDashboardRuntimeStore()
+  const jobsHistory = useJobsHistoryRuntimeStore()
   const jobs = useJobsRuntimeStore()
   const resources = useResourcesRuntimeStore()
 
@@ -122,6 +124,7 @@ export const useRuntimeStore = defineStore('runtime', () => {
     routePath,
     beforeSettingsRoute,
     dashboard,
+    jobsHistory,
     jobs,
     resources,
     errors,

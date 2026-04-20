@@ -5,6 +5,7 @@
 # SPDX-License-Identifier: MIT
 
 from datetime import datetime, timezone
+import types
 from unittest import mock
 import unittest
 
@@ -338,3 +339,62 @@ class TestJobsStoreReconcile(unittest.TestCase):
             }
         )
         self.assertFalse(self.store._needs_detail_enrichment(completed_record))
+
+
+class TestJobsStoreQuerySorting(unittest.TestCase):
+    def setUp(self):
+        self.store = JobsStore(settings=mock.Mock(), slurmrestd=None)
+        self.conn = mock.Mock()
+        self.cursor = mock.Mock()
+        self.cursor_cm = mock.MagicMock()
+        self.cursor_cm.__enter__.return_value = self.cursor
+        self.conn.cursor.return_value = self.cursor_cm
+        self.store._get_conn = mock.Mock(return_value=self.conn)
+        self.store._release_conn = mock.Mock()
+        self.cursor.fetchone.return_value = {"count": 0}
+        self.cursor.fetchall.return_value = []
+        self.psycopg2_patcher = mock.patch.dict(
+            "sys.modules",
+            {
+                "psycopg2": types.SimpleNamespace(
+                    extras=types.SimpleNamespace(RealDictCursor=object)
+                ),
+                "psycopg2.extras": types.SimpleNamespace(RealDictCursor=object),
+            },
+        )
+        self.psycopg2_patcher.start()
+
+    def tearDown(self):
+        self.psycopg2_patcher.stop()
+
+    def _run_query(self, filters):
+        self.cursor.execute.reset_mock()
+        self.store.query(filters)
+        return self.cursor.execute.call_args_list[1].args[0]
+
+    def test_query_uses_submit_time_desc_by_default(self):
+        sql = self._run_query({})
+        self.assertIn(
+            "ORDER BY js.submit_time DESC NULLS LAST, js.job_id DESC LIMIT %s OFFSET %s",
+            sql,
+        )
+
+    def test_query_supports_scalar_history_sort_fields(self):
+        cases = {
+            ("id", "asc"): "ORDER BY js.job_id ASC NULLS FIRST LIMIT %s OFFSET %s",
+            ("state", "desc"): "ORDER BY js.job_state DESC NULLS LAST, js.job_id DESC LIMIT %s OFFSET %s",
+            ("user", "asc"): "ORDER BY u.username ASC NULLS FIRST, js.job_id ASC LIMIT %s OFFSET %s",
+            ("priority", "desc"): "ORDER BY js.priority DESC NULLS LAST, js.job_id DESC LIMIT %s OFFSET %s",
+        }
+
+        for (sort, order), expected in cases.items():
+            with self.subTest(sort=sort, order=order):
+                sql = self._run_query({"sort": sort, "order": order})
+                self.assertIn(expected, sql)
+
+    def test_query_sorts_resources_by_nodes_then_cpus(self):
+        sql = self._run_query({"sort": "resources", "order": "asc"})
+        self.assertIn(
+            "ORDER BY js.node_count ASC NULLS FIRST, js.cpus ASC NULLS FIRST, js.job_id ASC LIMIT %s OFFSET %s",
+            sql,
+        )

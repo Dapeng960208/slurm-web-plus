@@ -156,6 +156,7 @@ async def get_cluster(agent):
             "infrastructure": agent.racksdb.infrastructure,
             "metrics": agent.metrics,
             "cache": agent.cache,
+            "database": agent.database,
             "permissions": permissions,
             "persistence": agent.persistence,
             "node_metrics": agent.node_metrics,
@@ -330,6 +331,12 @@ def cache_stats(cluster: str):
 @validate_cluster
 def cache_reset(cluster: str):
     return proxy_agent(cluster, "cache/reset", request.token)
+
+
+@check_jwt
+@validate_cluster
+def ldap_cache_users(cluster: str):
+    return proxy_agent(cluster, "users/cache", request.token)
 
 
 @check_jwt

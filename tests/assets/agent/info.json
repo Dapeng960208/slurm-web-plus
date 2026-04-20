@@ -1,7 +1,10 @@
 {
   "cache": true,
   "cluster": "nova",
+  "database": true,
   "metrics": true,
+  "node_metrics": false,
+  "persistence": false,
   "racksdb": {
     "enabled": true,
     "infrastructure": "nova",

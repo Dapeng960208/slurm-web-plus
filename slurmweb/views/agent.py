@@ -44,6 +44,7 @@ def info():
         "cluster": current_app.settings.service.cluster,
         "metrics": current_app.settings.metrics.enabled,
         "cache": current_app.settings.cache.enabled,
+        "database": current_app.users_store is not None,
         "racksdb": {
             "enabled": current_app.settings.racksdb.enabled,
             "infrastructure": current_app.settings.racksdb.infrastructure,
@@ -312,6 +313,8 @@ def jobs_history():
         "job_id": request.args.get("job_id"),
         "page": request.args.get("page", 1),
         "page_size": request.args.get("page_size", 100),
+        "sort": request.args.get("sort"),
+        "order": request.args.get("order"),
     }
     try:
         return jsonify(current_app.jobs_store.query(filters))
@@ -356,6 +359,21 @@ def cache_authenticated_user():
         abort(500, str(err))
 
     return jsonify({"result": "User cache updated"})
+
+
+@rbac_action("cache-view")
+def ldap_cache_users():
+    """Return cached LDAP users stored in the local database."""
+    if current_app.users_store is None:
+        error = "User cache persistence is disabled"
+        logger.warning(error)
+        abort(501, error)
+
+    try:
+        return jsonify(current_app.users_store.list_ldap_users())
+    except Exception as err:
+        logger.warning("Unable to list cached LDAP users: %s", err)
+        abort(500, str(err))
 
 
 @rbac_action("view-nodes")
