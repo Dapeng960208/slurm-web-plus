@@ -33,17 +33,13 @@ type HistoryField =
   | 'job-id' | 'name' | 'state-reason' | 'user' | 'group' | 'account'
   | 'partition' | 'qos' | 'priority' | 'nodes' | 'resources' | 'requested'
   | 'allocated' | 'used-memory' | 'tres-per-job' | 'tres-per-node' | 'gres'
-  | 'time-limit' | 'exit-code' | 'workdir' | 'command' | 'submit-time'
-  | 'eligible-time' | 'start-time' | 'last-sched-evaluation-time' | 'end-time'
-  | 'snapshot-time'
+  | 'time-limit' | 'exit-code' | 'workdir' | 'command'
 
 const ALL_FIELDS: HistoryField[] = [
   'job-id', 'name', 'state-reason', 'user', 'group', 'account',
   'partition', 'qos', 'priority', 'nodes', 'resources', 'requested',
   'allocated', 'used-memory', 'tres-per-job', 'tres-per-node', 'gres',
-  'time-limit', 'exit-code', 'workdir', 'command', 'submit-time',
-  'eligible-time', 'start-time', 'last-sched-evaluation-time', 'end-time',
-  'snapshot-time'
+  'time-limit', 'exit-code', 'workdir', 'command'
 ]
 
 type TimelineStep = {
@@ -159,7 +155,6 @@ function fmtMemoryGB(value: number | null | undefined) {
 function timelineSteps(j: JobHistoryRecord): TimelineStep[] {
   const states = splitJobHistoryState(j.job_state)
   const completed = states.includes('COMPLETED')
-  const terminated = !completed && j.end_time !== null
   return [
     { id: 'submitted', label: 'Submitted', time: j.submit_time, reached: !!j.submit_time },
     { id: 'eligible', label: 'Eligible', time: j.eligible_time, reached: !!j.eligible_time },
@@ -179,8 +174,8 @@ function timelineSteps(j: JobHistoryRecord): TimelineStep[] {
     {
       id: 'terminated',
       label: 'Terminated',
-      time: terminated ? j.end_time : null,
-      reached: terminated && !!j.end_time
+      time: j.end_time,
+      reached: !!j.end_time
     }
   ]
 }
@@ -216,17 +211,7 @@ const fields = (j: JobHistoryRecord): HistoryFieldRow[] => [
   textField('time-limit', 'Time Limit', fmtDuration(j.time_limit_minutes)),
   textField('exit-code', 'Exit Code', fmt(j.exit_code)),
   textField('workdir', 'Working Directory', fmt(j.working_directory), true),
-  textField('command', 'Command', fmt(j.command), true),
-  textField('submit-time', 'Submit Time', fmtTime(j.submit_time)),
-  textField('eligible-time', 'Eligible Time', fmtTime(j.eligible_time)),
-  textField('start-time', 'Start Time', fmtTime(j.start_time)),
-  textField(
-    'last-sched-evaluation-time',
-    'Last Scheduling Time',
-    fmtTime(j.last_sched_evaluation_time)
-  ),
-  textField('end-time', 'End Time', fmtTime(j.end_time)),
-  textField('snapshot-time', 'Snapshot Time', fmtTime(j.snapshot_time))
+  textField('command', 'Command', fmt(j.command), true)
 ]
 
 const timeline = computed(() => (job.value ? timelineSteps(job.value) : []))
@@ -287,6 +272,7 @@ onMounted(async () => {
             <li
               v-for="(step, idx) in timeline"
               :key="step.id"
+              :id="`step-${step.id}`"
               :class="[idx !== timeline.length - 1 ? 'pb-10' : '', 'relative']"
             >
               <div
@@ -350,6 +336,9 @@ onMounted(async () => {
                   displayTags[field.id as HistoryField].highlight
                     ? 'bg-slurmweb-light dark:bg-slurmweb-dark'
                     : '',
+                  field.id === 'used-memory'
+                    ? 'rounded-lg bg-emerald-50 ring-1 ring-emerald-200 dark:bg-emerald-950/30 dark:ring-emerald-800'
+                    : '',
                   'px-4 py-2 transition-colors duration-700 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0'
                 ]"
                 @mouseenter="displayTags[field.id as HistoryField].show = true"
@@ -386,8 +375,14 @@ onMounted(async () => {
                 <dd
                   v-else
                   :class="[
-                    field.monospace ? 'font-mono text-xs break-all' : 'text-sm',
-                    'mt-1 leading-6 text-gray-700 sm:col-span-2 sm:mt-0 dark:text-gray-300'
+                    field.id === 'used-memory'
+                      ? 'text-lg font-semibold text-emerald-700 dark:text-emerald-300'
+                      : field.monospace
+                        ? 'font-mono text-xs break-all'
+                        : 'text-sm',
+                    field.id === 'used-memory'
+                      ? 'mt-1 leading-6 sm:col-span-2 sm:mt-0'
+                      : 'mt-1 leading-6 text-gray-700 sm:col-span-2 sm:mt-0 dark:text-gray-300'
                   ]"
                 >
                   {{ field.value }}
