@@ -149,6 +149,14 @@ class TestJobsStoreExtract(unittest.TestCase):
                 "state": {"current": ["COMPLETED"], "reason": "None"},
                 "time": {"submission": 1710000000, "end": 1710000900},
                 "steps": [
+                    {},
+                    {
+                        "tres": {
+                            "consumed": {
+                                "total": {"count": 4 * 1024**2}
+                            }
+                        }
+                    },
                     {
                         "tres": {
                             "consumed": {
@@ -156,7 +164,7 @@ class TestJobsStoreExtract(unittest.TestCase):
                                     {"type": "cpu", "count": 32, "id": 1, "name": ""},
                                     {
                                         "type": "mem",
-                                        "count": 4 * 1024**2,
+                                        "count": 5 * 1024**2,
                                         "id": 2,
                                         "name": "",
                                     },
@@ -168,7 +176,7 @@ class TestJobsStoreExtract(unittest.TestCase):
             }
         )
 
-        self.assertEqual(row["used_memory_gb"], 4.0)
+        self.assertEqual(row["used_memory_gb"], 5.0)
 
     def test_extract_detail_ignores_missing_running_steps_memory(self):
         row = _extract_detail(
@@ -176,11 +184,23 @@ class TestJobsStoreExtract(unittest.TestCase):
                 "job_id": 123,
                 "state": {"current": ["RUNNING"], "reason": "None"},
                 "time": {"submission": 1710000000, "start": 1710000300},
-                "steps": [{"tres": {"consumed": {"total": []}}}],
+                "steps": [{}, {"tres": {"consumed": {"total": []}}}],
             }
         )
 
         self.assertIsNone(row["used_memory_gb"])
+
+    def test_extract_detail_uses_step_1_when_step_2_missing(self):
+        row = _extract_detail(
+            {
+                "job_id": 123,
+                "state": {"current": ["COMPLETED"], "reason": "None"},
+                "time": {"submission": 1710000000, "end": 1710000900},
+                "steps": [{}, {"tres": {"consumed": {"total": {"count": 3 * 1024**2}}}}],
+            }
+        )
+
+        self.assertEqual(row["used_memory_gb"], 3.0)
 
 
 class TestJobsStoreReconcile(unittest.TestCase):
@@ -255,6 +275,14 @@ class TestJobsStoreReconcile(unittest.TestCase):
                 "limit": {"set": True, "infinite": False, "number": 60},
             },
             "steps": [
+                {},
+                {
+                    "tres": {
+                        "consumed": {
+                            "total": {"count": 2 * 1024**2}
+                        }
+                    }
+                },
                 {
                     "tres": {
                         "consumed": {
@@ -262,7 +290,7 @@ class TestJobsStoreReconcile(unittest.TestCase):
                                 {"type": "cpu", "count": 16, "id": 1, "name": ""},
                                 {
                                     "type": "mem",
-                                    "count": 2 * 1024**2,
+                                    "count": 3 * 1024**2,
                                     "id": 2,
                                     "name": "",
                                 },
@@ -283,7 +311,7 @@ class TestJobsStoreReconcile(unittest.TestCase):
             self.store._pending[0]["end_time"],
             datetime.fromtimestamp(1710000600, tz=timezone.utc),
         )
-        self.assertEqual(self.store._pending[0]["used_memory_gb"], 2.0)
+        self.assertEqual(self.store._pending[0]["used_memory_gb"], 3.0)
         self.assertEqual(
             self.store._pending[0]["eligible_time"],
             datetime.fromtimestamp(1710000200, tz=timezone.utc),

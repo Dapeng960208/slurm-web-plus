@@ -241,14 +241,18 @@ def _used_memory_gb(job: dict, job_state) -> Optional[float]:
     if not isinstance(steps, list):
         return None
 
-    for step in reversed(steps):
+    def _step_memory_kb(step: dict) -> Optional[float]:
         if not isinstance(step, dict):
-            continue
+            return None
         tres = step.get("tres")
         consumed = tres.get("consumed") if isinstance(tres, dict) else None
         total = consumed.get("total") if isinstance(consumed, dict) else None
+
+        if isinstance(total, dict):
+            return _float_field(total.get("count"))
+
         if not isinstance(total, list) or not total:
-            continue
+            return None
 
         candidates = [
             item
@@ -262,10 +266,22 @@ def _used_memory_gb(job: dict, job_state) -> Optional[float]:
         for item in candidates:
             count = _float_field(item.get("count"))
             if count is not None:
-                # Slurm reports consumed memory here in KB; persist GB.
-                return round(count / 1024**2, 2)
+                return count
+        return None
 
-    return None
+    counts = []
+    for index in (1, 2):
+        if len(steps) <= index:
+            continue
+        count = _step_memory_kb(steps[index])
+        if count is not None:
+            counts.append(count)
+
+    if not counts:
+        return None
+
+    # Slurm reports consumed memory here in KB; persist GB.
+    return round(max(counts) / 1024**2, 2)
 
 
 def _extract(job: dict) -> dict:
