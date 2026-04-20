@@ -264,8 +264,6 @@ def _used_memory_gb(job: dict, job_state) -> Optional[float]:
         for item in total:
             if not isinstance(item, dict):
                 continue
-            if item.get("type") != "mem" and item.get("id") != 2:
-                continue
             count = _float_field(item.get("count"))
             if count is not None:
                 return count
