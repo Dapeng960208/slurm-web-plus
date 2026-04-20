@@ -142,7 +142,7 @@ class TestJobsStoreExtract(unittest.TestCase):
         self.assertEqual(len(row["tres_allocated"]), 2)
         self.assertIsNone(row["used_memory_gb"])
 
-    def test_extract_detail_maps_completed_job_used_memory(self):
+    def test_extract_detail_does_not_record_step_memory_as_used_memory(self):
         row = _extract_detail(
             {
                 "job_id": 123,
@@ -176,47 +176,7 @@ class TestJobsStoreExtract(unittest.TestCase):
             }
         )
 
-        self.assertEqual(row["used_memory_gb"], 5.0)
-
-    def test_extract_detail_ignores_missing_running_steps_memory(self):
-        row = _extract_detail(
-            {
-                "job_id": 123,
-                "state": {"current": ["RUNNING"], "reason": "None"},
-                "time": {"submission": 1710000000, "start": 1710000300},
-                "steps": [{}, {"tres": {"consumed": {"total": []}}}],
-            }
-        )
-
         self.assertIsNone(row["used_memory_gb"])
-
-    def test_extract_detail_uses_step_1_when_step_2_missing(self):
-        row = _extract_detail(
-            {
-                "job_id": 123,
-                "state": {"current": ["COMPLETED"], "reason": "None"},
-                "time": {"submission": 1710000000, "end": 1710000900},
-                "steps": [{}, {"tres": {"consumed": {"total": {"count": 3 * 1024**2}}}}],
-            }
-        )
-
-        self.assertEqual(row["used_memory_gb"], 3.0)
-
-    def test_extract_detail_falls_back_to_step_2_when_step_1_has_no_memory(self):
-        row = _extract_detail(
-            {
-                "job_id": 123,
-                "state": {"current": ["COMPLETED"], "reason": "None"},
-                "time": {"submission": 1710000000, "end": 1710000900},
-                "steps": [
-                    {},
-                    {"tres": {"consumed": {"total": []}}},
-                    {"tres": {"consumed": {"total": {"count": 6 * 1024**2}}}},
-                ],
-            }
-        )
-
-        self.assertEqual(row["used_memory_gb"], 6.0)
 
 
 class TestJobsStoreReconcile(unittest.TestCase):
@@ -327,7 +287,7 @@ class TestJobsStoreReconcile(unittest.TestCase):
             self.store._pending[0]["end_time"],
             datetime.fromtimestamp(1710000600, tz=timezone.utc),
         )
-        self.assertEqual(self.store._pending[0]["used_memory_gb"], 3.0)
+        self.assertIsNone(self.store._pending[0]["used_memory_gb"])
         self.assertEqual(
             self.store._pending[0]["eligible_time"],
             datetime.fromtimestamp(1710000200, tz=timezone.utc),
@@ -359,7 +319,7 @@ class TestJobsStoreReconcile(unittest.TestCase):
         self.slurmrestd.job.assert_not_called()
         self.assertEqual(self.store._pending, [])
 
-    def test_needs_detail_enrichment_only_requires_memory_for_completed_jobs(self):
+    def test_needs_detail_enrichment_ignores_used_memory_for_completed_jobs(self):
         running_record = self._record()
         running_record.update(
             {
@@ -377,4 +337,4 @@ class TestJobsStoreReconcile(unittest.TestCase):
                 "tres_allocated": [],
             }
         )
-        self.assertTrue(self.store._needs_detail_enrichment(completed_record))
+        self.assertFalse(self.store._needs_detail_enrichment(completed_record))

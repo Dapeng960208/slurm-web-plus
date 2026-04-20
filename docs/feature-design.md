@@ -529,15 +529,15 @@ Agent /node/<name>/metrics
 - `last_sched_evaluation_time`：最后一次调度评估时间，历史时间线的 scheduling 阶段优先使用该字段。
 - `tres_requested`：单作业详情中的 `tres.requested`，JSONB 保存。
 - `tres_allocated`：单作业详情中的 `tres.allocated`，JSONB 保存。
-- `used_memory_gb`：已完成作业的实际使用内存，来源于 `steps[*].tres.consumed.total` 的 memory TRES；该值单位为 KB，按 `KB / 1024^2` 转为 GB。
+- `used_memory_gb`：兼容保留字段，当前不再从历史详情接口提取或展示，统一保持为 `null`。
 
 数据来源分为两层：
 
 - 列表快照 `_extract()` 只保持轻量写入，额外提取 `eligible_time` 和 `last_sched_evaluation_time`，不从列表接口硬拼结构化资源。
-- 单作业详情 `_extract_detail()` 负责提取结构化 TRES、完整时间字段和已完成作业内存。
+- 单作业详情 `_extract_detail()` 负责提取结构化 TRES 和完整时间字段。
 
 富化策略：
 
 - 后台缺失活动作业对账时，如果当前列表没有某个非终态历史记录，先调用 `job(job_id)` 补查；补查成功则按真实详情 UPSERT，补查不到再兜底写 `COMPLETED`。
 - 历史详情接口返回前，如果记录缺少详情字段，会按需调用 `job(job_id)` 补查一次；只有 `(job_id, submit_time)` 与当前记录一致时才允许回写。
-- 运行中作业通常没有完整 `steps[*].tres.consumed.total`，因此 `used_memory_gb` 为 `null` 是正常结果。
+- `used_memory_gb` 保留是为了兼容既有 schema；新版本不再根据 `steps[*].tres.consumed.total` 推导该字段，避免把 step 统计值误当成作业实际内存。

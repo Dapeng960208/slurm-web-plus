@@ -500,6 +500,8 @@ enabled = yes
 - `tres_allocated`
 - `used_memory_gb`
 
+`used_memory_gb` 是兼容保留列，当前版本不再填充或在前端展示该字段。
+
 推荐生产升级顺序：
 
 1. 备份数据库。

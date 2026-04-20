@@ -157,7 +157,7 @@ psql -h 127.0.0.1 -U slurmweb -d slurmweb -c "\d job_snapshots"
 
 ## 7. 20260420_0002 历史作业详情字段迁移
 
-本次变更新增 migration `20260420_0002_job_history_detail_fields.py`，用于补全历史作业详情页需要的时间线、结构化资源和已完成作业实际内存字段。
+本次变更新增 migration `20260420_0002_job_history_detail_fields.py`，用于补全历史作业详情页需要的时间线和结构化资源字段，并保留兼容列 `used_memory_gb`。
 
 新增字段如下：
 

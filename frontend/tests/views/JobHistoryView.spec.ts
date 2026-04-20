@@ -79,7 +79,7 @@ describe('JobHistoryView.vue', () => {
     expect(wrapper.text()).not.toContain('End Time')
   })
 
-  test('renders completed timeline, structured resources, and used memory', async () => {
+  test('renders completed timeline and structured resources without used memory', async () => {
     mockGatewayAPI.job_history_detail.mockResolvedValueOnce({
       id: 2,
       snapshot_time: '2026-04-20T10:00:00+00:00',
@@ -142,8 +142,8 @@ describe('JobHistoryView.vue', () => {
     expect(wrapper.text()).toContain('Requested')
     expect(wrapper.text()).toContain('Allocated')
     expect(wrapper.text()).toContain('Memory: 64GB')
-    expect(wrapper.text()).toContain('4.00 GB')
-    expect(wrapper.get('#used-memory').classes()).toContain('bg-emerald-50')
+    expect(wrapper.text()).not.toContain('Used Memory')
+    expect(wrapper.text()).not.toContain('4.00 GB')
     expect(wrapper.get('#step-terminated').text()).not.toContain('\n                  -')
     expect(wrapper.text()).not.toContain('Submit Time')
     expect(wrapper.text()).not.toContain('Eligible Time')

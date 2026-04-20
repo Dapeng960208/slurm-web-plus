@@ -32,13 +32,13 @@ const job = ref<JobHistoryRecord | null>(null)
 type HistoryField =
   | 'job-id' | 'name' | 'state-reason' | 'user' | 'group' | 'account'
   | 'partition' | 'qos' | 'priority' | 'nodes' | 'resources' | 'requested'
-  | 'allocated' | 'used-memory' | 'tres-per-job' | 'tres-per-node' | 'gres'
+  | 'allocated' | 'tres-per-job' | 'tres-per-node' | 'gres'
   | 'time-limit' | 'exit-code' | 'workdir' | 'command'
 
 const ALL_FIELDS: HistoryField[] = [
   'job-id', 'name', 'state-reason', 'user', 'group', 'account',
   'partition', 'qos', 'priority', 'nodes', 'resources', 'requested',
-  'allocated', 'used-memory', 'tres-per-job', 'tres-per-node', 'gres',
+  'allocated', 'tres-per-job', 'tres-per-node', 'gres',
   'time-limit', 'exit-code', 'workdir', 'command'
 ]
 
@@ -147,11 +147,6 @@ function historyAllocatedGPU(j: JobHistoryRecord): { count: number; reliable: bo
   return { count: countGPUTRESRequest(j.gres_detail), reliable: true }
 }
 
-function fmtMemoryGB(value: number | null | undefined) {
-  if (value == null) return '-'
-  return `${value.toFixed(2)} GB`
-}
-
 function timelineSteps(j: JobHistoryRecord): TimelineStep[] {
   const states = splitJobHistoryState(j.job_state)
   const completed = states.includes('COMPLETED')
@@ -204,7 +199,6 @@ const fields = (j: JobHistoryRecord): HistoryFieldRow[] => [
   ),
   resourceField('requested', 'Requested', j.tres_requested, historyRequestedGPU(j)),
   resourceField('allocated', 'Allocated', j.tres_allocated, historyAllocatedGPU(j)),
-  textField('used-memory', 'Used Memory', fmtMemoryGB(j.used_memory_gb)),
   textField('tres-per-job', 'TRES/Job', fmt(j.tres_per_job)),
   textField('tres-per-node', 'TRES/Node', fmt(j.tres_per_node)),
   textField('gres', 'GRES', fmt(j.gres_detail)),
@@ -336,9 +330,6 @@ onMounted(async () => {
                   displayTags[field.id as HistoryField].highlight
                     ? 'bg-slurmweb-light dark:bg-slurmweb-dark'
                     : '',
-                  field.id === 'used-memory'
-                    ? 'rounded-lg bg-emerald-50 ring-1 ring-emerald-200 dark:bg-emerald-950/30 dark:ring-emerald-800'
-                    : '',
                   'px-4 py-2 transition-colors duration-700 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0'
                 ]"
                 @mouseenter="displayTags[field.id as HistoryField].show = true"
@@ -375,14 +366,10 @@ onMounted(async () => {
                 <dd
                   v-else
                   :class="[
-                    field.id === 'used-memory'
-                      ? 'text-lg font-semibold text-emerald-700 dark:text-emerald-300'
-                      : field.monospace
+                    field.monospace
                         ? 'font-mono text-xs break-all'
                         : 'text-sm',
-                    field.id === 'used-memory'
-                      ? 'mt-1 leading-6 sm:col-span-2 sm:mt-0'
-                      : 'mt-1 leading-6 text-gray-700 sm:col-span-2 sm:mt-0 dark:text-gray-300'
+                    'mt-1 leading-6 text-gray-700 sm:col-span-2 sm:mt-0 dark:text-gray-300'
                   ]"
                 >
                   {{ field.value }}

@@ -185,17 +185,6 @@ def _float_field(value):
         return None
 
 
-def _state_values(value) -> list:
-    state_str = _state_str(value)
-    if state_str is None:
-        return []
-    return [state.strip() for state in state_str.split(",") if state.strip()]
-
-
-def _is_terminal_state(value) -> bool:
-    return any(state in TERMINAL_STATES for state in _state_values(value))
-
-
 def _is_not_found_error(err: Exception) -> bool:
     return err.__class__.__name__ == "SlurmrestdNotFoundError"
 
@@ -231,59 +220,6 @@ def _time_value(time_data, key: str, fallback_value=None):
     if isinstance(time_data, dict):
         return time_data.get(key, fallback_value)
     return fallback_value
-
-
-def _used_memory_gb(job: dict, job_state) -> Optional[float]:
-    if not _is_terminal_state(job_state):
-        return None
-
-    steps = job.get("steps")
-    if not isinstance(steps, list):
-        return None
-
-    def _step_memory_kb(step: dict) -> Optional[float]:
-        if not isinstance(step, dict):
-            return None
-        tres = step.get("tres")
-        if not isinstance(tres, dict):
-            return None
-        consumed = tres.get("consumed")
-        if not isinstance(consumed, dict):
-            return None
-        total = consumed.get("total")
-
-        if isinstance(total, dict):
-            return _float_field(total.get("count"))
-
-        if not isinstance(total, list) or not total:
-            return None
-
-        if len(total) == 2 and isinstance(total[1], dict):
-            return _float_field(total[1].get("count"))
-
-        for item in total:
-            if not isinstance(item, dict):
-                continue
-            count = _float_field(item.get("count"))
-            if count is not None:
-                return count
-        return None
-
-    step_1_count = _step_memory_kb(steps[1]) if len(steps) > 1 else None
-    step_2_count = _step_memory_kb(steps[2]) if len(steps) > 2 else None
-
-    if step_1_count is None:
-        max_count = step_2_count
-    elif step_2_count is None:
-        max_count = step_1_count
-    else:
-        max_count = step_1_count if step_1_count >= step_2_count else step_2_count
-
-    if max_count is None:
-        return None
-
-    # Slurm reports consumed memory here in KB; persist GB.
-    return round(max_count / 1024**2, 2)
 
 
 def _extract(job: dict) -> dict:
@@ -386,7 +322,7 @@ def _extract_detail(job: dict, fallback: Optional[dict] = None) -> dict:
         "time_limit_minutes": _int_field(
             _time_value(time_data, "limit", job.get("time_limit"))
         ),
-        "used_memory_gb": _used_memory_gb(job, job_state),
+        "used_memory_gb": None,
         "exit_code": _exit_str(job.get("exit_code") or job.get("derived_exit_code")),
         "working_directory": job.get("current_working_directory")
         or job.get("working_directory")
@@ -412,7 +348,6 @@ def _extract_detail(job: dict, fallback: Optional[dict] = None) -> dict:
         "last_sched_evaluation_time",
         "tres_requested",
         "tres_allocated",
-        "used_memory_gb",
         "time_limit_minutes",
     ):
         if row[key] is None:
@@ -748,13 +683,7 @@ class JobsStore:
             "tres_requested",
             "tres_allocated",
         )
-        if any(record.get(field) is None for field in detail_fields):
-            return True
-        return (
-            record.get("job_state") is not None
-            and "COMPLETED" in _state_values(record.get("job_state"))
-            and record.get("used_memory_gb") is None
-        )
+        return any(record.get(field) is None for field in detail_fields)
 
     def _maybe_enrich_record(self, record: dict) -> Optional[dict]:
         if self._slurmrestd is None or not self._needs_detail_enrichment(record):
@@ -817,7 +746,7 @@ class JobsStore:
             "eligible_time": record.get("eligible_time"),
             "last_sched_evaluation_time": record.get("last_sched_evaluation_time"),
             "time_limit_minutes": record.get("time_limit_minutes"),
-            "used_memory_gb": record.get("used_memory_gb"),
+            "used_memory_gb": None,
             "exit_code": record.get("exit_code"),
             "working_directory": record.get("working_directory"),
             "command": record.get("command"),
