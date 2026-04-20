@@ -10,6 +10,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { useGatewayAPI } from '@/composables/GatewayAPI'
 import type { JobHistoryRecord, JobHistoryFilters } from '@/composables/GatewayAPI'
+import { splitJobHistoryState } from '@/composables/GatewayAPI'
 import ClusterMainLayout from '@/components/ClusterMainLayout.vue'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
 import ErrorAlert from '@/components/ErrorAlert.vue'
@@ -71,6 +72,10 @@ function applyFilters() {
 }
 
 const lastpage = () => Math.max(Math.ceil(total.value / pageSize), 1)
+
+function hasValue(value: number | null | undefined) {
+  return value !== null && value !== undefined
+}
 
 function jobsPages(): { id: number; ellipsis: boolean }[] {
   const result: { id: number; ellipsis: boolean }[] = []
@@ -183,18 +188,20 @@ onMounted(() => fetchHistory())
                     {{ job.job_id }}
                   </td>
                   <td class="px-3 py-4 whitespace-nowrap">
-                    <JobStatusBadge :status="job.job_state ? [job.job_state] : ['UNKNOWN']" />
+                    <JobStatusBadge :status="splitJobHistoryState(job.job_state)" />
                   </td>
                   <td class="px-3 py-4 whitespace-nowrap">
                     {{ job.user_name ?? '-' }} ({{ job.account ?? '-' }})
                   </td>
                   <td class="hidden px-3 py-4 whitespace-nowrap sm:table-cell">
-                    <span v-if="job.node_count"
+                    <span v-if="hasValue(job.node_count)"
                       >{{ job.node_count }} node{{ job.node_count > 1 ? 's' : '' }}</span
                     >
-                    <span v-if="job.node_count && job.cpus">, </span>
-                    <span v-if="job.cpus">{{ job.cpus }} CPU{{ job.cpus > 1 ? 's' : '' }}</span>
-                    <span v-if="!job.node_count && !job.cpus">-</span>
+                    <span v-if="hasValue(job.node_count) && hasValue(job.cpus)">, </span>
+                    <span v-if="hasValue(job.cpus)"
+                      >{{ job.cpus }} CPU{{ job.cpus > 1 ? 's' : '' }}</span
+                    >
+                    <span v-if="!hasValue(job.node_count) && !hasValue(job.cpus)">-</span>
                   </td>
                   <td class="hidden px-3 py-4 whitespace-nowrap xl:table-cell">
                     {{ job.partition ?? '-' }}

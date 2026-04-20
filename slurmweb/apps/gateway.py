@@ -143,6 +143,10 @@ class SlurmwebAppGateway(SlurmwebWebApp, RFLTokenizedWebApp):
         ),
         SlurmwebAppRoute("/api/agents/<cluster>/jobs/history", views.jobs_history),
         SlurmwebAppRoute(
+            "/api/agents/<cluster>/jobs/history/<int:record_id>",
+            views.job_history_detail,
+        ),
+        SlurmwebAppRoute(
             "/api/agents/<cluster>/node/<name>/metrics", views.node_metrics
         ),
     }

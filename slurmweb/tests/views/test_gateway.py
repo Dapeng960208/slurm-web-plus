@@ -9,6 +9,8 @@ import tempfile
 import os
 import shutil
 
+from rfl.authentication.user import AuthenticatedUser
+
 from slurmweb.version import get_version
 
 from ..lib.gateway import TestGatewayBase, fake_slurmweb_agent
@@ -104,6 +106,45 @@ class TestGatewayViews(TestGatewayBase):
                 "message template message.html.j2 not found",
             )
 
+    @mock.patch("slurmweb.views.gateway.async_cache_user_on_agents")
+    def test_login_propagates_user_cache(self, mock_cache_user_on_agents):
+        self.setup_app(use_token=False, conf_overrides={"ldap": True})
+        self.app.authentifier.login = mock.Mock(
+            return_value=AuthenticatedUser(
+                login="test", fullname="Testing User", groups=["group"]
+            )
+        )
+        response = self.client.post(
+            "/api/login",
+            data='{"user":"test","password":"secret"}',
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json["fullname"], "Testing User")
+        self.assertEqual(response.json["groups"], ["group"])
+        mock_cache_user_on_agents.assert_called_once()
+
+    @mock.patch("slurmweb.views.gateway.async_cache_user_on_agents")
+    def test_login_cache_failure_does_not_fail_authentication(self, mock_cache_user_on_agents):
+        self.setup_app(use_token=False, conf_overrides={"ldap": True})
+        self.app.authentifier.login = mock.Mock(
+            return_value=AuthenticatedUser(
+                login="test", fullname="Testing User", groups=["group"]
+            )
+        )
+        mock_cache_user_on_agents.side_effect = RuntimeError("cache failed")
+        with self.assertLogs("slurmweb", level="WARNING") as cm:
+            response = self.client.post(
+                "/api/login",
+                data='{"user":"test","password":"secret"}',
+                content_type="application/json",
+            )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(
+            "WARNING:slurmweb.views.gateway:Failed to propagate authenticated user cache to agents: cache failed",
+            cm.output,
+        )
+
     @mock.patch("slurmweb.views.gateway.aiohttp.ClientSession.get")
     def test_cache_stats(self, mock_get):
         self.app_set_agents({"foo": fake_slurmweb_agent("foo")})
@@ -111,6 +152,22 @@ class TestGatewayViews(TestGatewayBase):
         response = self.client.get("/api/agents/foo/cache/stats")
         self.assertEqual(response.status_code, 200)
         self.assertCountEqual(response.json.keys(), ["hit", "miss"])
+
+    @mock.patch("slurmweb.views.gateway.proxy_agent")
+    def test_job_history_detail(self, mock_proxy_agent):
+        self.app_set_agents({"foo": fake_slurmweb_agent("foo")})
+        mock_proxy_agent.return_value = (self.app.response_class(
+            response='{"id": 12, "job_id": 1234}',
+            status=200,
+            mimetype="application/json",
+        ), 200)
+        response = self.client.get("/api/agents/foo/jobs/history/12")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json["id"], 12)
+        self.assertEqual(response.json["job_id"], 1234)
+        mock_proxy_agent.assert_called_once()
+        self.assertEqual(mock_proxy_agent.call_args.args[:2], ("foo", "jobs/history/12"))
+        self.assertTrue(mock_proxy_agent.call_args.args[2])
 
     @mock.patch("slurmweb.views.gateway.aiohttp.ClientSession.post")
     def test_cache_reset(self, mock_post):

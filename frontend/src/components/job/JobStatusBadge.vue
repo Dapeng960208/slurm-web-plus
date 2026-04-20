@@ -125,7 +125,7 @@ const mainStatus = computed<string>(() => {
   else if (status.includes('BOOT_FAIL')) return 'BOOT FAIL'
   else if (status.includes('DEADLINE')) return 'DEADLINE'
   else if (status.includes('OUT_OF_MEMORY')) return 'OUT OF MEMORY'
-  throw new Error('Unable to determine main job status: ' + status)
+  return 'UNKNOWN'
 })
 
 const stateFlagsIcons = computed(() => {

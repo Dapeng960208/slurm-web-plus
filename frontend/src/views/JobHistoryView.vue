@@ -11,6 +11,7 @@ import { onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { useGatewayAPI } from '@/composables/GatewayAPI'
 import type { JobHistoryRecord } from '@/composables/GatewayAPI'
+import { splitJobHistoryState } from '@/composables/GatewayAPI'
 import ClusterMainLayout from '@/components/ClusterMainLayout.vue'
 import JobStatusBadge from '@/components/job/JobStatusBadge.vue'
 import JobBackButton from '@/components/job/JobBackButton.vue'
@@ -64,10 +65,14 @@ function fmtTime(v: string | null | undefined) {
 }
 
 function fmtDuration(minutes: number | null | undefined) {
-  if (!minutes) return '-'
+  if (minutes == null) return '-'
   const h = Math.floor(minutes / 60)
   const m = minutes % 60
   return h > 0 ? `${h}h ${m}m` : `${m}m`
+}
+
+function hasValue(value: number | null | undefined) {
+  return value !== null && value !== undefined
 }
 
 /** Build a simple timeline from the history record timestamps */
@@ -100,8 +105,8 @@ const fields = (j: JobHistoryRecord) => [
     id: 'resources',
     label: 'Resources',
     value: [
-      j.node_count ? `${j.node_count} node${j.node_count > 1 ? 's' : ''}` : null,
-      j.cpus ? `${j.cpus} CPU${j.cpus > 1 ? 's' : ''}` : null,
+      hasValue(j.node_count) ? `${j.node_count} node${j.node_count > 1 ? 's' : ''}` : null,
+      hasValue(j.cpus) ? `${j.cpus} CPU${j.cpus > 1 ? 's' : ''}` : null,
       j.tres_req_str ?? null
     ]
       .filter(Boolean)
@@ -168,7 +173,7 @@ onMounted(async () => {
           </p>
         </div>
         <div>
-          <JobStatusBadge :status="job.job_state ? [job.job_state] : ['UNKNOWN']" :large="true" />
+          <JobStatusBadge :status="splitJobHistoryState(job.job_state)" :large="true" />
         </div>
       </div>
 

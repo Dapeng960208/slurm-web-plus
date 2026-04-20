@@ -677,6 +677,7 @@ export interface JobHistoryRecord {
   job_name: string | null
   job_state: string | null
   state_reason: string | null
+  user_id: number | null
   user_name: string | null
   account: string | null
   group: string | null
@@ -697,6 +698,17 @@ export interface JobHistoryRecord {
   exit_code: string | null
   working_directory: string | null
   command: string | null
+}
+
+export function splitJobHistoryState(jobState: string | null | undefined): string[] {
+  if (!jobState) return ['UNKNOWN']
+
+  const states = jobState
+    .split(',')
+    .map((state) => state.trim())
+    .filter((state) => state.length > 0)
+
+  return states.length ? states : ['UNKNOWN']
 }
 
 export interface JobHistoryResponse {

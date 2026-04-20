@@ -94,4 +94,22 @@ describe('JobBackButton', () => {
       query: {}
     })
   })
+
+  test('redirects to jobs history when routeName=jobs-history', async () => {
+    router.setQuery({})
+    const wrapper = mount(JobBackButton, {
+      props: {
+        cluster: 'foo',
+        routeName: 'jobs-history'
+      }
+    })
+
+    expect(wrapper.text()).toContain('Back to jobs history')
+    await wrapper.find('button').trigger('click')
+
+    expect(router.push).toHaveBeenCalledWith({
+      name: 'jobs-history',
+      params: { cluster: 'foo' }
+    })
+  })
 })

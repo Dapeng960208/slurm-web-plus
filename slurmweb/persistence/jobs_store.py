@@ -8,45 +8,43 @@
 Job history persistence module.
 
 Runs a background thread that periodically snapshots active jobs and writes
-them to PostgreSQL via UPSERT.  The main request path is never blocked.
-
-Key design decisions:
-- Only jobs with both job_id AND submit_time are persisted (others are skipped).
-- Table is partitioned by submit_time (monthly) for query performance at scale.
-- Bulk UPSERT via execute_values() for throughput; falls back to row-by-row on error.
-- A SimpleConnectionPool keeps 1-3 long-lived connections to avoid reconnect overhead.
-- _extract() runs in the calling thread (submit()) to spread CPU load.
-- Background thread starts an immediate snapshot on startup, then repeats every
-  snapshot_interval seconds.
+them to PostgreSQL via UPSERT. The main request path is never blocked.
 """
 
-import threading
 import logging
+import threading
 import time
 from datetime import datetime, timezone
 from typing import Optional
 
+from ..models.db import psycopg_connect_kwargs
+
+
 logger = logging.getLogger(__name__)
 
-TERMINAL_STATES = frozenset([
-    "COMPLETED", "FAILED", "CANCELLED", "TIMEOUT",
-    "NODE_FAIL", "DEADLINE", "OUT_OF_MEMORY", "PREEMPTED", "BOOT_FAIL",
-])
+TERMINAL_STATES = frozenset(
+    [
+        "COMPLETED",
+        "FAILED",
+        "CANCELLED",
+        "TIMEOUT",
+        "NODE_FAIL",
+        "DEADLINE",
+        "OUT_OF_MEMORY",
+        "PREEMPTED",
+        "BOOT_FAIL",
+    ]
+)
 
-BATCH_CHUNK = 500  # rows per execute_values() call
+BATCH_CHUNK = 500
+_LOOKUP_FAILED = object()
 
-# ---------------------------------------------------------------------------
-# SQL templates
-# ---------------------------------------------------------------------------
-
-# Bulk UPSERT for jobs that have a non-NULL submit_time.
-# Conflict target: (job_id, submit_time) unique index.
 _UPSERT_SQL = """
 INSERT INTO job_snapshots (
     job_id, submit_time,
     first_seen, last_seen,
     job_name, job_state, state_reason,
-    user_name, account, "group", partition, qos,
+    user_id, account, "group", partition, qos,
     nodes, node_count, cpus, priority,
     tres_req_str, tres_per_job, tres_per_node, gres_detail,
     start_time, end_time, time_limit_minutes,
@@ -68,65 +66,143 @@ ON CONFLICT (job_id, submit_time) DO UPDATE SET
     qos                = EXCLUDED.qos,
     time_limit_minutes = EXCLUDED.time_limit_minutes,
     working_directory  = EXCLUDED.working_directory,
-    command            = EXCLUDED.command
+    command            = EXCLUDED.command,
+    user_id            = EXCLUDED.user_id
 """
 
-# Template for execute_values – one tuple per row, matching column order above.
-_ROW_TEMPLATE = "(%(job_id)s, %(submit_time)s, NOW(), NOW(), %(job_name)s, %(job_state)s, %(state_reason)s, %(user_name)s, %(account)s, %(group)s, %(partition)s, %(qos)s, %(nodes)s, %(node_count)s, %(cpus)s, %(priority)s, %(tres_req_str)s, %(tres_per_job)s, %(tres_per_node)s, %(gres_detail)s, %(start_time)s, %(end_time)s, %(time_limit_minutes)s, %(exit_code)s, %(working_directory)s, %(command)s)"
+_ROW_TEMPLATE = (
+    "(%(job_id)s, %(submit_time)s, NOW(), NOW(), %(job_name)s, %(job_state)s, "
+    "%(state_reason)s, %(user_id)s, %(account)s, %(group)s, %(partition)s, %(qos)s, "
+    "%(nodes)s, %(node_count)s, %(cpus)s, %(priority)s, %(tres_req_str)s, "
+    "%(tres_per_job)s, %(tres_per_node)s, %(gres_detail)s, %(start_time)s, "
+    "%(end_time)s, %(time_limit_minutes)s, %(exit_code)s, %(working_directory)s, "
+    "%(command)s)"
+)
+
+_SELECT_COLUMNS = """
+js.id,
+js.job_id,
+js.submit_time,
+js.first_seen,
+js.last_seen AS snapshot_time,
+js.job_name,
+js.job_state,
+js.state_reason,
+js.user_id,
+u.username AS user_name,
+js.account,
+js."group",
+js.partition,
+js.qos,
+js.nodes,
+js.node_count,
+js.cpus,
+js.priority,
+js.tres_req_str,
+js.tres_per_job,
+js.tres_per_node,
+js.gres_detail,
+js.start_time,
+js.end_time,
+js.time_limit_minutes,
+js.exit_code,
+js.working_directory,
+js.command
+"""
 
 _CLEANUP_SQL = "DELETE FROM job_snapshots WHERE submit_time < NOW() - INTERVAL '%s days'"
 
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
+def _state_str(value) -> Optional[str]:
+    if isinstance(value, list):
+        states = [state for state in value if state]
+        return ",".join(states) if states else None
+    if value in (None, ""):
+        return None
+    return str(value)
+
+
+def _tres_str(value):
+    if isinstance(value, dict):
+        return ",".join(f"{key}={val}" for key, val in value.items())
+    return str(value) if value else None
+
+
+def _gres_str(value):
+    if isinstance(value, list):
+        return ",".join(value) if value else None
+    return str(value) if value else None
+
+
+def _exit_str(value):
+    if isinstance(value, dict):
+        return "{}:{}".format(
+            value.get("return_code", ""),
+            value.get("signal", {}).get("signal_id", ""),
+        )
+    return str(value) if value else None
+
+
+def _int_field(value):
+    if isinstance(value, dict):
+        if not value.get("set", True):
+            return None
+        if value.get("infinite", False):
+            return None
+        value = value.get("number")
+    try:
+        return int(value) if value is not None else None
+    except (TypeError, ValueError):
+        return None
+
+
+def _state_values(value) -> list:
+    state_str = _state_str(value)
+    if state_str is None:
+        return []
+    return [state.strip() for state in state_str.split(",") if state.strip()]
+
+
+def _is_terminal_state(value) -> bool:
+    return any(state in TERMINAL_STATES for state in _state_values(value))
+
+
+def _is_not_found_error(err: Exception) -> bool:
+    return err.__class__.__name__ == "SlurmrestdNotFoundError"
+
 
 def _ts(value):
     """Convert a Slurm epoch integer to a timezone-aware datetime, or None."""
-    if not value or value <= 0:
+    if isinstance(value, dict):
+        if not value.get("set", True):
+            return None
+        value = value.get("number")
+
+    if value in (None, ""):
+        return None
+
+    try:
+        value = int(value)
+    except (TypeError, ValueError):
+        return None
+
+    if value <= 0:
         return None
     try:
-        return datetime.fromtimestamp(int(value), tz=timezone.utc)
+        return datetime.fromtimestamp(value, tz=timezone.utc)
     except (OSError, OverflowError, ValueError):
         return None
 
 
 def _extract(job: dict) -> dict:
-    """Extract and normalise fields from a raw slurmrestd job dict."""
-    states = job.get("job_state", [])
-    state_str = ",".join(states) if isinstance(states, list) else str(states)
-
-    def _tres_str(v):
-        if isinstance(v, dict):
-            return ",".join(f"{k}={val}" for k, val in v.items())
-        return str(v) if v else None
-
-    gres_detail = job.get("gres_detail", [])
-    if isinstance(gres_detail, list):
-        gres_str = ",".join(gres_detail) if gres_detail else None
-    else:
-        gres_str = str(gres_detail) if gres_detail else None
-
-    exit_code = job.get("exit_code", {})
-    if isinstance(exit_code, dict):
-        exit_str = f"{exit_code.get('return_code', '')}:{exit_code.get('signal', {}).get('signal_id', '')}"
-    else:
-        exit_str = str(exit_code) if exit_code else None
-
-    def _int_field(v):
-        if isinstance(v, dict):
-            return v.get("number") or v.get("set") or None
-        try:
-            return int(v) if v is not None else None
-        except (TypeError, ValueError):
-            return None
-
+    """Extract and normalize fields from a raw slurmrestd job dict."""
     return {
         "job_id": job.get("job_id"),
         "job_name": job.get("name"),
-        "job_state": state_str,
+        "job_state": _state_str(job.get("job_state")),
         "state_reason": job.get("state_reason"),
         "user_name": job.get("user_name"),
+        "user_id": None,
         "account": job.get("account"),
         "group": job.get("group"),
         "partition": job.get("partition"),
@@ -138,15 +214,97 @@ def _extract(job: dict) -> dict:
         "tres_req_str": _tres_str(job.get("tres_req_str") or job.get("tres_per_job")),
         "tres_per_job": _tres_str(job.get("tres_per_job")),
         "tres_per_node": _tres_str(job.get("tres_per_node")),
-        "gres_detail": gres_str,
+        "gres_detail": _gres_str(job.get("gres_detail")),
         "submit_time": _ts(job.get("submit_time")),
         "start_time": _ts(job.get("start_time")),
         "end_time": _ts(job.get("end_time")),
         "time_limit_minutes": _int_field(job.get("time_limit")),
-        "exit_code": exit_str,
+        "exit_code": _exit_str(job.get("exit_code")),
         "working_directory": job.get("current_working_directory"),
         "command": job.get("command"),
     }
+
+
+def _extract_detail(job: dict, fallback: Optional[dict] = None) -> dict:
+    """Extract fields from merged slurmdb/slurmctld job details."""
+    fallback = fallback or {}
+    association = job.get("association", {})
+    state = job.get("state", {})
+    time_data = job.get("time", {})
+
+    row = {
+        "job_id": job.get("job_id", fallback.get("job_id")),
+        "job_name": job.get("name", fallback.get("job_name")),
+        "job_state": _state_str(
+            state.get("current", job.get("job_state")) if isinstance(state, dict) else job.get("job_state")
+        )
+        or fallback.get("job_state"),
+        "state_reason": (
+            state.get("reason") if isinstance(state, dict) else job.get("state_reason")
+        )
+        or fallback.get("state_reason"),
+        "user_name": job.get("user")
+        or job.get("user_name")
+        or fallback.get("user_name"),
+        "user_id": fallback.get("user_id"),
+        "account": association.get("account", job.get("account"))
+        if isinstance(association, dict)
+        else job.get("account"),
+        "group": job.get("group")
+        or job.get("group_name")
+        or fallback.get("group"),
+        "partition": job.get("partition", fallback.get("partition")),
+        "qos": job.get("qos", fallback.get("qos")),
+        "nodes": job.get("nodes", fallback.get("nodes")),
+        "node_count": _int_field(job.get("node_count")),
+        "cpus": _int_field(job.get("cpus")),
+        "priority": _int_field(job.get("priority")),
+        "tres_req_str": _tres_str(job.get("tres_req_str") or job.get("tres_per_job")),
+        "tres_per_job": _tres_str(job.get("tres_per_job")),
+        "tres_per_node": _tres_str(job.get("tres_per_node")),
+        "gres_detail": _gres_str(job.get("gres_detail")),
+        "submit_time": _ts(
+            time_data.get("submission") if isinstance(time_data, dict) else job.get("submit_time")
+        ),
+        "start_time": _ts(
+            time_data.get("start") if isinstance(time_data, dict) else job.get("start_time")
+        ),
+        "end_time": _ts(
+            time_data.get("end") if isinstance(time_data, dict) else job.get("end_time")
+        ),
+        "time_limit_minutes": _int_field(
+            time_data.get("limit") if isinstance(time_data, dict) else job.get("time_limit")
+        ),
+        "exit_code": _exit_str(job.get("exit_code") or job.get("derived_exit_code")),
+        "working_directory": job.get("current_working_directory")
+        or job.get("working_directory")
+        or fallback.get("working_directory"),
+        "command": job.get("command")
+        or job.get("submit_line")
+        or fallback.get("command"),
+    }
+
+    for key in (
+        "account",
+        "partition",
+        "qos",
+        "nodes",
+        "node_count",
+        "cpus",
+        "priority",
+        "tres_req_str",
+        "tres_per_job",
+        "tres_per_node",
+        "gres_detail",
+        "time_limit_minutes",
+    ):
+        if row[key] is None:
+            row[key] = fallback.get(key)
+
+    if row["submit_time"] is None:
+        row["submit_time"] = fallback.get("submit_time")
+
+    return row
 
 
 def _dedup(rows: list) -> list:
@@ -157,35 +315,35 @@ def _dedup(rows: list) -> list:
     return list(seen.values())
 
 
-# ---------------------------------------------------------------------------
-# JobsStore
-# ---------------------------------------------------------------------------
+def _serialize_datetimes(row: dict) -> dict:
+    data = dict(row)
+    for key, value in data.items():
+        if isinstance(value, datetime):
+            data[key] = value.isoformat()
+    return data
+
 
 class JobsStore:
     """
-    Manages PostgreSQL persistence for job snapshots.
+    Manage PostgreSQL persistence for job snapshots.
 
     Usage:
         store = JobsStore(settings, slurmrestd)
-        store.start()           # start background thread
-        store.submit(jobs_list) # called from /jobs view (optional supplement)
-        store.query(filters)    # called from /jobs/history view
-        store.stop()            # on shutdown (optional)
+        store.start()
+        store.submit(jobs_list)
+        store.query(filters)
+        store.stop()
     """
 
     def __init__(self, settings, slurmrestd=None):
         self._settings = settings
         self._slurmrestd = slurmrestd
         self._lock = threading.Lock()
-        self._pending: list = []
-        self._thread: Optional[threading.Thread] = None
+        self._pending = []
+        self._thread = None  # type: Optional[threading.Thread]
         self._stop_event = threading.Event()
         self._last_cleanup = 0.0
-        self._pool = None  # initialised lazily in background thread
-
-    # ------------------------------------------------------------------
-    # Public API
-    # ------------------------------------------------------------------
+        self._pool = None
 
     def start(self):
         self._thread = threading.Thread(
@@ -198,85 +356,77 @@ class JobsStore:
         self._stop_event.set()
 
     def submit(self, jobs: list):
-        """
-        Called from the /jobs view after slurmrestd returns data.
-        Extracts fields immediately and enqueues valid rows.
-        Jobs missing job_id or submit_time are silently skipped.
-        """
-        valid = []
-        for job in jobs:
-            row = _extract(job)
-            if not row["job_id"] or not row["submit_time"]:
-                logger.debug(
-                    "Skipping job with missing job_id or submit_time: job_id=%s",
-                    row.get("job_id"),
-                )
-                continue
-            valid.append(row)
-        if valid:
-            with self._lock:
-                self._pending.extend(valid)
+        self._queue_rows(self._prepare_rows(jobs))
 
     def query(self, filters: dict) -> dict:
-        """Query job_snapshots with optional filters."""
         import psycopg2.extras
 
         page = max(1, int(filters.get("page", 1)))
         page_size = min(500, max(1, int(filters.get("page_size", 100))))
         offset = (page - 1) * page_size
 
-        where_clauses, params = [], []
+        where_clauses = []
+        params = []
 
         if filters.get("start"):
-            where_clauses.append("submit_time >= %s")
+            where_clauses.append("js.submit_time >= %s")
             params.append(filters["start"])
         if filters.get("end"):
-            where_clauses.append("submit_time <= %s")
+            where_clauses.append("js.submit_time <= %s")
             params.append(filters["end"])
         if filters.get("user"):
-            where_clauses.append("user_name = %s")
+            where_clauses.append("u.username = %s")
             params.append(filters["user"])
         if filters.get("account"):
-            where_clauses.append("account = %s")
+            where_clauses.append("js.account = %s")
             params.append(filters["account"])
         if filters.get("partition"):
-            where_clauses.append("partition = %s")
+            where_clauses.append("js.partition = %s")
             params.append(filters["partition"])
         if filters.get("qos"):
-            where_clauses.append("qos = %s")
+            where_clauses.append("js.qos = %s")
             params.append(filters["qos"])
         if filters.get("state"):
-            where_clauses.append("job_state LIKE %s")
+            where_clauses.append("js.job_state LIKE %s")
             params.append(f"%{filters['state']}%")
         if filters.get("job_id"):
-            where_clauses.append("job_id = %s")
+            where_clauses.append("js.job_id = %s")
             params.append(int(filters["job_id"]))
 
-        where_sql = ("WHERE " + " AND ".join(where_clauses)) if where_clauses else ""
+        where_sql = ""
+        if where_clauses:
+            where_sql = "WHERE " + " AND ".join(where_clauses)
 
         conn = self._get_conn()
         try:
             with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-                cur.execute(f"SELECT COUNT(*) FROM job_snapshots {where_sql}", params)
+                cur.execute(
+                    "SELECT COUNT(*) "
+                    "FROM job_snapshots js "
+                    "LEFT JOIN users u ON u.id = js.user_id "
+                    f"{where_sql}",
+                    params,
+                )
                 total = cur.fetchone()["count"]
                 cur.execute(
-                    f"SELECT * FROM job_snapshots {where_sql} "
-                    f"ORDER BY submit_time DESC LIMIT %s OFFSET %s",
+                    "SELECT "
+                    + _SELECT_COLUMNS
+                    + " FROM job_snapshots js "
+                    + "LEFT JOIN users u ON u.id = js.user_id "
+                    + f"{where_sql} "
+                    + "ORDER BY js.submit_time DESC LIMIT %s OFFSET %s",
                     params + [page_size, offset],
                 )
                 rows = cur.fetchall()
         finally:
             self._release_conn(conn)
 
-        jobs_out = []
-        for row in rows:
-            d = dict(row)
-            for k, v in d.items():
-                if isinstance(v, datetime):
-                    d[k] = v.isoformat()
-            jobs_out.append(d)
-
-        return {"total": total, "page": page, "page_size": page_size, "jobs": jobs_out}
+        return {
+            "total": total,
+            "page": page,
+            "page_size": page_size,
+            "jobs": [_serialize_datetimes(row) for row in rows],
+        }
 
     def get_by_id(self, record_id: int) -> Optional[dict]:
         import psycopg2.extras
@@ -284,34 +434,29 @@ class JobsStore:
         conn = self._get_conn()
         try:
             with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-                cur.execute("SELECT * FROM job_snapshots WHERE id = %s", (record_id,))
+                cur.execute(
+                    "SELECT "
+                    + _SELECT_COLUMNS
+                    + " FROM job_snapshots js "
+                    + "LEFT JOIN users u ON u.id = js.user_id "
+                    + "WHERE js.id = %s",
+                    (record_id,),
+                )
                 row = cur.fetchone()
         finally:
             self._release_conn(conn)
 
         if row is None:
             return None
-        d = dict(row)
-        for k, v in d.items():
-            if isinstance(v, datetime):
-                d[k] = v.isoformat()
-        return d
-
-    # ------------------------------------------------------------------
-    # Connection pool
-    # ------------------------------------------------------------------
+        return _serialize_datetimes(row)
 
     def _init_pool(self):
         import psycopg2.pool
 
-        s = self._settings
         self._pool = psycopg2.pool.SimpleConnectionPool(
-            1, 3,
-            host=s.host,
-            port=s.port,
-            dbname=s.database,
-            user=s.user,
-            password=s.password,
+            1,
+            3,
+            **psycopg_connect_kwargs(self._settings),
         )
         logger.debug("PostgreSQL connection pool initialised")
 
@@ -324,26 +469,17 @@ class JobsStore:
         if self._pool is not None:
             self._pool.putconn(conn)
 
-    # ------------------------------------------------------------------
-    # Background thread
-    # ------------------------------------------------------------------
-
     def _run(self):
         interval = getattr(self._settings, "snapshot_interval", 60)
         retention = getattr(self._settings, "retention_days", 180)
 
-        # Initialise pool inside the thread so psycopg2 connections are
-        # owned by the thread that uses them.
         try:
             self._init_pool()
-        except Exception as e:
-            logger.error("Failed to initialise DB connection pool: %s", e)
+        except Exception as err:
+            logger.error("Failed to initialise DB connection pool: %s", err)
             return
 
-        # Ensure partitions exist before first write
         self._ensure_partitions()
-
-        # Immediate first snapshot
         self._scheduled_snapshot()
         self._flush()
 
@@ -353,34 +489,162 @@ class JobsStore:
             self._flush()
             self._maybe_cleanup(retention)
 
-        # Final flush on shutdown
         self._flush()
 
     def _scheduled_snapshot(self):
-        """Fetch all current jobs from slurmrestd (unfiltered) and enqueue them."""
         if self._slurmrestd is None:
             return
         try:
-            # Use jobs_unfiltered() to get complete field set for persistence
             if hasattr(self._slurmrestd, "jobs_unfiltered"):
                 jobs = self._slurmrestd.jobs_unfiltered()
             else:
                 jobs = self._slurmrestd.jobs()
-            self.submit(jobs)
+            rows = self._prepare_rows(jobs)
+            self._queue_rows(rows)
+            self._reconcile_missing_active_jobs(rows)
             logger.debug("Scheduled snapshot: fetched %d jobs", len(jobs))
-        except Exception as e:
-            logger.warning("Scheduled snapshot failed: %s", e)
+        except Exception as err:
+            logger.warning("Scheduled snapshot failed: %s", err)
 
-    # ------------------------------------------------------------------
-    # Partition management
-    # ------------------------------------------------------------------
+    def _prepare_rows(self, jobs: list) -> list:
+        valid = []
+        for job in jobs:
+            row = _extract(job)
+            if not row["job_id"] or not row["submit_time"]:
+                logger.debug(
+                    "Skipping job with missing job_id or submit_time: job_id=%s",
+                    row.get("job_id"),
+                )
+                continue
+            valid.append(row)
+        return valid
+
+    def _queue_rows(self, rows: list):
+        if rows:
+            with self._lock:
+                self._pending.extend(rows)
+
+    def _active_records(self) -> list:
+        import psycopg2.extras
+
+        terminal_params = [f"%{state}%" for state in TERMINAL_STATES]
+        where_sql = " OR ".join(["js.job_state LIKE %s"] * len(TERMINAL_STATES))
+
+        conn = self._get_conn()
+        try:
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                cur.execute(
+                    "SELECT "
+                    + _SELECT_COLUMNS
+                    + " FROM job_snapshots js "
+                    + "LEFT JOIN users u ON u.id = js.user_id "
+                    + "WHERE js.job_state IS NULL OR NOT ("
+                    + where_sql
+                    + ") "
+                    + "ORDER BY js.last_seen DESC",
+                    terminal_params,
+                )
+                return cur.fetchall()
+        finally:
+            self._release_conn(conn)
+
+    def _reconcile_missing_active_jobs(self, current_rows: list):
+        if self._slurmrestd is None:
+            return
+
+        current_keys = {(row["job_id"], row["submit_time"]) for row in current_rows}
+        queued_rows = []
+        observed_at = datetime.now(tz=timezone.utc)
+
+        for record in self._active_records():
+            key = (record["job_id"], record["submit_time"])
+            if key in current_keys:
+                continue
+
+            updated_row = self._refresh_missing_active_job(record)
+            if updated_row is _LOOKUP_FAILED:
+                continue
+            if updated_row is None:
+                queued_rows.append(self._complete_missing_job(record, observed_at))
+            else:
+                queued_rows.append(updated_row)
+
+        self._queue_rows(queued_rows)
+
+    def _refresh_missing_active_job(self, record: dict):
+        try:
+            job = self._slurmrestd.job(record["job_id"])
+        except Exception as err:
+            if not _is_not_found_error(err):
+                logger.warning(
+                    "Unable to refresh missing active job %s: %s",
+                    record["job_id"],
+                    err,
+                )
+                return _LOOKUP_FAILED
+            logger.info(
+                "Job %s missing from active queue and detail lookup; marking completed",
+                record["job_id"],
+            )
+            return None
+
+        row = _extract_detail(job, record)
+        if not row["job_id"] or not row["submit_time"]:
+            logger.warning(
+                "Ignoring detail refresh for job %s due to missing key fields",
+                record["job_id"],
+            )
+            return _LOOKUP_FAILED
+
+        record_submit_time = record.get("submit_time")
+        if (
+            record_submit_time is not None
+            and row["submit_time"] is not None
+            and row["submit_time"] != record_submit_time
+        ):
+            logger.warning(
+                "Ignoring detail refresh for job %s due to submit_time mismatch",
+                record["job_id"],
+            )
+            return None
+
+        return row
+
+    def _complete_missing_job(self, record: dict, observed_at: datetime) -> dict:
+        return {
+            "job_id": record.get("job_id"),
+            "job_name": record.get("job_name"),
+            "job_state": "COMPLETED",
+            "state_reason": record.get("state_reason")
+            or "Job missing from active queue and detail lookup",
+            "user_name": record.get("user_name"),
+            "user_id": record.get("user_id"),
+            "account": record.get("account"),
+            "group": record.get("group"),
+            "partition": record.get("partition"),
+            "qos": record.get("qos"),
+            "nodes": record.get("nodes"),
+            "node_count": record.get("node_count"),
+            "cpus": record.get("cpus"),
+            "priority": record.get("priority"),
+            "tres_req_str": record.get("tres_req_str"),
+            "tres_per_job": record.get("tres_per_job"),
+            "tres_per_node": record.get("tres_per_node"),
+            "gres_detail": record.get("gres_detail"),
+            "submit_time": record.get("submit_time"),
+            "start_time": record.get("start_time"),
+            "end_time": record.get("end_time") or observed_at,
+            "time_limit_minutes": record.get("time_limit_minutes"),
+            "exit_code": record.get("exit_code"),
+            "working_directory": record.get("working_directory"),
+            "command": record.get("command"),
+        }
 
     def _ensure_partitions(self):
         """Create monthly partitions for the current month and next month if missing."""
         try:
             from dateutil.relativedelta import relativedelta
         except ImportError:
-            # dateutil not available – skip auto-partition creation
             logger.debug("python-dateutil not available, skipping auto-partition creation")
             return
 
@@ -388,8 +652,10 @@ class JobsStore:
         conn = self._get_conn()
         try:
             for delta in (0, 1):
-                month_start = (now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-                               + relativedelta(months=delta))
+                month_start = (
+                    now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+                    + relativedelta(months=delta)
+                )
                 month_end = month_start + relativedelta(months=1)
                 table = f"job_snapshots_{month_start.strftime('%Y_%m')}"
                 with conn.cursor() as cur:
@@ -403,8 +669,8 @@ class JobsStore:
                     )
                 conn.commit()
                 logger.debug("Ensured partition %s", table)
-        except Exception as e:
-            logger.warning("Failed to ensure partitions: %s", e)
+        except Exception as err:
+            logger.warning("Failed to ensure partitions: %s", err)
             try:
                 conn.rollback()
             except Exception:
@@ -412,9 +678,38 @@ class JobsStore:
         finally:
             self._release_conn(conn)
 
-    # ------------------------------------------------------------------
-    # Flush logic
-    # ------------------------------------------------------------------
+    def _ensure_users(self, conn, rows: list):
+        from psycopg2.extras import execute_values
+
+        usernames = sorted(
+            {row["user_name"] for row in rows if row.get("user_name")}
+        )
+        if not usernames:
+            for row in rows:
+                row.setdefault("user_id", None)
+            return
+
+        payload = [(username,) for username in usernames]
+        with conn.cursor() as cur:
+            execute_values(
+                cur,
+                """
+                INSERT INTO users (username, groups, created_at, updated_at)
+                VALUES %s
+                ON CONFLICT (username) DO NOTHING
+                """,
+                payload,
+                template="(%s, '[]'::jsonb, NOW(), NOW())",
+                page_size=len(payload),
+            )
+            cur.execute(
+                "SELECT id, username FROM users WHERE username = ANY(%s)",
+                (usernames,),
+            )
+            mapping = {username: user_id for user_id, username in cur.fetchall()}
+
+        for row in rows:
+            row["user_id"] = mapping.get(row.get("user_name"))
 
     def _flush(self):
         with self._lock:
@@ -424,60 +719,69 @@ class JobsStore:
         if not batch:
             return
 
-        # Deduplicate within this batch
         batch = _dedup(batch)
-
         failed = []
         for i in range(0, len(batch), BATCH_CHUNK):
-            chunk = batch[i: i + BATCH_CHUNK]
-            chunk_failed = self._flush_chunk(chunk)
-            failed.extend(chunk_failed)
+            chunk = batch[i : i + BATCH_CHUNK]
+            failed.extend(self._flush_chunk(chunk))
 
         if failed:
             logger.warning("Re-queuing %d failed job rows for retry", len(failed))
             with self._lock:
                 self._pending = failed + self._pending
 
-        logger.debug("Persisted %d job snapshots (%d failed)", len(batch) - len(failed), len(failed))
+        logger.debug(
+            "Persisted %d job snapshots (%d failed)",
+            len(batch) - len(failed),
+            len(failed),
+        )
 
     def _flush_chunk(self, chunk: list) -> list:
-        """
-        Attempt bulk UPSERT for a chunk.  On failure, fall back to row-by-row
-        without rolling back successfully committed rows.
-        Returns list of rows that ultimately failed.
-        """
         from psycopg2.extras import execute_values
 
         conn = self._get_conn()
         try:
+            self._ensure_users(conn, chunk)
             with conn.cursor() as cur:
-                execute_values(cur, _UPSERT_SQL, chunk, template=_ROW_TEMPLATE, page_size=len(chunk))
+                execute_values(
+                    cur,
+                    _UPSERT_SQL,
+                    chunk,
+                    template=_ROW_TEMPLATE,
+                    page_size=len(chunk),
+                )
             conn.commit()
             return []
         except Exception as bulk_err:
             logger.warning(
                 "Bulk UPSERT failed for %d jobs, falling back to row-by-row: %s",
-                len(chunk), bulk_err,
+                len(chunk),
+                bulk_err,
             )
             try:
                 conn.rollback()
             except Exception:
                 pass
 
-            # Row-by-row fallback – each row is its own transaction
             failed = []
             for row in chunk:
                 try:
+                    self._ensure_users(conn, [row])
                     with conn.cursor() as cur:
                         execute_values(
-                            cur, _UPSERT_SQL, [row],
-                            template=_ROW_TEMPLATE, page_size=1,
+                            cur,
+                            _UPSERT_SQL,
+                            [row],
+                            template=_ROW_TEMPLATE,
+                            page_size=1,
                         )
                     conn.commit()
                 except Exception as row_err:
                     logger.warning(
                         "Failed to upsert job_id=%s submit_time=%s: %s",
-                        row.get("job_id"), row.get("submit_time"), row_err,
+                        row.get("job_id"),
+                        row.get("submit_time"),
+                        row_err,
                     )
                     try:
                         conn.rollback()
@@ -487,10 +791,6 @@ class JobsStore:
             return failed
         finally:
             self._release_conn(conn)
-
-    # ------------------------------------------------------------------
-    # Cleanup
-    # ------------------------------------------------------------------
 
     def _maybe_cleanup(self, retention_days: int):
         now = time.time()
@@ -506,10 +806,11 @@ class JobsStore:
             if deleted:
                 logger.info(
                     "Cleaned up %d job snapshot records older than %d days",
-                    deleted, retention_days,
+                    deleted,
+                    retention_days,
                 )
-        except Exception as e:
-            logger.error("Job persistence cleanup error: %s", e)
+        except Exception as err:
+            logger.error("Job persistence cleanup error: %s", err)
             try:
                 conn.rollback()
             except Exception:

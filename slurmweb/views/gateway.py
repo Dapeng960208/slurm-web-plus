@@ -68,6 +68,10 @@ def login():
     token = current_app.jwt.generate(
         user=user, duration=current_app.settings.jwt.duration
     )
+    try:
+        asyncio_run(async_cache_user_on_agents(token))
+    except Exception as err:
+        logger.warning("Failed to propagate authenticated user cache to agents: %s", err)
     return jsonify(
         result="Authentication successful",
         token=token,
@@ -189,6 +193,44 @@ def users():
             for user in current_app.authentifier.users()
         ]
     )
+
+
+async def cache_user_on_agent(session: aiohttp.ClientSession, cluster: str, token: str):
+    url = (
+        f"{current_app.agents[cluster].url}/"
+        f"v{current_app.agents[cluster].version}/users/cache"
+    )
+    try:
+        async with session.post(
+            url,
+            headers={"Authorization": f"Bearer {token}"},
+        ) as response:
+            if response.status >= 400:
+                logger.warning(
+                    "Unable to cache authenticated user on agent %s: HTTP %s",
+                    cluster,
+                    response.status,
+                )
+    except aiohttp.ClientError as err:
+        logger.warning(
+            "Unable to cache authenticated user on agent %s: %s",
+            cluster,
+            err,
+        )
+
+
+async def async_cache_user_on_agents(token: str):
+    if not current_app.agents:
+        return
+    async with aiohttp.ClientSession(
+        connector=current_app.get_agent_connector()
+    ) as session:
+        await asyncio.gather(
+            *[
+                cache_user_on_agent(session, cluster, token)
+                for cluster in current_app.agents.keys()
+            ]
+        )
 
 
 def request_agent(
@@ -394,6 +436,13 @@ def ui_files(name="index.html"):
 def jobs_history(cluster: str):
     """Proxy job history query to the agent."""
     return proxy_agent(cluster, "jobs/history", request.token)
+
+
+@check_jwt
+@validate_cluster
+def job_history_detail(cluster: str, record_id: int):
+    """Proxy one job history record query to the agent."""
+    return proxy_agent(cluster, f"jobs/history/{record_id}", request.token)
 
 
 @check_jwt

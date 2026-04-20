@@ -13,7 +13,10 @@ import type { LocationQueryRaw } from 'vue-router'
 import { ChevronLeftIcon } from '@heroicons/vue/20/solid'
 import { useRuntimeStore } from '@/stores/runtime'
 
-const { cluster } = defineProps<{ cluster: string }>()
+const { cluster, routeName = 'jobs' } = defineProps<{
+  cluster: string
+  routeName?: 'jobs' | 'jobs-history'
+}>()
 
 const router = useRouter()
 const route = useRoute()
@@ -22,7 +25,8 @@ const runtimeStore = useRuntimeStore()
 const buttonText = computed(() => {
   const returnTo = route.query.returnTo as string
   const nodeName = route.query.nodeName as string
-  return returnTo === 'node' && nodeName ? 'Back to node' : 'Back to jobs'
+  if (returnTo === 'node' && nodeName) return 'Back to node'
+  return routeName === 'jobs-history' ? 'Back to jobs history' : 'Back to jobs'
 })
 
 /* Handle back button click. If returnTo query parameter is set to 'node',
@@ -36,10 +40,15 @@ function handleBackClick() {
       name: 'node',
       params: { cluster: cluster, nodeName: nodeName }
     })
+  } else if (routeName === 'jobs-history') {
+    router.push({
+      name: 'jobs-history',
+      params: { cluster: cluster }
+    })
   } else {
     router.push({
       name: 'jobs',
-      params: { cluster: runtimeStore.currentCluster?.name },
+      params: { cluster: runtimeStore.currentCluster?.name ?? cluster },
       query: runtimeStore.jobs.query() as LocationQueryRaw
     })
   }
