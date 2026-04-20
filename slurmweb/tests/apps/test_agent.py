@@ -83,3 +83,25 @@ class TestAgentApp(TestAgentBase):
         self.assertEqual(
             cm.output, ["CRITICAL:slurmweb.apps.agent:Configuration error: fail"]
         )
+
+    @mock.patch("slurmweb.persistence.users_store.UsersStore")
+    def test_app_enables_database_support_when_database_enabled(
+        self, mock_users_store
+    ):
+        self.setup_client(database=True)
+        mock_users_store.assert_called_once()
+        mock_users_store.return_value.validate_connection.assert_called_once()
+
+    @mock.patch("slurmweb.persistence.users_store.UsersStore")
+    def test_app_continues_when_database_support_init_fails(self, mock_users_store):
+        mock_users_store.return_value.validate_connection.side_effect = RuntimeError("boom")
+        with self.assertLogs("slurmweb", level="WARNING") as cm:
+            self.setup_client(database=True, persistence=True)
+        self.assertIn(
+            "WARNING:slurmweb.apps.agent:Unable to initialize database support: boom",
+            cm.output,
+        )
+        self.assertIn(
+            "WARNING:slurmweb.apps.agent:Job history persistence is enabled but database support is unavailable: boom",
+            cm.output,
+        )

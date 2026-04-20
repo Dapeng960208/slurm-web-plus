@@ -134,7 +134,7 @@ if [ $? -eq 0 ]; then
 else
     echo "✗ 数据库连接失败或表不存在"
     echo "  如果启用了 persistence，请运行："
-    echo "  sudo -u postgres psql -d slurmweb -f conf/init_db.sql"
+    echo "  alembic upgrade head"
 fi
 echo ""
 

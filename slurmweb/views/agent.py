@@ -50,7 +50,7 @@ def info():
             "version": racksdb_get_version(),
         },
         "version": get_version(),
-        "persistence": current_app.settings.persistence.enabled,
+        "persistence": current_app.jobs_store is not None,
         "node_metrics": current_app.settings.node_metrics.enabled,
     }
     return jsonify(data)
@@ -335,6 +335,27 @@ def job_history_detail(record_id: int):
     if record is None:
         abort(404, f"Job history record {record_id} not found")
     return jsonify(record)
+
+
+@check_jwt
+def cache_authenticated_user():
+    """Cache the authenticated user details in the local users table."""
+    if current_app.users_store is None:
+        error = "User cache persistence is disabled"
+        logger.warning(error)
+        abort(501, error)
+
+    try:
+        current_app.users_store.upsert_ldap_user(
+            request.user.login,
+            getattr(request.user, "fullname", None),
+            getattr(request.user, "groups", []),
+        )
+    except Exception as err:
+        logger.warning("Unable to cache authenticated user %s: %s", request.user, err)
+        abort(500, str(err))
+
+    return jsonify({"result": "User cache updated"})
 
 
 @rbac_action("view-nodes")

@@ -64,6 +64,21 @@ enabled=yes
 [cache]
 enabled=yes
 {% endif %}
+
+{% if database %}
+[database]
+enabled=yes
+host=localhost
+port=5432
+database=slurmweb
+user=slurmweb
+password=secret
+{% endif %}
+
+{% if persistence %}
+[persistence]
+enabled=yes
+{% endif %}
 """
 
 
@@ -81,7 +96,13 @@ class FakeRacksDBWebBlueprint(Blueprint):
 
 class TestAgentConfBase(unittest.TestCase):
     def setup_agent_conf(
-        self, slurmrestd_parameters=None, racksdb=True, metrics=False, cache=False
+        self,
+        slurmrestd_parameters=None,
+        racksdb=True,
+        metrics=False,
+        cache=False,
+        database=False,
+        persistence=False,
     ):
         # Generate JWT signing key
         self.key = tempfile.NamedTemporaryFile(mode="w+")
@@ -116,6 +137,8 @@ class TestAgentConfBase(unittest.TestCase):
                 racksdb=racksdb,
                 metrics=metrics,
                 cache=cache,
+                database=database,
+                persistence=persistence,
             )
         )
         self.conf.seek(0)
@@ -145,6 +168,8 @@ class TestAgentBase(TestSlurmrestdClient):
         racksdb=True,
         metrics=False,
         cache=False,
+        database=False,
+        persistence=False,
         racksdb_format_error=False,
         racksdb_schema_error=False,
         anonymous_user=False,
@@ -163,6 +188,8 @@ class TestAgentBase(TestSlurmrestdClient):
             racksdb=racksdb,
             metrics=metrics,
             cache=cache,
+            database=database,
+            persistence=persistence,
         )
 
         if racksdb:

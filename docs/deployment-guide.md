@@ -1,384 +1,492 @@
-# Slurm-web 功能扩展部署指南
+# Slurm-web 新增数据库功能生产部署指南
 
-## 1. 前提条件
+本文档面向生产环境，说明如何将“作业历史持久化 + LDAP 用户缓存”这一新增功能安全部署到服务器。
 
-| 组件 | 要求 |
-|---|---|
-| Slurm-web | 已通过 dnf 安装并正常运行 |
-| PostgreSQL | 需新安装（作业历史功能） |
-| Prometheus | 已部署，node_exporter 正在采集节点数据（节点实时资源功能） |
-| python3-psycopg2 | 需新安装（作业历史功能） |
+当前假设生产环境还没有创建 PostgreSQL 数据库，因此本文档按“首次上线数据库能力”的方式编写。
 
----
+## 1. 适用范围
 
-## 2. 安装 PostgreSQL（作业历史功能）
+适用于以下场景：
+
+- 现有 Slurm-web 已在生产运行
+- 本次上线新增 PostgreSQL、Alembic 迁移、作业历史持久化、用户缓存
+- 希望即使数据库不可用，也不影响 agent 其他非数据库功能
+
+本文默认：
+
+- `gateway` 不直连数据库
+- 数据库配置只在 `agent.ini` 中启用
+- 生产库结构由 Alembic 管理
+- agent 启动时不会自动执行 `alembic upgrade head`
+
+本次上线涉及的配置段边界如下：
+
+- `[database]`：新增，用于启用 PostgreSQL 连接和 Alembic 自动迁移
+- `[persistence]`：新增，用于启用作业历史持久化写入
+- `[node_metrics]`：新增，用于启用节点实时资源监控
+- `[metrics]`：已有功能，用于 Slurm-web 指标导出和 Prometheus 查询，不属于本次数据库迁移功能的必需项
+
+## 2. 上线前准备
+
+上线前建议先确认以下事项：
+
+- 已评估本次发布窗口，建议在低峰期执行
+- 已备份生产环境的 `agent.ini`、`gateway.ini`、前端静态文件和当前发布包
+- 已准备 PostgreSQL 实例
+- 已准备回滚方案
+- 已在测试或预发布环境完成一次完整演练
+
+建议记录当前版本：
 
 ```bash
-# 安装 PostgreSQL 和 Python 驱动
-dnf install -y postgresql-server postgresql-contrib python3-psycopg2
+slurm-web --version
+systemctl status slurm-web-agent --no-pager
+systemctl status slurm-web-gateway --no-pager
+```
 
-# 初始化数据库
+## 3. 生产发布总流程
+
+推荐顺序如下：
+
+1. 备份当前应用和配置
+2. 安装新增依赖
+3. 创建 PostgreSQL 数据库和账号
+4. 部署新版本代码
+5. 更新 `agent.ini` 中的数据库与持久化配置
+6. 手工执行一次 `alembic upgrade head`
+7. 重启 `slurm-web-agent`
+8. 验证数据库迁移和历史功能
+9. 重启 `slurm-web-gateway`
+10. 验证登录、页面和日志
+
+agent 启动时不会自动执行迁移，因此生产环境需要在重启前手工执行一次 `alembic upgrade head`。
+
+如果你当前的生产环境“还没有数据库、也没有任何历史表”，推荐按下面的最短路径执行：
+
+1. 安装并启动 PostgreSQL
+2. 创建 `slurmweb` 数据库和数据库账号
+3. 部署包含 `alembic.ini`、`slurmweb/alembic/`、`slurmweb/models/` 的新版本
+4. 在 `agent.ini` 中配置 `[database]`
+5. 先保持 `[persistence] enabled = no`
+6. 手工执行 `alembic upgrade head`
+7. 重启 `slurm-web-agent`
+8. 验证 `users`、`job_snapshots` 等表已创建
+9. 验证 LDAP 登录后 `users` 表能缓存用户
+10. 最后再开启 `[persistence] enabled = yes`
+
+## 4. 备份
+
+至少备份以下内容：
+
+```bash
+BACKUP_DIR=/root/slurm-web-backup-$(date +%F-%H%M%S)
+mkdir -p "$BACKUP_DIR"
+
+cp -a /etc/slurm-web "$BACKUP_DIR"/etc-slurm-web
+cp -a /usr/share/slurm-web "$BACKUP_DIR"/usr-share-slurm-web
+cp -a /usr/lib/python*/site-packages/slurmweb "$BACKUP_DIR"/slurmweb-python || true
+```
+
+如果已存在 PostgreSQL 数据库，建议同时备份：
+
+```bash
+sudo -u postgres pg_dump -Fc slurmweb > "$BACKUP_DIR"/slurmweb.dump
+```
+
+## 5. 安装新增依赖
+
+如果是 RPM/系统包部署，确认目标环境已经具备 PostgreSQL 客户端库和 Python 依赖。
+
+最少需要：
+
+```bash
+dnf install -y postgresql-server postgresql-contrib
+python -m pip install alembic sqlalchemy psycopg2-binary
+```
+
+如果你们是通过内部制品或虚拟环境部署，请确保以下 Python 依赖已进入最终运行环境：
+
+- `alembic`
+- `sqlalchemy`
+- `psycopg2-binary`
+
+## 6. 初始化 PostgreSQL
+
+如果生产上还没有 PostgreSQL：
+
+```bash
 postgresql-setup --initdb
-
-# 启动并设置开机自启
 systemctl enable --now postgresql
+```
 
-# 创建数据库用户和数据库
-# 切换到 postgres 用户执行
-sudo -u postgres psql -c "CREATE USER slurmweb WITH PASSWORD 'slurmweb';"
+创建数据库和账号：
+
+```bash
+sudo -u postgres psql -c "CREATE USER slurmweb WITH PASSWORD 'REPLACE_ME';"
 sudo -u postgres psql -c "CREATE DATABASE slurmweb OWNER slurmweb;"
 sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE slurmweb TO slurmweb;"
-
-# 配置 PostgreSQL 允许密码认证（解决 ident 认证失败问题）
-PG_HBA=$(sudo -u postgres psql -t -c "SHOW hba_file;" | tr -d ' ')
-# local（Unix socket）连接也需要 md5，否则报 "Ident authentication failed"
-echo "local   slurmweb   slurmweb               md5" | sudo tee -a $PG_HBA
-echo "host    slurmweb   slurmweb   127.0.0.1/32   md5" | sudo tee -a $PG_HBA
-echo "host    slurmweb   slurmweb   ::1/128        md5" | sudo tee -a $PG_HBA
-sudo systemctl reload postgresql
 ```
 
----
-
-## 3. 初始化数据库表结构
+如果启用了密码认证，确认 `pg_hba.conf` 已允许本机访问：
 
 ```bash
-# 将 init_db.sql 复制到服务器后执行
-sudo -u postgres psql -d slurmweb -f  /etc/slurm-web/init_db.sql
-
-# 验证表已创建
-sudo -u postgres psql -d slurmweb -c "\dt"
+local   slurmweb   slurmweb               md5
+host    slurmweb   slurmweb   127.0.0.1/32   md5
+host    slurmweb   slurmweb   ::1/128        md5
 ```
 
----
-
-## 4. 数据库表结构说明（job_snapshots）
-
-`job_snapshots` 表存储 agent 定时从 slurmrestd 采集的作业快照，字段与作业列表页核心字段对齐：
-
-| 字段 | 类型 | 说明 |
-|---|---|---|
-| id | BIGSERIAL PK | 自增主键，用于历史详情页跳转 |
-| snapshot_time | TIMESTAMPTZ | 快照写入时间（每次 UPSERT 更新） |
-| job_id | INTEGER | Slurm 作业 ID |
-| job_name | TEXT | 作业名称 |
-| job_state | TEXT | 作业状态（RUNNING / COMPLETED / FAILED …） |
-| state_reason | TEXT | 状态原因 |
-| user_name | TEXT | 提交用户 |
-| account | TEXT | 账户 |
-| group | TEXT | 用户组 |
-| partition | TEXT | 分区 |
-| qos | TEXT | QOS |
-| nodes | TEXT | 节点列表字符串 |
-| node_count | INTEGER | 节点数 |
-| cpus | INTEGER | CPU 数 |
-| priority | INTEGER | 优先级 |
-| tres_req_str | TEXT | TRES 请求字符串 |
-| tres_per_job | TEXT | 每作业 TRES |
-| tres_per_node | TEXT | 每节点 TRES |
-| gres_detail | TEXT | GRES 详情 |
-| submit_time | TIMESTAMPTZ | 提交时间（与 job_id 组成唯一键） |
-| start_time | TIMESTAMPTZ | 开始时间 |
-| end_time | TIMESTAMPTZ | 结束时间 |
-| time_limit_minutes | INTEGER | 时间限制（分钟） |
-| exit_code | TEXT | 退出码 |
-| working_directory | TEXT | 工作目录 |
-| command | TEXT | 提交命令 |
-
-> 这些字段与作业列表页（`/jobs`）展示的核心字段完全对应，保证历史数据与实时数据的一致性。
-
-### 唯一约束与 UPSERT 策略
-
-`(job_id, submit_time)` 组成复合唯一索引。Agent 每次采集时执行 **UPSERT**：
-- 若该作业记录已存在，则更新 `job_state`、`end_time`、`exit_code` 等可变字段，并刷新 `snapshot_time`。
-- 若不存在，则插入新行。
-
-这样每个作业在数据库中只保留一条最新状态记录，避免重复写入。
-
-### 定时采集机制
-
-Agent 启动后会在后台线程中按 `snapshot_interval`（默认 60 秒）定时调用 slurmrestd 获取全量作业列表并执行 UPSERT。无需依赖前端页面访问触发写入。
-
----
-
-## 5. 替换后端代码
-
-### 5.1 确认安装路径
+修改后重载：
 
 ```bash
-# 查找 slurmweb 安装路径
-SLURMWEB_PATH=$(python3 -c "import slurmweb; import os; print(os.path.dirname(slurmweb.__file__))")
-echo "安装路径: $SLURMWEB_PATH"
+systemctl reload postgresql
 ```
 
-### 5.2 备份原有文件
+验证连接：
 
 ```bash
-# 备份将要修改的文件
-cp $SLURMWEB_PATH/apps/agent.py    $SLURMWEB_PATH/apps/agent.py.bak
-cp $SLURMWEB_PATH/apps/gateway.py  $SLURMWEB_PATH/apps/gateway.py.bak
-cp $SLURMWEB_PATH/views/agent.py   $SLURMWEB_PATH/views/agent.py.bak
-cp $SLURMWEB_PATH/views/gateway.py $SLURMWEB_PATH/views/gateway.py.bak
-cp $SLURMWEB_PATH/metrics/db.py    $SLURMWEB_PATH/metrics/db.py.bak
-cp /usr/share/slurm-web/conf/agent.yml /usr/share/slurm-web/conf/agent.yml.bak
+psql -h 127.0.0.1 -U slurmweb -d slurmweb -c "SELECT 1;"
 ```
 
-### 5.3 替换修改的文件
+## 7. 部署新版本代码
+
+将新版本部署到生产服务器后，确认以下文件已存在：
+
+- `alembic.ini`
+- `slurmweb/alembic/env.py`
+- `slurmweb/alembic/script.py.mako`
+- `slurmweb/alembic/versions/*.py`
+- `slurmweb/models/db.py`
+- `slurmweb/models/modes.py`
+
+验证 Alembic 文件是否完整：
 
 ```bash
-# 替换核心文件
-cp /root/slurmweb/apps/agent.py    $SLURMWEB_PATH/apps/agent.py
-cp /root/slurmweb/apps/gateway.py  $SLURMWEB_PATH/apps/gateway.py
-cp /root/slurmweb/views/agent.py   $SLURMWEB_PATH/views/agent.py
-cp /root/slurmweb/views/gateway.py $SLURMWEB_PATH/views/gateway.py
-cp /root/slurmweb/metrics/db.py    $SLURMWEB_PATH/metrics/db.py
-
-# 新增 persistence 模块
-mkdir -p $SLURMWEB_PATH/persistence
-cp /root/slurmweb/persistence/__init__.py   $SLURMWEB_PATH/persistence/
-cp /root/slurmweb/persistence/jobs_store.py $SLURMWEB_PATH/persistence/
-
-# 替换配置定义文件（必须执行，否则启动时报错：
-# "Section persistence loaded in settings overrides is not defined in settings definition"）
-cp conf/vendor/agent.yml /usr/share/slurm-web/conf/agent.yml
+find /usr -path "*slurmweb/alembic*" | sort
 ```
 
----
+## 8. 配置 agent.ini
 
-## 6. 更新 Agent 配置文件
+数据库功能只在 `agent.ini` 启用，不需要在 `gateway.ini` 添加数据库配置。
 
-编辑 `/etc/slurm-web/agent.ini`，在文件末尾追加以下内容：
+示例：
 
 ```ini
-# ── 作业历史持久化（新增）────────────────────────────
-[persistence]
-enabled = true
-host = localhost
+[database]
+enabled = yes
+host = 127.0.0.1
 port = 5432
 database = slurmweb
 user = slurmweb
-password = your_password_here
-retention_days = 180
+password = REPLACE_ME
+
+[persistence]
+enabled = yes
 snapshot_interval = 60
+retention_days = 180
 
-# ── 节点实时资源监控（新增）──────────────────────────
 [node_metrics]
-enabled = true
-prometheus_host = http://your-prometheus-server:9090
-node_exporter_job = BJ-IDC-Linux-IC-HPC-Node
+enabled = no
+prometheus_host = http://127.0.0.1:9090
+node_exporter_job = node
 node_hostname_label = hostname
+
+[metrics]
+enabled = no
+restrict =
+  127.0.0.0/24
+  ::1/128
+host = http://127.0.0.1:9090
+job = slurm
 ```
 
-> **注意**：
-> - 如果只需要其中一个功能，将对应的 `enabled = false` 即可
-> - `prometheus_host` 填写你们实际的 Prometheus 服务地址
-> - `node_exporter_job` 填写 Prometheus 中 node_exporter 的 job 名称
+说明：
 
----
+- `[database]` 是本次新增配置段，负责 PostgreSQL 连接、Alembic 迁移、用户缓存前置能力
+- `[database] enabled = no` 时，agent 不会启用本地用户缓存
+- `[persistence]` 是本次新增配置段，依赖 `[database]`，负责将作业历史写入 PostgreSQL
+- `[persistence] enabled = no` 时，即使数据库可用，也不会写入作业历史
+- `[node_metrics]` 是本次新增配置段，负责从 Prometheus 查询节点实时资源
+- `[metrics]` 不是本次新增数据库能力的一部分，它是已有的指标导出/查询功能；数据库迁移和作业历史上线不要求必须启用它
+- 即使数据库表尚未准备好，也不阻塞 agent 其他非数据库功能启动
 
-## 7. 构建并替换前端代码
+建议生产首发时先采用下面的灰度配置：
 
-### 7.1 构建前端
+```ini
+[database]
+enabled = yes
+host = 127.0.0.1
+port = 5432
+database = slurmweb
+user = slurmweb
+password = REPLACE_ME
+
+[persistence]
+enabled = no
+
+[node_metrics]
+enabled = no
+```
+
+先确认数据库连接、迁移、LDAP 用户缓存都正常，再单独把 `[persistence] enabled` 改成 `yes`。
+
+## 9. Alembic 生产迁移
+
+### 9.1 生产环境执行方式
+
+在生产环境只需要执行：
 
 ```bash
-cd frontend
-npm install
-npm run build
+alembic upgrade head
 ```
 
-### 7.2 查找前端静态文件路径
+该命令默认会读取 `/etc/slurm-web/agent.ini` 中 `[database]` 的连接参数，因此生产环境不需要再把数据库密码重复写入 `alembic.ini`。
+如果你的配置文件不在默认位置，可先设置：
 
 ```bash
-# 方式一：通过 gateway 配置查找
-grep -r "ui" /etc/slurm-web/gateway.ini | grep path
-
-# 方式二：查找 index.html 位置
-find /usr -name "index.html" -path "*slurm*" 2>/dev/null
+export SLURMWEB_AGENT_INI=/path/to/agent.ini
+export SLURMWEB_AGENT_SETTINGS_DEFINITION=/path/to/agent.yml
+alembic upgrade head
 ```
 
-### 7.3 备份并替换前端文件
+不要在生产环境执行以下开发态命令：
 
 ```bash
-FRONTEND_PATH=/usr/share/slurm-web/html   # 根据实际路径修改
-
-# 备份
-cp -r $FRONTEND_PATH ${FRONTEND_PATH}.bak
-
-# 替换
-cp -r frontend/dist/* $FRONTEND_PATH/
+alembic init ...
+alembic revision --autogenerate ...
 ```
 
----
+这些命令只用于开发阶段生成或更新迁移脚本。生产环境只负责执行已经随发布包带上的迁移。
 
-## 8. 重启服务
+对于“生产环境目前还没有数据库表”的首次部署场景，`alembic upgrade head` 会直接从空库创建完整 schema，不需要手工执行任何建表 SQL。
+
+### 9.2 迁移前检查
+
+```bash
+alembic current
+alembic history
+```
+
+### 9.3 执行迁移
+
+```bash
+alembic upgrade head
+```
+
+### 9.4 迁移后验证
+
+```bash
+alembic current
+psql -h 127.0.0.1 -U slurmweb -d slurmweb -c "\dt"
+psql -h 127.0.0.1 -U slurmweb -d slurmweb -c "\d users"
+psql -h 127.0.0.1 -U slurmweb -d slurmweb -c "\d job_snapshots"
+```
+
+首次建库时，至少应看到：
+
+- `users`
+- `job_snapshots`
+- `alembic_version`
+
+## 10. 重启顺序
+
+推荐先重启 agent，再重启 gateway：
 
 ```bash
 systemctl restart slurm-web-agent
+systemctl status slurm-web-agent --no-pager
+
 systemctl restart slurm-web-gateway
-
-# 确认服务正常运行
-systemctl status slurm-web-agent
-systemctl status slurm-web-gateway
+systemctl status slurm-web-gateway --no-pager
 ```
 
----
+原因：
 
-## 9. 前端调试日志
+- 应先保证数据库迁移已经手工执行成功
+- gateway 登录成功后会通知 agent 缓存 LDAP 用户
+- 若 gateway 先启动、agent 侧表尚未准备好，用户登录仍然成功，但 agent 侧缓存可能会打 warning
 
-前端已内置详细的控制台日志，用于诊断功能是否正常启用。
+## 11. 生产验证清单
 
-### 9.1 查看浏览器控制台
-
-1. 打开浏览器开发者工具（F12 或右键 → 检查）
-2. 切换到 "Console"（控制台）标签
-3. 访问 Slurm-web 界面
-
-### 9.2 功能启用状态检查
-
-**集群列表加载时**，会显示每个集群的功能状态：
-```
-[GatewayAPI] 集群列表已加载:
-[GatewayAPI]   集群 "cluster1": persistence=true, node_metrics=true
-```
-
-**访问作业历史页面时**，会显示：
-```
-[JobsHistory] 📊 作业历史页面已挂载
-[JobsHistory] 功能说明: 此功能需要后端启用 persistence 配置
-[JobsHistory] 检查项:
-[JobsHistory]   1. /etc/slurm-web/agent.ini 中 [persistence] enabled = true
-[JobsHistory]   2. PostgreSQL 数据库已安装并配置
-[JobsHistory]   3. 数据库表 job_snapshots 已创建
-[JobsHistory]   4. Agent 服务已重启
-[JobsHistory] 开始获取作业历史数据...
-[JobsHistory] 集群: cluster1
-[JobsHistory] ✅ 成功获取数据
-[JobsHistory] 返回记录数: 50
-[JobsHistory] 总记录数: 1234
-```
-
-**访问节点详情页面时**，会显示：
-```
-[NodeView] 🖥️ 节点详情页面已挂载
-[NodeView] 节点名称: node01
-[NodeView] ✅ 节点实时监控功能已启用
-[NodeView] 功能说明: 从 Prometheus 获取节点实时资源使用情况
-[NodeView] 检查项:
-[NodeView]   1. /etc/slurm-web/agent.ini 中 [node_metrics] enabled = true
-[NodeView]   2. prometheus_host 配置正确
-[NodeView]   3. Prometheus 中有对应节点的 node_exporter 数据
-[NodeView]   4. Agent 服务已重启
-[NodeView] 刷新间隔: 15秒
-[NodeMetrics] 开始获取节点实时指标...
-[NodeMetrics] ✅ 成功获取实时指标
-[NodeMetrics] CPU使用率: 45.2 %
-[NodeMetrics] 内存使用率: 67.8 %
-[NodeMetrics] 磁盘使用率: 32.1 %
-```
-
-### 9.3 常见错误信息
-
-**功能未启用**：
-```
-[JobsHistory] ❌ 获取数据失败: Error: Request failed with status code 404
-```
-→ 检查后端配置中 `[persistence] enabled = true`
-
-**数据库连接失败**：
-```
-[JobsHistory] ❌ 获取数据失败: Error: Request failed with status code 500
-```
-→ 检查 PostgreSQL 是否运行，数据库连接配置是否正确
-
-**Prometheus 连接失败**：
-```
-[NodeMetrics] ❌ 获取实时指标失败: Error: Request failed with status code 500
-```
-→ 检查 prometheus_host 配置，确认 Prometheus 可访问
-
----
-
-## 10. API 验证
-
-### 10.1 验证作业历史 API
+### 11.1 应用状态
 
 ```bash
-# 获取 token（替换为实际用户名密码）
-TOKEN=$(curl -s -X POST http://localhost:5012/login \
-  -H "Content-Type: application/json" \
-  -d '{"user":"admin","password":"xxx"}' | python3 -c "import sys,json; print(json.load(sys.stdin)['token'])")
-
-# 查询历史作业
-curl -H "Authorization: Bearer $TOKEN" \
-  "http://localhost:5012/v$(slurm-web --version 2>&1 | head -1 | awk '{print $NF}')/jobs/history?page=1&page_size=10"
+journalctl -u slurm-web-agent -n 100 --no-pager
+journalctl -u slurm-web-gateway -n 100 --no-pager
 ```
 
-### 10.2 验证节点实时资源 API
+关注以下日志：
+
+- 数据库迁移成功
+- Job history persistence enabled
+- 用户缓存相关 warning 是否持续出现
+
+### 11.2 数据库对象
 
 ```bash
-# 查询节点实时资源（替换 node01 为实际节点名）
-curl -H "Authorization: Bearer $TOKEN" \
-  "http://localhost:5012/v.../node/node01/metrics"
+psql -h 127.0.0.1 -U slurmweb -d slurmweb -c "SELECT COUNT(*) FROM users;"
+psql -h 127.0.0.1 -U slurmweb -d slurmweb -c "SELECT COUNT(*) FROM job_snapshots;"
 ```
 
-### 10.3 验证数据库写入
+### 11.3 登录验证
+
+验证一次正常 LDAP 登录，检查 `users` 表是否有缓存记录：
 
 ```bash
-# 等待约 60 秒后检查数据库
-sudo -u postgres psql -d slurmweb -c \
-  "SELECT COUNT(*), MIN(snapshot_time), MAX(snapshot_time) FROM job_snapshots;"
+psql -h 127.0.0.1 -U slurmweb -d slurmweb -c \
+  "SELECT id, username, fullname, ldap_synced_at FROM users ORDER BY updated_at DESC LIMIT 20;"
 ```
 
----
+### 11.4 作业历史验证
 
-## 11. 日常维护
-
-### 查看数据量
+等待一个采集周期后检查：
 
 ```bash
-sudo -u postgres psql -d slurmweb -c "
+psql -h 127.0.0.1 -U slurmweb -d slurmweb -c \
+  "SELECT job_id, user_id, job_state, submit_time, last_seen FROM job_snapshots ORDER BY last_seen DESC LIMIT 20;"
+```
+
+联表检查：
+
+```bash
+psql -h 127.0.0.1 -U slurmweb -d slurmweb -c "
 SELECT
-  COUNT(*) as total_records,
-  COUNT(DISTINCT job_id) as unique_jobs,
-  MIN(snapshot_time) as oldest,
-  MAX(snapshot_time) as newest,
-  pg_size_pretty(pg_total_relation_size('job_snapshots')) as table_size
-FROM job_snapshots;"
+  js.job_id,
+  u.username,
+  js.job_state,
+  js.submit_time,
+  js.last_seen
+FROM job_snapshots js
+LEFT JOIN users u ON u.id = js.user_id
+ORDER BY js.last_seen DESC
+LIMIT 20;"
 ```
 
-### 手动清理旧数据
+## 12. 失败场景说明
+
+### 12.1 数据库不可用
+
+现象：
+
+- `alembic upgrade head` 失败
+- agent 日志出现数据库迁移 warning
+
+影响：
+
+- 作业历史不可用
+- LDAP 用户缓存不可用
+- agent 其他非数据库接口仍应保持可用
+
+这意味着即使生产上暂时不启用 `[database]`，或者数据库在首发时仍未准备好，agent 其他功能也不应因此停服。
+
+### 12.2 只启用 database，未启用 persistence
+
+现象：
+
+- `users` 表可正常缓存登录用户
+- `job_snapshots` 不会持续写入作业历史
+
+适合：
+
+- 先灰度数据库连接和迁移，再单独开启历史持久化
+
+### 12.3 gateway 早于 agent 完成迁移
+
+现象：
+
+- 用户可正常登录
+- gateway 或 agent 可能出现一次用户缓存失败 warning
+
+影响：
+
+- 不影响登录
+- agent 完成迁移后后续登录可恢复缓存
+
+## 13. 回滚方案
+
+### 13.1 应用回滚
 
 ```bash
-# 清理 180 天前的数据（程序会自动执行，此命令用于手动触发）
-sudo -u postgres psql -d slurmweb -c \
-  "DELETE FROM job_snapshots WHERE snapshot_time < NOW() - INTERVAL '180 days';"
+systemctl stop slurm-web-gateway slurm-web-agent
 ```
 
----
-
-## 12. 回滚方案
-
-如需回滚到原版本：
+恢复应用文件与配置备份后：
 
 ```bash
-# 1. 停止服务
-systemctl stop slurm-web-agent slurm-web-gateway
-
-# 2. 还原后端文件
-cp $SLURMWEB_PATH/apps/agent.py.bak    $SLURMWEB_PATH/apps/agent.py
-cp $SLURMWEB_PATH/apps/gateway.py.bak  $SLURMWEB_PATH/apps/gateway.py
-cp $SLURMWEB_PATH/views/agent.py.bak   $SLURMWEB_PATH/views/agent.py
-cp $SLURMWEB_PATH/views/gateway.py.bak $SLURMWEB_PATH/views/gateway.py
-cp $SLURMWEB_PATH/metrics/db.py.bak    $SLURMWEB_PATH/metrics/db.py
-cp /usr/share/slurm-web/conf/agent.yml.bak /usr/share/slurm-web/conf/agent.yml
-
-# 3. 还原前端
-cp -r ${FRONTEND_PATH}.bak/* $FRONTEND_PATH/
-
-# 4. 从配置文件中删除 [persistence] 和 [node_metrics] 节
-
-# 5. 重启服务
-systemctl start slurm-web-agent slurm-web-gateway
+systemctl start slurm-web-agent
+systemctl start slurm-web-gateway
 ```
 
-> PostgreSQL 数据库和数据不受回滚影响，可保留供后续重新启用。
+### 13.2 数据库回滚
+
+如果只是应用回滚，不一定要立即回滚数据库。
+
+如果确需回滚数据库 schema：
+
+```bash
+alembic downgrade -1
+```
+
+或回滚到指定 revision：
+
+```bash
+alembic downgrade <revision_id>
+```
+
+生产环境执行 downgrade 前，建议先做数据库备份。
+
+### 13.3 最保守回滚
+
+如果需要快速恢复业务：
+
+1. 将 `agent.ini` 中 `[database] enabled = no`
+2. 将 `[persistence] enabled = no`
+3. 重启 agent
+
+这样可直接关闭所有数据库相关能力，同时保留 agent/gateway 其他功能继续服务。
+
+## 14. 开发与生产职责边界
+
+开发阶段：
+
+- 修改 `slurmweb/models/modes.py`
+- 执行 `alembic revision --autogenerate -m "xxx"`
+- 提交生成的 migration 文件
+
+生产阶段：
+
+- 部署发布包中已存在的 migration 文件
+- 只执行 `alembic upgrade head`
+
+## 15. 推荐上线策略
+
+建议分两步上线：
+
+### 第一步：只启用数据库
+
+```ini
+[database]
+enabled = yes
+
+[persistence]
+enabled = no
+```
+
+目的：
+
+- 验证 PostgreSQL 连接
+- 验证 Alembic 迁移
+- 验证登录后用户缓存
+
+### 第二步：启用持久化
+
+```ini
+[persistence]
+enabled = yes
+```
+
+目的：
+
+- 开始写入作业历史
+- 观察数据库容量、写入性能和日志
+
+这种方式更适合生产首发。

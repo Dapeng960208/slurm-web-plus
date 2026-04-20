@@ -39,7 +39,7 @@ class TestAgentViews(TestAgentBase):
         response = self.client.get("/info")
         self.assertEqual(response.status_code, 200)
         self.assertIsInstance(response.json, dict)
-        self.assertEqual(len(response.json.keys()), 5)
+        self.assertEqual(len(response.json.keys()), 7)
         self.assertIn("cluster", response.json)
         self.assertEqual(response.json["cluster"], "test")
         self.assertIn("racksdb", response.json)
@@ -55,6 +55,21 @@ class TestAgentViews(TestAgentBase):
         self.assertIn("version", response.json)
         self.assertIsInstance(response.json["version"], str)
         self.assertEqual(response.json["version"], get_version())
+        self.assertIn("persistence", response.json)
+        self.assertIsInstance(response.json["persistence"], bool)
+        self.assertIn("node_metrics", response.json)
+        self.assertIsInstance(response.json["node_metrics"], bool)
+
+    def test_cache_authenticated_user(self):
+        self.app.users_store = mock.Mock()
+        response = self.client.post(f"/v{get_version()}/users/cache")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json, {"result": "User cache updated"})
+        self.app.users_store.upsert_ldap_user.assert_called_once_with(
+            self.user.login,
+            self.user.fullname,
+            self.user.groups,
+        )
 
     #
     # General error cases

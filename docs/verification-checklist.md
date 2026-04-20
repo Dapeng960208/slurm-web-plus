@@ -4,10 +4,20 @@
 
 ### 1.1 检查配置文件
 ```bash
-# 确认 agent.ini 中已添加配置
+# 本次新增功能配置段
+grep -A 10 "\[database\]" /etc/slurm-web/agent.ini
 grep -A 10 "\[persistence\]" /etc/slurm-web/agent.ini
 grep -A 10 "\[node_metrics\]" /etc/slurm-web/agent.ini
+
+# metrics 为已有功能，如本次未启用可不检查
+grep -A 10 "\[metrics\]" /etc/slurm-web/agent.ini
 ```
+
+说明：
+
+- `[database]`、`[persistence]`、`[node_metrics]` 是本次新增能力
+- `[metrics]` 是已有 Prometheus 指标功能，不属于数据库迁移必需项
+- 即使 `[database] enabled = no`，agent 其他非数据库功能也应继续可用
 
 ### 1.2 检查服务状态
 ```bash
@@ -67,6 +77,7 @@ curl -s -H "Authorization: Bearer $TOKEN" \
     {
       "id": 1,
       "job_id": 12345,
+      "user_id": 7,
       "job_name": "test_job",
       "user_name": "user1",
       "account": "account1",
@@ -104,14 +115,18 @@ curl -s -H "Authorization: Bearer $TOKEN" \
 
 ### 1.4 检查数据库（如果 persistence=true）
 ```bash
+# 检查迁移版本
+alembic current
+
 # 检查数据库连接
 sudo -u postgres psql -d slurmweb -c "SELECT COUNT(*) FROM job_snapshots;"
 
 # 查看最近的快照
 sudo -u postgres psql -d slurmweb -c "
-SELECT job_id, job_name, user_name, job_state, snapshot_time 
-FROM job_snapshots 
-ORDER BY snapshot_time DESC 
+SELECT js.job_id, js.job_name, u.username AS user_name, js.job_state, js.last_seen AS snapshot_time
+FROM job_snapshots js
+LEFT JOIN users u ON u.id = js.user_id
+ORDER BY js.last_seen DESC 
 LIMIT 10;"
 
 # 检查数据量和时间范围
@@ -119,9 +134,17 @@ sudo -u postgres psql -d slurmweb -c "
 SELECT 
   COUNT(*) as total_records,
   COUNT(DISTINCT job_id) as unique_jobs,
-  MIN(snapshot_time) as oldest,
-  MAX(snapshot_time) as newest
+  MIN(last_seen) as oldest,
+  MAX(last_seen) as newest
 FROM job_snapshots;"
+```
+
+如果是首次生产部署，至少还应确认：
+
+```bash
+sudo -u postgres psql -d slurmweb -c "\dt"
+sudo -u postgres psql -d slurmweb -c "\d users"
+sudo -u postgres psql -d slurmweb -c "\d job_snapshots"
 ```
 
 ---
@@ -237,18 +260,24 @@ journalctl -u slurm-web-agent | grep -i prometheus
 
 **检查步骤：**
 ```bash
+# 1. 确认 database.enabled = yes
+grep -A 10 "\[database\]" /etc/slurm-web/agent.ini
+
 # 1. 确认后台线程正在运行
 journalctl -u slurm-web-agent | grep "Starting job snapshot thread"
 
 # 2. 检查是否有错误
 journalctl -u slurm-web-agent | grep -i error | grep -i persist
 
-# 3. 手动测试数据库写入
-sudo -u postgres psql -d slurmweb -c "
-INSERT INTO job_snapshots (job_id, job_name, user_name, snapshot_time) 
-VALUES (99999, 'test', 'testuser', NOW());"
+# 3. 确认迁移已成功完成
+alembic current
+sudo -u postgres psql -d slurmweb -c "\dt"
 
-# 4. 检查 Slurm 是否有作业
+# 4. 检查 users 表是否能缓存 LDAP 登录用户
+sudo -u postgres psql -d slurmweb -c \
+  "SELECT id, username, fullname, ldap_synced_at FROM users ORDER BY updated_at DESC LIMIT 20;"
+
+# 5. 检查 Slurm 是否有作业
 squeue
 sacct -S now-1hour
 ```

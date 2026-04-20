@@ -499,12 +499,12 @@ cache:
     default: 120
     doc: Expiration delay in seconds for associations in cache
 
-persistence:
+database:
   enabled:
     type: bool
     default: false
     doc: |
-      Determine if job history persistence to PostgreSQL is enabled.
+      Determine if PostgreSQL-backed persistence features are enabled.
   host:
     type: str
     default: localhost
@@ -525,6 +525,13 @@ persistence:
     type: password
     doc: PostgreSQL user password
     ex: SECR3T
+
+persistence:
+  enabled:
+    type: bool
+    default: false
+    doc: |
+      Determine if job history persistence to PostgreSQL is enabled.
   retention_days:
     type: int
     default: 180

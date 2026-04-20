@@ -7,6 +7,7 @@
 import sys
 import urllib
 import logging
+from types import SimpleNamespace
 
 from rfl.web.tokens import RFLTokenizedRBACWebApp
 
@@ -55,6 +56,9 @@ class SlurmwebAppAgent(SlurmwebWebApp, RFLTokenizedRBACWebApp):
         SlurmwebAppRoute(f"/v{get_version()}/metrics/<metric>", views.metrics),
         SlurmwebAppRoute(f"/v{get_version()}/jobs/history", views.jobs_history),
         SlurmwebAppRoute(f"/v{get_version()}/jobs/history/<int:record_id>", views.job_history_detail),
+        SlurmwebAppRoute(
+            f"/v{get_version()}/users/cache", views.cache_authenticated_user, methods=["POST"]
+        ),
         SlurmwebAppRoute(f"/v{get_version()}/node/<name>/metrics", views.node_metrics),
     }
 
@@ -182,14 +186,50 @@ class SlurmwebAppAgent(SlurmwebWebApp, RFLTokenizedRBACWebApp):
                 self.settings.metrics.host, self.settings.metrics.job
             )
 
-        # Initialize job history persistence (new, optional)
+        self.users_store = None
         self.jobs_store = None
-        if self.settings.persistence.enabled:
-            from ..persistence.jobs_store import JobsStore
+        database_ready = False
+        database_error = None
+        if self.settings.database.enabled:
+            try:
+                from ..persistence.users_store import UsersStore
 
-            self.jobs_store = JobsStore(self.settings.persistence, self.slurmrestd)
-            self.jobs_store.start()
-            logger.info("Job history persistence enabled")
+                self.users_store = UsersStore(self.settings.database)
+                self.users_store.validate_connection()
+                database_ready = True
+                logger.info("Database support enabled")
+            except Exception as err:
+                database_error = err
+                logger.warning("Unable to initialize database support: %s", err)
+        else:
+            database_error = RuntimeError("[database] enabled = no")
+            logger.debug("Database support is disabled")
+
+        if self.settings.persistence.enabled:
+            if database_ready:
+                try:
+                    from ..persistence.jobs_store import JobsStore
+
+                    store_settings = SimpleNamespace(
+                        host=self.settings.database.host,
+                        port=self.settings.database.port,
+                        database=self.settings.database.database,
+                        user=self.settings.database.user,
+                        password=self.settings.database.password,
+                        snapshot_interval=self.settings.persistence.snapshot_interval,
+                        retention_days=self.settings.persistence.retention_days,
+                    )
+                    self.jobs_store = JobsStore(store_settings, self.slurmrestd)
+                    self.jobs_store.start()
+                    logger.info("Job history persistence enabled")
+                except Exception as err:
+                    logger.warning("Unable to initialize job history persistence: %s", err)
+            else:
+                reason = str(database_error) if database_error is not None else "unknown reason"
+                logger.warning(
+                    "Job history persistence is enabled but database support is unavailable: %s",
+                    reason,
+                )
         else:
             logger.debug("Job history persistence is disabled")
 
