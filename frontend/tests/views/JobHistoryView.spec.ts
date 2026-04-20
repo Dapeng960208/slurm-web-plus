@@ -75,6 +75,7 @@ describe('JobHistoryView.vue', () => {
     expect(badge.text()).toContain('UNKNOWN')
     expect(wrapper.text()).toContain('0 node, 0 CPU')
     expect(wrapper.text()).toContain('0m')
+    expect(wrapper.get('#exit-code').text()).toContain('success')
     expect(wrapper.text()).not.toContain('Submit Time')
     expect(wrapper.text()).not.toContain('End Time')
   })
@@ -145,9 +146,66 @@ describe('JobHistoryView.vue', () => {
     expect(wrapper.text()).not.toContain('Used Memory')
     expect(wrapper.text()).not.toContain('4.00 GB')
     expect(wrapper.get('#step-terminated').text()).not.toContain('\n                  -')
+    expect(wrapper.get('#exit-code').text()).toContain('success')
     expect(wrapper.text()).not.toContain('Submit Time')
     expect(wrapper.text()).not.toContain('Eligible Time')
     expect(wrapper.text()).not.toContain('Start Time')
     expect(wrapper.text()).not.toContain('End Time')
+  })
+
+  test('renders numeric exit code from object payload', async () => {
+    mockGatewayAPI.job_history_detail.mockResolvedValueOnce({
+      id: 3,
+      snapshot_time: '2026-04-20T10:00:00+00:00',
+      job_id: 9999,
+      job_name: 'failed-job',
+      job_state: 'FAILED',
+      state_reason: 'NonZeroExitCode',
+      user_id: 7,
+      user_name: 'alice',
+      account: 'science',
+      group: 'research',
+      partition: 'normal',
+      qos: 'debug',
+      nodes: 'cn1',
+      node_count: 1,
+      cpus: 4,
+      priority: 10,
+      tres_req_str: 'cpu=4,mem=8G,node=1',
+      tres_per_job: null,
+      tres_per_node: null,
+      gres_detail: null,
+      submit_time: '2026-04-20T09:00:00+00:00',
+      eligible_time: '2026-04-20T09:01:00+00:00',
+      start_time: '2026-04-20T09:05:00+00:00',
+      end_time: '2026-04-20T09:30:00+00:00',
+      last_sched_evaluation_time: '2026-04-20T09:04:00+00:00',
+      time_limit_minutes: 60,
+      tres_requested: null,
+      tres_allocated: null,
+      used_memory_gb: null,
+      exit_code: {
+        return_code: { infinite: false, number: 9, set: true },
+        signal: { id: { infinite: false, number: 0, set: true }, name: 'NONE' },
+        status: ['FAILED']
+      },
+      working_directory: '/tmp',
+      command: 'false'
+    })
+
+    const wrapper = mount(JobHistoryView, {
+      props: { cluster: 'foo', id: 3 },
+      global: {
+        stubs: {
+          ClusterMainLayout: { template: '<div><slot /></div>' },
+          JobBackButton: { template: '<button>Back</button>' }
+        }
+      }
+    })
+
+    await flushPromises()
+
+    expect(wrapper.get('#exit-code').text()).toContain('9')
+    expect(wrapper.get('#exit-code').text()).not.toContain('[object Object]')
   })
 })

@@ -701,10 +701,12 @@ export interface JobHistoryRecord {
   tres_requested: ClusterTRES[] | null
   tres_allocated: ClusterTRES[] | null
   used_memory_gb: number | null
-  exit_code: string | null
+  exit_code: JobHistoryExitCode
   working_directory: string | null
   command: string | null
 }
+
+export type JobHistoryExitCode = string | ClusterJobExitCode | null
 
 const JobHistorySortCriteria = [
   'submit_time',

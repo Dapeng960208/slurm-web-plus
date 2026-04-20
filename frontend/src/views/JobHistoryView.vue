@@ -10,7 +10,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { useGatewayAPI } from '@/composables/GatewayAPI'
-import type { ClusterTRES, JobHistoryRecord } from '@/composables/GatewayAPI'
+import type { ClusterJobExitCode, ClusterTRES, JobHistoryRecord } from '@/composables/GatewayAPI'
 import { splitJobHistoryState } from '@/composables/GatewayAPI'
 import ClusterMainLayout from '@/components/ClusterMainLayout.vue'
 import JobStatusBadge from '@/components/job/JobStatusBadge.vue'
@@ -101,6 +101,32 @@ function resourceField(
 
 function fmt(v: string | null | undefined) {
   return v ?? '-'
+}
+
+function isClusterJobExitCode(value: unknown): value is ClusterJobExitCode {
+  if (typeof value !== 'object' || value === null || !('return_code' in value)) {
+    return false
+  }
+  const returnCode = value.return_code
+  return typeof returnCode === 'object' && returnCode !== null && 'number' in returnCode
+}
+
+function formatHistoryExitCode(exitCode: JobHistoryRecord['exit_code']) {
+  if (exitCode == null) return '-'
+
+  if (typeof exitCode === 'string') {
+    const trimmed = exitCode.trim()
+    if (!trimmed.length) return '-'
+    const match = /^(-?\d+)(?::.*)?$/.exec(trimmed)
+    if (!match) return trimmed
+    return match[1] === '0' ? 'success' : match[1]
+  }
+
+  if (isClusterJobExitCode(exitCode)) {
+    return exitCode.return_code.number === 0 ? 'success' : String(exitCode.return_code.number)
+  }
+
+  return '-'
 }
 
 function fmtTime(v: string | null | undefined) {
@@ -203,7 +229,7 @@ const fields = (j: JobHistoryRecord): HistoryFieldRow[] => [
   textField('tres-per-node', 'TRES/Node', fmt(j.tres_per_node)),
   textField('gres', 'GRES', fmt(j.gres_detail)),
   textField('time-limit', 'Time Limit', fmtDuration(j.time_limit_minutes)),
-  textField('exit-code', 'Exit Code', fmt(j.exit_code)),
+  textField('exit-code', 'Exit Code', formatHistoryExitCode(j.exit_code)),
   textField('workdir', 'Working Directory', fmt(j.working_directory), true),
   textField('command', 'Command', fmt(j.command), true)
 ]
