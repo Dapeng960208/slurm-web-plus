@@ -196,22 +196,29 @@ def users():
     )
 
 
-async def cache_user_on_agent(session: aiohttp.ClientSession, cluster: str, token: str):
-    url = (
-        f"{current_app.agents[cluster].url}/"
-        f"v{current_app.agents[cluster].version}/users/cache"
-    )
+async def cache_user_on_agent(
+    session: aiohttp.ClientSession, cluster: str, agent, token: str
+):
+    url = f"{agent.url}/v{agent.version}/users/cache"
     try:
         async with session.post(
             url,
             headers={"Authorization": f"Bearer {token}"},
         ) as response:
             if response.status >= 400:
+                body = None
+                try:
+                    body = await response.text()
+                except Exception:
+                    pass
                 logger.warning(
-                    "Unable to cache authenticated user on agent %s: HTTP %s",
+                    "Unable to cache authenticated user on agent %s: HTTP %s%s",
                     cluster,
                     response.status,
+                    f" body={body.strip()}" if body else "",
                 )
+            else:
+                logger.info("Cached authenticated user on agent %s", cluster)
     except aiohttp.ClientError as err:
         logger.warning(
             "Unable to cache authenticated user on agent %s: %s",
@@ -221,15 +228,38 @@ async def cache_user_on_agent(session: aiohttp.ClientSession, cluster: str, toke
 
 
 async def async_cache_user_on_agents(token: str):
-    if not current_app.agents:
+    agents = current_app.refresh_agents()
+    if not agents:
+        logger.info(
+            "No agents available from cached discovery while propagating authenticated "
+            "user cache, forcing refresh"
+        )
+        agents = current_app.refresh_agents(force=True)
+
+    if not agents:
+        logger.warning(
+            "Skipping authenticated user cache propagation because no agents are "
+            "currently available"
+        )
         return
+
+    agents = {
+        cluster: agent for cluster, agent in agents.items() if getattr(agent, "database", False)
+    }
+    if not agents:
+        logger.warning(
+            "Skipping authenticated user cache propagation because no discovered "
+            "agents have database support enabled"
+        )
+        return
+
     async with aiohttp.ClientSession(
         connector=current_app.get_agent_connector()
     ) as session:
         await asyncio.gather(
             *[
-                cache_user_on_agent(session, cluster, token)
-                for cluster in current_app.agents.keys()
+                cache_user_on_agent(session, cluster, agent, token)
+                for cluster, agent in agents.items()
             ]
         )
 

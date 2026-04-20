@@ -145,6 +145,65 @@ class TestGatewayViews(TestGatewayBase):
             cm.output,
         )
 
+    @mock.patch("slurmweb.views.gateway.aiohttp.ClientSession.post")
+    def test_login_retries_agent_refresh_when_cached_agents_empty(self, mock_post):
+        self.setup_app(use_token=False, conf_overrides={"ldap": True})
+        self.app.authentifier.login = mock.Mock(
+            return_value=AuthenticatedUser(
+                login="test", fullname="Testing User", groups=["group"]
+            )
+        )
+        foo = fake_slurmweb_agent("foo")
+        self.app.refresh_agents = mock.Mock(side_effect=[{}, {"foo": foo}])
+        _, mock_post.return_value = mock_agent_aio_response(
+            content='{"result":"User cache updated"}'
+        )
+
+        response = self.client.post(
+            "/api/login",
+            data='{"user":"test","password":"secret"}',
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            self.app.refresh_agents.call_args_list,
+            [mock.call(), mock.call(force=True)],
+        )
+        mock_post.assert_called_once_with(
+            f"http://foo/v{foo.version}/users/cache",
+            headers=mock.ANY,
+        )
+
+    @mock.patch("slurmweb.views.gateway.aiohttp.ClientSession.post")
+    def test_login_propagates_user_cache_only_to_database_enabled_agents(self, mock_post):
+        self.setup_app(use_token=False, conf_overrides={"ldap": True})
+        self.app.authentifier.login = mock.Mock(
+            return_value=AuthenticatedUser(
+                login="test", fullname="Testing User", groups=["group"]
+            )
+        )
+        foo = fake_slurmweb_agent("foo")
+        bar = fake_slurmweb_agent("bar")
+        bar.database = False
+        self.app.refresh_agents = mock.Mock(return_value={"foo": foo, "bar": bar})
+        _, mock_post.return_value = mock_agent_aio_response(
+            content='{"result":"User cache updated"}'
+        )
+
+        response = self.client.post(
+            "/api/login",
+            data='{"user":"test","password":"secret"}',
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.app.refresh_agents.assert_called_once_with()
+        mock_post.assert_called_once_with(
+            f"http://foo/v{foo.version}/users/cache",
+            headers=mock.ANY,
+        )
+
     @mock.patch("slurmweb.views.gateway.aiohttp.ClientSession.get")
     def test_cache_stats(self, mock_get):
         self.app_set_agents({"foo": fake_slurmweb_agent("foo")})

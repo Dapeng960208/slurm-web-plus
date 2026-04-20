@@ -245,13 +245,16 @@ class SlurmwebAppGateway(SlurmwebWebApp, RFLTokenizedWebApp):
         in configuration to get information from them, re-initialize _agents property
         with new retrieved values and return it."""
 
-        if int(time.time()) < self._agents_timeout:
+        return self.refresh_agents()
+
+    def refresh_agents(self, force: bool = False):
+        """Refresh discovered agents when cache is stale or refresh is forced."""
+
+        if not force and int(time.time()) < self._agents_timeout:
             return self._agents
 
         self._agents = asyncio_run(self._get_agents_info())
-        # Set new agents information timeout
         self._agents_timeout = int(time.time()) + 300
-
         return self._agents
 
     def _infer_ui_prefix(self) -> str:
