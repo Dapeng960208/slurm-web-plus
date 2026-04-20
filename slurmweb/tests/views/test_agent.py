@@ -73,20 +73,72 @@ class TestAgentViews(TestAgentBase):
             self.user.groups,
         )
 
+    def test_cache_authenticated_user_with_payload(self):
+        self.app.users_store = mock.Mock()
+        response = self.client.post(
+            f"/v{get_version()}/users/cache",
+            data='{"username":"alice","fullname":"Alice Doe","groups":["users"]}',
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json, {"result": "User cache updated"})
+        self.app.users_store.upsert_ldap_user.assert_called_once_with(
+            "alice",
+            "Alice Doe",
+            ["users"],
+        )
+
     def test_ldap_cache_users(self):
         self.app.users_store = mock.Mock()
-        self.app.users_store.list_ldap_users.return_value = [
-            {"username": "alice", "fullname": "Alice Doe"},
-            {"username": "bob", "fullname": None},
-        ]
+        self.app.users_store.list_ldap_users.return_value = {
+            "items": [
+                {"username": "alice", "fullname": "Alice Doe"},
+                {"username": "bob", "fullname": None},
+            ],
+            "total": 2,
+            "page": 1,
+            "page_size": 50,
+        }
         response = self.client.get(f"/v{get_version()}/users/cache")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(
             response.json,
-            [
-                {"username": "alice", "fullname": "Alice Doe"},
-                {"username": "bob", "fullname": None},
-            ],
+            {
+                "items": [
+                    {"username": "alice", "fullname": "Alice Doe"},
+                    {"username": "bob", "fullname": None},
+                ],
+                "total": 2,
+                "page": 1,
+                "page_size": 50,
+            },
+        )
+
+    def test_ldap_cache_users_with_filters(self):
+        self.app.users_store = mock.Mock()
+        self.app.users_store.list_ldap_users.return_value = {
+            "items": [{"username": "alice", "fullname": "Alice Doe"}],
+            "total": 1,
+            "page": 2,
+            "page_size": 20,
+        }
+        response = self.client.get(
+            f"/v{get_version()}/users/cache?username=ali&page=2&page_size=20"
+        )
+        self.assertEqual(response.status_code, 200)
+        self.app.users_store.list_ldap_users.assert_called_once_with(
+            username="ali",
+            page=2,
+            page_size=20,
+        )
+        self.assertEqual(
+            response.json,
+            {
+                "items": [{"username": "alice", "fullname": "Alice Doe"}],
+                "total": 1,
+                "page": 2,
+                "page_size": 20,
+            },
         )
 
     def test_ldap_cache_users_disabled(self):

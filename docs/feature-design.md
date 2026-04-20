@@ -120,7 +120,8 @@ Gateway /login
     └── [新增] 异步请求各 Agent: POST /v{version}/users/cache
 
 Agent /users/cache
-    └── 将 request.user.login / fullname / groups UPSERT 到 users 表
+    └── 优先将 gateway 显式传递的 username / fullname / groups UPSERT 到 users 表，
+          若请求体缺失则回退 request.user
 ```
 
 这个链路的含义是：
@@ -166,6 +167,8 @@ Gateway /api/agents/<cluster>/jobs/history
 
 - 首次由作业快照遇到未知用户时，可创建占位记录，仅填充 `username`
 - 用户真正登录后，由 `/users/cache` 把 `fullname`、`groups`、`ldap_synced_at` 补全
+- 为避免 agent 侧仅依赖 JWT 反解结果导致 `fullname` 丢失，gateway 登录成功后会显式向每个
+  database-enabled agent 发送 `username`、`fullname`、`groups`
 - `groups` 固定存储为 `JSONB`
 
 #### `job_snapshots`
@@ -287,6 +290,66 @@ GET /v{version}/jobs/history/<id>
 
 返回单条历史记录，字段与列表接口一致，但用于详情页展示。
 
+### 4.9 LDAP Cache 查询与缓存写入接口
+
+#### 缓存写入接口
+
+```text
+POST /v{version}/users/cache
+```
+
+请求体：
+
+```json
+{
+  "username": "user1",
+  "fullname": "User One",
+  "groups": ["users", "admins"]
+}
+```
+
+行为约束：
+
+- agent 仍然保留 Bearer token 校验
+- agent 写库时优先使用请求体中的 `username`、`fullname`、`groups`
+- 当请求体缺失时，回退到 `request.user`
+- gateway 登录成功后，会向所有 `database = true` 的 agent 并发发送该请求体
+
+#### LDAP Cache 查询接口
+
+```text
+GET /v{version}/users/cache
+```
+
+参数：
+
+- `username`
+- `page`
+- `page_size`
+
+返回示例：
+
+```json
+{
+  "items": [
+    {
+      "username": "alice",
+      "fullname": "Alice Doe"
+    }
+  ],
+  "total": 1,
+  "page": 1,
+  "page_size": 50
+}
+```
+
+查询规则：
+
+- 仅按 `username` 做大小写不敏感包含匹配
+- 固定按 `username ASC` 排序
+- 默认 `page = 1`
+- 默认 `page_size = 50`
+
 ### 4.8 前端控制逻辑
 
 - Gateway `/api/clusters` 在集群信息中新增 `persistence: bool`
@@ -295,6 +358,9 @@ GET /v{version}/jobs/history/<id>
 - 前端 `JobHistoryRecord` 新增 `user_id: number | null`
 - 历史页面仍然使用 `user_name` 展示用户名
 - 左侧菜单 Jobs 下的 “History” 入口仅在 `cluster.persistence === true` 时显示
+- Settings 里的 `LDAP Cache` 页面保持按 cluster 独立展示
+- 每个 cluster 独立维护用户名搜索、分页、总数和错误状态
+- LDAP Cache 页面只按 `username` 搜索，不按 `fullname` 搜索
 
 ---
 
@@ -426,14 +492,15 @@ Agent /node/<name>/metrics
 |---|---|
 | `GET /v{version}/jobs/history` | 分页查询作业历史 |
 | `GET /v{version}/jobs/history/<id>` | 查询单条历史详情 |
-| `POST /v{version}/users/cache` | 缓存当前已认证用户到 `users` 表 |
+| `POST /v{version}/users/cache` | 缓存当前已认证用户到 `users` 表，支持显式请求体 |
+| `GET /v{version}/users/cache` | 分页查询本地 LDAP cache，支持按用户名过滤 |
 | `GET /v{version}/node/<name>/metrics` | 查询节点实时资源 |
 
 ### 7.2 Gateway 新增或扩展接口
 
 | 接口 | 说明 |
 |---|---|
-| `POST /login` | LDAP 登录成功后异步通知各 Agent 缓存用户 |
+| `POST /login` | LDAP 登录成功后异步通知各 Agent 缓存用户，并显式透传 `username/fullname/groups` |
 | `GET /api/agents/<cluster>/jobs/history` | 透传历史列表 |
 | `GET /api/agents/<cluster>/jobs/history/<id>` | 透传历史详情 |
 | `GET /api/agents/<cluster>/node/<name>/metrics` | 透传节点实时资源 |

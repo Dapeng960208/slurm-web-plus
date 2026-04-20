@@ -303,6 +303,7 @@ systemctl status slurm-web-gateway --no-pager
 
 - 应先保证数据库迁移已经手工执行成功
 - gateway 登录成功后会通知 agent 缓存 LDAP 用户
+- 通知请求会显式携带 `username`、`fullname`、`groups`，不再只依赖 agent 侧从 JWT 反解用户全名
 - 若 gateway 先启动、agent 侧表尚未准备好，用户登录仍然成功，但 agent 侧缓存可能会打 warning
 
 ## 11. 生产验证清单
@@ -335,6 +336,48 @@ psql -h 127.0.0.1 -U slurmweb -d slurmweb -c "SELECT COUNT(*) FROM job_snapshots
 psql -h 127.0.0.1 -U slurmweb -d slurmweb -c \
   "SELECT id, username, fullname, ldap_synced_at FROM users ORDER BY updated_at DESC LIMIT 20;"
 ```
+
+预期结果：
+
+- 新登录用户出现在 `users` 表
+- `fullname` 不应为空；若该用户在 LDAP 中没有全名属性，可接受为空
+- `ldap_synced_at` 被刷新到最近一次登录时间附近
+
+如需直接验证 agent 侧 LDAP cache 查询接口，可执行：
+
+```bash
+VERSION=$(slurm-web --version 2>&1 | head -1 | awk '{print $NF}')
+curl -s -H "Authorization: Bearer $TOKEN" \
+  "http://localhost:5012/api/agents/your_cluster/users/cache?page=1&page_size=10" \
+  | python3 -m json.tool
+```
+
+返回体应为分页对象，包含：
+
+- `items`
+- `total`
+- `page`
+- `page_size`
+
+如果要验证按用户名过滤：
+
+```bash
+curl -s -H "Authorization: Bearer $TOKEN" \
+  "http://localhost:5012/api/agents/your_cluster/users/cache?page=1&page_size=10&username=alice" \
+  | python3 -m json.tool
+```
+
+### 11.3.1 LDAP Cache 页面验证
+
+登录 Web 页面后，进入 Settings -> LDAP Cache，逐项确认：
+
+1. 页面仍按 cluster 分块展示，而不是把多个 agent 的用户混成单表。
+2. 每个 cluster 都显示用户名搜索框、Search、Reset 和分页栏。
+3. 在搜索框输入用户名后，列表只按 `username` 过滤，不按 `fullname` 过滤。
+4. 翻页只影响当前 cluster，不影响其他 cluster。
+5. 新登录 LDAP 用户在页面上能看到 `fullname`；若数据库中有值但页面仍为空，优先检查浏览器请求 `/api/agents/<cluster>/users/cache` 的返回体。
+
+更细的接口、数据库和多 agent 验证步骤，可参考 `docs/ldap-cache-verification.md`。
 
 ### 11.4 作业历史验证
 

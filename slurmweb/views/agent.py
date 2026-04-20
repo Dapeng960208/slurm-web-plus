@@ -25,6 +25,14 @@ from ..slurmrestd.errors import (
 logger = logging.getLogger(__name__)
 
 
+def _positive_int_query_arg(name: str, default: int) -> int:
+    value = request.args.get(name, default)
+    try:
+        return max(int(value), 1)
+    except (TypeError, ValueError):
+        return default
+
+
 def racksdb_get_version():
     """Get RacksDB version if available, or return 'N/A' if not installed."""
     try:
@@ -348,11 +356,20 @@ def cache_authenticated_user():
         logger.warning(error)
         abort(501, error)
 
+    payload = request.get_json(silent=True) or {}
+    username = payload.get("username") or request.user.login
+    fullname = payload.get("fullname")
+    if "fullname" not in payload:
+        fullname = getattr(request.user, "fullname", None)
+    groups = payload.get("groups")
+    if groups is None:
+        groups = getattr(request.user, "groups", [])
+
     try:
         current_app.users_store.upsert_ldap_user(
-            request.user.login,
-            getattr(request.user, "fullname", None),
-            getattr(request.user, "groups", []),
+            username,
+            fullname,
+            groups,
         )
     except Exception as err:
         logger.warning("Unable to cache authenticated user %s: %s", request.user, err)
@@ -369,8 +386,18 @@ def ldap_cache_users():
         logger.warning(error)
         abort(501, error)
 
+    page = _positive_int_query_arg("page", 1)
+    page_size = _positive_int_query_arg("page_size", 50)
+    username = request.args.get("username")
+
     try:
-        return jsonify(current_app.users_store.list_ldap_users())
+        return jsonify(
+            current_app.users_store.list_ldap_users(
+                username=username,
+                page=page,
+                page_size=page_size,
+            )
+        )
     except Exception as err:
         logger.warning("Unable to list cached LDAP users: %s", err)
         abort(500, str(err))

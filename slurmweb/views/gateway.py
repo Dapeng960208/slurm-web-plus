@@ -69,7 +69,7 @@ def login():
         user=user, duration=current_app.settings.jwt.duration
     )
     try:
-        asyncio_run(async_cache_user_on_agents(token))
+        asyncio_run(async_cache_user_on_agents(token, user))
     except Exception as err:
         logger.warning("Failed to propagate authenticated user cache to agents: %s", err)
     return jsonify(
@@ -197,13 +197,14 @@ def users():
 
 
 async def cache_user_on_agent(
-    session: aiohttp.ClientSession, cluster: str, agent, token: str
+    session: aiohttp.ClientSession, cluster: str, agent, token: str, user_cache: dict
 ):
     url = f"{agent.url}/v{agent.version}/users/cache"
     try:
         async with session.post(
             url,
             headers={"Authorization": f"Bearer {token}"},
+            json=user_cache,
         ) as response:
             if response.status >= 400:
                 body = None
@@ -227,7 +228,7 @@ async def cache_user_on_agent(
         )
 
 
-async def async_cache_user_on_agents(token: str):
+async def async_cache_user_on_agents(token: str, user):
     agents = current_app.refresh_agents()
     if not agents:
         logger.info(
@@ -256,9 +257,14 @@ async def async_cache_user_on_agents(token: str):
     async with aiohttp.ClientSession(
         connector=current_app.get_agent_connector()
     ) as session:
+        user_cache = {
+            "username": user.login,
+            "fullname": getattr(user, "fullname", None),
+            "groups": getattr(user, "groups", []),
+        }
         await asyncio.gather(
             *[
-                cache_user_on_agent(session, cluster, agent, token)
+                cache_user_on_agent(session, cluster, agent, token, user_cache)
                 for cluster, agent in agents.items()
             ]
         )

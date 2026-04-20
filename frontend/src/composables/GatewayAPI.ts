@@ -723,6 +723,27 @@ export interface CachedLdapUser {
   fullname: string | null
 }
 
+export interface CachedLdapUsersResponse {
+  items: CachedLdapUser[]
+  total: number
+  page: number
+  page_size: number
+}
+
+export interface CachedLdapUsersFilters {
+  username?: string
+  page?: number
+  page_size?: number
+}
+
+type CachedLdapUsersAPIResponse = CachedLdapUser[] | CachedLdapUsersResponse
+
+function isCachedLdapUsersResponse(
+  response: CachedLdapUsersAPIResponse
+): response is CachedLdapUsersResponse {
+  return !Array.isArray(response)
+}
+
 export function splitJobHistoryState(jobState: string | null | undefined): string[] {
   if (!jobState) return ['UNKNOWN']
 
@@ -1026,8 +1047,26 @@ export function useGatewayAPI() {
     return await restAPI.get<CacheStatistics>(`/agents/${cluster}/cache/stats`)
   }
 
-  async function ldap_cache_users(cluster: string): Promise<CachedLdapUser[]> {
-    return await restAPI.get<CachedLdapUser[]>(`/agents/${cluster}/users/cache`)
+  async function ldap_cache_users(
+    cluster: string,
+    filters: CachedLdapUsersFilters = {}
+  ): Promise<CachedLdapUsersResponse> {
+    const params = new URLSearchParams()
+    if (filters.username) params.append('username', filters.username)
+    if (filters.page) params.append('page', filters.page.toString())
+    if (filters.page_size) params.append('page_size', filters.page_size.toString())
+    const query = params.toString()
+    const url = `/agents/${cluster}/users/cache${query ? '?' + query : ''}`
+    const response = await restAPI.get<CachedLdapUsersAPIResponse>(url)
+    if (isCachedLdapUsersResponse(response)) {
+      return response
+    }
+    return {
+      items: response,
+      total: response.length,
+      page: filters.page ?? 1,
+      page_size: filters.page_size ?? response.length
+    }
   }
 
   async function cache_reset(cluster: string): Promise<CacheStatistics> {

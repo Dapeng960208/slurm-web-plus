@@ -173,6 +173,11 @@ class TestGatewayViews(TestGatewayBase):
         mock_post.assert_called_once_with(
             f"http://foo/v{foo.version}/users/cache",
             headers=mock.ANY,
+            json={
+                "username": "test",
+                "fullname": "Testing User",
+                "groups": ["group"],
+            },
         )
 
     @mock.patch("slurmweb.views.gateway.aiohttp.ClientSession.post")
@@ -202,6 +207,11 @@ class TestGatewayViews(TestGatewayBase):
         mock_post.assert_called_once_with(
             f"http://foo/v{foo.version}/users/cache",
             headers=mock.ANY,
+            json={
+                "username": "test",
+                "fullname": "Testing User",
+                "groups": ["group"],
+            },
         )
 
     @mock.patch("slurmweb.views.gateway.aiohttp.ClientSession.get")
@@ -233,7 +243,7 @@ class TestGatewayViews(TestGatewayBase):
         self.app_set_agents({"foo": fake_slurmweb_agent("foo")})
         mock_proxy_agent.return_value = (
             self.app.response_class(
-                response='[{"username": "alice", "fullname": "Alice Doe"}]',
+                response='{"items": [{"username": "alice", "fullname": "Alice Doe"}], "total": 1, "page": 1, "page_size": 50}',
                 status=200,
                 mimetype="application/json",
             ),
@@ -242,7 +252,13 @@ class TestGatewayViews(TestGatewayBase):
         response = self.client.get("/api/agents/foo/users/cache")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(
-            response.json, [{"username": "alice", "fullname": "Alice Doe"}]
+            response.json,
+            {
+                "items": [{"username": "alice", "fullname": "Alice Doe"}],
+                "total": 1,
+                "page": 1,
+                "page_size": 50,
+            },
         )
         mock_proxy_agent.assert_called_once()
         self.assertEqual(mock_proxy_agent.call_args.args[:2], ("foo", "users/cache"))

@@ -16,6 +16,15 @@ vi.mock('@/composables/GatewayAPI', async (importOriginal) => {
   }
 })
 
+function paginatedUsersResponse(items: Array<{ username: string; fullname: string | null }>, total: number, page = 1) {
+  return {
+    items,
+    total,
+    page,
+    page_size: 20
+  }
+}
+
 describe('settings/SettingsLdapCache.vue', () => {
   beforeEach(() => {
     init_plugins()
@@ -23,6 +32,50 @@ describe('settings/SettingsLdapCache.vue', () => {
   })
 
   test('renders cached LDAP users by cluster', async () => {
+    useRuntimeStore().availableClusters = [
+      {
+        name: 'foo',
+        permissions: { roles: [], actions: ['cache-view'] },
+        racksdb: true,
+        infrastructure: 'foo',
+        metrics: true,
+        cache: true,
+        database: true
+      }
+    ]
+    mockGatewayAPI.ldap_cache_users.mockResolvedValueOnce(
+      paginatedUsersResponse(
+        [
+          { username: 'alice', fullname: 'Alice Doe' },
+          { username: 'bob', fullname: null }
+        ],
+        2
+      )
+    )
+
+    const wrapper = mount(SettingsLdapCacheView, {
+      global: {
+        stubs: {
+          SettingsTabs: true
+        }
+      }
+    })
+
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Cluster foo')
+    expect(wrapper.text()).toContain('alice')
+    expect(wrapper.text()).toContain('Alice Doe')
+    expect(wrapper.text()).toContain('bob')
+    expect(wrapper.text()).toContain('-')
+    expect(mockGatewayAPI.ldap_cache_users).toHaveBeenCalledWith('foo', {
+      username: undefined,
+      page: 1,
+      page_size: 20
+    })
+  })
+
+  test('renders cached LDAP users when backend still returns a legacy array', async () => {
     useRuntimeStore().availableClusters = [
       {
         name: 'foo',
@@ -49,11 +102,156 @@ describe('settings/SettingsLdapCache.vue', () => {
 
     await flushPromises()
 
-    expect(wrapper.text()).toContain('Cluster foo')
     expect(wrapper.text()).toContain('alice')
     expect(wrapper.text()).toContain('Alice Doe')
     expect(wrapper.text()).toContain('bob')
-    expect(mockGatewayAPI.ldap_cache_users).toHaveBeenCalledWith('foo')
+    expect(wrapper.text()).toContain('2 users found')
+  })
+
+  test('searches by username and resets to first page', async () => {
+    useRuntimeStore().availableClusters = [
+      {
+        name: 'foo',
+        permissions: { roles: [], actions: ['cache-view'] },
+        racksdb: true,
+        infrastructure: 'foo',
+        metrics: true,
+        cache: true,
+        database: true
+      }
+    ]
+    mockGatewayAPI.ldap_cache_users
+      .mockResolvedValueOnce(paginatedUsersResponse([{ username: 'alice', fullname: 'Alice Doe' }], 1))
+      .mockResolvedValueOnce(paginatedUsersResponse([{ username: 'alice', fullname: 'Alice Doe' }], 1))
+
+    const wrapper = mount(SettingsLdapCacheView, {
+      global: {
+        stubs: {
+          SettingsTabs: true
+        }
+      }
+    })
+
+    await flushPromises()
+    await wrapper.get('input').setValue('ali')
+    await wrapper.get('button').trigger('click')
+    await flushPromises()
+
+    expect(mockGatewayAPI.ldap_cache_users).toHaveBeenLastCalledWith('foo', {
+      username: 'ali',
+      page: 1,
+      page_size: 20
+    })
+  })
+
+  test('supports pagination and reset', async () => {
+    useRuntimeStore().availableClusters = [
+      {
+        name: 'foo',
+        permissions: { roles: [], actions: ['cache-view'] },
+        racksdb: true,
+        infrastructure: 'foo',
+        metrics: true,
+        cache: true,
+        database: true
+      }
+    ]
+    mockGatewayAPI.ldap_cache_users
+      .mockResolvedValueOnce(paginatedUsersResponse([{ username: 'alice', fullname: 'Alice Doe' }], 60, 1))
+      .mockResolvedValueOnce(paginatedUsersResponse([{ username: 'bob', fullname: 'Bob Doe' }], 60, 2))
+      .mockResolvedValueOnce(paginatedUsersResponse([{ username: 'alice', fullname: 'Alice Doe' }], 60, 1))
+
+    const wrapper = mount(SettingsLdapCacheView, {
+      global: {
+        stubs: {
+          SettingsTabs: true
+        }
+      }
+    })
+
+    await flushPromises()
+    const pageTwoButton = wrapper
+      .findAll('button')
+      .find((button) => button.text().trim() === '2')
+    expect(pageTwoButton).toBeDefined()
+    await pageTwoButton!.trigger('click')
+    await flushPromises()
+    expect(mockGatewayAPI.ldap_cache_users).toHaveBeenLastCalledWith('foo', {
+      username: undefined,
+      page: 2,
+      page_size: 20
+    })
+
+    const resetButton = wrapper
+      .findAll('button')
+      .find((button) => button.text().trim() === 'Reset')
+    expect(resetButton).toBeDefined()
+    await resetButton!.trigger('click')
+    await flushPromises()
+    expect(mockGatewayAPI.ldap_cache_users).toHaveBeenLastCalledWith('foo', {
+      username: undefined,
+      page: 1,
+      page_size: 20
+    })
+  })
+
+  test('keeps cluster state isolated', async () => {
+    useRuntimeStore().availableClusters = [
+      {
+        name: 'foo',
+        permissions: { roles: [], actions: ['cache-view'] },
+        racksdb: true,
+        infrastructure: 'foo',
+        metrics: true,
+        cache: true,
+        database: true
+      },
+      {
+        name: 'bar',
+        permissions: { roles: [], actions: ['cache-view'] },
+        racksdb: true,
+        infrastructure: 'bar',
+        metrics: true,
+        cache: true,
+        database: true
+      }
+    ]
+    mockGatewayAPI.ldap_cache_users
+      .mockResolvedValueOnce(paginatedUsersResponse([{ username: 'alice', fullname: 'Alice Doe' }], 1))
+      .mockResolvedValueOnce(paginatedUsersResponse([{ username: 'bob', fullname: 'Bob Doe' }], 1))
+      .mockResolvedValueOnce(paginatedUsersResponse([{ username: 'alice', fullname: 'Alice Doe' }], 1))
+
+    const wrapper = mount(SettingsLdapCacheView, {
+      global: {
+        stubs: {
+          SettingsTabs: true
+        }
+      }
+    })
+
+    await flushPromises()
+
+    const inputs = wrapper.findAll('input')
+    await inputs[0].setValue('ali')
+    const searchButtons = wrapper.findAll('button').filter((button) => button.text().trim() === 'Search')
+    await searchButtons[0].trigger('click')
+    await flushPromises()
+
+    expect(mockGatewayAPI.ldap_cache_users).toHaveBeenNthCalledWith(1, 'foo', {
+      username: undefined,
+      page: 1,
+      page_size: 20
+    })
+    expect(mockGatewayAPI.ldap_cache_users).toHaveBeenNthCalledWith(2, 'bar', {
+      username: undefined,
+      page: 1,
+      page_size: 20
+    })
+    expect(mockGatewayAPI.ldap_cache_users).toHaveBeenNthCalledWith(3, 'foo', {
+      username: 'ali',
+      page: 1,
+      page_size: 20
+    })
   })
 
   test('shows disabled message when cluster database support is unavailable', async () => {
@@ -122,7 +320,7 @@ describe('settings/SettingsLdapCache.vue', () => {
         database: true
       }
     ]
-    mockGatewayAPI.ldap_cache_users.mockResolvedValueOnce([])
+    mockGatewayAPI.ldap_cache_users.mockResolvedValueOnce(paginatedUsersResponse([], 0))
 
     const wrapper = mount(SettingsLdapCacheView, {
       global: {

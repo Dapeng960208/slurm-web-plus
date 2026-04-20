@@ -79,20 +79,51 @@ class UsersStore:
         finally:
             self._release_conn(conn)
 
-    def list_ldap_users(self):
+    def list_ldap_users(self, username=None, page=1, page_size=50):
         conn = self._get_conn()
         try:
             with conn.cursor() as cur:
+                filters = []
+                params = []
+
+                if username:
+                    filters.append("username ILIKE %s")
+                    params.append(f"%{username}%")
+
+                where_clause = ""
+                if filters:
+                    where_clause = "WHERE " + " AND ".join(filters)
+
                 cur.execute(
-                    """
+                    f"""
+                    SELECT COUNT(*)
+                    FROM users
+                    {where_clause}
+                    """,
+                    params,
+                )
+                total = cur.fetchone()[0]
+
+                offset = (page - 1) * page_size
+                params.extend([page_size, offset])
+                cur.execute(
+                    f"""
                     SELECT username, fullname
                     FROM users
+                    {where_clause}
                     ORDER BY username ASC
-                    """
+                    LIMIT %s OFFSET %s
+                    """,
+                    params,
                 )
-                return [
-                    {"username": username, "fullname": fullname}
-                    for username, fullname in cur.fetchall()
-                ]
+                return {
+                    "items": [
+                        {"username": username, "fullname": fullname}
+                        for username, fullname in cur.fetchall()
+                    ],
+                    "total": total,
+                    "page": page,
+                    "page_size": page_size,
+                }
         finally:
             self._release_conn(conn)
