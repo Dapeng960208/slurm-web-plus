@@ -16,6 +16,7 @@ import LoadingSpinner from '@/components/LoadingSpinner.vue'
 import ErrorAlert from '@/components/ErrorAlert.vue'
 import InfoAlert from '@/components/InfoAlert.vue'
 import JobStatusBadge from '@/components/job/JobStatusBadge.vue'
+import JobHistoryResources from '@/components/jobs/JobHistoryResources.vue'
 import JobsHistoryFiltersPanel from '@/components/jobs/JobsHistoryFiltersPanel.vue'
 import JobsHistoryFiltersBar from '@/components/jobs/JobsHistoryFiltersBar.vue'
 import { WindowIcon } from '@heroicons/vue/24/outline'
@@ -73,8 +74,10 @@ function applyFilters() {
 
 const lastpage = () => Math.max(Math.ceil(total.value / pageSize), 1)
 
-function hasValue(value: number | null | undefined) {
-  return value !== null && value !== undefined
+function historyJobPriority(job: JobHistoryRecord): string {
+  const states = splitJobHistoryState(job.job_state)
+  if (!states.includes('PENDING')) return '-'
+  return job.priority != null ? String(job.priority) : '-'
 }
 
 function jobsPages(): { id: number; ellipsis: boolean }[] {
@@ -171,8 +174,14 @@ onMounted(() => fetchHistory())
                   <th scope="col" class="px-3 py-3.5 text-left">User (account)</th>
                   <th scope="col" class="hidden px-3 py-3.5 text-left sm:table-cell">Resources</th>
                   <th scope="col" class="hidden px-3 py-3.5 text-left xl:table-cell">Partition</th>
-                  <th scope="col" class="hidden px-3 py-3.5 text-left xl:table-cell">Submit Time</th>
-                  <th scope="col" class="hidden px-3 py-3.5 text-left 2xl:table-cell">End Time</th>
+                  <th scope="col" class="hidden px-3 py-3.5 text-left xl:table-cell">QOS</th>
+                  <th scope="col" class="hidden px-3 py-3.5 text-center sm:table-cell">Priority</th>
+                  <th
+                    scope="col"
+                    class="hidden px-3 py-3.5 text-left 2xl:table-cell 2xl:min-w-[100px]"
+                  >
+                    Reason
+                  </th>
                   <th scope="col" class="py-3.5 pr-4 pl-3 sm:pr-6 lg:pr-8">
                     <span class="sr-only">View</span>
                   </th>
@@ -194,23 +203,21 @@ onMounted(() => fetchHistory())
                     {{ job.user_name ?? '-' }} ({{ job.account ?? '-' }})
                   </td>
                   <td class="hidden px-3 py-4 whitespace-nowrap sm:table-cell">
-                    <span v-if="hasValue(job.node_count)"
-                      >{{ job.node_count }} node{{ job.node_count > 1 ? 's' : '' }}</span
-                    >
-                    <span v-if="hasValue(job.node_count) && hasValue(job.cpus)">, </span>
-                    <span v-if="hasValue(job.cpus)"
-                      >{{ job.cpus }} CPU{{ job.cpus > 1 ? 's' : '' }}</span
-                    >
-                    <span v-if="!hasValue(job.node_count) && !hasValue(job.cpus)">-</span>
+                    <JobHistoryResources :job="job" />
                   </td>
                   <td class="hidden px-3 py-4 whitespace-nowrap xl:table-cell">
                     {{ job.partition ?? '-' }}
                   </td>
                   <td class="hidden px-3 py-4 whitespace-nowrap xl:table-cell">
-                    {{ job.submit_time ? new Date(job.submit_time).toLocaleString() : '-' }}
+                    {{ job.qos ?? '-' }}
+                  </td>
+                  <td class="hidden px-3 py-4 text-center whitespace-nowrap sm:table-cell">
+                    {{ historyJobPriority(job) }}
                   </td>
                   <td class="hidden px-3 py-4 whitespace-nowrap 2xl:table-cell">
-                    {{ job.end_time ? new Date(job.end_time).toLocaleString() : '-' }}
+                    <template v-if="job.state_reason != 'None'">
+                      {{ job.state_reason }}
+                    </template>
                   </td>
                   <td class="h-full text-right font-medium">
                     <RouterLink
