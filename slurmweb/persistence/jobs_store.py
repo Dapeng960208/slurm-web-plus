@@ -269,15 +269,15 @@ def _used_memory_gb(job: dict, job_state) -> Optional[float]:
                 return count
         return None
 
-    max_count = None
-    for index in (1, 2):
-        if index >= len(steps):
-            continue
-        count = _step_memory_kb(steps[index])
-        if count is None:
-            continue
-        if max_count is None or count > max_count:
-            max_count = count
+    step_1_count = _step_memory_kb(steps[1]) if len(steps) > 1 else None
+    step_2_count = _step_memory_kb(steps[2]) if len(steps) > 2 else None
+
+    if step_1_count is None:
+        max_count = step_2_count
+    elif step_2_count is None:
+        max_count = step_1_count
+    else:
+        max_count = step_1_count if step_1_count >= step_2_count else step_2_count
 
     if max_count is None:
         return None

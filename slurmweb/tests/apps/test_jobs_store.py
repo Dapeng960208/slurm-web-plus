@@ -202,6 +202,22 @@ class TestJobsStoreExtract(unittest.TestCase):
 
         self.assertEqual(row["used_memory_gb"], 3.0)
 
+    def test_extract_detail_falls_back_to_step_2_when_step_1_has_no_memory(self):
+        row = _extract_detail(
+            {
+                "job_id": 123,
+                "state": {"current": ["COMPLETED"], "reason": "None"},
+                "time": {"submission": 1710000000, "end": 1710000900},
+                "steps": [
+                    {},
+                    {"tres": {"consumed": {"total": []}}},
+                    {"tres": {"consumed": {"total": {"count": 6 * 1024**2}}}},
+                ],
+            }
+        )
+
+        self.assertEqual(row["used_memory_gb"], 6.0)
+
 
 class TestJobsStoreReconcile(unittest.TestCase):
     def setUp(self):
