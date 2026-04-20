@@ -529,7 +529,7 @@ Agent /node/<name>/metrics
 - `last_sched_evaluation_time`：最后一次调度评估时间，历史时间线的 scheduling 阶段优先使用该字段。
 - `tres_requested`：单作业详情中的 `tres.requested`，JSONB 保存。
 - `tres_allocated`：单作业详情中的 `tres.allocated`，JSONB 保存。
-- `used_memory_gb`：已完成作业的实际使用内存，来源于 `steps[*].tres.consumed.total` 的 memory TRES，按 `bytes / 1024^3` 转为 GB。
+- `used_memory_gb`：已完成作业的实际使用内存，来源于 `steps[*].tres.consumed.total` 的 memory TRES；该值单位为 KB，按 `KB / 1024^2` 转为 GB。
 
 数据来源分为两层：
 

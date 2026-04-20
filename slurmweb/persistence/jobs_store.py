@@ -262,7 +262,8 @@ def _used_memory_gb(job: dict, job_state) -> Optional[float]:
         for item in candidates:
             count = _float_field(item.get("count"))
             if count is not None:
-                return round(count / 1024**3, 2)
+                # Slurm reports consumed memory here in KB; persist GB.
+                return round(count / 1024**2, 2)
 
     return None
 

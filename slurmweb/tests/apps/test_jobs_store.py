@@ -156,7 +156,7 @@ class TestJobsStoreExtract(unittest.TestCase):
                                     {"type": "cpu", "count": 32, "id": 1, "name": ""},
                                     {
                                         "type": "mem",
-                                        "count": 4 * 1024**3,
+                                        "count": 4 * 1024**2,
                                         "id": 2,
                                         "name": "",
                                     },
@@ -262,7 +262,7 @@ class TestJobsStoreReconcile(unittest.TestCase):
                                 {"type": "cpu", "count": 16, "id": 1, "name": ""},
                                 {
                                     "type": "mem",
-                                    "count": 2 * 1024**3,
+                                    "count": 2 * 1024**2,
                                     "id": 2,
                                     "name": "",
                                 },
