@@ -10,4 +10,4 @@ node_modules
 /docs/man/*.1
 frontend/node_modules
 Slurm_web.egg-info
-
+slurmweb4.2/
