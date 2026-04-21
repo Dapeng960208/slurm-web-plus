@@ -5,11 +5,18 @@
 # SPDX-License-Identifier: MIT
 
 from datetime import datetime, timezone
+import json
 import types
 from unittest import mock
 import unittest
 
-from slurmweb.persistence.jobs_store import JobsStore, _extract, _extract_detail, _ts
+from slurmweb.persistence.jobs_store import (
+    JobsStore,
+    _extract,
+    _extract_detail,
+    _ts,
+    normalize_history_exit_code,
+)
 
 
 class SlurmrestdNotFoundError(Exception):
@@ -47,6 +54,14 @@ class TestJobsStoreExtract(unittest.TestCase):
                 "cpus": {"set": True, "infinite": False, "number": 48},
                 "priority": {"set": True, "infinite": False, "number": 100},
                 "time_limit": {"set": True, "infinite": False, "number": 120},
+                "exit_code": {
+                    "return_code": {"set": True, "infinite": False, "number": 9},
+                    "signal": {
+                        "id": {"set": True, "infinite": False, "number": 0},
+                        "name": "NONE",
+                    },
+                    "status": ["FAILED"],
+                },
             }
         )
 
@@ -69,6 +84,17 @@ class TestJobsStoreExtract(unittest.TestCase):
         self.assertEqual(row["cpus"], 48)
         self.assertEqual(row["priority"], 100)
         self.assertEqual(row["time_limit_minutes"], 120)
+        self.assertEqual(
+            json.loads(row["exit_code"]),
+            {
+                "return_code": {"set": True, "infinite": False, "number": 9},
+                "signal": {
+                    "id": {"set": True, "infinite": False, "number": 0},
+                    "name": "NONE",
+                },
+                "status": ["FAILED"],
+            },
+        )
         self.assertIsNone(row["tres_requested"])
         self.assertIsNone(row["tres_allocated"])
         self.assertIsNone(row["used_memory_gb"])
@@ -112,6 +138,14 @@ class TestJobsStoreExtract(unittest.TestCase):
                 },
                 "working_directory": "/tmp/detail",
                 "submit_line": "sleep 1",
+                "exit_code": {
+                    "return_code": {"set": True, "infinite": False, "number": 0},
+                    "signal": {
+                        "id": {"set": True, "infinite": False, "number": 0},
+                        "name": "NONE",
+                    },
+                    "status": ["SUCCESS"],
+                },
             }
         )
 
@@ -139,6 +173,17 @@ class TestJobsStoreExtract(unittest.TestCase):
         self.assertIsNone(row["end_time"])
         self.assertEqual(row["working_directory"], "/tmp/detail")
         self.assertEqual(row["command"], "sleep 1")
+        self.assertEqual(
+            json.loads(row["exit_code"]),
+            {
+                "return_code": {"set": True, "infinite": False, "number": 0},
+                "signal": {
+                    "id": {"set": True, "infinite": False, "number": 0},
+                    "name": "NONE",
+                },
+                "status": ["SUCCESS"],
+            },
+        )
         self.assertEqual(len(row["tres_requested"]), 2)
         self.assertEqual(len(row["tres_allocated"]), 2)
         self.assertIsNone(row["used_memory_gb"])
@@ -185,6 +230,9 @@ class TestJobsStoreReconcile(unittest.TestCase):
         self.slurmrestd = mock.Mock()
         self.store = JobsStore(settings=mock.Mock(), slurmrestd=self.slurmrestd)
         self.store._active_records = mock.Mock()
+
+    def _pending_rows(self):
+        return list(self.store._pending.values())
 
     def _record(self):
         return {
@@ -283,17 +331,18 @@ class TestJobsStoreReconcile(unittest.TestCase):
         self.store._reconcile_missing_active_jobs([])
 
         self.assertEqual(len(self.store._pending), 1)
-        self.assertEqual(self.store._pending[0]["job_state"], "COMPLETED")
+        [pending_row] = self._pending_rows()
+        self.assertEqual(pending_row["job_state"], "COMPLETED")
         self.assertEqual(
-            self.store._pending[0]["end_time"],
+            pending_row["end_time"],
             datetime.fromtimestamp(1710000600, tz=timezone.utc),
         )
-        self.assertIsNone(self.store._pending[0]["used_memory_gb"])
+        self.assertIsNone(pending_row["used_memory_gb"])
         self.assertEqual(
-            self.store._pending[0]["eligible_time"],
+            pending_row["eligible_time"],
             datetime.fromtimestamp(1710000200, tz=timezone.utc),
         )
-        self.assertEqual(len(self.store._pending[0]["tres_requested"]), 1)
+        self.assertEqual(len(pending_row["tres_requested"]), 1)
 
     def test_reconcile_missing_job_marks_completed_when_lookup_not_found(self):
         self.store._active_records.return_value = [self._record()]
@@ -302,10 +351,11 @@ class TestJobsStoreReconcile(unittest.TestCase):
         self.store._reconcile_missing_active_jobs([])
 
         self.assertEqual(len(self.store._pending), 1)
-        self.assertEqual(self.store._pending[0]["job_state"], "COMPLETED")
-        self.assertIsNotNone(self.store._pending[0]["end_time"])
+        [pending_row] = self._pending_rows()
+        self.assertEqual(pending_row["job_state"], "COMPLETED")
+        self.assertIsNotNone(pending_row["end_time"])
         self.assertEqual(
-            self.store._pending[0]["state_reason"],
+            pending_row["state_reason"],
             "Job missing from active queue and detail lookup",
         )
 
@@ -318,7 +368,7 @@ class TestJobsStoreReconcile(unittest.TestCase):
         )
 
         self.slurmrestd.job.assert_not_called()
-        self.assertEqual(self.store._pending, [])
+        self.assertEqual(self.store._pending, {})
 
     def test_needs_detail_enrichment_ignores_used_memory_for_completed_jobs(self):
         running_record = self._record()
@@ -398,3 +448,147 @@ class TestJobsStoreQuerySorting(unittest.TestCase):
             "ORDER BY js.node_count ASC NULLS FIRST, js.cpus ASC NULLS FIRST, js.job_id ASC LIMIT %s OFFSET %s",
             sql,
         )
+
+
+class TestJobsStorePendingQueue(unittest.TestCase):
+    def setUp(self):
+        self.store = JobsStore(settings=mock.Mock(), slurmrestd=None)
+
+    def _row(self, job_id=123, submit_ts=1710000000, job_state="PENDING"):
+        return {
+            "job_id": job_id,
+            "job_name": f"job-{job_id}",
+            "job_state": job_state,
+            "state_reason": None,
+            "user_name": "alice",
+            "user_id": None,
+            "account": "science",
+            "group": "research",
+            "partition": "normal",
+            "qos": "debug",
+            "nodes": "cn1",
+            "node_count": 1,
+            "cpus": 16,
+            "priority": 100,
+            "tres_req_str": "cpu=16",
+            "tres_per_job": None,
+            "tres_per_node": None,
+            "gres_detail": None,
+            "tres_requested": None,
+            "tres_allocated": None,
+            "submit_time": datetime.fromtimestamp(submit_ts, tz=timezone.utc),
+            "start_time": None,
+            "end_time": None,
+            "eligible_time": None,
+            "last_sched_evaluation_time": None,
+            "time_limit_minutes": 60,
+            "used_memory_gb": None,
+            "exit_code": "0:0",
+            "working_directory": "/tmp/job",
+            "command": "sleep 1",
+        }
+
+    def test_queue_rows_keeps_last_occurrence_for_same_job_and_submit_time(self):
+        self.store._queue_rows(
+            [
+                self._row(job_state="PENDING"),
+                self._row(job_state="RUNNING"),
+            ]
+        )
+
+        self.assertEqual(len(self.store._pending), 1)
+        [pending_row] = self.store._pending.values()
+        self.assertEqual(pending_row["job_state"], "RUNNING")
+
+    def test_queue_rows_keeps_distinct_submit_times_for_same_job(self):
+        self.store._queue_rows(
+            [
+                self._row(submit_ts=1710000000),
+                self._row(submit_ts=1710000060),
+            ]
+        )
+
+        self.assertEqual(len(self.store._pending), 2)
+
+    def test_flush_batches_unique_pending_rows_once(self):
+        self.store._queue_rows(
+            [
+                self._row(job_state="PENDING"),
+                self._row(job_state="RUNNING"),
+                self._row(job_id=124, job_state="COMPLETED"),
+            ]
+        )
+        self.store._flush_chunk = mock.Mock(return_value=[])
+
+        self.store._flush()
+
+        self.store._flush_chunk.assert_called_once()
+        flushed_rows = self.store._flush_chunk.call_args.args[0]
+        self.assertEqual(len(flushed_rows), 2)
+        states = {row["job_id"]: row["job_state"] for row in flushed_rows}
+        self.assertEqual(states[123], "RUNNING")
+        self.assertEqual(states[124], "COMPLETED")
+        self.assertEqual(self.store._pending, {})
+
+    def test_flush_requeues_failed_rows_without_overwriting_newer_pending_rows(self):
+        stale_row = self._row(job_state="PENDING")
+        newer_row = self._row(job_state="RUNNING")
+        self.store._queue_rows([stale_row])
+
+        def flush_side_effect(chunk):
+            self.store._queue_rows([newer_row])
+            return [stale_row]
+
+        self.store._flush_chunk = mock.Mock(side_effect=flush_side_effect)
+
+        self.store._flush()
+
+        self.assertEqual(len(self.store._pending), 1)
+        self.assertEqual(
+            self.store._pending[(123, stale_row["submit_time"])]["job_state"],
+            "RUNNING",
+        )
+
+    def test_queue_rows_scales_with_unique_keys_under_repeated_submissions(self):
+        repeated_rows = []
+        for submit_offset in range(200):
+            for state in ("PENDING", "RUNNING", "COMPLETED"):
+                repeated_rows.append(
+                    self._row(
+                        job_id=1000 + submit_offset,
+                        submit_ts=1710000000 + submit_offset,
+                        job_state=state,
+                    )
+                )
+
+        self.store._queue_rows(repeated_rows)
+
+        self.assertEqual(len(self.store._pending), 200)
+        self.assertTrue(
+            all(row["job_state"] == "COMPLETED" for row in self.store._pending.values())
+        )
+
+
+class TestHistoryExitCodeNormalization(unittest.TestCase):
+    def test_normalize_history_exit_code_from_legacy_string(self):
+        result = normalize_history_exit_code("0:0")
+        self.assertEqual(result["return_code"]["number"], 0)
+        self.assertEqual(result["signal"]["id"]["number"], 0)
+        self.assertEqual(result["status"], ["SUCCESS"])
+
+    def test_normalize_history_exit_code_from_json_string(self):
+        result = normalize_history_exit_code(
+            json.dumps(
+                {
+                    "return_code": {"set": True, "infinite": False, "number": 9},
+                    "signal": {
+                        "id": {"set": True, "infinite": False, "number": 0},
+                        "name": "NONE",
+                    },
+                    "status": ["FAILED"],
+                }
+            )
+        )
+        self.assertEqual(result["return_code"]["number"], 9)
+        self.assertEqual(result["signal"]["id"]["number"], 0)
+        self.assertEqual(result["status"], ["FAILED"])

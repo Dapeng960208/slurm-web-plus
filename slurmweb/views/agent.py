@@ -12,6 +12,7 @@ from rfl.web.tokens import rbac_action, check_jwt
 
 from ..version import get_version
 from ..errors import SlurmwebCacheError, SlurmwebMetricsDBError
+from ..persistence.jobs_store import normalize_history_exit_code
 
 from ..slurmrestd.errors import (
     SlurmrestdNotFoundError,
@@ -31,6 +32,12 @@ def _positive_int_query_arg(name: str, default: int) -> int:
         return max(int(value), 1)
     except (TypeError, ValueError):
         return default
+
+
+def _normalize_job_history_record(record: dict) -> dict:
+    data = dict(record)
+    data["exit_code"] = normalize_history_exit_code(data.get("exit_code"))
+    return data
 
 
 def racksdb_get_version():
@@ -177,12 +184,6 @@ def jobs():
         result = slurmrest("jobs_by_node", node)
     else:
         result = slurmrest("jobs")
-    # Async submit to persistence store if enabled (non-blocking)
-    if current_app.jobs_store is not None:
-        try:
-            current_app.jobs_store.submit(result)
-        except Exception as err:
-            logger.warning("Failed to submit jobs to persistence store: %s", err)
     return jsonify(result)
 
 
@@ -325,7 +326,11 @@ def jobs_history():
         "order": request.args.get("order"),
     }
     try:
-        return jsonify(current_app.jobs_store.query(filters))
+        result = current_app.jobs_store.query(filters)
+        result["jobs"] = [
+            _normalize_job_history_record(record) for record in result.get("jobs", [])
+        ]
+        return jsonify(result)
     except Exception as err:
         logger.error("Job history query error: %s", err)
         abort(500, str(err))
@@ -345,7 +350,7 @@ def job_history_detail(record_id: int):
         abort(500, str(err))
     if record is None:
         abort(404, f"Job history record {record_id} not found")
-    return jsonify(record)
+    return jsonify(_normalize_job_history_record(record))
 
 
 @check_jwt

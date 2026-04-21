@@ -11,7 +11,9 @@ Runs a background thread that periodically snapshots active jobs and writes
 them to PostgreSQL via UPSERT. The main request path is never blocked.
 """
 
+import json
 import logging
+import re
 import threading
 import time
 from datetime import datetime, timezone
@@ -176,12 +178,102 @@ def _gres_str(value):
 
 
 def _exit_str(value):
-    if isinstance(value, dict):
-        return "{}:{}".format(
-            value.get("return_code", ""),
-            value.get("signal", {}).get("signal_id", ""),
-        )
+    if isinstance(value, (dict, list)):
+        return json.dumps(value)
     return str(value) if value else None
+
+
+def _optional_number_dict(value: Optional[int]) -> dict:
+    if value is None:
+        return {"set": False, "infinite": False, "number": 0}
+    return {"set": True, "infinite": False, "number": int(value)}
+
+
+def normalize_history_exit_code(value):
+    if value in (None, ""):
+        return None
+
+    if isinstance(value, str):
+        trimmed = value.strip()
+        if not trimmed:
+            return None
+        try:
+            parsed = json.loads(trimmed)
+        except (TypeError, ValueError):
+            parsed = None
+        else:
+            normalized = normalize_history_exit_code(parsed)
+            if normalized is not None:
+                return normalized
+
+        matched = re.fullmatch(r"(-?\d+)(?::(-?\d+))?", trimmed)
+        if matched:
+            return_code = int(matched.group(1))
+            signal_id = int(matched.group(2) or 0)
+            return {
+                "return_code": _optional_number_dict(return_code),
+                "signal": {
+                    "id": _optional_number_dict(signal_id),
+                    "name": "",
+                },
+                "status": ["SUCCESS" if return_code == 0 else "FAILED"],
+            }
+        return trimmed
+
+    if not isinstance(value, dict):
+        return value
+
+    return_code_value = value.get("return_code")
+    if isinstance(return_code_value, dict):
+        return_code = _int_field(return_code_value)
+        normalized_return_code = {
+            "set": return_code_value.get("set", return_code is not None),
+            "infinite": return_code_value.get("infinite", False),
+            "number": return_code_value.get("number", return_code or 0),
+        }
+    else:
+        return_code = _int_field(return_code_value)
+        normalized_return_code = _optional_number_dict(return_code)
+
+    signal_value = value.get("signal")
+    signal_id_value = None
+    signal_name = ""
+    if isinstance(signal_value, dict):
+        signal_name = signal_value.get("name", "")
+        if "id" in signal_value:
+            signal_id_value = signal_value.get("id")
+        elif "signal_id" in signal_value:
+            signal_id_value = signal_value.get("signal_id")
+    else:
+        signal_id_value = signal_value
+
+    if isinstance(signal_id_value, dict):
+        signal_id = _int_field(signal_id_value)
+        normalized_signal_id = {
+            "set": signal_id_value.get("set", signal_id is not None),
+            "infinite": signal_id_value.get("infinite", False),
+            "number": signal_id_value.get("number", signal_id or 0),
+        }
+    else:
+        signal_id = _int_field(signal_id_value)
+        normalized_signal_id = _optional_number_dict(signal_id)
+
+    status = value.get("status")
+    if isinstance(status, list):
+        normalized_status = [str(item) for item in status if item not in (None, "")]
+    elif isinstance(status, str) and status:
+        normalized_status = [status]
+    else:
+        normalized_status = ["SUCCESS" if return_code == 0 else "FAILED"]
+
+    return {
+        "return_code": normalized_return_code,
+        "signal": {
+            "id": normalized_signal_id,
+            "name": signal_name,
+        },
+        "status": normalized_status,
+    }
 
 
 def _int_field(value):
@@ -392,11 +484,16 @@ def _dedup(rows: list) -> list:
     return list(seen.values())
 
 
+def _row_key(row: dict) -> tuple:
+    return (row["job_id"], row["submit_time"])
+
+
 def _serialize_datetimes(row: dict) -> dict:
     data = dict(row)
     for key, value in data.items():
         if isinstance(value, datetime):
             data[key] = value.isoformat()
+    data["exit_code"] = normalize_history_exit_code(data.get("exit_code"))
     return data
 
 
@@ -426,7 +523,7 @@ class JobsStore:
         self._settings = settings
         self._slurmrestd = slurmrestd
         self._lock = threading.Lock()
-        self._pending = []
+        self._pending = {}
         self._thread = None  # type: Optional[threading.Thread]
         self._stop_event = threading.Event()
         self._last_cleanup = 0.0
@@ -614,7 +711,8 @@ class JobsStore:
     def _queue_rows(self, rows: list):
         if rows:
             with self._lock:
-                self._pending.extend(rows)
+                for row in rows:
+                    self._pending[_row_key(row)] = row
 
     def _active_records(self) -> list:
         import psycopg2.extras
@@ -851,13 +949,12 @@ class JobsStore:
 
     def _flush(self):
         with self._lock:
-            batch = self._pending[:]
-            self._pending.clear()
+            batch = list(self._pending.values())
+            self._pending = {}
 
         if not batch:
             return
 
-        batch = _dedup(batch)
         failed = []
         for i in range(0, len(batch), BATCH_CHUNK):
             chunk = batch[i : i + BATCH_CHUNK]
@@ -866,7 +963,9 @@ class JobsStore:
         if failed:
             logger.warning("Re-queuing %d failed job rows for retry", len(failed))
             with self._lock:
-                self._pending = failed + self._pending
+                requeued = {_row_key(row): row for row in failed}
+                requeued.update(self._pending)
+                self._pending = requeued
 
         logger.debug(
             "Persisted %d job snapshots (%d failed)",

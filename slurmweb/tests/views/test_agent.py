@@ -160,6 +160,47 @@ class TestAgentViews(TestAgentBase):
             ],
         )
 
+    def test_job_history_detail_normalizes_exit_code_json_string(self):
+        self.app.jobs_store = mock.Mock()
+        self.app.jobs_store.get_by_id.return_value = {
+            "id": 12,
+            "job_id": 1234,
+            "exit_code": (
+                '{"return_code":{"set":true,"infinite":false,"number":0},'
+                '"signal":{"id":{"set":true,"infinite":false,"number":0},"name":"NONE"},'
+                '"status":["SUCCESS"]}'
+            ),
+        }
+
+        response = self.client.get(f"/v{get_version()}/jobs/history/12")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json["job_id"], 1234)
+        self.assertEqual(response.json["exit_code"]["return_code"]["number"], 0)
+        self.assertEqual(response.json["exit_code"]["status"], ["SUCCESS"])
+
+    def test_jobs_history_normalizes_legacy_exit_code_string(self):
+        self.app.jobs_store = mock.Mock()
+        self.app.jobs_store.query.return_value = {
+            "total": 1,
+            "page": 1,
+            "page_size": 20,
+            "jobs": [
+                {
+                    "id": 12,
+                    "job_id": 1234,
+                    "exit_code": "9:0",
+                }
+            ],
+        }
+
+        response = self.client.get(f"/v{get_version()}/jobs/history")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json["jobs"][0]["exit_code"]["return_code"]["number"], 9)
+        self.assertEqual(response.json["jobs"][0]["exit_code"]["signal"]["id"]["number"], 0)
+        self.assertEqual(response.json["jobs"][0]["exit_code"]["status"], ["FAILED"])
+
     #
     # General error cases
     #
@@ -265,6 +306,7 @@ class TestAgentViews(TestAgentBase):
     @all_slurm_api_versions
     def test_request_jobs(self, slurm_version, api_version):
         self.setup_slurmrestd(slurm_version, api_version)
+        self.app.jobs_store = mock.Mock()
         [jobs_asset] = self.mock_slurmrestd_responses(
             slurm_version,
             api_version,
@@ -277,6 +319,7 @@ class TestAgentViews(TestAgentBase):
         self.assertEqual(len(response.json), len(jobs_asset))
         for idx in range(len(response.json)):
             self.assertEqual(response.json[idx]["job_id"], jobs_asset[idx]["job_id"])
+        self.app.jobs_store.submit.assert_not_called()
 
     @all_slurm_api_versions
     def test_request_jobs_node(self, slurm_version, api_version):
