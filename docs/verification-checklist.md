@@ -89,12 +89,29 @@ curl -s -H "Authorization: Bearer $TOKEN" \
       "start_time": "2024-01-01T10:05:00",
       "end_time": "2024-01-01T11:00:00",
       "time_limit_minutes": 120,
-      "exit_code": "0:0"
+      "exit_code": {
+        "return_code": {
+          "set": true,
+          "infinite": false,
+          "number": 0
+        },
+        "signal": {
+          "id": {
+            "set": true,
+            "infinite": false,
+            "number": 0
+          },
+          "name": "NONE"
+        },
+        "status": ["SUCCESS"]
+      }
     }
   ],
   "total": 150
 }
 ```
+
+- 鍘嗗彶鎺ュ彛鐜板湪浼氬皢 `exit_code` 瑙勮寖鍖栦负瀵硅薄锛屽吋瀹规柊鍐欏叆鐨?JSON 瀛楃涓插拰鏃ф暟鎹?`0:0` 杩欑被瀛楃涓层€?
 
 #### 测试节点实时资源 API（如果 node_metrics=true）
 ```bash
