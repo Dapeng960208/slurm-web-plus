@@ -10,6 +10,8 @@ import logging
 from .base import BaseAdapter
 
 # Import adapter classes after BaseAdapter is defined to avoid circular imports
+from .v0_0_39 import AdapterV0_0_39
+from .v0_0_40 import AdapterV0_0_40
 from .v0_0_41 import AdapterV0_0_41
 from .v0_0_42 import AdapterV0_0_42
 from .v0_0_43 import AdapterV0_0_43
@@ -18,6 +20,8 @@ logger = logging.getLogger(__name__)
 
 # Hard-coded registry of adapters
 _ADAPTERS = {
+    "0.0.39": AdapterV0_0_39,
+    "0.0.40": AdapterV0_0_40,
     "0.0.41": AdapterV0_0_41,
     "0.0.42": AdapterV0_0_42,
     "0.0.43": AdapterV0_0_43,
@@ -25,7 +29,10 @@ _ADAPTERS = {
 
 
 def build_adaptation_chain(
-    from_version: str, to_version: str, supported_versions: t.List[str]
+    from_version: str,
+    to_version: str,
+    supported_versions: t.List[str],
+    cluster_name_hint: t.Optional[str] = None,
 ) -> t.List[BaseAdapter]:
     """Build a chain of adapters from one version to another.
 
@@ -60,7 +67,7 @@ def build_adaptation_chain(
         version = VERSION_CHAIN[i]
         adapter_class = _ADAPTERS.get(version)
         if adapter_class:
-            chain.append(adapter_class())
+            chain.append(adapter_class(cluster_name_hint=cluster_name_hint))
         else:
             logger.debug("No adapter found for version %s", version)
 

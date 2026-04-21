@@ -37,6 +37,7 @@ class Slurmrestd:
         uri: urllib.parse.ParseResult,
         auth: SlurmrestdAuthentifier,
         supported_versions: t.List[str],
+        cluster_name_hint: t.Optional[str] = None,
     ):
         self.session = requests.Session()
 
@@ -55,6 +56,7 @@ class Slurmrestd:
 
         self.auth = auth
         self.supported_versions = supported_versions
+        self.cluster_name_hint = cluster_name_hint
 
         # Initialized in discover()
         self.cluster_name = None
@@ -178,8 +180,13 @@ class Slurmrestd:
                     "slurm", version, "ping", ignore_notfound=True
                 )
                 # If we get here, the request was successful
-                self.cluster_name = result["meta"]["slurm"]["cluster"]
-                self.slurm_version = result["meta"]["slurm"]["release"]
+                slurm_meta = result["meta"].get("slurm") or result["meta"].get("Slurm")
+                if not isinstance(slurm_meta, dict):
+                    raise KeyError("meta.slurm")
+                self.cluster_name = slurm_meta.get(
+                    "cluster", self.cluster_name_hint or "unknown"
+                )
+                self.slurm_version = slurm_meta["release"]
                 self.api_version = version
                 logger.info(
                     "Discovered slurmrestd Slurm version: %s and API version: %s",
@@ -408,8 +415,9 @@ class SlurmrestdAdapter(Slurmrestd):
         uri: urllib.parse.ParseResult,
         auth: SlurmrestdAuthentifier,
         supported_versions: t.List[str],
+        cluster_name_hint: t.Optional[str] = None,
     ):
-        super().__init__(uri, auth, supported_versions)
+        super().__init__(uri, auth, supported_versions, cluster_name_hint)
         # Will be set after discover() is called
         self._adaptation_chain = []
 
@@ -423,7 +431,10 @@ class SlurmrestdAdapter(Slurmrestd):
         # Build adaptation chain if API version is older than target
         if self.api_version != target_version:
             self._adaptation_chain = build_adaptation_chain(
-                self.api_version, target_version, self.supported_versions
+                self.api_version,
+                target_version,
+                self.supported_versions,
+                cluster_name_hint=self.cluster_name_hint,
             )
         else:
             self._adaptation_chain = []
@@ -450,8 +461,9 @@ class SlurmrestdFiltered(SlurmrestdAdapter):
         auth: SlurmrestdAuthentifier,
         supported_versions: t.List[str],
         filters: "RuntimeSettings",
+        cluster_name_hint: t.Optional[str] = None,
     ):
-        super().__init__(uri, auth, supported_versions)
+        super().__init__(uri, auth, supported_versions, cluster_name_hint)
         self.filters = filters
 
     @staticmethod
@@ -546,8 +558,9 @@ class SlurmrestdFilteredCached(SlurmrestdFiltered):
         filters: "RuntimeSettings",
         cache: "RuntimeSettings",
         service: "CachingService",
+        cluster_name_hint: t.Optional[str] = None,
     ):
-        super().__init__(uri, auth, supported_versions, filters)
+        super().__init__(uri, auth, supported_versions, filters, cluster_name_hint)
         self.cache = cache
         self.service = service
 

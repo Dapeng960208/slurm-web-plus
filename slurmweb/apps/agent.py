@@ -126,8 +126,11 @@ class SlurmwebAppAgent(SlurmwebWebApp, RFLTokenizedRBACWebApp):
                 "Using deprecated parameter [slurmrestd]>socket to define "
                 "[slurmrest]>uri, update your site agent configuration file"
             )
+            socket_path = str(self.settings.slurmrestd.socket).replace("\\", "/")
+            if not socket_path.startswith("/"):
+                socket_path = f"/{socket_path}"
             self.settings.slurmrestd.uri = urllib.parse.urlparse(
-                f"unix://{self.settings.slurmrestd.socket}"
+                f"unix://{socket_path}"
             )
 
         # Warn deprecated local authentication method to slurmrestd
@@ -160,6 +163,7 @@ class SlurmwebAppAgent(SlurmwebWebApp, RFLTokenizedRBACWebApp):
                 self.settings.filters,
                 self.settings.cache,
                 self.cache,
+                cluster_name_hint=self.settings.service.cluster,
             )
         except SlurmwebConfigurationError as err:
             logger.critical("Configuration error: %s", err)

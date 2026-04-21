@@ -14,6 +14,9 @@ class BaseAdapter:
     Methods should be named after the endpoint key (e.g., adapt_jobs, adapt_nodes).
     """
 
+    def __init__(self, cluster_name_hint: t.Optional[str] = None):
+        self.cluster_name_hint = cluster_name_hint
+
     def adapt(self, component: str, key: str, data: t.Any) -> t.Any:
         """Adapt data for the given key using the appropriate method.
 
@@ -29,6 +32,7 @@ class BaseAdapter:
         adapter = getattr(self, method_name, None)
         if adapter is not None:
             return adapter(data)
+        return data
 
     def adapt_slurm_jobs(self, data: t.Any) -> t.Any:
         """Adapt jobs data from slurmctld."""

@@ -39,7 +39,14 @@ ASSETS = Path(__file__).parent.resolve() / ".." / ".." / "tests" / "assets"
 
 # Supported slurmrestd API versions to try during discovery, in descending order
 # (newest first)
-SUPPORTED_SLURMRESTD_API_VERSIONS = ["0.0.44", "0.0.43", "0.0.42", "0.0.41"]
+SUPPORTED_SLURMRESTD_API_VERSIONS = [
+    "0.0.44",
+    "0.0.43",
+    "0.0.42",
+    "0.0.41",
+    "0.0.40",
+    "0.0.39",
+]
 
 
 class BaseAssetsManager:
@@ -275,7 +282,9 @@ class DevelopmentHostCluster:
                             continue
 
                         # Extract Slurm version
-                        slurm_meta = result.get("meta", {}).get("slurm", {})
+                        slurm_meta = result.get("meta", {}).get("slurm") or result.get(
+                            "meta", {}
+                        ).get("Slurm", {})
                         if slurm_meta:
                             release = slurm_meta.get("release", "")
                             # Extract major.minor version (e.g., "23.11" from "23.11.0")

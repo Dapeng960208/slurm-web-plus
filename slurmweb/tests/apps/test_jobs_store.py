@@ -6,6 +6,7 @@
 
 from datetime import datetime, timezone
 import json
+import copy
 import types
 from unittest import mock
 import unittest
@@ -18,6 +19,7 @@ from slurmweb.persistence.jobs_store import (
     _ts,
     normalize_history_exit_code,
 )
+from slurmweb.slurmrestd.adapters import build_adaptation_chain
 
 
 class SlurmrestdNotFoundError(Exception):
@@ -25,6 +27,26 @@ class SlurmrestdNotFoundError(Exception):
 
 
 class TestJobsStoreExtract(unittest.TestCase):
+    SUPPORTED_VERSIONS = [
+        "0.0.44",
+        "0.0.43",
+        "0.0.42",
+        "0.0.41",
+        "0.0.40",
+        "0.0.39",
+    ]
+
+    def adapt(self, from_version, component, key, data):
+        result = copy.deepcopy(data)
+        for adapter in build_adaptation_chain(
+            from_version,
+            self.SUPPORTED_VERSIONS[0],
+            self.SUPPORTED_VERSIONS,
+            cluster_name_hint="atlas",
+        ):
+            result = adapter.adapt(component, key, result)
+        return result
+
     def test_ts_accepts_optional_number_dict(self):
         value = {"set": True, "infinite": False, "number": 1710000000}
         result = _ts(value)
@@ -99,6 +121,56 @@ class TestJobsStoreExtract(unittest.TestCase):
         self.assertIsNone(row["tres_requested"])
         self.assertIsNone(row["tres_allocated"])
         self.assertIsNone(row["used_memory_gb"])
+
+    def test_extract_handles_v0_0_39_job_after_adaptation(self):
+        [job] = self.adapt(
+            "0.0.39",
+            "slurm",
+            "jobs",
+            [
+                {
+                    "job_id": 123,
+                    "name": "legacy-job",
+                    "job_state": "RUNNING",
+                    "submit_time": 1710000000,
+                    "eligible_time": 1710000200,
+                    "start_time": 1710000300,
+                    "last_sched_evaluation": 1710000250,
+                    "end_time": 0,
+                    "node_count": {"set": True, "infinite": False, "number": 2},
+                    "cpus": {"set": True, "infinite": False, "number": 48},
+                    "priority": {"set": True, "infinite": False, "number": 100},
+                    "time_limit": {"set": True, "infinite": False, "number": 120},
+                    "exit_code": {
+                        "status": "FAILED",
+                        "return_code": 9,
+                        "signal": {"signal_id": 0, "name": "NONE"},
+                    },
+                    "standard_input": "",
+                    "standard_output": "",
+                    "standard_error": "",
+                }
+            ],
+        )
+
+        row = _extract(job)
+
+        self.assertEqual(row["job_id"], 123)
+        self.assertEqual(row["job_state"], "RUNNING")
+        self.assertEqual(
+            row["submit_time"], datetime.fromtimestamp(1710000000, tz=timezone.utc)
+        )
+        self.assertEqual(
+            row["eligible_time"], datetime.fromtimestamp(1710000200, tz=timezone.utc)
+        )
+        self.assertEqual(
+            row["start_time"], datetime.fromtimestamp(1710000300, tz=timezone.utc)
+        )
+        self.assertIsNone(row["end_time"])
+        self.assertEqual(
+            json.loads(row["exit_code"])["return_code"]["number"],
+            9,
+        )
 
     def test_extract_detail_maps_merged_job_fields(self):
         row = _extract_detail(
@@ -204,6 +276,79 @@ class TestJobsStoreExtract(unittest.TestCase):
         self.assertEqual(len(row["tres_requested"]), 2)
         self.assertEqual(len(row["tres_allocated"]), 2)
         self.assertEqual(row["used_memory_gb"], 2.0)
+
+    def test_extract_detail_handles_v0_0_40_job_after_adaptation(self):
+        [job] = self.adapt(
+            "0.0.40",
+            "slurmdb",
+            "jobs",
+            [
+                {
+                    "job_id": 456,
+                    "name": "history-job",
+                    "association": {"account": "science", "user": "alice"},
+                    "group_name": "research",
+                    "partition": "normal",
+                    "qos": "debug",
+                    "nodes": "cn1",
+                    "node_count": {"set": True, "infinite": False, "number": 1},
+                    "cpus": {"set": True, "infinite": False, "number": 16},
+                    "priority": {"set": True, "infinite": False, "number": 42},
+                    "state": {"current": ["COMPLETED"], "reason": "None"},
+                    "time": {
+                        "submission": 1710000000,
+                        "eligible": 1710000200,
+                        "start": 1710000300,
+                        "end": 1710000600,
+                        "limit": {"set": True, "infinite": False, "number": 60},
+                    },
+                    "tres": {
+                        "requested": [{"type": "cpu", "count": 16, "id": 1, "name": ""}],
+                        "allocated": [{"type": "cpu", "count": 16, "id": 1, "name": ""}],
+                    },
+                    "steps": [
+                        {
+                            "time": {},
+                            "step": {},
+                            "tres": {
+                                "consumed": {
+                                    "max": [
+                                        {
+                                            "type": "mem",
+                                            "count": 3 * 1024**3,
+                                            "id": 2,
+                                            "name": "",
+                                        }
+                                    ]
+                                }
+                            },
+                        }
+                    ],
+                    "submit_line": "sleep 1",
+                    "working_directory": "/tmp/detail",
+                    "exit_code": {
+                        "return_code": {"set": True, "infinite": False, "number": 0},
+                        "signal": {
+                            "id": {"set": True, "infinite": False, "number": 0},
+                            "name": "NONE",
+                        },
+                        "status": ["SUCCESS"],
+                    },
+                }
+            ],
+        )
+
+        row = _extract_detail(job)
+
+        self.assertEqual(row["job_id"], 456)
+        self.assertEqual(row["job_state"], "COMPLETED")
+        self.assertEqual(row["user_name"], "alice")
+        self.assertEqual(row["account"], "science")
+        self.assertEqual(row["working_directory"], "/tmp/detail")
+        self.assertEqual(row["command"], "sleep 1")
+        self.assertEqual(row["used_memory_gb"], 3.0)
+        self.assertEqual(len(row["tres_requested"]), 1)
+        self.assertEqual(len(row["tres_allocated"]), 1)
 
     def test_extract_detail_ignores_step_total_memory_for_used_memory(self):
         row = _extract_detail(

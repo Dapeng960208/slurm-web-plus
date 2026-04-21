@@ -105,14 +105,16 @@ class TestAgentConfBase(unittest.TestCase):
         persistence=False,
     ):
         # Generate JWT signing key
-        self.key = tempfile.NamedTemporaryFile(mode="w+")
+        self.key = tempfile.NamedTemporaryFile(mode="w+", delete=False)
         self.key.write("hey")
-        self.key.seek(0)
+        self.key.flush()
+        self.key.close()
 
         # Generate slurmrestd_key
-        self.slurmrestd_key = tempfile.NamedTemporaryFile(mode="w+")
+        self.slurmrestd_key = tempfile.NamedTemporaryFile(mode="w+", delete=False)
         self.slurmrestd_key.write("hey")
-        self.slurmrestd_key.seek(0)
+        self.slurmrestd_key.flush()
+        self.slurmrestd_key.close()
 
         vendor_path = os.path.join(
             os.path.dirname(__file__), "..", "..", "..", "conf", "vendor"
@@ -125,7 +127,7 @@ class TestAgentConfBase(unittest.TestCase):
         policy = os.path.join(vendor_path, "policy.ini")
 
         # Generate configuration file
-        self.conf = tempfile.NamedTemporaryFile(mode="w+")
+        self.conf = tempfile.NamedTemporaryFile(mode="w+", delete=False)
         conf_template = jinja2.Template(CONF_TPL)
         self.conf.write(
             conf_template.render(
@@ -141,7 +143,8 @@ class TestAgentConfBase(unittest.TestCase):
                 persistence=persistence,
             )
         )
-        self.conf.seek(0)
+        self.conf.flush()
+        self.conf.close()
 
         self.conf_defs = os.path.join(vendor_path, "agent.yml")
 

@@ -25,7 +25,7 @@ class TestSlurmrestdDiscover(TestSlurmrestdBase):
         self.slurmrestd = Slurmrestd(
             urllib.parse.urlparse("unix:///dev/null"),
             basic_authentifier(),
-            ["0.0.44", "0.0.43", "0.0.42", "0.0.41"],
+            ["0.0.44", "0.0.43", "0.0.42", "0.0.41", "0.0.40", "0.0.39"],
         )
 
     def setup_execute_request_mock(
@@ -213,22 +213,84 @@ class TestSlurmrestdDiscover(TestSlurmrestdBase):
             ):
                 self.slurmrestd.discover()
 
-        # Should try all 4 versions
-        self.assertEqual(self.slurmrestd._execute_request.call_count, 4)
+        # Should try all 6 versions
+        self.assertEqual(self.slurmrestd._execute_request.call_count, 6)
         # Verify all versions were tried
         calls = [call[0] for call in self.slurmrestd._execute_request.call_args_list]
         self.assertEqual(calls[0], ("slurm", "0.0.44", "ping"))
         self.assertEqual(calls[1], ("slurm", "0.0.43", "ping"))
         self.assertEqual(calls[2], ("slurm", "0.0.42", "ping"))
         self.assertEqual(calls[3], ("slurm", "0.0.41", "ping"))
+        self.assertEqual(calls[4], ("slurm", "0.0.40", "ping"))
+        self.assertEqual(calls[5], ("slurm", "0.0.39", "ping"))
         # Verify DEBUG logs for all versions
-        self.assertEqual(len(cm.output), 4)
+        self.assertEqual(len(cm.output), 6)
         for version in self.slurmrestd.supported_versions:
             self.assertIn(
                 f"DEBUG:slurmweb.slurmrestd:Slurmrestd API version {version} not "
                 "supported, trying next",
                 cm.output,
             )
+
+    def test_discover_success_v0_0_39_legacy_meta(self):
+        self.slurmrestd._execute_request = mock.Mock(
+            side_effect=[
+                SlurmrestdNotFoundError("/slurm/v0.0.44/ping"),
+                SlurmrestdNotFoundError("/slurm/v0.0.43/ping"),
+                SlurmrestdNotFoundError("/slurm/v0.0.42/ping"),
+                SlurmrestdNotFoundError("/slurm/v0.0.41/ping"),
+                SlurmrestdNotFoundError("/slurm/v0.0.40/ping"),
+                {"meta": {"Slurm": {"cluster": "legacy", "release": "23.11.9"}}},
+            ]
+        )
+
+        cluster_name, slurm_version, api_version = self.slurmrestd.discover()
+
+        self.assertEqual(cluster_name, "legacy")
+        self.assertEqual(slurm_version, "23.11.9")
+        self.assertEqual(api_version, "0.0.39")
+
+    def test_discover_success_v0_0_39_cluster_hint_fallback(self):
+        slurmrestd = Slurmrestd(
+            urllib.parse.urlparse("unix:///dev/null"),
+            basic_authentifier(),
+            ["0.0.44", "0.0.43", "0.0.42", "0.0.41", "0.0.40", "0.0.39"],
+            cluster_name_hint="atlas",
+        )
+        slurmrestd._execute_request = mock.Mock(
+            side_effect=[
+                SlurmrestdNotFoundError("/slurm/v0.0.44/ping"),
+                SlurmrestdNotFoundError("/slurm/v0.0.43/ping"),
+                SlurmrestdNotFoundError("/slurm/v0.0.42/ping"),
+                SlurmrestdNotFoundError("/slurm/v0.0.41/ping"),
+                SlurmrestdNotFoundError("/slurm/v0.0.40/ping"),
+                {"meta": {"Slurm": {"release": "23.11.9"}}},
+            ]
+        )
+
+        cluster_name, slurm_version, api_version = slurmrestd.discover()
+
+        self.assertEqual(cluster_name, "atlas")
+        self.assertEqual(slurm_version, "23.11.9")
+        self.assertEqual(api_version, "0.0.39")
+
+    def test_discover_success_v0_0_39_unknown_cluster_fallback(self):
+        self.slurmrestd._execute_request = mock.Mock(
+            side_effect=[
+                SlurmrestdNotFoundError("/slurm/v0.0.44/ping"),
+                SlurmrestdNotFoundError("/slurm/v0.0.43/ping"),
+                SlurmrestdNotFoundError("/slurm/v0.0.42/ping"),
+                SlurmrestdNotFoundError("/slurm/v0.0.41/ping"),
+                SlurmrestdNotFoundError("/slurm/v0.0.40/ping"),
+                {"meta": {"Slurm": {"release": "23.11.9"}}},
+            ]
+        )
+
+        cluster_name, slurm_version, api_version = self.slurmrestd.discover()
+
+        self.assertEqual(cluster_name, "unknown")
+        self.assertEqual(slurm_version, "23.11.9")
+        self.assertEqual(api_version, "0.0.39")
 
     def test_discover_invalid_response_continues(self):
         """Test that invalid response error continues to next version."""
