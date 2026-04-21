@@ -201,6 +201,24 @@ class TestAgentViews(TestAgentBase):
         self.assertEqual(response.json["jobs"][0]["exit_code"]["signal"]["id"]["number"], 0)
         self.assertEqual(response.json["jobs"][0]["exit_code"]["status"], ["FAILED"])
 
+    def test_jobs_history_passes_keyword_filter(self):
+        self.app.jobs_store = mock.Mock()
+        self.app.jobs_store.query.return_value = {
+            "total": 0,
+            "page": 1,
+            "page_size": 20,
+            "jobs": [],
+        }
+
+        response = self.client.get(f"/v{get_version()}/jobs/history?keyword=sleep")
+
+        self.assertEqual(response.status_code, 200)
+        self.app.jobs_store.query.assert_called_once()
+        self.assertEqual(
+            self.app.jobs_store.query.call_args.args[0]["keyword"],
+            "sleep",
+        )
+
     #
     # General error cases
     #

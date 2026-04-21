@@ -9,6 +9,7 @@ describe('JobsHistoryFiltersPanel.vue', () => {
         open: true,
         total: 0,
         filters: {
+          keyword: '',
           user: '',
           account: '',
           partition: '',
@@ -36,5 +37,6 @@ describe('JobsHistoryFiltersPanel.vue', () => {
     expect(inputs).toHaveLength(2)
     expect(inputs[0].attributes('step')).toBe('1')
     expect(inputs[1].attributes('step')).toBe('1')
+    expect(wrapper.get('input[placeholder="Search workdir / command"]').exists()).toBe(true)
   })
 })

@@ -314,6 +314,7 @@ def jobs_history():
     filters = {
         "start": request.args.get("start"),
         "end": request.args.get("end"),
+        "keyword": request.args.get("keyword"),
         "user": request.args.get("user"),
         "account": request.args.get("account"),
         "partition": request.args.get("partition"),

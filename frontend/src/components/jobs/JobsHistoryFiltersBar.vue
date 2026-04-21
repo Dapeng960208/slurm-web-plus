@@ -12,6 +12,7 @@ import {
   FunnelIcon,
   BoltIcon,
   RectangleGroupIcon,
+  MagnifyingGlassIcon,
   UserIcon,
   UsersIcon,
   SwatchIcon,
@@ -41,6 +42,17 @@ interface ActiveFilter {
 
 function activeFilters(): ActiveFilter[] {
   const result: ActiveFilter[] = []
+  if (props.filters.keyword)
+    result.push({
+      key: 'keyword',
+      label: props.filters.keyword,
+      value: props.filters.keyword,
+      icon: MagnifyingGlassIcon,
+      colors: {
+        badge: 'border-gray-200 dark:border-gray-400 bg-slate-600 dark:bg-slate-500',
+        button: 'text-slate-600 hover:bg-slate-600 hover:text-slate-700'
+      }
+    })
   if (props.filters.state)
     result.push({
       key: 'state',

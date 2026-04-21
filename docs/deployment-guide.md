@@ -543,7 +543,7 @@ enabled = yes
 - `tres_allocated`
 - `used_memory_gb`
 
-`used_memory_gb` 是兼容保留列，当前版本不再填充或在前端展示该字段。
+`used_memory_gb` 用于保存历史作业的 Max Memory，来源于 `steps[*].tres.consumed.max.mem`，按 `1024^3` 转换为 GB；历史详情页会以 `Max Memory` 展示该字段。
 
 推荐生产升级顺序：
 

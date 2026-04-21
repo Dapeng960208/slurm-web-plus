@@ -394,4 +394,4 @@ ORDER BY column_name;
 
 - 六段式时间线：Submitted、Eligible、Scheduling、Running、Completed、Terminated。
 - `Requested` 和 `Allocated` 资源块。
-- 不再显示 `Used Memory` 字段；`used_memory_gb` 仅作为兼容字段保留在返回结构中，值应为 `null`。
+- 历史详情页应显示 `Max Memory` 字段；`used_memory_gb` 应返回由 `steps[*].tres.consumed.max.mem` 计算出的 GB 值，取所有 step 中的最大值。

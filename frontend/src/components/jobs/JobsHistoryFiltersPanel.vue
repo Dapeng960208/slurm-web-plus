@@ -21,6 +21,7 @@ import {
   ChevronDownIcon,
   BoltIcon,
   RectangleGroupIcon,
+  MagnifyingGlassIcon,
   UserIcon,
   UsersIcon,
   SwatchIcon,
@@ -99,6 +100,37 @@ const state_options = [
             </div>
 
             <form class="mt-4" @submit.prevent="() => { emit('search'); emit('close') }">
+              <!-- Keyword -->
+              <Disclosure
+                as="div"
+                class="border-t border-gray-200 px-4 py-6 dark:border-gray-600"
+                v-slot="{ open: dOpen }"
+              >
+                <h3 class="-mx-2 -my-3 flow-root">
+                  <DisclosureButton
+                    class="flex w-full items-center justify-between px-2 py-3 text-sm text-gray-400"
+                  >
+                    <span class="flex">
+                      <MagnifyingGlassIcon
+                        class="-mt-1 mr-2 -ml-1 h-8 w-8 rounded-full bg-slate-600 p-2 text-white dark:bg-slate-500"
+                      />
+                      <span class="font-medium text-gray-900 dark:text-gray-100">Keyword</span>
+                    </span>
+                    <ChevronDownIcon
+                      :class="[dOpen ? '-rotate-180' : 'rotate-0', 'h-5 w-5 transform']"
+                      aria-hidden="true"
+                    />
+                  </DisclosureButton>
+                </h3>
+                <DisclosurePanel class="pt-4">
+                  <input
+                    v-model="props.filters.keyword"
+                    placeholder="Search workdir / command"
+                    class="w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-slurmweb dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+                  />
+                </DisclosurePanel>
+              </Disclosure>
+
               <!-- State -->
               <Disclosure
                 as="div"

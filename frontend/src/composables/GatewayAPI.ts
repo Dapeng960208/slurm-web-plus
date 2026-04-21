@@ -215,6 +215,13 @@ export interface ClusterJobExitCode {
   status: string[]
 }
 
+function getOptionalNumberValue(value: ClusterOptionalNumber | null | undefined): number | null {
+  if (!value || !value.set || value.infinite) {
+    return null
+  }
+  return value.number
+}
+
 export interface ClusterIndividualJob {
   accrue_time?: ClusterOptionalNumber
   association: { account: string; cluster: string; id: number; partition: string; user: string }
@@ -757,6 +764,77 @@ export function splitJobHistoryState(jobState: string | null | undefined): strin
   return states.length ? states : ['UNKNOWN']
 }
 
+export function isClusterJobExitCode(value: unknown): value is ClusterJobExitCode {
+  if (typeof value !== 'object' || value === null || !('return_code' in value)) {
+    return false
+  }
+  const returnCode = value.return_code
+  return typeof returnCode === 'object' && returnCode !== null && 'number' in returnCode
+}
+
+export function formatJobExitCode(exitCode: JobHistoryExitCode | ClusterJobExitCode | null): string {
+  if (exitCode == null) return '-'
+
+  if (typeof exitCode === 'string') {
+    const trimmed = exitCode.trim()
+    if (!trimmed.length) return '-'
+
+    try {
+      return formatJobExitCode(JSON.parse(trimmed))
+    } catch {
+      const match = /^(-?\d+)(?::(-?\d+))?$/.exec(trimmed)
+      if (!match) return trimmed
+
+      const returnCode = parseInt(match[1], 10)
+      const signalId = parseInt(match[2] ?? '0', 10)
+      if (signalId > 0) {
+        return returnCode === 0
+          ? `SIGNALED (${signalId})`
+          : `SIGNALED (rc=${returnCode}, sig=${signalId})`
+      }
+      return `${returnCode === 0 ? 'SUCCESS' : 'FAILED'} (${returnCode})`
+    }
+  }
+
+  if (!isClusterJobExitCode(exitCode)) {
+    return '-'
+  }
+
+  const status =
+    exitCode.status.find((candidate) => typeof candidate === 'string' && candidate.length > 0) ??
+    null
+  const returnCode = getOptionalNumberValue(exitCode.return_code)
+  const signalId = getOptionalNumberValue(exitCode.signal.id)
+  const signalName =
+    exitCode.signal.name && exitCode.signal.name !== 'NONE' ? exitCode.signal.name : null
+  const signalLabel =
+    signalId && signalId > 0 ? (signalName ? `${signalName}/${signalId}` : String(signalId)) : null
+  const effectiveStatus =
+    status ?? (signalLabel ? 'SIGNALED' : returnCode === 0 ? 'SUCCESS' : returnCode != null ? 'FAILED' : null)
+
+  if (signalLabel && returnCode != null) {
+    return `${effectiveStatus ?? 'UNKNOWN'} (rc=${returnCode}, sig=${signalLabel})`
+  }
+  if (signalLabel) {
+    return `${effectiveStatus ?? 'SIGNALED'} (${signalLabel})`
+  }
+  if (returnCode != null) {
+    return `${effectiveStatus ?? 'UNKNOWN'} (${returnCode})`
+  }
+  if (effectiveStatus) {
+    return effectiveStatus
+  }
+
+  return '-'
+}
+
+export function formatMemoryGB(value: number | null | undefined): string {
+  if (value == null || Number.isNaN(value)) {
+    return '-'
+  }
+  return `${value.toFixed(2)} GB`
+}
+
 export interface JobHistoryResponse {
   total: number
   page: number
@@ -765,6 +843,7 @@ export interface JobHistoryResponse {
 }
 
 export interface JobHistoryFilters {
+  keyword?: string
   start?: string
   end?: string
   user?: string
@@ -1129,6 +1208,7 @@ export function useGatewayAPI() {
     filters: JobHistoryFilters
   ): Promise<JobHistoryResponse> {
     const params = new URLSearchParams()
+    if (filters.keyword) params.append('keyword', filters.keyword)
     if (filters.start) params.append('start', filters.start)
     if (filters.end) params.append('end', filters.end)
     if (filters.user) params.append('user', filters.user)

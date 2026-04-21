@@ -83,6 +83,8 @@ describe('JobsHistoryView.vue', () => {
     const resources = wrapper.getComponent(JobHistoryResources)
     expect(badge.props('status')).toStrictEqual(['RUNNING', 'COMPLETING'])
     expect(resources.text()).toContain('0')
+    expect(wrapper.text()).toContain('Submit Time')
+    expect(wrapper.text()).toContain(new Date('2026-04-20T09:00:00+00:00').toLocaleString())
     expect(wrapper.text()).toContain('QOS')
     expect(wrapper.text()).toContain('Priority')
     expect(wrapper.text()).toContain('Reason')
@@ -105,7 +107,8 @@ describe('JobsHistoryView.vue', () => {
       sort: 'user',
       order: 'asc',
       page: '3',
-      start: '2026-04-20T10:11:12'
+      start: '2026-04-20T10:11:12',
+      keyword: 'sleep'
     })
 
     mount(JobsHistoryView, {
@@ -128,7 +131,8 @@ describe('JobsHistoryView.vue', () => {
         sort: 'user',
         order: 'asc',
         page: 3,
-        start: '2026-04-20T10:11:12'
+        start: '2026-04-20T10:11:12',
+        keyword: 'sleep'
       })
     )
   })

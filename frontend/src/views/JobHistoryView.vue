@@ -10,8 +10,8 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { useGatewayAPI } from '@/composables/GatewayAPI'
-import type { ClusterJobExitCode, ClusterTRES, JobHistoryRecord } from '@/composables/GatewayAPI'
-import { splitJobHistoryState } from '@/composables/GatewayAPI'
+import type { ClusterTRES, JobHistoryRecord } from '@/composables/GatewayAPI'
+import { formatJobExitCode, formatMemoryGB, splitJobHistoryState } from '@/composables/GatewayAPI'
 import ClusterMainLayout from '@/components/ClusterMainLayout.vue'
 import JobStatusBadge from '@/components/job/JobStatusBadge.vue'
 import JobBackButton from '@/components/job/JobBackButton.vue'
@@ -33,12 +33,12 @@ type HistoryField =
   | 'job-id' | 'name' | 'state-reason' | 'user' | 'group' | 'account'
   | 'partition' | 'qos' | 'priority' | 'nodes' | 'resources' | 'requested'
   | 'allocated' | 'tres-per-job' | 'tres-per-node' | 'gres'
-  | 'time-limit' | 'exit-code' | 'workdir' | 'command'
+  | 'max-memory' | 'time-limit' | 'exit-code' | 'workdir' | 'command'
 
 const ALL_FIELDS: HistoryField[] = [
   'job-id', 'name', 'state-reason', 'user', 'group', 'account',
   'partition', 'qos', 'priority', 'nodes', 'resources', 'requested',
-  'allocated', 'tres-per-job', 'tres-per-node', 'gres',
+  'allocated', 'tres-per-job', 'tres-per-node', 'gres', 'max-memory',
   'time-limit', 'exit-code', 'workdir', 'command'
 ]
 
@@ -101,32 +101,6 @@ function resourceField(
 
 function fmt(v: string | null | undefined) {
   return v ?? '-'
-}
-
-function isClusterJobExitCode(value: unknown): value is ClusterJobExitCode {
-  if (typeof value !== 'object' || value === null || !('return_code' in value)) {
-    return false
-  }
-  const returnCode = value.return_code
-  return typeof returnCode === 'object' && returnCode !== null && 'number' in returnCode
-}
-
-function formatHistoryExitCode(exitCode: JobHistoryRecord['exit_code']) {
-  if (exitCode == null) return '-'
-
-  if (typeof exitCode === 'string') {
-    const trimmed = exitCode.trim()
-    if (!trimmed.length) return '-'
-    const match = /^(-?\d+)(?::.*)?$/.exec(trimmed)
-    if (!match) return trimmed
-    return match[1] === '0' ? 'success' : match[1]
-  }
-
-  if (isClusterJobExitCode(exitCode)) {
-    return exitCode.return_code.number === 0 ? 'success' : String(exitCode.return_code.number)
-  }
-
-  return '-'
 }
 
 function fmtTime(v: string | null | undefined) {
@@ -228,8 +202,9 @@ const fields = (j: JobHistoryRecord): HistoryFieldRow[] => [
   textField('tres-per-job', 'TRES/Job', fmt(j.tres_per_job)),
   textField('tres-per-node', 'TRES/Node', fmt(j.tres_per_node)),
   textField('gres', 'GRES', fmt(j.gres_detail)),
+  textField('max-memory', 'Max Memory', formatMemoryGB(j.used_memory_gb)),
   textField('time-limit', 'Time Limit', fmtDuration(j.time_limit_minutes)),
-  textField('exit-code', 'Exit Code', formatHistoryExitCode(j.exit_code)),
+  textField('exit-code', 'Exit Code', formatJobExitCode(j.exit_code)),
   textField('workdir', 'Working Directory', fmt(j.working_directory), true),
   textField('command', 'Command', fmt(j.command), true)
 ]

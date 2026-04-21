@@ -596,7 +596,7 @@ Agent /node/<name>/metrics
 - `last_sched_evaluation_time`：最后一次调度评估时间，历史时间线的 scheduling 阶段优先使用该字段。
 - `tres_requested`：单作业详情中的 `tres.requested`，JSONB 保存。
 - `tres_allocated`：单作业详情中的 `tres.allocated`，JSONB 保存。
-- `used_memory_gb`：兼容保留字段，当前不再从历史详情接口提取或展示，统一保持为 `null`。
+- `used_memory_gb`：历史作业的 Max Memory，来源于 `steps[*].tres.consumed.max.mem`，单位为 GB。
 
 数据来源分为两层：
 
@@ -607,4 +607,4 @@ Agent /node/<name>/metrics
 
 - 后台缺失活动作业对账时，如果当前列表没有某个非终态历史记录，先调用 `job(job_id)` 补查；补查成功则按真实详情 UPSERT，补查不到再兜底写 `COMPLETED`。
 - 历史详情接口返回前，如果记录缺少详情字段，会按需调用 `job(job_id)` 补查一次；只有 `(job_id, submit_time)` 与当前记录一致时才允许回写。
-- `used_memory_gb` 保留是为了兼容既有 schema；新版本不再根据 `steps[*].tres.consumed.total` 推导该字段，避免把 step 统计值误当成作业实际内存。
+- `used_memory_gb` 复用既有 schema 存储 Max Memory；值通过 `steps[*].tres.consumed.max.mem` 提取峰值后按 `1024^3` 转换为 GB，不再使用 `steps[*].tres.consumed.total` 近似推导。

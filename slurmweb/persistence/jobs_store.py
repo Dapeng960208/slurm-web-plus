@@ -339,6 +339,40 @@ def _time_value(time_data, key: str, fallback_value=None):
     return fallback_value
 
 
+def _max_memory_gb(job: dict):
+    max_memory_bytes = None
+
+    for step in job.get("steps", []):
+        if not isinstance(step, dict):
+            continue
+
+        step_tres = step.get("tres", {})
+        if not isinstance(step_tres, dict):
+            continue
+
+        consumed = step_tres.get("consumed", {})
+        if not isinstance(consumed, dict):
+            continue
+
+        step_max = consumed.get("max", [])
+        if not isinstance(step_max, list):
+            continue
+
+        for tres in step_max:
+            if not isinstance(tres, dict) or tres.get("type") != "mem":
+                continue
+            count = _float_field(tres.get("count"))
+            if count is None or count < 0:
+                continue
+            if max_memory_bytes is None or count > max_memory_bytes:
+                max_memory_bytes = count
+
+    if max_memory_bytes is None:
+        return None
+
+    return max_memory_bytes / float(1024**3)
+
+
 def _extract(job: dict) -> dict:
     """Extract and normalize fields from a raw slurmrestd job dict."""
     return {
@@ -439,7 +473,7 @@ def _extract_detail(job: dict, fallback: Optional[dict] = None) -> dict:
         "time_limit_minutes": _int_field(
             _time_value(time_data, "limit", job.get("time_limit"))
         ),
-        "used_memory_gb": None,
+        "used_memory_gb": _max_memory_gb(job),
         "exit_code": _exit_str(job.get("exit_code") or job.get("derived_exit_code")),
         "working_directory": job.get("current_working_directory")
         or job.get("working_directory")
@@ -574,6 +608,12 @@ class JobsStore:
         if filters.get("state"):
             where_clauses.append("js.job_state LIKE %s")
             params.append(f"%{filters['state']}%")
+        if filters.get("keyword"):
+            where_clauses.append(
+                "(COALESCE(js.working_directory, '') ILIKE %s OR COALESCE(js.command, '') ILIKE %s)"
+            )
+            keyword = f"%{filters['keyword']}%"
+            params.extend([keyword, keyword])
         if filters.get("job_id"):
             where_clauses.append("js.job_id = %s")
             params.append(int(filters["job_id"]))

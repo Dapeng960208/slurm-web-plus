@@ -27,6 +27,7 @@ const JobHistorySortOrders = ['asc', 'desc'] as const
 
 function defaultFilters(): JobHistoryFilters {
   return {
+    keyword: '',
     user: '',
     account: '',
     partition: '',
@@ -39,6 +40,7 @@ function defaultFilters(): JobHistoryFilters {
 }
 
 export interface JobsHistoryQueryParameters {
+  keyword?: string
   start?: string
   end?: string
   user?: string
@@ -95,8 +97,9 @@ export const useJobsHistoryRuntimeStore = defineStore('jobsHistoryRuntime', () =
     }
 
     const stringKeys: Array<
-      'start' | 'end' | 'user' | 'account' | 'partition' | 'qos' | 'state'
+      'keyword' | 'start' | 'end' | 'user' | 'account' | 'partition' | 'qos' | 'state'
     > = [
+      'keyword',
       'start',
       'end',
       'user',
@@ -118,6 +121,7 @@ export const useJobsHistoryRuntimeStore = defineStore('jobsHistoryRuntime', () =
 
   function query(): JobsHistoryQueryParameters {
     const result: JobsHistoryQueryParameters = {}
+    if (filters.value.keyword) result.keyword = filters.value.keyword
     if (filters.value.start) result.start = filters.value.start
     if (filters.value.end) result.end = filters.value.end
     if (filters.value.user) result.user = filters.value.user

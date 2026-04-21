@@ -102,6 +102,11 @@ function historyJobPriority(job: JobHistoryRecord): string {
   return job.priority != null ? String(job.priority) : '-'
 }
 
+function fmtTime(v: string | null | undefined) {
+  if (!v) return '-'
+  return new Date(v).toLocaleString()
+}
+
 function jobsPages(): { id: number; ellipsis: boolean }[] {
   const result: { id: number; ellipsis: boolean }[] = []
   let ellipsis = false
@@ -210,6 +215,7 @@ watch(
               <thead>
                 <tr class="text-sm font-semibold text-gray-900 dark:text-gray-200">
                   <th scope="col" class="w-12 py-3.5 pr-3 text-left sm:pl-6 lg:pl-8">#ID</th>
+                  <th scope="col" class="px-3 py-3.5 text-left">Submit Time</th>
                   <th scope="col" class="w-16 px-3 py-3.5 text-left">State</th>
                   <th scope="col" class="px-3 py-3.5 text-left">User (account)</th>
                   <th scope="col" class="hidden px-3 py-3.5 text-left sm:table-cell">Resources</th>
@@ -235,6 +241,9 @@ watch(
                     class="py-4 pr-3 font-medium whitespace-nowrap text-gray-900 sm:pl-6 lg:pl-8 dark:text-gray-100"
                   >
                     {{ job.job_id }}
+                  </td>
+                  <td class="px-3 py-4 whitespace-nowrap">
+                    {{ fmtTime(job.submit_time) }}
                   </td>
                   <td class="px-3 py-4 whitespace-nowrap">
                     <JobStatusBadge :status="splitJobHistoryState(job.job_state)" />

@@ -14,6 +14,7 @@ from slurmweb.persistence.jobs_store import (
     JobsStore,
     _extract,
     _extract_detail,
+    _max_memory_gb,
     _ts,
     normalize_history_exit_code,
 )
@@ -136,6 +137,22 @@ class TestJobsStoreExtract(unittest.TestCase):
                     "end": 0,
                     "limit": {"set": True, "infinite": False, "number": 0},
                 },
+                "steps": [
+                    {
+                        "tres": {
+                            "consumed": {
+                                "max": [
+                                    {
+                                        "type": "mem",
+                                        "count": 2 * 1024**3,
+                                        "id": 2,
+                                        "name": "",
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                ],
                 "working_directory": "/tmp/detail",
                 "submit_line": "sleep 1",
                 "exit_code": {
@@ -186,9 +203,9 @@ class TestJobsStoreExtract(unittest.TestCase):
         )
         self.assertEqual(len(row["tres_requested"]), 2)
         self.assertEqual(len(row["tres_allocated"]), 2)
-        self.assertIsNone(row["used_memory_gb"])
+        self.assertEqual(row["used_memory_gb"], 2.0)
 
-    def test_extract_detail_does_not_record_step_memory_as_used_memory(self):
+    def test_extract_detail_ignores_step_total_memory_for_used_memory(self):
         row = _extract_detail(
             {
                 "job_id": 123,
@@ -223,6 +240,84 @@ class TestJobsStoreExtract(unittest.TestCase):
         )
 
         self.assertIsNone(row["used_memory_gb"])
+
+    def test_max_memory_gb_uses_max_mem_across_steps(self):
+        result = _max_memory_gb(
+            {
+                "steps": [
+                    {
+                        "tres": {
+                            "consumed": {
+                                "max": [
+                                    {"type": "cpu", "count": 32, "id": 1, "name": ""},
+                                    {
+                                        "type": "mem",
+                                        "count": 2 * 1024**3,
+                                        "id": 2,
+                                        "name": "",
+                                    },
+                                ]
+                            }
+                        }
+                    },
+                    {
+                        "tres": {
+                            "consumed": {
+                                "max": [
+                                    {
+                                        "type": "mem",
+                                        "count": 5 * 1024**3,
+                                        "id": 2,
+                                        "name": "",
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                ]
+            }
+        )
+
+        self.assertEqual(result, 5.0)
+
+    def test_max_memory_gb_returns_none_without_valid_mem_values(self):
+        result = _max_memory_gb(
+            {
+                "steps": [
+                    {"tres": {"consumed": {"max": []}}},
+                    {
+                        "tres": {
+                            "consumed": {
+                                "max": [
+                                    {
+                                        "type": "mem",
+                                        "count": -1,
+                                        "id": 2,
+                                        "name": "",
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    {
+                        "tres": {
+                            "consumed": {
+                                "max": [
+                                    {
+                                        "type": "mem",
+                                        "count": {"set": False, "infinite": False, "number": 0},
+                                        "id": 2,
+                                        "name": "",
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                ]
+            }
+        )
+
+        self.assertIsNone(result)
 
 
 class TestJobsStoreReconcile(unittest.TestCase):
@@ -304,18 +399,25 @@ class TestJobsStoreReconcile(unittest.TestCase):
                 {
                     "tres": {
                         "consumed": {
-                            "total": {"count": 2 * 1024**2}
+                            "max": [
+                                {
+                                    "type": "mem",
+                                    "count": 2 * 1024**3,
+                                    "id": 2,
+                                    "name": "",
+                                }
+                            ]
                         }
                     }
                 },
                 {
                     "tres": {
                         "consumed": {
-                            "total": [
+                            "max": [
                                 {"type": "cpu", "count": 16, "id": 1, "name": ""},
                                 {
                                     "type": "mem",
-                                    "count": 3 * 1024**2,
+                                    "count": 3 * 1024**3,
                                     "id": 2,
                                     "name": "",
                                 },
@@ -337,7 +439,7 @@ class TestJobsStoreReconcile(unittest.TestCase):
             pending_row["end_time"],
             datetime.fromtimestamp(1710000600, tz=timezone.utc),
         )
-        self.assertIsNone(pending_row["used_memory_gb"])
+        self.assertEqual(pending_row["used_memory_gb"], 3.0)
         self.assertEqual(
             pending_row["eligible_time"],
             datetime.fromtimestamp(1710000200, tz=timezone.utc),
@@ -448,6 +550,15 @@ class TestJobsStoreQuerySorting(unittest.TestCase):
             "ORDER BY js.node_count ASC NULLS FIRST, js.cpus ASC NULLS FIRST, js.job_id ASC LIMIT %s OFFSET %s",
             sql,
         )
+
+    def test_query_searches_keyword_in_workdir_or_command(self):
+        sql = self._run_query({"keyword": "sleep"})
+        self.assertIn(
+            "(COALESCE(js.working_directory, '') ILIKE %s OR COALESCE(js.command, '') ILIKE %s)",
+            sql,
+        )
+        params = self.cursor.execute.call_args_list[1].args[1]
+        self.assertEqual(params[:2], ["%sleep%", "%sleep%"])
 
 
 class TestJobsStorePendingQueue(unittest.TestCase):

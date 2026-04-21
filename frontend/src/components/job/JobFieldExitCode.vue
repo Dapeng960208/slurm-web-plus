@@ -7,6 +7,7 @@
 -->
 
 <script setup lang="ts">
+import { formatJobExitCode } from '@/composables/GatewayAPI'
 import type { ClusterJobExitCode } from '@/composables/GatewayAPI'
 
 const { exit_code } = defineProps<{ exit_code: ClusterJobExitCode }>()
@@ -14,6 +15,6 @@ const { exit_code } = defineProps<{ exit_code: ClusterJobExitCode }>()
 
 <template>
   <dd class="mt-1 text-sm leading-6 text-gray-700 sm:col-span-2 sm:mt-0 dark:text-gray-300">
-    {{ exit_code.status[0] }} ({{ exit_code.return_code.number }})
+    {{ formatJobExitCode(exit_code) }}
   </dd>
 </template>
