@@ -7,12 +7,13 @@
 -->
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import type { Component } from 'vue'
-import { useRoute } from 'vue-router'
+import type { RouteLocationRaw } from 'vue-router'
+import { RouterLink, useRoute } from 'vue-router'
 import ClusterMainLayout from '@/components/ClusterMainLayout.vue'
 import { useClusterDataPoller } from '@/composables/DataPoller'
-import { jobRequestedGPU, jobAllocatedGPU } from '@/composables/GatewayAPI'
+import { formatJobExitCode, jobRequestedGPU, jobAllocatedGPU } from '@/composables/GatewayAPI'
 import type { ClusterIndividualJob } from '@/composables/GatewayAPI'
 import JobStatusBadge from '@/components/job/JobStatusBadge.vue'
 import JobProgress from '@/components/job/JobProgress.vue'
@@ -24,7 +25,6 @@ import PanelSkeleton from '@/components/PanelSkeleton.vue'
 import { HashtagIcon } from '@heroicons/vue/24/outline'
 import JobFieldRaw from '@/components/job/JobFieldRaw.vue'
 import JobFieldComment from '@/components/job/JobFieldComment.vue'
-import JobFieldExitCode from '@/components/job/JobFieldExitCode.vue'
 import JobResources from '@/components/job/JobResources.vue'
 
 const { cluster, id } = defineProps<{ cluster: string; id: number }>()
@@ -51,6 +51,38 @@ const jobsFields = [
 ] as const
 
 type JobField = (typeof jobsFields)[number]
+type JobFieldLayout = 'compact' | 'full'
+
+type JobCompactField = {
+  id: JobField
+  label: string
+  layout: 'compact'
+  value: string
+  monospace?: boolean
+  to?: RouteLocationRaw
+}
+
+type JobComponentField = {
+  id: JobField
+  label: string
+  layout: 'full'
+  component: Component
+  props: object
+}
+
+type JobFieldRow = JobCompactField | JobComponentField
+
+const compactFieldIds: JobField[] = [
+  'user',
+  'group',
+  'account',
+  'wckeys',
+  'priority',
+  'nodes',
+  'partition',
+  'qos',
+  'exit-code'
+]
 
 function isValidJobField(key: string): key is JobField {
   return typeof key === 'string' && jobsFields.includes(key as JobField)
@@ -83,97 +115,83 @@ const displayTags = ref<Record<JobField, { show: boolean; highlight: boolean }>>
   'tres-requested': { show: false, highlight: false }
 })
 
-const jobFieldsContent = computed(
-  (): { id: JobField; label: string; component: Component; props: object }[] => {
-    if (!data.value) return []
-    return [
-      {
-        id: 'user',
-        label: 'User',
-        component: JobFieldRaw,
-        props: {
-          field: data.value.user,
-          to: { name: 'user', params: { cluster, user: data.value.user } }
-        }
-      },
-      { id: 'group', label: 'Group', component: JobFieldRaw, props: { field: data.value.group } },
-      {
-        id: 'account',
-        label: 'Account',
-        component: JobFieldRaw,
-        props: {
-          field: data.value.association.account,
-          to: { name: 'account', params: { cluster, account: data.value.association.account } }
-        }
-      },
-      {
-        id: 'wckeys',
-        label: 'Wckeys',
-        component: JobFieldRaw,
-        props: { field: data.value.wckey.wckey }
-      },
-      {
-        id: 'priority',
-        label: 'Priority',
-        component: JobFieldRaw,
-        props: { field: data.value.priority.number }
-      },
-      { id: 'name', label: 'Name', component: JobFieldRaw, props: { field: data.value.name } },
-      {
-        id: 'comments',
-        label: 'Comments',
-        component: JobFieldComment,
-        props: { comment: data.value.comment }
-      },
-      {
-        id: 'submit-line',
-        label: 'Submit line',
-        component: JobFieldRaw,
-        props: { field: data.value.submit_line, monospace: true }
-      },
-      {
-        id: 'script',
-        label: 'Script',
-        component: JobFieldRaw,
-        props: { field: data.value.script }
-      },
-      {
-        id: 'workdir',
-        label: 'Working directory',
-        component: JobFieldRaw,
-        props: { field: data.value.working_directory, monospace: true }
-      },
-      {
-        id: 'exit-code',
-        label: 'Exit Code',
-        component: JobFieldExitCode,
-        props: { exit_code: data.value.exit_code }
-      },
-      { id: 'nodes', label: 'Nodes', component: JobFieldRaw, props: { field: data.value.nodes } },
-      {
-        id: 'partition',
-        label: 'Partition',
-        component: JobFieldRaw,
-        props: { field: data.value.partition }
-      },
-      { id: 'qos', label: 'QOS', component: JobFieldRaw, props: { field: data.value.qos } },
-      {
-        id: 'tres-requested',
-        label: 'Requested',
-        component: JobResources,
-        props: { tres: data.value.tres.requested, gpu: jobRequestedGPU(data.value) }
-      },
-      {
-        id: 'tres-allocated',
-        label: 'Allocated',
-        component: JobResources,
-        props: {
-          tres: data.value.tres.allocated,
-          gpu: { count: jobAllocatedGPU(data.value), reliable: true }
-        }
-      }
-    ]
-  }
+function fieldLayout(id: JobField): JobFieldLayout {
+  return compactFieldIds.includes(id) ? 'compact' : 'full'
+}
+
+function fmtField(value: string | number | null | undefined) {
+  if (value == null || value === '') return '-'
+  return String(value)
+}
+
+function compactField(
+  id: JobField,
+  label: string,
+  value: string | number | null | undefined,
+  to?: RouteLocationRaw
+): JobCompactField {
+  return { id, label, layout: fieldLayout(id) as 'compact', value: fmtField(value), to }
+}
+
+function fullField(
+  id: JobField,
+  label: string,
+  component: Component,
+  props: object
+): JobComponentField {
+  return { id, label, layout: fieldLayout(id) as 'full', component, props }
+}
+
+const jobFieldsContent = computed((): JobFieldRow[] => {
+  if (!data.value) return []
+  const account = data.value.association.account
+
+  return [
+    compactField('user', 'User', data.value.user, {
+      name: 'user',
+      params: { cluster, user: data.value.user }
+    }),
+    compactField('group', 'Group', data.value.group),
+    compactField(
+      'account',
+      'Account',
+      account,
+      account ? { name: 'account', params: { cluster, account } } : undefined
+    ),
+    compactField('wckeys', 'Wckeys', data.value.wckey.wckey),
+    compactField('priority', 'Priority', data.value.priority.number),
+    compactField('nodes', 'Nodes', data.value.nodes),
+    compactField('partition', 'Partition', data.value.partition),
+    compactField('qos', 'QOS', data.value.qos),
+    compactField('exit-code', 'Exit Code', formatJobExitCode(data.value.exit_code)),
+    fullField('name', 'Name', JobFieldRaw, { field: data.value.name }),
+    fullField('comments', 'Comments', JobFieldComment, { comment: data.value.comment }),
+    fullField('submit-line', 'Submit line', JobFieldRaw, {
+      field: data.value.submit_line,
+      monospace: true
+    }),
+    fullField('script', 'Script', JobFieldRaw, { field: data.value.script }),
+    fullField('workdir', 'Working directory', JobFieldRaw, {
+      field: data.value.working_directory,
+      monospace: true
+    }),
+    fullField('tres-requested', 'Requested', JobResources, {
+      tres: data.value.tres.requested,
+      gpu: jobRequestedGPU(data.value)
+    }),
+    fullField('tres-allocated', 'Allocated', JobResources, {
+      tres: data.value.tres.allocated,
+      gpu: { count: jobAllocatedGPU(data.value), reliable: true }
+    })
+  ]
+})
+
+const compactFields = computed((): JobCompactField[] =>
+  jobFieldsContent.value.filter((field): field is JobCompactField => field.layout === 'compact')
+)
+
+const fullFields = computed((): JobComponentField[] =>
+  jobFieldsContent.value.filter((field): field is JobComponentField => field.layout === 'full')
 )
 
 function highlightField(field: JobField) {
@@ -197,13 +215,17 @@ watch(
   }
 )
 
-onMounted(() => {
-  if (!route.hash) return
-  const field = route.hash.slice(1)
-  if (isValidJobField(field)) {
-    highlightField(field)
-  }
-})
+watch(
+  () => route.hash,
+  (hash) => {
+    if (!hash) return
+    const field = hash.slice(1)
+    if (isValidJobField(field)) {
+      highlightField(field)
+    }
+  },
+  { immediate: true }
+)
 </script>
 
 <template>
@@ -240,7 +262,10 @@ onMounted(() => {
           </template>
         </PageHeader>
 
-        <div v-if="!loaded && !unable" class="grid gap-6 xl:grid-cols-[minmax(280px,0.76fr)_minmax(0,1.24fr)]">
+        <div
+          v-if="!loaded && !unable"
+          class="grid gap-6 xl:grid-cols-[minmax(280px,0.68fr)_minmax(0,1.32fr)]"
+        >
           <PanelSkeleton :rows="5" />
           <div class="ui-panel ui-section">
             <div class="mb-5">
@@ -249,86 +274,136 @@ onMounted(() => {
                 Core identity, command context and requested versus allocated resources.
               </p>
             </div>
-            <DetailSkeletonList :rows="10" />
+            <DetailSkeletonList :rows="8" />
           </div>
         </div>
 
-      <ErrorAlert v-if="unable"
-        >Unable to retrieve job {{ id }} from cluster
-        <span class="font-medium">{{ cluster }}</span></ErrorAlert
-      >
-      <div v-else-if="data">
-        <div class="grid gap-6 xl:grid-cols-[minmax(280px,0.76fr)_minmax(0,1.24fr)]">
-          <div class="ui-panel ui-section">
-            <div class="mb-5">
-              <h2 class="ui-panel-title">Execution Timeline</h2>
-              <p class="ui-panel-description mt-2">
-                Submission, scheduling and runtime milestones for this job.
-              </p>
+        <ErrorAlert v-if="unable"
+          >Unable to retrieve job {{ id }} from cluster
+          <span class="font-medium">{{ cluster }}</span></ErrorAlert
+        >
+        <div v-else-if="data">
+          <div class="grid gap-6 xl:grid-cols-[minmax(280px,0.68fr)_minmax(0,1.32fr)]">
+            <div class="ui-panel ui-section">
+              <div class="mb-5">
+                <h2 class="ui-panel-title">Execution Timeline</h2>
+                <p class="ui-panel-description mt-2">
+                  Submission, scheduling and runtime milestones for this job.
+                </p>
+              </div>
+              <JobProgress :job="data" />
             </div>
-            <JobProgress :job="data" />
-          </div>
 
-          <div class="ui-panel ui-section">
-            <div class="mb-5">
-              <h2 class="ui-panel-title">Job Configuration</h2>
-              <p class="ui-panel-description mt-2">
-                Core identity, command context and requested versus allocated resources.
-              </p>
-            </div>
-            <div class="ui-detail-list">
-              <dl>
-                <div
-                  v-for="field in jobFieldsContent"
-                  :key="field.id"
-                  :id="field.id"
-                  :class="[
-                    displayTags[field.id].highlight
-                      ? 'rounded-[18px] bg-slurmweb-light bg-[rgba(182,232,44,0.16)] px-4 sm:px-5'
-                      : '',
-                    'px-4 py-3 transition-colors duration-700 sm:grid sm:grid-cols-3 sm:gap-5 sm:px-0'
-                  ]"
-                >
-                  <dt class="text-sm leading-6 font-semibold text-[var(--color-brand-ink-strong)]">
-                    <a :href="`#${field.id}`">
-                      <span
-                        class="group inline-flex items-center gap-2 rounded-full px-1.5 py-1 transition-colors hover:bg-[rgba(182,232,44,0.12)]"
-                        @mouseover="displayTags[field.id].show = true"
+            <div class="ui-panel ui-section">
+              <div class="mb-5">
+                <h2 class="ui-panel-title">Job Configuration</h2>
+                <p class="ui-panel-description mt-2">
+                  Core identity, command context and requested versus allocated resources.
+                </p>
+              </div>
+              <section class="space-y-6">
+                <div>
+                  <div class="mb-4">
+                    <h3 class="ui-panel-title">Overview</h3>
+                    <p class="ui-panel-description mt-1">
+                      Key identifiers, scheduler state and the current execution summary.
+                    </p>
+                  </div>
+                  <dl class="ui-detail-compact-grid" data-testid="job-overview-grid">
+                    <div
+                      v-for="field in compactFields"
+                      :key="field.id"
+                      :id="field.id"
+                      :class="[
+                        displayTags[field.id].highlight ? 'ring-2 ring-[rgba(182,232,44,0.4)]' : '',
+                        'ui-detail-compact-card'
+                      ]"
+                      @mouseenter="displayTags[field.id].show = true"
+                      @mouseleave="displayTags[field.id].show = false"
+                    >
+                      <dt class="ui-detail-compact-label">
+                        <a :href="`#${field.id}`" class="inline-flex max-w-full" @click="highlightField(field.id)">
+                          <span class="group inline-flex max-w-full items-center gap-2 rounded-full px-1.5 py-1 transition-colors hover:bg-[rgba(182,232,44,0.12)]">
+                            <span
+                              :class="[
+                                displayTags[field.id].show
+                                  ? 'border-[rgba(182,232,44,0.38)] bg-[rgba(182,232,44,0.18)] text-[var(--color-brand-blue)] shadow-[0_8px_16px_rgba(182,232,44,0.14)]'
+                                  : 'border-transparent bg-transparent text-[var(--color-brand-muted)]/70',
+                                'inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border transition-all duration-200'
+                              ]"
+                            >
+                              <HashtagIcon class="h-3.5 w-3.5" aria-hidden="true" />
+                            </span>
+                            <span class="truncate">{{ field.label }}</span>
+                          </span>
+                        </a>
+                      </dt>
+                      <dd
+                        :class="[field.monospace ? 'font-mono text-sm break-all' : '', 'ui-detail-compact-value']"
+                      >
+                        <RouterLink
+                          v-if="field.to && field.value !== '-'"
+                          :to="field.to"
+                          class="font-semibold text-[var(--color-brand-blue)] transition hover:text-[var(--color-brand-deep)]"
+                        >
+                          {{ field.value }}
+                        </RouterLink>
+                        <template v-else>
+                          {{ field.value }}
+                        </template>
+                      </dd>
+                    </div>
+                  </dl>
+                </div>
+
+                <div>
+                  <div class="mb-4">
+                    <h3 class="ui-panel-title">Detailed Resources & Commands</h3>
+                    <p class="ui-panel-description mt-1">
+                      Longer fields stay expanded for readability and copy-friendly access.
+                    </p>
+                  </div>
+                  <div class="ui-detail-list" data-testid="job-detail-list">
+                    <dl>
+                      <div
+                        v-for="field in fullFields"
+                        :key="field.id"
+                        :id="field.id"
+                        :class="[
+                          displayTags[field.id].highlight
+                            ? 'rounded-[18px] bg-[rgba(182,232,44,0.16)] px-4 sm:px-5'
+                            : '',
+                          'px-4 py-3 transition-colors duration-700 sm:grid sm:grid-cols-3 sm:gap-5 sm:px-0'
+                        ]"
+                        @mouseenter="displayTags[field.id].show = true"
                         @mouseleave="displayTags[field.id].show = false"
                       >
-                        <span
-                          :class="[
-                            displayTags[field.id].show
-                              ? 'border-[rgba(182,232,44,0.38)] bg-[rgba(182,232,44,0.18)] text-[var(--color-brand-blue)] shadow-[0_8px_16px_rgba(182,232,44,0.14)]'
-                              : 'border-transparent bg-transparent text-[var(--color-brand-muted)]/70',
-                            'inline-flex h-6 w-6 items-center justify-center rounded-full border transition-all duration-200'
-                          ]"
-                        >
-                          <HashtagIcon class="h-3.5 w-3.5" aria-hidden="true" />
-                        </span>
-                        {{ field.label }}
-                      </span>
-                    </a>
-                  </dt>
-                  <!--
-                    If the account is empty, do not render the component. This is actually a
-                    workaround for this Slurm bug:
-
-                    https://support.schedmd.com/show_bug.cgi?id=24215
-
-                    With Slurm REST API v0.0.43 and v0.0.44, this field is always empty.
-                  -->
-                  <component
-                    v-if="!(field.id === 'account' && data.association.account === '')"
-                    :is="field.component"
-                    v-bind="field.props"
-                  />
+                        <dt class="text-sm leading-6 font-semibold text-[var(--color-brand-ink-strong)]">
+                          <a :href="`#${field.id}`" @click="highlightField(field.id)">
+                            <span class="group inline-flex items-center gap-2 rounded-full px-1.5 py-1 transition-colors hover:bg-[rgba(182,232,44,0.12)]">
+                              <span
+                                :class="[
+                                  displayTags[field.id].show
+                                    ? 'border-[rgba(182,232,44,0.38)] bg-[rgba(182,232,44,0.18)] text-[var(--color-brand-blue)] shadow-[0_8px_16px_rgba(182,232,44,0.14)]'
+                                    : 'border-transparent bg-transparent text-[var(--color-brand-muted)]/70',
+                                  'inline-flex h-6 w-6 items-center justify-center rounded-full border transition-all duration-200'
+                                ]"
+                              >
+                                <HashtagIcon class="h-3.5 w-3.5" aria-hidden="true" />
+                              </span>
+                              <span>{{ field.label }}</span>
+                            </span>
+                          </a>
+                        </dt>
+                        <component :is="field.component" v-bind="field.props" />
+                      </div>
+                    </dl>
+                  </div>
                 </div>
-              </dl>
+              </section>
             </div>
           </div>
         </div>
-      </div>
       </div>
     </div>
   </ClusterMainLayout>

@@ -8,7 +8,6 @@ import { init_plugins, getMockClusterDataPoller } from '../lib/common'
 import type { ClusterIndividualJob } from '@/composables/GatewayAPI'
 import jobRunning from '../assets/job-running.json'
 import type { RouterMock } from 'vue-router-mock'
-import JobFieldRaw from '@/components/job/JobFieldRaw.vue'
 import PanelSkeleton from '@/components/PanelSkeleton.vue'
 
 const mockClusterDataPoller = getMockClusterDataPoller<ClusterIndividualJob>()
@@ -52,36 +51,38 @@ describe('JobView.vue', () => {
     expect(backButton.exists()).toBe(true)
     expect(backButton.props('cluster')).toBe('foo')
     expect(backButton.text()).toBe('Back to jobs')
-    // Check some jobs fields
 
-    // User field has RouterLink, so check JobFieldRaw component and props
-    const userField = wrapper.get('dl div#user').getComponent(JobFieldRaw)
-    expect(userField.props('field')).toBe(jobRunning.user)
-    expect(userField.props('to')).toEqual({
+    const overview = wrapper.get('[data-testid="job-overview-grid"]')
+    const details = wrapper.get('[data-testid="job-detail-list"]')
+    const userLink = wrapper.get('#user').findComponent({ name: 'RouterLink' })
+
+    expect(overview.text()).toContain('User')
+    expect(userLink.props('to')).toEqual({
       name: 'user',
       params: { cluster: 'foo', user: jobRunning.user }
     })
+    expect(overview.text()).toContain('Group')
+    expect(overview.text()).toContain(jobRunning.group)
+    expect(overview.text()).toContain('Priority')
+    expect(overview.text()).toContain(jobRunning.priority.number.toString())
+    expect(overview.text()).toContain('Nodes')
+    expect(overview.text()).toContain(jobRunning.nodes)
+    expect(overview.text()).toContain('Partition')
+    expect(overview.text()).toContain(jobRunning.partition)
+    expect(overview.text()).toContain('QOS')
+    expect(overview.text()).toContain(jobRunning.qos)
+    expect(overview.text()).toContain('Exit Code')
+    expect(overview.text()).toContain('SUCCESS (0)')
+    expect(wrapper.get('#account').text()).toContain('-')
+    expect(wrapper.get('#account').findComponent({ name: 'RouterLink' }).exists()).toBe(false)
 
-    // Account field has RouterLink, so check JobFieldRaw component and props.
-    // If the account is empty, the component is not rendered. This is actually a
-    // workaround for this Slurm bug:
-    // https://support.schedmd.com/show_bug.cgi?id=24215
-    if (jobRunning.association.account !== '') {
-      const accountField = wrapper.get('dl div#account').getComponent(JobFieldRaw)
-      expect(accountField.props('field')).toBe(jobRunning.association.account)
-      expect(accountField.props('to')).toEqual({
-        name: 'account',
-        params: { cluster: 'foo', account: jobRunning.association.account }
-      })
-    }
-    // Fields without RouterLink should have text directly accessible
-    expect(wrapper.get('dl div#group dd').text()).toBe(jobRunning.group)
-    expect(wrapper.get('dl div#priority dd').text()).toBe(jobRunning.priority.number.toString())
-    expect(wrapper.get('dl div#workdir dd').text()).toBe(jobRunning.working_directory)
-    expect(wrapper.get('dl div#nodes dd').text()).toBe(jobRunning.nodes)
-    expect(wrapper.get('dl div#partition dd').text()).toBe(jobRunning.partition)
-    expect(wrapper.get('dl div#qos dd').text()).toBe(jobRunning.qos)
+    expect(details.text()).toContain('Working directory')
+    expect(wrapper.get('#workdir').text()).toContain(jobRunning.working_directory)
+    expect(details.text()).toContain('Requested')
+    expect(details.text()).toContain('Allocated')
+    expect(details.text()).not.toContain('Exit Code')
   })
+
   test('highlight job field in route hash', async () => {
     await router.setHash('#user')
     mockClusterDataPoller.data.value = jobRunning
@@ -92,11 +93,11 @@ describe('JobView.vue', () => {
       }
     })
     await nextTick()
-    // Check user field is highlighted with specific background color due to
-    // #user hash in route while group field is not highlighted.
-    expect(wrapper.get('dl div#user').classes('bg-slurmweb-light')).toBe(true)
-    expect(wrapper.get('dl div#group').classes('bg-slurmweb-light')).toBe(false)
+
+    expect(wrapper.get('#user').classes('ring-2')).toBe(true)
+    expect(wrapper.get('#group').classes('ring-2')).toBe(false)
   })
+
   test('renders job skeleton before data arrives', () => {
     mockClusterDataPoller.loaded.value = false
     mockClusterDataPoller.initialLoading.value = true

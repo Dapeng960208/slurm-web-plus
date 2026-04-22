@@ -92,9 +92,12 @@ type HistoryFieldHelp = {
   body: string
 }
 
+type HistoryFieldLayout = 'compact' | 'full'
+
 type HistoryFieldBase = {
   id: HistoryField
   label: string
+  layout: HistoryFieldLayout
   help?: HistoryFieldHelp
 }
 
@@ -111,6 +114,26 @@ type HistoryResourceField = HistoryFieldBase & {
 }
 
 type HistoryFieldRow = HistoryTextField | HistoryResourceField
+
+const compactFieldIds: HistoryField[] = [
+  'job-id',
+  'state-reason',
+  'user',
+  'group',
+  'account',
+  'partition',
+  'qos',
+  'priority',
+  'nodes',
+  'max-memory',
+  'used-cpu-cores-avg',
+  'time-limit',
+  'exit-code'
+]
+
+function fieldLayout(id: HistoryField): HistoryFieldLayout {
+  return compactFieldIds.includes(id) ? 'compact' : 'full'
+}
 
 const displayTags = ref<Record<HistoryField, { show: boolean; highlight: boolean }>>(
   Object.fromEntries(allFields.map((field) => [field, { show: false, highlight: false }])) as Record<
@@ -134,7 +157,7 @@ function textField(
   monospace = false,
   help?: HistoryFieldHelp
 ): HistoryTextField {
-  return { id, kind: 'text', label, value, monospace, help }
+  return { id, kind: 'text', label, layout: fieldLayout(id), value, monospace, help }
 }
 
 function resourceField(
@@ -143,7 +166,7 @@ function resourceField(
   tres: ClusterTRES[] | null,
   gpu: { count: number; reliable: boolean }
 ): HistoryResourceField {
-  return { id, kind: 'resource', label, tres, gpu }
+  return { id, kind: 'resource', label, layout: fieldLayout(id), tres, gpu }
 }
 
 function fmt(value: string | null | undefined) {
@@ -282,6 +305,12 @@ const fields = (record: JobHistoryRecord): HistoryFieldRow[] => [
 ]
 
 const timeline = computed(() => (job.value ? timelineSteps(job.value) : []))
+const compactFields = computed(() =>
+  job.value ? fields(job.value).filter((field) => field.layout === 'compact') : []
+)
+const fullFields = computed(() =>
+  job.value ? fields(job.value).filter((field) => field.layout === 'full') : []
+)
 
 async function loadJobHistory() {
   try {
@@ -341,8 +370,11 @@ watch(
           </template>
         </PageHeader>
 
-        <div v-if="initialLoading && !error" class="grid gap-6 xl:grid-cols-[minmax(280px,0.72fr)_minmax(0,1.28fr)]">
-          <PanelSkeleton :rows="5" />
+        <div
+          v-if="initialLoading && !error"
+          class="grid gap-6 xl:grid-cols-[minmax(280px,0.68fr)_minmax(0,1.32fr)]"
+        >
+          <PanelSkeleton :rows="4" />
           <div class="ui-panel ui-section">
             <div class="mb-5">
               <h2 class="ui-panel-title">Recorded Fields</h2>
@@ -350,13 +382,13 @@ watch(
                 Scheduler metadata and accounting values archived for this historical record.
               </p>
             </div>
-            <DetailSkeletonList :rows="11" />
+            <DetailSkeletonList :rows="8" />
           </div>
         </div>
 
       <ErrorAlert v-if="error">Unable to retrieve job history record {{ id }}: {{ error }}</ErrorAlert>
       <div v-else-if="job">
-        <div class="grid gap-6 xl:grid-cols-[minmax(280px,0.72fr)_minmax(0,1.28fr)]">
+        <div class="grid gap-6 xl:grid-cols-[minmax(280px,0.68fr)_minmax(0,1.32fr)]">
           <div class="ui-panel ui-section">
             <div class="mb-5">
               <h2 class="ui-panel-title">Execution Timeline</h2>
@@ -365,33 +397,30 @@ watch(
               </p>
             </div>
 
-            <ol role="list" class="overflow-hidden">
+            <ol
+              role="list"
+              class="ui-timeline-grid"
+              data-testid="job-history-timeline-grid"
+            >
               <li
                 v-for="(step, idx) in timeline"
                 :key="step.id"
                 :id="`step-${step.id}`"
-                :class="[idx !== timeline.length - 1 ? 'pb-10' : '', 'relative']"
+                :class="[
+                  step.reached ? 'ui-timeline-card-complete' : 'ui-timeline-card-pending',
+                  'ui-timeline-card'
+                ]"
               >
-                <div
-                  v-if="idx !== timeline.length - 1"
-                  :class="[
-                    step.reached
-                      ? 'bg-[linear-gradient(180deg,rgba(182,232,44,0.95),rgba(152,201,31,0.9))]'
-                      : 'bg-[rgba(80,105,127,0.18)]',
-                    'absolute top-4 left-4 mt-0.5 -ml-px h-full w-0.5'
-                  ]"
-                  aria-hidden="true"
-                />
                 <template v-if="step.reached">
-                  <div class="group relative flex items-start">
-                    <span class="flex h-9 items-center">
+                  <div class="flex items-start gap-3">
+                    <span class="flex h-9 items-center shrink-0">
                       <span
                         class="relative z-10 flex h-9 w-9 items-center justify-center rounded-[16px] border border-white/70 bg-[linear-gradient(135deg,rgba(182,232,44,0.96),rgba(152,201,31,0.92))] shadow-[0_16px_30px_rgba(182,232,44,0.2)]"
                       >
                         <CheckIcon class="h-5 w-5 text-[var(--color-brand-deep)]" aria-hidden="true" />
                       </span>
                     </span>
-                    <span class="ml-4 flex min-w-0 flex-col">
+                    <span class="flex min-w-0 flex-col">
                       <span class="text-sm font-semibold text-[var(--color-brand-ink-strong)]">{{
                         step.label
                       }}</span>
@@ -400,15 +429,15 @@ watch(
                   </div>
                 </template>
                 <template v-else>
-                  <div class="group relative flex items-start">
-                    <span class="flex h-9 items-center" aria-hidden="true">
+                  <div class="flex items-start gap-3">
+                    <span class="flex h-9 items-center shrink-0" aria-hidden="true">
                       <span
                         class="relative z-10 flex h-9 w-9 items-center justify-center rounded-[16px] border border-[rgba(80,105,127,0.14)] bg-[rgba(239,244,246,0.9)] shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]"
                       >
                         <span class="h-2.5 w-2.5 rounded-full bg-[rgba(80,105,127,0.16)]" />
                       </span>
                     </span>
-                    <span class="ml-4 flex min-w-0 flex-col">
+                    <span class="flex min-w-0 flex-col">
                       <span class="text-sm font-medium text-[var(--color-brand-muted)]">{{
                         step.label
                       }}</span>
@@ -427,93 +456,178 @@ watch(
                 Scheduler metadata and accounting values archived for this historical record.
               </p>
             </div>
-            <div class="ui-detail-list">
-              <dl>
-                <div
-                  v-for="field in fields(job)"
-                  :key="field.id"
-                  :id="field.id"
-                  :class="[
-                    displayTags[field.id as HistoryField].highlight
-                      ? 'rounded-[18px] bg-[rgba(182,232,44,0.16)] px-4 sm:px-5'
-                      : '',
-                    'px-4 py-3 transition-colors duration-700 sm:grid sm:grid-cols-3 sm:gap-5 sm:px-0'
-                  ]"
-                  @mouseenter="displayTags[field.id as HistoryField].show = true"
-                  @mouseleave="displayTags[field.id as HistoryField].show = false"
-                >
-                  <dt class="text-sm leading-6 font-semibold text-[var(--color-brand-ink-strong)]">
-                    <a
-                      :href="`#${field.id}`"
-                      @click.prevent="highlightField(field.id as HistoryField)"
-                    >
-                      <span class="group inline-flex items-center gap-2 rounded-full px-1.5 py-1 transition-colors hover:bg-[rgba(182,232,44,0.12)]">
-                        <span
-                          :class="[
-                            displayTags[field.id as HistoryField].show
-                              ? 'border-[rgba(182,232,44,0.38)] bg-[rgba(182,232,44,0.18)] text-[var(--color-brand-blue)] shadow-[0_8px_16px_rgba(182,232,44,0.14)]'
-                              : 'border-transparent bg-transparent text-[var(--color-brand-muted)]/70',
-                            'inline-flex h-6 w-6 items-center justify-center rounded-full border transition-all duration-200'
-                          ]"
-                        >
-                          <HashtagIcon class="h-3.5 w-3.5" aria-hidden="true" />
-                        </span>
-                        <span>{{ field.label }}</span>
-                        <span
-                          v-if="field.help"
-                          class="relative inline-flex items-center"
-                        >
-                          <button
-                            type="button"
-                            class="inline-flex h-5 w-5 items-center justify-center rounded-full text-[var(--color-brand-blue)]/80 transition hover:bg-[rgba(116,165,214,0.14)] hover:text-[var(--color-brand-blue)] focus:outline-hidden focus-visible:ring-2 focus-visible:ring-[rgba(116,165,214,0.28)]"
-                            :aria-label="`About ${field.label}`"
-                            :aria-expanded="helpOpenField === field.id"
-                            @mouseenter="helpOpenField = field.id as HistoryField"
-                            @mouseleave="closeHelp(field.id as HistoryField)"
-                            @focus="helpOpenField = field.id as HistoryField"
-                            @blur="closeHelp(field.id as HistoryField)"
-                          >
-                            <InformationCircleIcon class="h-4 w-4" aria-hidden="true" />
-                          </button>
-                          <div
-                            v-if="helpOpenField === field.id"
-                            role="tooltip"
-                            class="absolute top-full left-0 z-20 mt-3 w-72 rounded-[18px] border border-[rgba(80,105,127,0.12)] bg-white/98 p-4 text-left shadow-[var(--shadow-soft)]"
-                          >
-                            <p class="text-sm font-semibold text-[var(--color-brand-ink-strong)]">
-                              {{ field.help.title }}
-                            </p>
-                            <p class="mt-2 text-xs leading-5 text-[var(--color-brand-muted)]">
-                              {{ field.help.body }}
-                            </p>
-                          </div>
-                        </span>
-                      </span>
-                    </a>
-                  </dt>
-                  <JobResources
-                    v-if="field.kind === 'resource' && field.tres && field.tres.length > 0"
-                    :tres="field.tres"
-                    :gpu="field.gpu"
-                  />
-                  <dd
-                    v-else-if="field.kind === 'resource'"
-                    class="mt-1 text-sm leading-6 text-[var(--color-brand-muted)] sm:col-span-2 sm:mt-0"
-                  >
-                    -
-                  </dd>
-                  <dd
-                    v-else
-                    :class="[
-                      field.monospace ? 'font-mono text-xs break-all' : 'text-sm',
-                      'mt-1 leading-6 text-[var(--color-brand-muted)] sm:col-span-2 sm:mt-0'
-                    ]"
-                  >
-                    {{ field.value }}
-                  </dd>
+            <section class="space-y-6">
+              <div>
+                <div class="mb-4 flex items-center justify-between gap-3">
+                  <div>
+                    <h3 class="ui-panel-title">Overview</h3>
+                    <p class="ui-panel-description mt-1">
+                      Key identifiers, scheduler context and usage summary.
+                    </p>
+                  </div>
                 </div>
-              </dl>
-            </div>
+                <dl
+                  class="ui-detail-compact-grid"
+                  data-testid="job-history-overview-grid"
+                >
+                  <div
+                    v-for="field in compactFields"
+                    :key="field.id"
+                    :id="field.id"
+                    :class="[
+                      displayTags[field.id as HistoryField].highlight
+                        ? 'ring-2 ring-[rgba(182,232,44,0.4)]'
+                        : '',
+                      'ui-detail-compact-card'
+                    ]"
+                    @mouseenter="displayTags[field.id as HistoryField].show = true"
+                    @mouseleave="displayTags[field.id as HistoryField].show = false"
+                  >
+                    <dt class="ui-detail-compact-label">
+                      <a
+                        :href="`#${field.id}`"
+                        class="inline-flex max-w-full"
+                        @click.prevent="highlightField(field.id as HistoryField)"
+                      >
+                        <span class="group inline-flex max-w-full items-center gap-2 rounded-full px-1.5 py-1 transition-colors hover:bg-[rgba(182,232,44,0.12)]">
+                          <span
+                            :class="[
+                              displayTags[field.id as HistoryField].show
+                                ? 'border-[rgba(182,232,44,0.38)] bg-[rgba(182,232,44,0.18)] text-[var(--color-brand-blue)] shadow-[0_8px_16px_rgba(182,232,44,0.14)]'
+                                : 'border-transparent bg-transparent text-[var(--color-brand-muted)]/70',
+                              'inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border transition-all duration-200'
+                            ]"
+                          >
+                            <HashtagIcon class="h-3.5 w-3.5" aria-hidden="true" />
+                          </span>
+                          <span class="truncate">{{ field.label }}</span>
+                          <span
+                            v-if="field.help"
+                            class="relative inline-flex items-center shrink-0"
+                          >
+                            <button
+                              type="button"
+                              class="inline-flex h-5 w-5 items-center justify-center rounded-full text-[var(--color-brand-blue)]/80 transition hover:bg-[rgba(116,165,214,0.14)] hover:text-[var(--color-brand-blue)] focus:outline-hidden focus-visible:ring-2 focus-visible:ring-[rgba(116,165,214,0.28)]"
+                              :aria-label="`About ${field.label}`"
+                              :aria-expanded="helpOpenField === field.id"
+                              @mouseenter="helpOpenField = field.id as HistoryField"
+                              @mouseleave="closeHelp(field.id as HistoryField)"
+                              @focus="helpOpenField = field.id as HistoryField"
+                              @blur="closeHelp(field.id as HistoryField)"
+                            >
+                              <InformationCircleIcon class="h-4 w-4" aria-hidden="true" />
+                            </button>
+                            <div
+                              v-if="helpOpenField === field.id"
+                              role="tooltip"
+                              class="absolute top-full left-0 z-20 mt-3 w-72 rounded-[18px] border border-[rgba(80,105,127,0.12)] bg-white/98 p-4 text-left shadow-[var(--shadow-soft)]"
+                            >
+                              <p class="text-sm font-semibold text-[var(--color-brand-ink-strong)]">
+                                {{ field.help.title }}
+                              </p>
+                              <p class="mt-2 text-xs leading-5 text-[var(--color-brand-muted)]">
+                                {{ field.help.body }}
+                              </p>
+                            </div>
+                          </span>
+                        </span>
+                      </a>
+                    </dt>
+                    <dd
+                      v-if="field.kind === 'resource' && field.tres && field.tres.length > 0"
+                      class="ui-detail-compact-value"
+                    >
+                      <JobResources
+                        :tres="field.tres"
+                        :gpu="field.gpu"
+                      />
+                    </dd>
+                    <dd
+                      v-else-if="field.kind === 'resource'"
+                      class="ui-detail-compact-value"
+                    >
+                      -
+                    </dd>
+                    <dd
+                      v-else
+                      :class="[
+                        field.monospace ? 'font-mono text-sm break-all' : '',
+                        'ui-detail-compact-value'
+                      ]"
+                    >
+                      {{ field.value }}
+                    </dd>
+                  </div>
+                </dl>
+              </div>
+
+              <div>
+                <div class="mb-4">
+                  <h3 class="ui-panel-title">Detailed Resources & Commands</h3>
+                  <p class="ui-panel-description mt-1">
+                    Longer fields stay expanded for readability and copy-friendly access.
+                  </p>
+                </div>
+                <div class="ui-detail-list" data-testid="job-history-detail-list">
+                  <dl>
+                    <div
+                      v-for="field in fullFields"
+                      :key="field.id"
+                      :id="field.id"
+                      :class="[
+                        displayTags[field.id as HistoryField].highlight
+                          ? 'rounded-[18px] bg-[rgba(182,232,44,0.16)] px-4 sm:px-5'
+                          : '',
+                        'px-4 py-3 transition-colors duration-700 sm:grid sm:grid-cols-3 sm:gap-5 sm:px-0'
+                      ]"
+                      @mouseenter="displayTags[field.id as HistoryField].show = true"
+                      @mouseleave="displayTags[field.id as HistoryField].show = false"
+                    >
+                      <dt class="text-sm leading-6 font-semibold text-[var(--color-brand-ink-strong)]">
+                        <a
+                          :href="`#${field.id}`"
+                          @click.prevent="highlightField(field.id as HistoryField)"
+                        >
+                          <span class="group inline-flex items-center gap-2 rounded-full px-1.5 py-1 transition-colors hover:bg-[rgba(182,232,44,0.12)]">
+                            <span
+                              :class="[
+                                displayTags[field.id as HistoryField].show
+                                  ? 'border-[rgba(182,232,44,0.38)] bg-[rgba(182,232,44,0.18)] text-[var(--color-brand-blue)] shadow-[0_8px_16px_rgba(182,232,44,0.14)]'
+                                  : 'border-transparent bg-transparent text-[var(--color-brand-muted)]/70',
+                                'inline-flex h-6 w-6 items-center justify-center rounded-full border transition-all duration-200'
+                              ]"
+                            >
+                              <HashtagIcon class="h-3.5 w-3.5" aria-hidden="true" />
+                            </span>
+                            <span>{{ field.label }}</span>
+                          </span>
+                        </a>
+                      </dt>
+                      <JobResources
+                        v-if="field.kind === 'resource' && field.tres && field.tres.length > 0"
+                        :tres="field.tres"
+                        :gpu="field.gpu"
+                      />
+                      <dd
+                        v-else-if="field.kind === 'resource'"
+                        class="mt-1 text-sm leading-6 text-[var(--color-brand-muted)] sm:col-span-2 sm:mt-0"
+                      >
+                        -
+                      </dd>
+                      <dd
+                        v-else
+                        :class="[
+                          field.monospace ? 'font-mono text-xs break-all' : 'text-sm',
+                          'mt-1 leading-6 text-[var(--color-brand-muted)] sm:col-span-2 sm:mt-0'
+                        ]"
+                      >
+                        {{ field.value }}
+                      </dd>
+                    </div>
+                  </dl>
+                </div>
+              </div>
+            </section>
           </div>
         </div>
       </div>

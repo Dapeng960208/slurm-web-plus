@@ -40,31 +40,40 @@ function capitalize(step: string) {
 }
 
 const steps = ['submitted', 'eligible', 'scheduling', 'running', 'completing', 'terminated']
+
+function stepState(stepIdx: number): 'complete' | 'current' | 'pending' {
+  if (current.value[0] >= stepIdx) return 'complete'
+  if (current.value[0] + 1 === stepIdx && current.value[1]) return 'current'
+  return 'pending'
+}
 </script>
 
 <template>
-  <ol v-if="current" role="list" class="overflow-hidden">
+  <ol v-if="current" role="list" class="ui-timeline-grid" data-testid="job-progress-grid">
     <li
       v-for="(step, stepIdx) in steps"
       :key="step"
-      :class="[stepIdx !== steps.length - 1 ? 'pb-10' : '', 'relative']"
       :id="'step-' + step"
+      :data-state="stepState(stepIdx)"
+      :class="[
+        stepState(stepIdx) === 'complete'
+          ? 'ui-timeline-card-complete'
+          : stepState(stepIdx) === 'current'
+            ? 'ui-timeline-card-current'
+            : 'ui-timeline-card-pending',
+        'ui-timeline-card'
+      ]"
     >
-      <template v-if="current[0] >= stepIdx">
-        <div
-          v-if="stepIdx !== steps.length - 1"
-          class="absolute top-4 left-4 mt-0.5 -ml-px h-full w-0.5 bg-[linear-gradient(180deg,rgba(182,232,44,0.95),rgba(152,201,31,0.9))]"
-          aria-hidden="true"
-        />
-        <div class="group relative flex items-start">
-          <span class="flex h-9 items-center">
+      <template v-if="stepState(stepIdx) === 'complete'">
+        <div class="flex items-start gap-3">
+          <span class="flex h-9 items-center shrink-0">
             <span
               class="relative z-10 flex h-9 w-9 items-center justify-center rounded-[16px] border border-white/70 bg-[linear-gradient(135deg,rgba(182,232,44,0.96),rgba(152,201,31,0.92))] shadow-[0_16px_30px_rgba(182,232,44,0.2)]"
             >
               <CheckIcon class="h-5 w-5 text-[var(--color-brand-deep)]" aria-hidden="true" />
             </span>
           </span>
-          <span class="ml-4 flex min-w-0 flex-col">
+          <span class="flex min-w-0 flex-col">
             <span class="text-sm font-semibold text-[var(--color-brand-ink-strong)]">{{
               capitalize(step)
             }}</span>
@@ -72,21 +81,16 @@ const steps = ['submitted', 'eligible', 'scheduling', 'running', 'completing', '
           </span>
         </div>
       </template>
-      <template v-else-if="current[0] + 1 == stepIdx && current[1]">
-        <div
-          v-if="stepIdx !== steps.length - 1"
-          class="absolute top-4 left-4 mt-0.5 -ml-px h-full w-0.5 bg-[rgba(80,105,127,0.18)]"
-          aria-hidden="true"
-        />
-        <div class="group relative flex items-start" aria-current="step">
-          <span class="flex h-9 items-center" aria-hidden="true">
+      <template v-else-if="stepState(stepIdx) === 'current'">
+        <div class="flex items-start gap-3" aria-current="step">
+          <span class="flex h-9 items-center shrink-0" aria-hidden="true">
             <span
               class="relative z-10 flex h-9 w-9 items-center justify-center rounded-[16px] border border-[rgba(182,232,44,0.34)] bg-[rgba(182,232,44,0.14)] shadow-[0_12px_24px_rgba(182,232,44,0.12)]"
             >
               <span class="h-2.5 w-2.5 rounded-full bg-[var(--color-slurmweb-dark)]" />
             </span>
           </span>
-          <span class="ml-4 flex min-w-0 flex-col">
+          <span class="flex min-w-0 flex-col">
             <span class="text-sm font-semibold text-[var(--color-brand-ink-strong)]">{{
               capitalize(step)
             }}</span>
@@ -95,20 +99,15 @@ const steps = ['submitted', 'eligible', 'scheduling', 'running', 'completing', '
         </div>
       </template>
       <template v-else>
-        <div
-          v-if="stepIdx !== steps.length - 1"
-          class="absolute top-4 left-4 mt-0.5 -ml-px h-full w-0.5 bg-[rgba(80,105,127,0.18)]"
-          aria-hidden="true"
-        />
-        <div class="group relative flex items-start">
-          <span class="flex h-9 items-center" aria-hidden="true">
+        <div class="flex items-start gap-3">
+          <span class="flex h-9 items-center shrink-0" aria-hidden="true">
             <span
               class="relative z-10 flex h-9 w-9 items-center justify-center rounded-[16px] border border-[rgba(80,105,127,0.14)] bg-[rgba(239,244,246,0.9)] shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]"
             >
               <span class="h-2.5 w-2.5 rounded-full bg-[rgba(80,105,127,0.16)]" />
             </span>
           </span>
-          <span class="ml-4 flex min-w-0 flex-col">
+          <span class="flex min-w-0 flex-col">
             <span class="text-sm font-medium text-[var(--color-brand-muted)]">{{
               capitalize(step)
             }}</span>
