@@ -38,6 +38,7 @@ export default defineConfig(({ mode }) => {
     },
     build: {
       target: 'esnext',  // required for top-level await used by runtimeConfiguration plugin
+      manifest: 'asset-manifest.json',
       rollupOptions: {
         output: {
           manualChunks: {
