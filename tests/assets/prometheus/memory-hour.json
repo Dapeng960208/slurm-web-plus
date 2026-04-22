@@ -1,0 +1,41 @@
+{
+  "status": "success",
+  "data": {
+    "resultType": "matrix",
+    "result": [
+      {
+        "metric": {
+          "instance": "localhost:80",
+          "job": "slurm",
+          "state": "allocated"
+        },
+        "values": [
+          [1747754490, "32"],
+          [1747754520, "31.5"]
+        ]
+      },
+      {
+        "metric": {
+          "instance": "localhost:80",
+          "job": "slurm",
+          "state": "idle"
+        },
+        "values": [
+          [1747754490, "2048"],
+          [1747754520, "2047.5"]
+        ]
+      },
+      {
+        "metric": {
+          "instance": "localhost:80",
+          "job": "slurm",
+          "state": "mixed"
+        },
+        "values": [
+          [1747754490, "128"],
+          [1747754520, "129.25"]
+        ]
+      }
+    ]
+  }
+}

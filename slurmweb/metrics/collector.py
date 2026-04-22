@@ -74,9 +74,11 @@ class SlurmWebMetricsCollector(Collector):
             nodes_states,
             cores_states,
             gpus_states,
+            memory_states,
             nodes_total,
             cores_total,
             gpus_total,
+            memory_total,
         ) = self.slurmrestd.resources_states()
         c = prometheus_client.core.GaugeMetricFamily(
             "slurm_nodes", "Slurm nodes", labels=["state"]
@@ -104,6 +106,15 @@ class SlurmWebMetricsCollector(Collector):
         yield c
         yield prometheus_client.metrics_core.GaugeMetricFamily(
             "slurm_gpus_total", "Slurm total number of GPU", value=gpus_total
+        )
+        c = prometheus_client.core.GaugeMetricFamily(
+            "slurm_memory", "Slurm memory in GB", labels=["state"]
+        )
+        for status, value in memory_states.items():
+            c.add_metric([status], value)
+        yield c
+        yield prometheus_client.metrics_core.GaugeMetricFamily(
+            "slurm_memory_total", "Slurm total memory in GB", value=memory_total
         )
 
         (jobs_states, jobs_total) = self.slurmrestd.jobs_states()

@@ -280,6 +280,16 @@ class Slurmrestd:
     def nodes(self, **kwargs):
         return self._request("slurm", "nodes", "nodes", **kwargs)
 
+    @staticmethod
+    def _optional_number_value(value, default=0):
+        if isinstance(value, dict):
+            if not value.get("set", False):
+                return default
+            return value.get("number", default)
+        if value is None:
+            return default
+        return value
+
     def resources_states(self):
         # All Slurm nodes base states and some interesting flags such as drain and fail.
         nodes_states = {
@@ -312,12 +322,32 @@ class Slurmrestd:
             "fail": 0,
             "unknown": 0,
         }
+        memory_states = {
+            "idle": 0.0,
+            "mixed": 0.0,
+            "allocated": 0.0,
+        }
         nodes_total = 0
         cores_total = 0
         gpus_total = 0
-        for node in self.nodes():
+        memory_total = 0.0
+        nodes_getter = getattr(self, "nodes_unfiltered", None)
+        nodes = nodes_getter() if callable(nodes_getter) else self.nodes()
+        for node in nodes:
             cores = node["cpus"]
             node_gpus = self.node_gres_extract_gpus(node["gres"])
+            real_memory = max(0, node.get("real_memory", 0))
+            alloc_memory = max(0, node.get("alloc_memory", 0))
+            free_memory = self._optional_number_value(node.get("free_mem"), 0)
+            free_memory = max(0, min(real_memory, free_memory))
+            mixed_memory = max(real_memory - free_memory, 0)
+            allocated_memory = max(alloc_memory - mixed_memory, 0)
+            idle_memory = max(real_memory - alloc_memory, 0)
+
+            memory_states["idle"] += idle_memory / 1024
+            memory_states["allocated"] += allocated_memory / 1024
+            memory_states["mixed"] += mixed_memory / 1024
+
             if "ERROR" in node["state"]:
                 nodes_states["error"] += 1
                 cores_states["error"] += cores
@@ -359,13 +389,16 @@ class Slurmrestd:
             nodes_total += 1
             cores_total += cores
             gpus_total += node_gpus
+            memory_total += real_memory / 1024
         return (
             nodes_states,
             cores_states,
             gpus_states,
+            memory_states,
             nodes_total,
             cores_total,
             gpus_total,
+            memory_total,
         )
 
     def node(self, node_name: str, **kwargs):
@@ -520,6 +553,9 @@ class SlurmrestdFiltered(SlurmrestdAdapter):
     def nodes(self):
         return SlurmrestdFiltered.filter_fields(super().nodes(), self.filters.nodes)
 
+    def nodes_unfiltered(self):
+        return super().nodes()
+
     def node(self, node_name: str):
         return SlurmrestdFiltered.filter_fields(
             super().node(node_name), self.filters.node
@@ -596,6 +632,13 @@ class SlurmrestdFilteredCached(SlurmrestdFiltered):
 
     def nodes(self):
         return self._cached(CacheKey("nodes"), self.cache.nodes, super().nodes)
+
+    def nodes_unfiltered(self):
+        return self._cached(
+            CacheKey("nodes-unfiltered", "nodes"),
+            self.cache.nodes,
+            super().nodes_unfiltered,
+        )
 
     def node(self, node_name: str):
         return self._cached(

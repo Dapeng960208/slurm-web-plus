@@ -28,6 +28,12 @@ class TestSlurmwebMetricsDB(unittest.TestCase):
         self.db.request("nodes", "hour")
 
     @mock.patch("slurmweb.metrics.db.aiohttp.ClientSession.get")
+    def test_request_memory(self, mock_get):
+        _, mock_get.return_value = mock_prometheus_response("memory-hour")
+        result = self.db.request("memory", "hour")
+        self.assertCountEqual(result.keys(), ["allocated", "idle", "mixed"])
+
+    @mock.patch("slurmweb.metrics.db.aiohttp.ClientSession.get")
     def test_request_empty_result(self, mock_get):
         _, mock_get.return_value = mock_prometheus_response("unknown-metric")
         with self.assertRaisesRegex(

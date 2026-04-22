@@ -14,7 +14,7 @@ import type { MetricRange } from '@/composables/GatewayAPI'
  * Dashboard view settings
  */
 
-const chartResourcesTypes = ['nodes', 'cores', 'gpus'] as const
+const chartResourcesTypes = ['nodes', 'cores', 'memory', 'gpus'] as const
 export type ChartResourcesType = (typeof chartResourcesTypes)[number]
 
 export function isChartResourcesType(value: unknown): value is ChartResourcesType {

@@ -247,9 +247,11 @@ class TestSlurmrestd(TestSlurmrestdBase):
             nodes_states,
             cores_states,
             gpus_states,
+            memory_states,
             nodes_total,
             cores_total,
             gpus_total,
+            memory_total,
         ) = self.slurmrestd.resources_states()
         # Check total number of nodes matches the number of nodes in asset
         self.assertEqual(nodes_total, len(asset))
@@ -274,6 +276,53 @@ class TestSlurmrestd(TestSlurmrestdBase):
             gpus_sum += value
         self.assertEqual(gpus_total, gpus_sum)
         self.assertEqual(gpus_states["unknown"], 0)
+
+        # Check total memory matches the sum of node physical memory in GB
+        self.assertEqual(memory_total, sum(node["real_memory"] for node in asset) / 1024)
+
+    def test_resources_states_memory_breakdown(self):
+        self.slurmrestd.nodes = lambda: [
+            {
+                "cpus": 8,
+                "gres": "",
+                "gres_used": "",
+                "state": ["IDLE"],
+                "real_memory": 4096,
+                "alloc_memory": 1024,
+                "alloc_cpus": 0,
+                "alloc_idle_cpus": 8,
+                "free_mem": {"set": True, "infinite": False, "number": 3072},
+            },
+            {
+                "cpus": 8,
+                "gres": "",
+                "gres_used": "",
+                "state": ["ALLOCATED"],
+                "real_memory": 2048,
+                "alloc_memory": 1024,
+                "alloc_cpus": 8,
+                "alloc_idle_cpus": 0,
+                "free_mem": {"set": True, "infinite": False, "number": 1536},
+            },
+            {
+                "cpus": 8,
+                "gres": "",
+                "gres_used": "",
+                "state": ["MIXED"],
+                "real_memory": 1024,
+                "alloc_memory": 256,
+                "alloc_cpus": 2,
+                "alloc_idle_cpus": 6,
+                "free_mem": {"set": True, "infinite": False, "number": 256},
+            },
+        ]
+
+        (_, _, _, memory_states, _, _, _, memory_total) = self.slurmrestd.resources_states()
+
+        self.assertEqual(memory_states["idle"], 4.75)
+        self.assertEqual(memory_states["allocated"], 0.5)
+        self.assertEqual(memory_states["mixed"], 2.25)
+        self.assertEqual(memory_total, 7.0)
 
     @all_slurm_api_versions
     def test_node(self, slurm_version, api_version):

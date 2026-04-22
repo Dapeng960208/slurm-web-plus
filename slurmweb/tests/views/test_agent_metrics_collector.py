@@ -50,6 +50,8 @@ class TestAgentMetricsCollector(TestAgentBase):
                 "slurm_cores_total",
                 "slurm_gpus",
                 "slurm_gpus_total",
+                "slurm_memory",
+                "slurm_memory_total",
                 "slurm_jobs",
                 "slurm_jobs_total",
             ],
@@ -90,6 +92,8 @@ class TestAgentMetricsCollector(TestAgentBase):
                 "slurm_cores_total",
                 "slurm_gpus",
                 "slurm_gpus_total",
+                "slurm_memory",
+                "slurm_memory_total",
                 "slurm_jobs",
                 "slurm_jobs_total",
                 "slurmweb_cache_hit",
@@ -206,7 +210,7 @@ class TestAgentMetricsCollector(TestAgentBase):
     def test_request_metrics_cache_error(self):
         # Collector first calls slurmrestd.nodes() then trigger SlurmwebCacheError on
         # this method call.
-        self.app.slurmrestd.nodes = mock.Mock(
+        self.app.slurmrestd.nodes_unfiltered = mock.Mock(
             side_effect=SlurmwebCacheError("fake error")
         )
         with self.assertLogs("slurmweb", level="ERROR") as cm:

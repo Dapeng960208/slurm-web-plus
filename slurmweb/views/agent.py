@@ -274,6 +274,7 @@ def metrics(metric):
         "nodes": "view-nodes",
         "cores": "view-nodes",
         "gpus": "view-nodes",
+        "memory": "view-nodes",
         "jobs": "view-jobs",
         "cache": "cache-view",
     }

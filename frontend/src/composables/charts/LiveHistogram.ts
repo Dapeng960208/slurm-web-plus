@@ -17,6 +17,8 @@ import type { ChartOptions, TimeScaleOptions, TimeUnit, Point } from 'chart.js'
 import 'chartjs-adapter-luxon'
 import { DateTime } from 'luxon'
 
+type HistogramValueFormatter = (value: number) => string | undefined
+
 export interface DashboardLiveChart<MetricKeyType extends string> {
   metrics: ClusterDataPoller<Record<MetricKeyType, MetricValue[]>>
   setCluster: (cluster: string) => void
@@ -29,7 +31,8 @@ export function useLiveHistogram<MetricKeyType extends string>(
   callback: GatewayAnyClusterApiKey,
   chartCanvas: Ref<HTMLCanvasElement | null>,
   labels: Record<string, { group: MetricKeyType[]; color: string; invert?: boolean }>,
-  originalRange: string
+  originalRange: string,
+  valueFormatter?: HistogramValueFormatter
 ): DashboardLiveChart<MetricKeyType> {
   let range = originalRange
 
@@ -148,8 +151,12 @@ export function useLiveHistogram<MetricKeyType extends string>(
 
   /* Determine ticks labels on y-axis */
   function yTicksCallback(value: number | string) {
-    /* y-axis represent nodes, cores or jobs, select only integers values */
     if (typeof value !== 'number') return value
+    const formattedValue = valueFormatter?.(value)
+    if (formattedValue !== undefined) {
+      return formattedValue
+    }
+    /* y-axis represent nodes, cores or jobs, select only integers values */
     if (value % 1 === 0) {
       return value
     }
@@ -180,6 +187,22 @@ export function useLiveHistogram<MetricKeyType extends string>(
   const genericOptions: ChartOptions = {
     responsive: true,
     maintainAspectRatio: false,
+    plugins: valueFormatter
+      ? {
+          tooltip: {
+            callbacks: {
+              label: (context) => {
+                const value = context.parsed.y
+                const label = context.dataset.label ? `${context.dataset.label}: ` : ''
+                if (typeof value !== 'number') {
+                  return label.trim()
+                }
+                return `${label}${valueFormatter(value) ?? value}`
+              }
+            }
+          }
+        }
+      : undefined,
     scales: {
       y: {
         stacked: true,

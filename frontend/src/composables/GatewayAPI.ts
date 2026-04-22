@@ -1024,6 +1024,7 @@ const GatewayClusterWithStringAPIKeys = [
   'jobs',
   'metrics_nodes',
   'metrics_cores',
+  'metrics_memory',
   'metrics_gpus',
   'metrics_jobs',
   'metrics_cache'
@@ -1183,6 +1184,15 @@ export function useGatewayAPI() {
     )
   }
 
+  async function metrics_memory(
+    cluster: string,
+    last: string
+  ): Promise<Record<MetricResourceState, MetricValue[]>> {
+    return await restAPI.get<Record<MetricResourceState, MetricValue[]>>(
+      `/agents/${cluster}/metrics/memory?range=${last}`
+    )
+  }
+
   async function metrics_jobs(
     cluster: string,
     last: string
@@ -1332,6 +1342,7 @@ export function useGatewayAPI() {
     cache_reset,
     metrics_nodes,
     metrics_cores,
+    metrics_memory,
     metrics_gpus,
     metrics_jobs,
     metrics_cache,

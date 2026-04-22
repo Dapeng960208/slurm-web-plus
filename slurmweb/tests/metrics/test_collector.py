@@ -101,9 +101,11 @@ class TestSlurmWebMetricsCollector(unittest.TestCase):
             {"idle": 5, "allocated": 3, "down": 1},  # nodes_states
             {"idle": 20, "allocated": 12, "down": 4},  # cores_states
             {"idle": 2, "allocated": 1, "down": 0},  # gpus_states
+            {"idle": 24.0, "allocated": 8.0, "mixed": 4.0},  # memory_states
             9,  # nodes_total
             36,  # cores_total
             3,  # gpus_total
+            36.0,  # memory_total
         )
         self.mock_slurmrestd.jobs_states.return_value = (
             {"running": 10, "pending": 5, "completed": 100},  # jobs_states
@@ -125,7 +127,7 @@ class TestSlurmWebMetricsCollector(unittest.TestCase):
         metrics = list(self.collector.collect())
 
         # Verify we got the expected number of metrics
-        self.assertEqual(len(metrics), 12)  # 8 slurm metrics + 4 cache metrics
+        self.assertEqual(len(metrics), 14)  # 10 slurm metrics + 4 cache metrics
 
         # Verify slurmrestd methods were called
         self.mock_slurmrestd.resources_states.assert_called_once()
@@ -142,7 +144,7 @@ class TestSlurmWebMetricsCollector(unittest.TestCase):
         metrics = list(self.collector.collect())
 
         # Verify we got only slurm metrics (no cache metrics)
-        self.assertEqual(len(metrics), 8)
+        self.assertEqual(len(metrics), 10)
 
         # Verify slurmrestd methods were called
         self.mock_slurmrestd.resources_states.assert_called_once()

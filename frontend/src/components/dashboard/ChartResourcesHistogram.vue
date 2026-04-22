@@ -14,6 +14,7 @@ import { useRuntimeStore } from '@/stores/runtime'
 import type { ChartResourcesType } from '@/stores/runtime/dashboard'
 import { isChartResourcesType } from '@/stores/runtime/dashboard'
 import { useLiveHistogram } from '@/composables/charts/LiveHistogram'
+import { formatGigabytes } from '@/composables/charts/formatters'
 import type { GatewayAnyClusterApiKey, MetricResourceState } from '@/composables/GatewayAPI'
 import ChartSkeleton from '@/components/ChartSkeleton.vue'
 import ErrorAlert from '@/components/ErrorAlert.vue'
@@ -64,10 +65,18 @@ const labels: Record<string, { group: MetricResourceState[]; color: string }> = 
 function resourcesTypeCallback(): GatewayAnyClusterApiKey {
   if (runtimeStore.dashboard.chartResourcesType == 'cores') {
     return 'metrics_cores'
+  } else if (runtimeStore.dashboard.chartResourcesType == 'memory') {
+    return 'metrics_memory'
   } else if (runtimeStore.dashboard.chartResourcesType == 'gpus') {
     return 'metrics_gpus'
   } else {
     return 'metrics_nodes'
+  }
+}
+
+function formatResourceValue(value: number): string | undefined {
+  if (runtimeStore.dashboard.chartResourcesType == 'memory') {
+    return formatGigabytes(value)
   }
 }
 
@@ -76,7 +85,8 @@ const liveChart = useLiveHistogram<MetricResourceState>(
   resourcesTypeCallback(),
   chartCanvas,
   labels,
-  runtimeStore.dashboard.range
+  runtimeStore.dashboard.range,
+  formatResourceValue
 )
 
 function setResourceType(resourceType: ChartResourcesType) {
@@ -146,6 +156,18 @@ onBeforeMount(() => {
           @click="setResourceType('cores')"
         >
           Cores
+        </button>
+        <button
+          type="button"
+          :class="[
+            runtimeStore.dashboard.chartResourcesType == 'gpus'
+              ? 'bg-slurmweb dark:bg-slurmweb-dark text-white'
+              : 'bg-white text-gray-900 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-200 hover:dark:bg-gray-700',
+            'relative inline-flex items-center px-3 py-2 text-xs font-semibold ring-1 ring-gray-300 ring-inset focus:z-10 dark:ring-gray-600'
+          ]"
+          @click="setResourceType('memory')"
+        >
+          Memory
         </button>
         <button
           type="button"

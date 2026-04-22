@@ -90,6 +90,13 @@ class SlurmwebMetricsDB:
             agg="avg_over_time",
             label_as_key="state",
         ),
+        "memory": SlurmwebMetricQuery(
+            "query",
+            [SlurmwebMetricId("slurm_memory")],
+            RANGE_RESOLUTIONS["30s"],
+            agg="avg_over_time",
+            label_as_key="state",
+        ),
         "jobs": SlurmwebMetricQuery(
             "query",
             [SlurmwebMetricId("slurm_jobs")],

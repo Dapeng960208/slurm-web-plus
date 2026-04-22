@@ -71,6 +71,16 @@ class TestAgentMetricsRequest(TestAgentBase):
         )
 
     @mock.patch("slurmweb.metrics.db.aiohttp.ClientSession.get")
+    def test_request_metrics_memory(self, mock_get):
+        _, mock_get.return_value = mock_prometheus_response("memory-hour")
+        response = self.client.get(f"/v{get_version()}/metrics/memory")
+        self.assertEqual(response.status_code, 200)
+        self.assertCountEqual(
+            response.json.keys(),
+            ["allocated", "idle", "mixed"],
+        )
+
+    @mock.patch("slurmweb.metrics.db.aiohttp.ClientSession.get")
     def test_request_metrics_jobs(self, mock_get):
         _, mock_get.return_value = mock_prometheus_response("jobs-hour")
         response = self.client.get(f"/v{get_version()}/metrics/jobs")
@@ -142,6 +152,29 @@ class TestAgentMetricsRequest(TestAgentBase):
                 "WARNING:slurmweb.views.agent:Unauthorized access from user test (∅) "
                 "[group] to cores metric (missing permission on view-nodes)"
             ],
+        )
+
+    def test_request_metrics_memory_denied(self):
+        with RemoveActionInPolicy(self.app.policy, "user", "view-nodes"):
+            with self.assertLogs("slurmweb", level="WARNING") as cm:
+                response = self.client.get(f"/v{get_version()}/metrics/memory")
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(
+            response.json,
+            {
+                "code": 403,
+                "description": "Access to memory metric not permitted",
+                "name": "Forbidden",
+            },
+        )
+        self.assertEqual(len(cm.output), 1)
+        self.assertIn(
+            "Unauthorized access from user test",
+            cm.output[0],
+        )
+        self.assertIn(
+            "to memory metric (missing permission on view-nodes)",
+            cm.output[0],
         )
 
     def test_request_metrics_jobs_denied(self):
