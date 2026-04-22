@@ -26,7 +26,6 @@ import atexit
 import os
 import shutil
 import tempfile
-import json
 from pathlib import Path
 import logging
 
@@ -35,7 +34,6 @@ from .errors import SlurmwebRuntimeError
 logger = logging.getLogger(__name__)
 
 BASE_PLACEHOLDER = b"/__SLURMWEB_BASE__"
-MANIFEST_NAME = "asset-manifest.json"
 
 
 def prepare_ui_assets(source: Path, prefix: str) -> Path:
@@ -49,11 +47,6 @@ def prepare_ui_assets(source: Path, prefix: str) -> Path:
     source = Path(source)
     if not source.exists():
         raise SlurmwebRuntimeError(f"UI path {source} does not exist")
-
-    try:
-        _validate_ui_bundle(source)
-    except OSError as err:
-        raise SlurmwebRuntimeError(f"Unable to validate UI assets: {err}") from err
 
     try:
         target_dir = _target_directory()
@@ -72,43 +65,6 @@ def prepare_ui_assets(source: Path, prefix: str) -> Path:
     atexit.register(shutil.rmtree, target_dir, True)
     logger.info("Prepared UI assets in %s", target_dir)
     return target_dir
-
-
-def _validate_ui_bundle(source: Path):
-    """Validate the completeness of a Vite UI bundle when a manifest is present."""
-    manifest_path = source / MANIFEST_NAME
-    if not manifest_path.exists():
-        return
-
-    try:
-        manifest = json.loads(manifest_path.read_text())
-    except json.JSONDecodeError as err:
-        raise SlurmwebRuntimeError(
-            f"UI manifest {manifest_path} is invalid: {err}"
-        ) from err
-
-    missing = set()
-    for entry in manifest.values():
-        if not isinstance(entry, dict):
-            continue
-        for key in ("file",):
-            value = entry.get(key)
-            if isinstance(value, str) and not (source / value).exists():
-                missing.add(value)
-        for key in ("css", "assets"):
-            values = entry.get(key, [])
-            if not isinstance(values, list):
-                continue
-            for value in values:
-                if isinstance(value, str) and not (source / value).exists():
-                    missing.add(value)
-
-    if missing:
-        details = ", ".join(sorted(missing))
-        raise SlurmwebRuntimeError(
-            "UI bundle is incomplete; missing manifest assets: "
-            f"{details}. Redeploy the full frontend dist directory."
-        )
 
 
 def _target_directory() -> Path:

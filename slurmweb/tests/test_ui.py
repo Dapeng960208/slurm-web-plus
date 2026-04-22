@@ -9,7 +9,6 @@ from unittest import mock
 import tempfile
 import os
 import shutil
-import json
 from pathlib import Path
 
 from slurmweb.ui import prepare_ui_assets
@@ -65,23 +64,9 @@ class TestPrepareUIAssets(unittest.TestCase):
         (self.source_dir / "assets" / "app.js").write_text(
             'import("/__SLURMWEB_BASE__/vendor.js")'
         )
-        (self.source_dir / "assets" / "vendor.js").write_text("console.log('vendor')")
         (self.source_dir / "assets" / "css").mkdir()
         (self.source_dir / "assets" / "css" / "style.css").write_text(
             "body { background: url(/__SLURMWEB_BASE__/bg.png); }"
-        )
-        (self.source_dir / "assets" / "bg.png").write_bytes(b"fake bg")
-        (self.source_dir / "asset-manifest.json").write_text(
-            json.dumps(
-                {
-                    "index.html": {
-                        "file": "assets/app.js",
-                        "css": ["assets/css/style.css"],
-                        "assets": ["assets/bg.png"],
-                    },
-                    "vendor.js": {"file": "assets/vendor.js"},
-                }
-            )
         )
 
         target_dir = prepare_ui_assets(self.source_dir, "/gateway")
@@ -98,10 +83,8 @@ class TestPrepareUIAssets(unittest.TestCase):
         self.assertTrue((target_dir / "config.json").exists())
         self.assertTrue((target_dir / "assets").is_dir())
         self.assertTrue((target_dir / "assets" / "app.js").exists())
-        self.assertTrue((target_dir / "assets" / "vendor.js").exists())
         self.assertTrue((target_dir / "assets" / "css").is_dir())
         self.assertTrue((target_dir / "assets" / "css" / "style.css").exists())
-        self.assertTrue((target_dir / "asset-manifest.json").exists())
 
         # Verify placeholder replacement in root level files with placeholder
         index_content = (target_dir / "index.html").read_text()
@@ -141,26 +124,6 @@ class TestPrepareUIAssets(unittest.TestCase):
         self.assertEqual((target_dir / "favicon.ico").read_bytes(), b"fake ico data")
         self.assertEqual((target_dir / "image.png").read_bytes(), b"fake png")
         self.assertEqual((target_dir / "icon.ico").read_bytes(), b"fake ico")
-
-    def test_prepare_ui_assets_rejects_incomplete_manifest_bundle(self):
-        """Fail early when a manifest references assets missing from the UI bundle."""
-        (self.source_dir / "index.html").write_text("<html></html>")
-        (self.source_dir / "asset-manifest.json").write_text(
-            json.dumps(
-                {
-                    "index.html": {
-                        "file": "assets/index.js",
-                        "css": ["assets/index.css"],
-                    }
-                }
-            )
-        )
-
-        with self.assertRaisesRegex(
-            SlurmwebRuntimeError,
-            r"^UI bundle is incomplete; missing manifest assets: assets/index.css, assets/index.js\.",
-        ):
-            prepare_ui_assets(self.source_dir, "/gateway")
 
     def test_prefix_without_leading_slash(self):
         """Test that prefixes without a leading slash raise an error."""
