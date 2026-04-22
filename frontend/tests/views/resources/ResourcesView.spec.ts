@@ -121,4 +121,22 @@ describe('ResourcesView.vue', () => {
     // onMounted should push initial query when none is set
     expect(router.push).toHaveBeenCalled()
   })
+
+  test('uses the shared primary style for add filters button', () => {
+    mockClusterDataPoller.data.value = nodes
+
+    const wrapper = mount(ResourcesView, {
+      props: { cluster: 'foo' },
+      global: { stubs: { ResourcesDiagramThumbnail: true } }
+    })
+
+    const addFiltersButton = wrapper
+      .findAll('button[type="button"]')
+      .find((button) => button.text().includes('Add filters'))
+
+    if (!addFiltersButton) {
+      throw new Error('Add filters button not found')
+    }
+    expect(addFiltersButton.classes()).toContain('ui-button-primary')
+  })
 })
