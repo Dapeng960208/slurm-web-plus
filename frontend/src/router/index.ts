@@ -10,33 +10,34 @@ import { createRouter, createWebHistory, type RouteLocation } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useRuntimeStore } from '@/stores/runtime'
 import { useRuntimeConfiguration } from '@/plugins/runtimeConfiguration'
-import DashboardView from '@/views/DashboardView.vue'
-import LoginView from '@/views/LoginView.vue'
-import AnonymousView from '@/views/AnonymousView.vue'
-import SignoutView from '@/views/SignoutView.vue'
-import SettingsLayout from '@/components/settings/SettingsLayout.vue'
-import SettingsMainView from '@/views/settings/SettingsMain.vue'
-import SettingsErrorsView from '@/views/settings/SettingsErrors.vue'
-import SettingsAccountView from '@/views/settings/SettingsAccount.vue'
-import SettingsCacheView from '@/views/settings/SettingsCache.vue'
-import SettingsLdapCacheView from '@/views/settings/SettingsLdapCache.vue'
-import ClustersView from '@/views/ClustersView.vue'
-import JobsView from '@/views/JobsView.vue'
-import JobView from '@/views/JobView.vue'
-import JobsHistoryView from '@/views/JobsHistoryView.vue'
-import JobHistoryView from '@/views/JobHistoryView.vue'
-import ResourcesView from '@/views/resources/ResourcesView.vue'
-import ResourcesDiagramNodesView from '@/views/resources/ResourcesDiagramNodesView.vue'
-import ResourcesDiagramCoresView from '@/views/resources/ResourcesDiagramCoresView.vue'
-import NodeView from '@/views/NodeView.vue'
-import QosView from '@/views/QosView.vue'
-import ReservationsView from '@/views/ReservationsView.vue'
-import AccountsView from '@/views/AccountsView.vue'
-import AccountView from '@/views/AccountView.vue'
-import UserView from '@/views/UserView.vue'
-import JobsStatusBadges from '@/views/tests/JobsStatusBadges.vue'
-import NodesStatusBadges from '@/views/tests/NodesStatusBadges.vue'
-import NotFoundView from '@/views/NotFoundView.vue'
+
+const DashboardView = () => import('@/views/DashboardView.vue')
+const LoginView = () => import('@/views/LoginView.vue')
+const AnonymousView = () => import('@/views/AnonymousView.vue')
+const SignoutView = () => import('@/views/SignoutView.vue')
+const SettingsLayout = () => import('@/components/settings/SettingsLayout.vue')
+const SettingsMainView = () => import('@/views/settings/SettingsMain.vue')
+const SettingsErrorsView = () => import('@/views/settings/SettingsErrors.vue')
+const SettingsAccountView = () => import('@/views/settings/SettingsAccount.vue')
+const SettingsCacheView = () => import('@/views/settings/SettingsCache.vue')
+const SettingsLdapCacheView = () => import('@/views/settings/SettingsLdapCache.vue')
+const ClustersView = () => import('@/views/ClustersView.vue')
+const JobsView = () => import('@/views/JobsView.vue')
+const JobView = () => import('@/views/JobView.vue')
+const JobsHistoryView = () => import('@/views/JobsHistoryView.vue')
+const JobHistoryView = () => import('@/views/JobHistoryView.vue')
+const ResourcesView = () => import('@/views/resources/ResourcesView.vue')
+const ResourcesDiagramNodesView = () => import('@/views/resources/ResourcesDiagramNodesView.vue')
+const ResourcesDiagramCoresView = () => import('@/views/resources/ResourcesDiagramCoresView.vue')
+const NodeView = () => import('@/views/NodeView.vue')
+const QosView = () => import('@/views/QosView.vue')
+const ReservationsView = () => import('@/views/ReservationsView.vue')
+const AccountsView = () => import('@/views/AccountsView.vue')
+const AccountView = () => import('@/views/AccountView.vue')
+const UserView = () => import('@/views/UserView.vue')
+const JobsStatusBadges = () => import('@/views/tests/JobsStatusBadges.vue')
+const NodesStatusBadges = () => import('@/views/tests/NodesStatusBadges.vue')
+const NotFoundView = () => import('@/views/NotFoundView.vue')
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
