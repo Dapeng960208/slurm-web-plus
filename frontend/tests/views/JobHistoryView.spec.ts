@@ -266,8 +266,42 @@ describe('JobHistoryView.vue', () => {
     expect(wrapper.get('#exit-code').text()).toContain('SIGNALED (TERM/15)')
   })
 
-  test('renders job history skeleton before the API resolves', () => {
-    mockGatewayAPI.job_history_detail.mockReturnValue(new Promise(() => {}))
+  test('renders average cpu cores used value with help tooltip', async () => {
+    mockGatewayAPI.job_history_detail.mockResolvedValueOnce({
+      id: 5,
+      snapshot_time: '2026-04-20T10:00:00+00:00',
+      job_id: 7777,
+      job_name: 'cpu-heavy-job',
+      job_state: 'COMPLETED',
+      state_reason: 'None',
+      user_id: 7,
+      user_name: 'alice',
+      account: 'science',
+      group: 'research',
+      partition: 'normal',
+      qos: 'debug',
+      nodes: 'cn1',
+      node_count: 1,
+      cpus: 8,
+      priority: 10,
+      tres_req_str: 'cpu=8,mem=16G,node=1',
+      tres_per_job: null,
+      tres_per_node: null,
+      gres_detail: null,
+      submit_time: '2026-04-20T09:00:00+00:00',
+      eligible_time: '2026-04-20T09:01:00+00:00',
+      start_time: '2026-04-20T09:05:00+00:00',
+      end_time: '2026-04-20T09:30:00+00:00',
+      last_sched_evaluation_time: '2026-04-20T09:04:00+00:00',
+      time_limit_minutes: 60,
+      tres_requested: null,
+      tres_allocated: null,
+      used_memory_gb: 4,
+      used_cpu_cores_avg: 2.005,
+      exit_code: '0:0',
+      working_directory: '/tmp',
+      command: 'sleep 1'
+    })
 
     const wrapper = mount(JobHistoryView, {
       props: { cluster: 'foo', id: 5 },
@@ -279,7 +313,86 @@ describe('JobHistoryView.vue', () => {
       }
     })
 
-    expect(wrapper.text()).toContain('Job 5')
+    await flushPromises()
+
+    expect(wrapper.get('#used-cpu-cores-avg').text()).toContain('Average CPU Cores Used')
+    expect(wrapper.get('#used-cpu-cores-avg').text()).toContain('2.005')
+
+    await wrapper.get('button[aria-label="About Average CPU Cores Used"]').trigger('mouseenter')
+
+    expect(wrapper.get('[role="tooltip"]').text()).toContain('Average CPU Cores Used')
+    expect(wrapper.get('[role="tooltip"]').text()).toContain(
+      'sum(step.time.total) / job_elapsed_seconds'
+    )
+  })
+
+  test('renders dash when average cpu cores used is unavailable', async () => {
+    mockGatewayAPI.job_history_detail.mockResolvedValueOnce({
+      id: 6,
+      snapshot_time: '2026-04-20T10:00:00+00:00',
+      job_id: 8888,
+      job_name: 'cpu-missing-job',
+      job_state: 'FAILED',
+      state_reason: 'NonZeroExitCode',
+      user_id: 7,
+      user_name: 'alice',
+      account: 'science',
+      group: 'research',
+      partition: 'normal',
+      qos: 'debug',
+      nodes: 'cn1',
+      node_count: 1,
+      cpus: 8,
+      priority: 10,
+      tres_req_str: 'cpu=8,mem=16G,node=1',
+      tres_per_job: null,
+      tres_per_node: null,
+      gres_detail: null,
+      submit_time: '2026-04-20T09:00:00+00:00',
+      eligible_time: '2026-04-20T09:01:00+00:00',
+      start_time: '2026-04-20T09:05:00+00:00',
+      end_time: '2026-04-20T09:30:00+00:00',
+      last_sched_evaluation_time: '2026-04-20T09:04:00+00:00',
+      time_limit_minutes: 60,
+      tres_requested: null,
+      tres_allocated: null,
+      used_memory_gb: null,
+      used_cpu_cores_avg: null,
+      exit_code: '1:0',
+      working_directory: '/tmp',
+      command: 'false'
+    })
+
+    const wrapper = mount(JobHistoryView, {
+      props: { cluster: 'foo', id: 6 },
+      global: {
+        stubs: {
+          ClusterMainLayout: { template: '<div><slot /></div>' },
+          JobBackButton: { template: '<button>Back</button>' }
+        }
+      }
+    })
+
+    await flushPromises()
+
+    expect(wrapper.get('#used-cpu-cores-avg').text()).toContain('Average CPU Cores Used')
+    expect(wrapper.get('#used-cpu-cores-avg').text()).toContain('-')
+  })
+
+  test('renders job history skeleton before the API resolves', () => {
+    mockGatewayAPI.job_history_detail.mockReturnValue(new Promise(() => {}))
+
+    const wrapper = mount(JobHistoryView, {
+      props: { cluster: 'foo', id: 7 },
+      global: {
+        stubs: {
+          ClusterMainLayout: { template: '<div><slot /></div>' },
+          JobBackButton: { template: '<button>Back</button>' }
+        }
+      }
+    })
+
+    expect(wrapper.text()).toContain('Job 7')
     expect(wrapper.findComponent(PanelSkeleton).exists()).toBe(true)
   })
 })

@@ -21,7 +21,7 @@ import PageHeader from '@/components/PageHeader.vue'
 import DetailSkeletonList from '@/components/DetailSkeletonList.vue'
 import PanelSkeleton from '@/components/PanelSkeleton.vue'
 import { HashtagIcon } from '@heroicons/vue/24/outline'
-import { CheckIcon } from '@heroicons/vue/20/solid'
+import { CheckIcon, InformationCircleIcon } from '@heroicons/vue/20/solid'
 
 const props = defineProps<{ cluster: string; id: number }>()
 
@@ -49,6 +49,7 @@ type HistoryField =
   | 'tres-per-node'
   | 'gres'
   | 'max-memory'
+  | 'used-cpu-cores-avg'
   | 'time-limit'
   | 'exit-code'
   | 'workdir'
@@ -72,6 +73,7 @@ const allFields: HistoryField[] = [
   'tres-per-node',
   'gres',
   'max-memory',
+  'used-cpu-cores-avg',
   'time-limit',
   'exit-code',
   'workdir',
@@ -85,18 +87,25 @@ type TimelineStep = {
   time: string | null
 }
 
-type HistoryTextField = {
+type HistoryFieldHelp = {
+  title: string
+  body: string
+}
+
+type HistoryFieldBase = {
   id: HistoryField
-  kind: 'text'
   label: string
+  help?: HistoryFieldHelp
+}
+
+type HistoryTextField = HistoryFieldBase & {
+  kind: 'text'
   value: string
   monospace?: boolean
 }
 
-type HistoryResourceField = {
-  id: HistoryField
+type HistoryResourceField = HistoryFieldBase & {
   kind: 'resource'
-  label: string
   tres: ClusterTRES[] | null
   gpu: { count: number; reliable: boolean }
 }
@@ -109,6 +118,7 @@ const displayTags = ref<Record<HistoryField, { show: boolean; highlight: boolean
     { show: boolean; highlight: boolean }
   >
 )
+const helpOpenField = ref<HistoryField | null>(null)
 
 function highlightField(field: HistoryField) {
   displayTags.value[field].highlight = true
@@ -121,9 +131,10 @@ function textField(
   id: HistoryField,
   label: string,
   value: string,
-  monospace = false
+  monospace = false,
+  help?: HistoryFieldHelp
 ): HistoryTextField {
-  return { id, kind: 'text', label, value, monospace }
+  return { id, kind: 'text', label, value, monospace, help }
 }
 
 function resourceField(
@@ -151,8 +162,19 @@ function fmtDuration(minutes: number | null | undefined) {
   return hours > 0 ? `${hours}h ${remainingMinutes}m` : `${remainingMinutes}m`
 }
 
+function fmtCpuCoresAvg(value: number | null | undefined) {
+  if (value == null) return '-'
+  return new Intl.NumberFormat(undefined, { maximumFractionDigits: 3 }).format(value)
+}
+
 function hasValue(value: number | null | undefined) {
   return value !== null && value !== undefined
+}
+
+function closeHelp(field: HistoryField) {
+  if (helpOpenField.value === field) {
+    helpOpenField.value = null
+  }
 }
 
 function countGPUTRESRequest(tresRequest: string): number {
@@ -242,6 +264,17 @@ const fields = (record: JobHistoryRecord): HistoryFieldRow[] => [
   textField('tres-per-node', 'TRES/Node', fmt(record.tres_per_node)),
   textField('gres', 'GRES', fmt(record.gres_detail)),
   textField('max-memory', 'Max Memory', formatMemoryGB(record.used_memory_gb)),
+  textField(
+    'used-cpu-cores-avg',
+    'Average CPU Cores Used',
+    fmtCpuCoresAvg(record.used_cpu_cores_avg),
+    false,
+    {
+      title: 'Average CPU Cores Used',
+      body:
+        'Estimated average concurrent CPU cores used while the job ran. Calculated as sum(step.time.total) / job_elapsed_seconds from the included job steps.'
+    }
+  ),
   textField('time-limit', 'Time Limit', fmtDuration(record.time_limit_minutes)),
   textField('exit-code', 'Exit Code', formatJobExitCode(record.exit_code)),
   textField('workdir', 'Working Directory', fmt(record.working_directory), true),
@@ -425,7 +458,36 @@ watch(
                         >
                           <HashtagIcon class="h-3.5 w-3.5" aria-hidden="true" />
                         </span>
-                        {{ field.label }}
+                        <span>{{ field.label }}</span>
+                        <span
+                          v-if="field.help"
+                          class="relative inline-flex items-center"
+                        >
+                          <button
+                            type="button"
+                            class="inline-flex h-5 w-5 items-center justify-center rounded-full text-[var(--color-brand-blue)]/80 transition hover:bg-[rgba(116,165,214,0.14)] hover:text-[var(--color-brand-blue)] focus:outline-hidden focus-visible:ring-2 focus-visible:ring-[rgba(116,165,214,0.28)]"
+                            :aria-label="`About ${field.label}`"
+                            :aria-expanded="helpOpenField === field.id"
+                            @mouseenter="helpOpenField = field.id as HistoryField"
+                            @mouseleave="closeHelp(field.id as HistoryField)"
+                            @focus="helpOpenField = field.id as HistoryField"
+                            @blur="closeHelp(field.id as HistoryField)"
+                          >
+                            <InformationCircleIcon class="h-4 w-4" aria-hidden="true" />
+                          </button>
+                          <div
+                            v-if="helpOpenField === field.id"
+                            role="tooltip"
+                            class="absolute top-full left-0 z-20 mt-3 w-72 rounded-[18px] border border-[rgba(80,105,127,0.12)] bg-white/98 p-4 text-left shadow-[var(--shadow-soft)]"
+                          >
+                            <p class="text-sm font-semibold text-[var(--color-brand-ink-strong)]">
+                              {{ field.help.title }}
+                            </p>
+                            <p class="mt-2 text-xs leading-5 text-[var(--color-brand-muted)]">
+                              {{ field.help.body }}
+                            </p>
+                          </div>
+                        </span>
                       </span>
                     </a>
                   </dt>
