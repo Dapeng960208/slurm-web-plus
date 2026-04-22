@@ -1,24 +1,6 @@
 ---
 name: Backend Tests
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - 'slurmweb/**'
-      - 'tests/**'
-      - 'pyproject.toml'
-      - 'setup.py'
-      - '.github/workflows/python-ci.yml'
-  pull_request:
-    branches:
-      - main
-    paths:
-      - 'slurmweb/**'
-      - 'tests/**'
-      - 'pyproject.toml'
-      - 'setup.py'
-      - '.github/workflows/python-ci.yml'
   workflow_dispatch: {}
 
 permissions:

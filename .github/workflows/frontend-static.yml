@@ -1,18 +1,6 @@
 ---
 name: Frontend Static Analysis
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - 'frontend/**'
-      - '.github/workflows/frontend-static.yml'
-  pull_request:
-    branches:
-      - main
-    paths:
-      - 'frontend/**'
-      - '.github/workflows/frontend-static.yml'
   workflow_dispatch: {}
 
 permissions:
