@@ -397,30 +397,29 @@ watch(
               </p>
             </div>
 
-            <ol
-              role="list"
-              class="ui-timeline-grid"
-              data-testid="job-history-timeline-grid"
-            >
+            <ol role="list" class="overflow-hidden" data-testid="job-history-timeline-list">
               <li
                 v-for="(step, idx) in timeline"
                 :key="step.id"
                 :id="`step-${step.id}`"
-                :class="[
-                  step.reached ? 'ui-timeline-card-complete' : 'ui-timeline-card-pending',
-                  'ui-timeline-card'
-                ]"
+                :data-state="step.reached ? 'complete' : 'pending'"
+                :class="[idx !== timeline.length - 1 ? 'pb-10' : '', 'relative']"
               >
                 <template v-if="step.reached">
-                  <div class="flex items-start gap-3">
-                    <span class="flex h-9 items-center shrink-0">
+                  <div
+                    v-if="idx !== timeline.length - 1"
+                    class="absolute top-4 left-4 mt-0.5 -ml-px h-full w-0.5 bg-[linear-gradient(180deg,rgba(182,232,44,0.95),rgba(152,201,31,0.9))]"
+                    aria-hidden="true"
+                  />
+                  <div class="group relative flex items-start">
+                    <span class="flex h-9 items-center">
                       <span
                         class="relative z-10 flex h-9 w-9 items-center justify-center rounded-[16px] border border-white/70 bg-[linear-gradient(135deg,rgba(182,232,44,0.96),rgba(152,201,31,0.92))] shadow-[0_16px_30px_rgba(182,232,44,0.2)]"
                       >
                         <CheckIcon class="h-5 w-5 text-[var(--color-brand-deep)]" aria-hidden="true" />
                       </span>
                     </span>
-                    <span class="flex min-w-0 flex-col">
+                    <span class="ml-4 flex min-w-0 flex-col">
                       <span class="text-sm font-semibold text-[var(--color-brand-ink-strong)]">{{
                         step.label
                       }}</span>
@@ -429,15 +428,20 @@ watch(
                   </div>
                 </template>
                 <template v-else>
-                  <div class="flex items-start gap-3">
-                    <span class="flex h-9 items-center shrink-0" aria-hidden="true">
+                  <div
+                    v-if="idx !== timeline.length - 1"
+                    class="absolute top-4 left-4 mt-0.5 -ml-px h-full w-0.5 bg-[rgba(80,105,127,0.18)]"
+                    aria-hidden="true"
+                  />
+                  <div class="group relative flex items-start">
+                    <span class="flex h-9 items-center" aria-hidden="true">
                       <span
                         class="relative z-10 flex h-9 w-9 items-center justify-center rounded-[16px] border border-[rgba(80,105,127,0.14)] bg-[rgba(239,244,246,0.9)] shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]"
                       >
                         <span class="h-2.5 w-2.5 rounded-full bg-[rgba(80,105,127,0.16)]" />
                       </span>
                     </span>
-                    <span class="flex min-w-0 flex-col">
+                    <span class="ml-4 flex min-w-0 flex-col">
                       <span class="text-sm font-medium text-[var(--color-brand-muted)]">{{
                         step.label
                       }}</span>

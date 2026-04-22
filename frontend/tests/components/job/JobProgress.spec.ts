@@ -8,12 +8,12 @@ import jobFailed from '../../assets/job-failed.json'
 import jobTimeout from '../../assets/job-timeout.json'
 
 describe('JobProgress.vue', () => {
-  test('renders pending job progress as compact timeline cards', () => {
+  test('renders pending job progress as vertical timeline', () => {
     const wrapper = mount(JobProgress, {
       props: { job: jobPending }
     })
 
-    expect(wrapper.get('[data-testid="job-progress-grid"]').exists()).toBe(true)
+    expect(wrapper.get('[data-testid="job-progress-list"]').exists()).toBe(true)
     expect(wrapper.get('#step-submitted').attributes('data-state')).toBe('complete')
     expect(wrapper.get('#step-eligible').attributes('data-state')).toBe('complete')
     expect(wrapper.get('#step-scheduling').attributes('data-state')).toBe('current')
