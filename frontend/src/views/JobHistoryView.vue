@@ -342,7 +342,9 @@ watch(
                 <div
                   v-if="idx !== timeline.length - 1"
                   :class="[
-                    step.reached ? 'bg-[var(--color-slurmweb-dark)]' : 'bg-[rgba(80,105,127,0.2)]',
+                    step.reached
+                      ? 'bg-[linear-gradient(180deg,rgba(182,232,44,0.95),rgba(152,201,31,0.9))]'
+                      : 'bg-[rgba(80,105,127,0.18)]',
                     'absolute top-4 left-4 mt-0.5 -ml-px h-full w-0.5'
                   ]"
                   aria-hidden="true"
@@ -351,7 +353,7 @@ watch(
                   <div class="group relative flex items-start">
                     <span class="flex h-9 items-center">
                       <span
-                        class="relative z-10 flex h-8 w-8 items-center justify-center rounded-full bg-[linear-gradient(135deg,rgba(182,232,44,0.95),rgba(152,201,31,0.95))]"
+                        class="relative z-10 flex h-9 w-9 items-center justify-center rounded-[16px] border border-white/70 bg-[linear-gradient(135deg,rgba(182,232,44,0.96),rgba(152,201,31,0.92))] shadow-[0_16px_30px_rgba(182,232,44,0.2)]"
                       >
                         <CheckIcon class="h-5 w-5 text-[var(--color-brand-deep)]" aria-hidden="true" />
                       </span>
@@ -368,9 +370,9 @@ watch(
                   <div class="group relative flex items-start">
                     <span class="flex h-9 items-center" aria-hidden="true">
                       <span
-                        class="relative z-10 flex h-8 w-8 items-center justify-center rounded-full border-2 border-[rgba(80,105,127,0.18)] bg-white"
+                        class="relative z-10 flex h-9 w-9 items-center justify-center rounded-[16px] border border-[rgba(80,105,127,0.14)] bg-[rgba(239,244,246,0.9)] shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]"
                       >
-                        <span class="h-2.5 w-2.5 rounded-full bg-transparent" />
+                        <span class="h-2.5 w-2.5 rounded-full bg-[rgba(80,105,127,0.16)]" />
                       </span>
                     </span>
                     <span class="ml-4 flex min-w-0 flex-col">
@@ -412,14 +414,17 @@ watch(
                       :href="`#${field.id}`"
                       @click.prevent="highlightField(field.id as HistoryField)"
                     >
-                      <span class="flex items-center">
-                        <HashtagIcon
+                      <span class="group inline-flex items-center gap-2 rounded-full px-1.5 py-1 transition-colors hover:bg-[rgba(182,232,44,0.12)]">
+                        <span
                           :class="[
-                            displayTags[field.id as HistoryField].show ? 'opacity-100' : 'opacity-0',
-                            'mr-2 -ml-5 h-3.5 w-3.5 text-[var(--color-brand-muted)] transition-opacity'
+                            displayTags[field.id as HistoryField].show
+                              ? 'border-[rgba(182,232,44,0.38)] bg-[rgba(182,232,44,0.18)] text-[var(--color-brand-blue)] shadow-[0_8px_16px_rgba(182,232,44,0.14)]'
+                              : 'border-transparent bg-transparent text-[var(--color-brand-muted)]/70',
+                            'inline-flex h-6 w-6 items-center justify-center rounded-full border transition-all duration-200'
                           ]"
-                          aria-hidden="true"
-                        />
+                        >
+                          <HashtagIcon class="h-3.5 w-3.5" aria-hidden="true" />
+                        </span>
                         {{ field.label }}
                       </span>
                     </a>

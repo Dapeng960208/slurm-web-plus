@@ -35,28 +35,40 @@ const resources = jobResourcesTRES(tres)
     v-else
     class="mt-1 text-sm leading-6 text-[var(--color-brand-muted)] sm:col-span-2 sm:mt-0"
   >
-    <ul class="space-y-2">
+    <ul class="space-y-2.5">
       <li>
-        <span class="inline-flex items-center"
-          ><ServerIcon class="mr-1 h-5 w-5" aria-hidden="true" />Nodes: {{ resources.node }}</span
+        <span class="inline-flex items-center gap-2"
+          ><span
+            class="inline-flex h-8 w-8 items-center justify-center rounded-[14px] bg-[rgba(182,232,44,0.14)] text-[var(--color-brand-blue)] shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]"
+            ><ServerIcon class="h-4 w-4" aria-hidden="true" /></span
+          ><span>Nodes: {{ resources.node }}</span></span
         >
       </li>
       <li>
-        <span class="inline-flex items-center"
-          ><CpuChipIcon class="mr-1 h-5 w-5" aria-hidden="true" />CPU: {{ resources.cpu }}</span
+        <span class="inline-flex items-center gap-2"
+          ><span
+            class="inline-flex h-8 w-8 items-center justify-center rounded-[14px] bg-[rgba(116,165,214,0.14)] text-[var(--color-brand-blue)] shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]"
+            ><CpuChipIcon class="h-4 w-4" aria-hidden="true" /></span
+          ><span>CPU: {{ resources.cpu }}</span></span
         >
       </li>
       <li>
-        <span class="inline-flex items-center"
-          ><TableCellsIcon class="mr-1 h-5 w-5" aria-hidden="true" />Memory:
-          {{ getMBHumanUnit(resources.memory) }}</span
+        <span class="inline-flex items-center gap-2"
+          ><span
+            class="inline-flex h-8 w-8 items-center justify-center rounded-[14px] bg-[rgba(80,105,127,0.12)] text-[var(--color-brand-blue)] shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]"
+            ><TableCellsIcon class="h-4 w-4" aria-hidden="true" /></span
+          ><span>Memory: {{ getMBHumanUnit(resources.memory) }}</span></span
         >
       </li>
       <li v-if="gpu.count > 0">
-        <span class="inline-flex items-center"
-          ><Square3Stack3DIcon class="mr-1 h-5 w-5" aria-hidden="true" />GPU:
-          {{ gpu.count }}
-          <span v-if="!gpu.reliable" class="ml-1 text-[var(--color-brand-muted)]">~</span></span
+        <span class="inline-flex items-center gap-2"
+          ><span
+            class="inline-flex h-8 w-8 items-center justify-center rounded-[14px] bg-[rgba(216,75,80,0.1)] text-[var(--color-brand-blue)] shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]"
+            ><Square3Stack3DIcon class="h-4 w-4" aria-hidden="true" /></span
+          ><span
+            >GPU: {{ gpu.count }}
+            <span v-if="!gpu.reliable" class="ml-1 text-[var(--color-brand-muted)]">~</span></span
+          ></span
         >
       </li>
     </ul>

@@ -292,15 +292,20 @@ onMounted(() => {
                   <dt class="text-sm leading-6 font-semibold text-[var(--color-brand-ink-strong)]">
                     <a :href="`#${field.id}`">
                       <span
-                        class="flex items-center"
+                        class="group inline-flex items-center gap-2 rounded-full px-1.5 py-1 transition-colors hover:bg-[rgba(182,232,44,0.12)]"
                         @mouseover="displayTags[field.id].show = true"
                         @mouseleave="displayTags[field.id].show = false"
                       >
-                        <HashtagIcon
-                          v-show="displayTags[field.id].show"
-                          class="mr-2 -ml-5 h-3.5 w-3.5 text-[var(--color-brand-muted)]"
-                          aria-hidden="true"
-                        />
+                        <span
+                          :class="[
+                            displayTags[field.id].show
+                              ? 'border-[rgba(182,232,44,0.38)] bg-[rgba(182,232,44,0.18)] text-[var(--color-brand-blue)] shadow-[0_8px_16px_rgba(182,232,44,0.14)]'
+                              : 'border-transparent bg-transparent text-[var(--color-brand-muted)]/70',
+                            'inline-flex h-6 w-6 items-center justify-center rounded-full border transition-all duration-200'
+                          ]"
+                        >
+                          <HashtagIcon class="h-3.5 w-3.5" aria-hidden="true" />
+                        </span>
                         {{ field.label }}
                       </span>
                     </a>
