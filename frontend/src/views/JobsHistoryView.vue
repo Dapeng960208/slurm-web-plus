@@ -215,7 +215,12 @@ watch(
               <thead>
                 <tr class="text-sm font-semibold text-gray-900 dark:text-gray-200">
                   <th scope="col" class="w-12 py-3.5 pr-3 text-left sm:pl-6 lg:pl-8">#ID</th>
-                  <th scope="col" class="px-3 py-3.5 text-left">Submit Time</th>
+                  <th
+                    scope="col"
+                    class="min-w-[11rem] px-3 py-3.5 text-left text-xs tracking-wide text-gray-500 dark:text-gray-400"
+                  >
+                    Submit Time
+                  </th>
                   <th scope="col" class="w-16 px-3 py-3.5 text-left">State</th>
                   <th scope="col" class="px-3 py-3.5 text-left">User (account)</th>
                   <th scope="col" class="hidden px-3 py-3.5 text-left sm:table-cell">Resources</th>
@@ -242,7 +247,9 @@ watch(
                   >
                     {{ job.job_id }}
                   </td>
-                  <td class="px-3 py-4 whitespace-nowrap">
+                  <td
+                    class="px-3 py-4 text-xs tabular-nums whitespace-nowrap text-gray-500 dark:text-gray-400"
+                  >
                     {{ fmtTime(job.submit_time) }}
                   </td>
                   <td class="px-3 py-4 whitespace-nowrap">

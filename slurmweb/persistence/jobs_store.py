@@ -51,7 +51,7 @@ INSERT INTO job_snapshots (
     tres_req_str, tres_per_job, tres_per_node, gres_detail,
     tres_requested, tres_allocated,
     start_time, end_time, eligible_time, last_sched_evaluation_time,
-    time_limit_minutes, used_memory_gb,
+    time_limit_minutes, used_memory_gb, usage_stats, used_cpu_cores_avg,
     exit_code, working_directory, command
 ) VALUES %s
 ON CONFLICT (job_id, submit_time) DO UPDATE SET
@@ -72,6 +72,11 @@ ON CONFLICT (job_id, submit_time) DO UPDATE SET
     tres_requested     = COALESCE(EXCLUDED.tres_requested, job_snapshots.tres_requested),
     tres_allocated     = COALESCE(EXCLUDED.tres_allocated, job_snapshots.tres_allocated),
     used_memory_gb     = COALESCE(EXCLUDED.used_memory_gb, job_snapshots.used_memory_gb),
+    usage_stats        = COALESCE(EXCLUDED.usage_stats, job_snapshots.usage_stats),
+    used_cpu_cores_avg = COALESCE(
+        EXCLUDED.used_cpu_cores_avg,
+        job_snapshots.used_cpu_cores_avg
+    ),
     exit_code          = EXCLUDED.exit_code,
     gres_detail        = EXCLUDED.gres_detail,
     partition          = EXCLUDED.partition,
@@ -89,7 +94,8 @@ _ROW_TEMPLATE = (
     "%(tres_per_job)s, %(tres_per_node)s, %(gres_detail)s, %(tres_requested)s, "
     "%(tres_allocated)s, %(start_time)s, %(end_time)s, %(eligible_time)s, "
     "%(last_sched_evaluation_time)s, %(time_limit_minutes)s, %(used_memory_gb)s, "
-    "%(exit_code)s, %(working_directory)s, %(command)s)"
+    "%(usage_stats)s, %(used_cpu_cores_avg)s, %(exit_code)s, "
+    "%(working_directory)s, %(command)s)"
 )
 
 _SELECT_COLUMNS = """
@@ -123,6 +129,8 @@ js.eligible_time,
 js.last_sched_evaluation_time,
 js.time_limit_minutes,
 js.used_memory_gb,
+js.usage_stats,
+js.used_cpu_cores_avg,
 js.exit_code,
 js.working_directory,
 js.command
@@ -339,38 +347,159 @@ def _time_value(time_data, key: str, fallback_value=None):
     return fallback_value
 
 
+def _step_tres_values(step: dict, section: str, bucket: str) -> list:
+    if not isinstance(step, dict):
+        return []
+
+    step_tres = step.get("tres", {})
+    if not isinstance(step_tres, dict):
+        return []
+
+    tres_section = step_tres.get(section, {})
+    if not isinstance(tres_section, dict):
+        return []
+
+    values = tres_section.get(bucket, [])
+    return values if isinstance(values, list) else []
+
+
+def _extract_step_tres_count(step: dict, section: str, bucket: str, tres_type: str):
+    for tres in _step_tres_values(step, section, bucket):
+        if not isinstance(tres, dict) or tres.get("type") != tres_type:
+            continue
+        count = _float_field(tres.get("count"))
+        if count is None or count < 0:
+            continue
+        return count
+    return None
+
+
 def _max_memory_gb(job: dict):
     max_memory_bytes = None
+    memory_source = None
 
     for step in job.get("steps", []):
-        if not isinstance(step, dict):
+        count = _extract_step_tres_count(step, "consumed", "max", "mem")
+        if count is None:
             continue
+        if max_memory_bytes is None or count > max_memory_bytes:
+            max_memory_bytes = count
+            memory_source = "consumed.max.mem"
 
-        step_tres = step.get("tres", {})
-        if not isinstance(step_tres, dict):
-            continue
-
-        consumed = step_tres.get("consumed", {})
-        if not isinstance(consumed, dict):
-            continue
-
-        step_max = consumed.get("max", [])
-        if not isinstance(step_max, list):
-            continue
-
-        for tres in step_max:
-            if not isinstance(tres, dict) or tres.get("type") != "mem":
-                continue
-            count = _float_field(tres.get("count"))
-            if count is None or count < 0:
+    if max_memory_bytes is None:
+        for step in job.get("steps", []):
+            count = _extract_step_tres_count(step, "requested", "max", "mem")
+            if count is None:
                 continue
             if max_memory_bytes is None or count > max_memory_bytes:
                 max_memory_bytes = count
+                memory_source = "requested.max.mem"
 
     if max_memory_bytes is None:
-        return None
+        return None, None
 
-    return max_memory_bytes / float(1024**3)
+    return max_memory_bytes / float(1024**3), memory_source
+
+
+def _step_total_cpu_seconds(step: dict):
+    if not isinstance(step, dict):
+        return None
+    time_data = step.get("time", {})
+    if not isinstance(time_data, dict):
+        return None
+    total = time_data.get("total", {})
+    if not isinstance(total, dict):
+        return None
+    seconds = _float_field(total.get("seconds"))
+    microseconds = _float_field(total.get("microseconds"))
+    if seconds is None and microseconds is None:
+        return None
+    return float(seconds or 0) + float(microseconds or 0) / 1_000_000.0
+
+
+def _step_elapsed_seconds(step: dict):
+    if not isinstance(step, dict):
+        return None
+    elapsed = _float_field(step.get("time", {}).get("elapsed"))
+    if elapsed is None or elapsed <= 0:
+        return None
+    return elapsed
+
+
+def _step_identifier(step: dict):
+    step_info = step.get("step", {})
+    if not isinstance(step_info, dict):
+        return None
+    return step_info.get("id")
+
+
+def _step_name(step: dict):
+    step_info = step.get("step", {})
+    if not isinstance(step_info, dict):
+        return None
+    return step_info.get("name")
+
+
+def _include_cpu_step(step: dict) -> bool:
+    step_id = _step_identifier(step) or ""
+    step_name = _step_name(step) or ""
+    return not (step_name == "extern" or step_id.endswith(".extern"))
+
+
+def _job_elapsed_seconds(job: dict):
+    time_data = job.get("time", {})
+    start = _int_field(_time_value(time_data, "start"))
+    end = _int_field(_time_value(time_data, "end"))
+    if start is not None and end is not None and end > start:
+        return float(end - start)
+
+    elapsed = _float_field(_time_value(time_data, "elapsed"))
+    if elapsed is not None and elapsed > 0:
+        return float(elapsed)
+
+    return None
+
+
+def _usage_stats(job: dict):
+    included_steps = []
+    excluded_steps = []
+    total_cpu_seconds = 0.0
+
+    for step in job.get("steps", []):
+        summary = {
+            "step_id": _step_identifier(step),
+            "step_name": _step_name(step),
+            "elapsed_seconds": _step_elapsed_seconds(step),
+            "total_cpu_seconds": _step_total_cpu_seconds(step),
+        }
+        if _include_cpu_step(step):
+            included_steps.append(summary)
+            if summary["total_cpu_seconds"] is not None:
+                total_cpu_seconds += summary["total_cpu_seconds"]
+        else:
+            excluded_steps.append(summary)
+
+    job_elapsed_seconds = _job_elapsed_seconds(job)
+    used_cpu_cores_avg = None
+    if job_elapsed_seconds is not None and job_elapsed_seconds > 0:
+        used_cpu_cores_avg = total_cpu_seconds / job_elapsed_seconds
+
+    used_memory_gb, memory_source = _max_memory_gb(job)
+    return {
+        "memory": {
+            "value_gb": used_memory_gb,
+            "source": memory_source,
+        },
+        "cpu": {
+            "kind": "average_concurrency_estimate",
+            "total_seconds": total_cpu_seconds,
+            "job_elapsed_seconds": job_elapsed_seconds,
+            "estimated_cores_avg": used_cpu_cores_avg,
+            "formula": "sum(step.time.total) / job_elapsed_seconds",
+            "included_steps": included_steps,
+            "excluded_steps": excluded_steps,
+        },
+    }, used_memory_gb, used_cpu_cores_avg
 
 
 def _extract(job: dict) -> dict:
@@ -403,6 +532,8 @@ def _extract(job: dict) -> dict:
         "last_sched_evaluation_time": _ts(job.get("last_sched_evaluation")),
         "time_limit_minutes": _int_field(job.get("time_limit")),
         "used_memory_gb": None,
+        "usage_stats": None,
+        "used_cpu_cores_avg": None,
         "exit_code": _exit_str(job.get("exit_code")),
         "working_directory": job.get("current_working_directory"),
         "command": job.get("command"),
@@ -421,6 +552,7 @@ def _extract_detail(job: dict, fallback: Optional[dict] = None) -> dict:
         if isinstance(state, dict)
         else job.get("job_state")
     ) or fallback.get("job_state")
+    usage_stats, used_memory_gb, used_cpu_cores_avg = _usage_stats(job)
 
     row = {
         "job_id": job.get("job_id", fallback.get("job_id")),
@@ -473,7 +605,9 @@ def _extract_detail(job: dict, fallback: Optional[dict] = None) -> dict:
         "time_limit_minutes": _int_field(
             _time_value(time_data, "limit", job.get("time_limit"))
         ),
-        "used_memory_gb": _max_memory_gb(job),
+        "used_memory_gb": used_memory_gb,
+        "usage_stats": usage_stats,
+        "used_cpu_cores_avg": used_cpu_cores_avg,
         "exit_code": _exit_str(job.get("exit_code") or job.get("derived_exit_code")),
         "working_directory": job.get("current_working_directory")
         or job.get("working_directory")
@@ -535,7 +669,7 @@ def _prepare_db_row(row: dict) -> dict:
     from psycopg2.extras import Json
 
     data = dict(row)
-    for key in ("tres_requested", "tres_allocated"):
+    for key in ("tres_requested", "tres_allocated", "usage_stats"):
         if data.get(key) is not None:
             data[key] = Json(data[key])
     return data
@@ -846,6 +980,9 @@ class JobsStore:
             "last_sched_evaluation_time",
             "tres_requested",
             "tres_allocated",
+            "used_memory_gb",
+            "usage_stats",
+            "used_cpu_cores_avg",
         )
         return any(record.get(field) is None for field in detail_fields)
 
@@ -910,7 +1047,9 @@ class JobsStore:
             "eligible_time": record.get("eligible_time"),
             "last_sched_evaluation_time": record.get("last_sched_evaluation_time"),
             "time_limit_minutes": record.get("time_limit_minutes"),
-            "used_memory_gb": None,
+            "used_memory_gb": record.get("used_memory_gb"),
+            "usage_stats": record.get("usage_stats"),
+            "used_cpu_cores_avg": record.get("used_cpu_cores_avg"),
             "exit_code": record.get("exit_code"),
             "working_directory": record.get("working_directory"),
             "command": record.get("command"),

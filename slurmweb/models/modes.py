@@ -86,6 +86,8 @@ class JobSnapshot(Base):
     last_sched_evaluation_time = sa.Column(sa.TIMESTAMP(timezone=True), nullable=True)
     time_limit_minutes = sa.Column(sa.Integer(), nullable=True)
     used_memory_gb = sa.Column(sa.Float(), nullable=True)
+    usage_stats = sa.Column(postgresql.JSONB(astext_type=sa.Text()), nullable=True)
+    used_cpu_cores_avg = sa.Column(sa.Float(), nullable=True)
     exit_code = sa.Column(sa.Text(), nullable=True)
     working_directory = sa.Column(sa.Text(), nullable=True)
     command = sa.Column(sa.Text(), nullable=True)

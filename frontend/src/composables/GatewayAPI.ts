@@ -708,6 +708,8 @@ export interface JobHistoryRecord {
   tres_requested: ClusterTRES[] | null
   tres_allocated: ClusterTRES[] | null
   used_memory_gb: number | null
+  usage_stats: Record<string, unknown> | null
+  used_cpu_cores_avg: number | null
   exit_code: JobHistoryExitCode
   working_directory: string | null
   command: string | null

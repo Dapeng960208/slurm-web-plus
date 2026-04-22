@@ -56,6 +56,8 @@ describe('JobsHistoryView.vue', () => {
           tres_requested: null,
           tres_allocated: null,
           used_memory_gb: null,
+          usage_stats: null,
+          used_cpu_cores_avg: null,
           exit_code: '0:0',
           working_directory: '/tmp',
           command: 'sleep 1'
@@ -85,6 +87,8 @@ describe('JobsHistoryView.vue', () => {
     expect(resources.text()).toContain('0')
     expect(wrapper.text()).toContain('Submit Time')
     expect(wrapper.text()).toContain(new Date('2026-04-20T09:00:00+00:00').toLocaleString())
+    expect(wrapper.find('th:nth-child(2)').classes()).toContain('min-w-[11rem]')
+    expect(wrapper.find('td:nth-child(2)').classes()).toContain('tabular-nums')
     expect(wrapper.text()).toContain('QOS')
     expect(wrapper.text()).toContain('Priority')
     expect(wrapper.text()).toContain('Reason')

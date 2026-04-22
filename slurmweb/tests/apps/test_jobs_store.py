@@ -121,6 +121,8 @@ class TestJobsStoreExtract(unittest.TestCase):
         self.assertIsNone(row["tres_requested"])
         self.assertIsNone(row["tres_allocated"])
         self.assertIsNone(row["used_memory_gb"])
+        self.assertIsNone(row["usage_stats"])
+        self.assertIsNone(row["used_cpu_cores_avg"])
 
     def test_extract_handles_v0_0_39_job_after_adaptation(self):
         [job] = self.adapt(
@@ -211,6 +213,11 @@ class TestJobsStoreExtract(unittest.TestCase):
                 },
                 "steps": [
                     {
+                        "time": {
+                            "elapsed": 10,
+                            "total": {"seconds": 15, "microseconds": 0},
+                        },
+                        "step": {"id": "123.0", "name": "main"},
                         "tres": {
                             "consumed": {
                                 "max": [
@@ -276,6 +283,9 @@ class TestJobsStoreExtract(unittest.TestCase):
         self.assertEqual(len(row["tres_requested"]), 2)
         self.assertEqual(len(row["tres_allocated"]), 2)
         self.assertEqual(row["used_memory_gb"], 2.0)
+        self.assertIsNone(row["used_cpu_cores_avg"])
+        self.assertEqual(row["usage_stats"]["memory"]["source"], "consumed.max.mem")
+        self.assertIsNone(row["usage_stats"]["cpu"]["estimated_cores_avg"])
 
     def test_extract_detail_handles_v0_0_40_job_after_adaptation(self):
         [job] = self.adapt(
@@ -308,8 +318,11 @@ class TestJobsStoreExtract(unittest.TestCase):
                     },
                     "steps": [
                         {
-                            "time": {},
-                            "step": {},
+                            "time": {
+                                "elapsed": 30,
+                                "total": {"seconds": 45, "microseconds": 0},
+                            },
+                            "step": {"id": "456.0", "name": "main"},
                             "tres": {
                                 "consumed": {
                                     "max": [
@@ -347,6 +360,7 @@ class TestJobsStoreExtract(unittest.TestCase):
         self.assertEqual(row["working_directory"], "/tmp/detail")
         self.assertEqual(row["command"], "sleep 1")
         self.assertEqual(row["used_memory_gb"], 3.0)
+        self.assertEqual(row["used_cpu_cores_avg"], 0.15)
         self.assertEqual(len(row["tres_requested"]), 1)
         self.assertEqual(len(row["tres_allocated"]), 1)
 
@@ -385,6 +399,7 @@ class TestJobsStoreExtract(unittest.TestCase):
         )
 
         self.assertIsNone(row["used_memory_gb"])
+        self.assertIsNone(row["usage_stats"]["memory"]["source"])
 
     def test_max_memory_gb_uses_max_mem_across_steps(self):
         result = _max_memory_gb(
@@ -423,7 +438,37 @@ class TestJobsStoreExtract(unittest.TestCase):
             }
         )
 
-        self.assertEqual(result, 5.0)
+        self.assertEqual(result, (5.0, "consumed.max.mem"))
+
+    def test_max_memory_gb_falls_back_to_requested_max_mem(self):
+        result = _max_memory_gb(
+            {
+                "steps": [
+                    {
+                        "tres": {
+                            "consumed": {
+                                "max": [
+                                    {"type": "fs", "count": 12, "id": 6, "name": "disk"}
+                                ]
+                            },
+                            "requested": {
+                                "max": [
+                                    {"type": "cpu", "count": 4, "id": 1, "name": ""},
+                                    {
+                                        "type": "mem",
+                                        "count": 6 * 1024**3,
+                                        "id": 2,
+                                        "name": "",
+                                    },
+                                ]
+                            },
+                        }
+                    }
+                ]
+            }
+        )
+
+        self.assertEqual(result, (6.0, "requested.max.mem"))
 
     def test_max_memory_gb_returns_none_without_valid_mem_values(self):
         result = _max_memory_gb(
@@ -462,7 +507,50 @@ class TestJobsStoreExtract(unittest.TestCase):
             }
         )
 
-        self.assertIsNone(result)
+        self.assertEqual(result, (None, None))
+
+    def test_extract_detail_estimates_average_cpu_cores_from_selected_steps(self):
+        row = _extract_detail(
+            {
+                "job_id": 999,
+                "state": {"current": ["COMPLETED"], "reason": "None"},
+                "time": {
+                    "submission": 1710000000,
+                    "start": 1710000010,
+                    "end": 1710000110,
+                },
+                "steps": [
+                    {
+                        "step": {"id": "999.batch", "name": "batch"},
+                        "time": {
+                            "elapsed": 100,
+                            "total": {"seconds": 50, "microseconds": 0},
+                        },
+                        "tres": {"consumed": {"max": []}, "requested": {"max": []}},
+                    },
+                    {
+                        "step": {"id": "999.extern", "name": "extern"},
+                        "time": {
+                            "elapsed": 100,
+                            "total": {"seconds": 90, "microseconds": 0},
+                        },
+                        "tres": {"consumed": {"max": []}, "requested": {"max": []}},
+                    },
+                    {
+                        "step": {"id": "999.0", "name": "main"},
+                        "time": {
+                            "elapsed": 80,
+                            "total": {"seconds": 150, "microseconds": 500000},
+                        },
+                        "tres": {"consumed": {"max": []}, "requested": {"max": []}},
+                    },
+                ],
+            }
+        )
+
+        self.assertAlmostEqual(row["used_cpu_cores_avg"], 2.005)
+        self.assertEqual(len(row["usage_stats"]["cpu"]["included_steps"]), 2)
+        self.assertEqual(len(row["usage_stats"]["cpu"]["excluded_steps"]), 1)
 
 
 class TestJobsStoreReconcile(unittest.TestCase):
@@ -508,6 +596,8 @@ class TestJobsStoreReconcile(unittest.TestCase):
             "tres_requested": None,
             "tres_allocated": None,
             "used_memory_gb": None,
+            "usage_stats": None,
+            "used_cpu_cores_avg": None,
             "exit_code": "0:0",
             "working_directory": "/tmp/job",
             "command": "sleep 1",
@@ -542,6 +632,11 @@ class TestJobsStoreReconcile(unittest.TestCase):
             "steps": [
                 {},
                 {
+                    "time": {
+                        "elapsed": 300,
+                        "total": {"seconds": 300, "microseconds": 0},
+                    },
+                    "step": {"id": "123.batch", "name": "batch"},
                     "tres": {
                         "consumed": {
                             "max": [
@@ -556,6 +651,11 @@ class TestJobsStoreReconcile(unittest.TestCase):
                     }
                 },
                 {
+                    "time": {
+                        "elapsed": 280,
+                        "total": {"seconds": 420, "microseconds": 0},
+                    },
+                    "step": {"id": "123.0", "name": "main"},
                     "tres": {
                         "consumed": {
                             "max": [
@@ -585,6 +685,7 @@ class TestJobsStoreReconcile(unittest.TestCase):
             datetime.fromtimestamp(1710000600, tz=timezone.utc),
         )
         self.assertEqual(pending_row["used_memory_gb"], 3.0)
+        self.assertEqual(pending_row["used_cpu_cores_avg"], 2.4)
         self.assertEqual(
             pending_row["eligible_time"],
             datetime.fromtimestamp(1710000200, tz=timezone.utc),
@@ -601,6 +702,7 @@ class TestJobsStoreReconcile(unittest.TestCase):
         [pending_row] = self._pending_rows()
         self.assertEqual(pending_row["job_state"], "COMPLETED")
         self.assertIsNotNone(pending_row["end_time"])
+        self.assertIsNone(pending_row["usage_stats"])
         self.assertEqual(
             pending_row["state_reason"],
             "Job missing from active queue and detail lookup",
@@ -617,12 +719,15 @@ class TestJobsStoreReconcile(unittest.TestCase):
         self.slurmrestd.job.assert_not_called()
         self.assertEqual(self.store._pending, {})
 
-    def test_needs_detail_enrichment_ignores_used_memory_for_completed_jobs(self):
+    def test_needs_detail_enrichment_requires_usage_stats_for_completed_jobs(self):
         running_record = self._record()
         running_record.update(
             {
                 "tres_requested": [],
                 "tres_allocated": [],
+                "used_memory_gb": 1.0,
+                "usage_stats": {"memory": {"value_gb": 1.0}},
+                "used_cpu_cores_avg": 0.5,
             }
         )
         self.assertFalse(self.store._needs_detail_enrichment(running_record))
@@ -635,7 +740,7 @@ class TestJobsStoreReconcile(unittest.TestCase):
                 "tres_allocated": [],
             }
         )
-        self.assertFalse(self.store._needs_detail_enrichment(completed_record))
+        self.assertTrue(self.store._needs_detail_enrichment(completed_record))
 
 
 class TestJobsStoreQuerySorting(unittest.TestCase):
@@ -739,6 +844,8 @@ class TestJobsStorePendingQueue(unittest.TestCase):
             "last_sched_evaluation_time": None,
             "time_limit_minutes": 60,
             "used_memory_gb": None,
+            "usage_stats": None,
+            "used_cpu_cores_avg": None,
             "exit_code": "0:0",
             "working_directory": "/tmp/job",
             "command": "sleep 1",
