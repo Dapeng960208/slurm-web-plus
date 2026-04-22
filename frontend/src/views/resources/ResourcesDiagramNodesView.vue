@@ -1,7 +1,7 @@
 <!--
-  Copyright (c) 2023-2025 Rackslab
+  Copyright (c) 2023-2026 Slurm Web Plus
 
-  This file is part of Slurm-web.
+  This file is part of Slurm Web Plus.
 
   SPDX-License-Identifier: MIT
 -->

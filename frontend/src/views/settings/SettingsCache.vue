@@ -1,7 +1,7 @@
 <!--
-  Copyright (c) 2025 Rackslab
+  Copyright (c) 2023-2026 Slurm Web Plus
 
-  This file is part of Slurm-web.
+  This file is part of Slurm Web Plus.
 
   SPDX-License-Identifier: MIT
 -->
@@ -13,33 +13,37 @@ import { useRuntimeStore } from '@/stores/runtime'
 import SettingsCacheStatistics from '@/components/settings/SettingsCacheStatistics.vue'
 import SettingsCacheMetrics from '@/components/settings/SettingsCacheMetrics.vue'
 import InfoAlert from '@/components/InfoAlert.vue'
+
 const runtimeStore = useRuntimeStore()
 </script>
 
 <template>
   <SettingsTabs entry="Cache" />
-  <div class="px-4 pt-16 sm:px-6 lg:px-8">
-    <SettingsHeader title="Cache Service" description="Cache service information and metrics." />
-    <div class="mt-8 flow-root">
-      <div class="-mx-4 -my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
-        <template v-for="cluster in runtimeStore.availableClusters" :key="cluster.name">
-          <div class="min-w-full py-2 align-middle sm:px-6 lg:px-8">
-            <div class="border-b border-gray-200 pb-5 dark:border-gray-600">
-              <h3 class="text-base font-semibold text-gray-900 dark:text-gray-100">
-                Cluster {{ cluster.name }}
-              </h3>
-            </div>
-            <InfoAlert v-if="!runtimeStore.hasClusterPermission(cluster.name, 'cache-view')"
-              >No permission to get cache information on this cluster.</InfoAlert
-            >
-            <InfoAlert v-else-if="!cluster.cache">Cache is disabled on this cluster.</InfoAlert>
-            <template v-else>
-              <SettingsCacheStatistics :cluster="cluster" />
-              <SettingsCacheMetrics v-if="cluster.metrics" :cluster="cluster" />
-            </template>
-          </div>
-        </template>
+  <div class="ui-panel ui-section">
+    <SettingsHeader title="Cache Service" description="Cache availability, hit ratios and live metrics for each cluster." />
+  </div>
+
+  <div class="space-y-6">
+    <div
+      v-for="cluster in runtimeStore.availableClusters"
+      :key="cluster.name"
+      class="ui-panel ui-section"
+    >
+      <div class="mb-6">
+        <p class="ui-page-kicker">Cluster Cache</p>
+        <h3 class="text-2xl font-bold text-[var(--color-brand-ink-strong)]">
+          Cluster {{ cluster.name }}
+        </h3>
       </div>
+
+      <InfoAlert v-if="!runtimeStore.hasClusterPermission(cluster.name, 'cache-view')">
+        No permission to get cache information on this cluster.
+      </InfoAlert>
+      <InfoAlert v-else-if="!cluster.cache">Cache is disabled on this cluster.</InfoAlert>
+      <template v-else>
+        <SettingsCacheStatistics :cluster="cluster" />
+        <SettingsCacheMetrics v-if="cluster.metrics" :cluster="cluster" />
+      </template>
     </div>
   </div>
 </template>

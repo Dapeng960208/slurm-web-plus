@@ -25,9 +25,7 @@ describe('LoginView.vue', () => {
   })
   test('should display login form', () => {
     const wrapper = shallowMount(LoginView, {})
-    // Check presence of the logo and its source.
-    const image = wrapper.get('img')
-    expect(image.attributes('src')).toBe('/logo/slurm-web_logo.png')
+    expect(wrapper.findComponent({ name: 'BrandLogo' }).exists()).toBe(true)
     // Check presence on user/password inputs.
     wrapper.get('input#user')
     wrapper.get('input#password')

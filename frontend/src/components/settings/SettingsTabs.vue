@@ -1,7 +1,7 @@
 <!--
-  Copyright (c) 2023-2024 Rackslab
+  Copyright (c) 2023-2026 Slurm Web Plus
 
-  This file is part of Slurm-web.
+  This file is part of Slurm Web Plus.
 
   SPDX-License-Identifier: MIT
 -->
@@ -33,20 +33,25 @@ const tabs = computed(() => {
 })
 </script>
 <template>
-  <div class="border-b border-gray-200 dark:border-gray-700">
-    <div class="sm:flex sm:items-baseline">
-      <h3 class="text-base leading-6 font-semibold text-gray-900 dark:text-gray-100">Settings</h3>
-      <div class="mt-4 sm:mt-0 sm:ml-10">
-        <nav class="-mb-px flex space-x-8">
+  <div class="ui-panel ui-section">
+    <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div>
+        <h3 class="text-base leading-6 font-semibold text-[var(--color-brand-ink-strong)]">Settings</h3>
+        <p class="mt-1 text-sm text-[var(--color-brand-muted)]">
+          Preferences, access and cache services in one unified workspace.
+        </p>
+      </div>
+      <div class="mt-1">
+        <nav class="flex flex-wrap gap-2">
           <RouterLink
             v-for="tab in tabs"
             :key="tab.name"
             :to="{ name: tab.href }"
             :class="[
               entry == tab.name
-                ? 'border-slurmweb-dark text-slurmweb-dark dark:border-slurmweb dark:text-slurmweb'
-                : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-300 hover:dark:text-gray-100',
-              'border-b-2 px-1 py-4 text-sm font-medium whitespace-nowrap'
+                ? 'bg-[linear-gradient(135deg,rgba(182,232,44,0.95),rgba(152,201,31,0.95))] text-[var(--color-brand-deep)]'
+                : 'bg-[rgba(239,244,246,0.7)] text-[var(--color-brand-muted)] hover:bg-white hover:text-[var(--color-brand-ink-strong)]',
+              'rounded-full px-4 py-2.5 text-sm font-medium whitespace-nowrap transition'
             ]"
             :aria-current="entry == tab.name ? 'page' : undefined"
             >{{ tab.name }}</RouterLink

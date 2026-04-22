@@ -1,7 +1,7 @@
 <!--
-  Copyright (c) 2023-2024 Rackslab
+  Copyright (c) 2023-2026 Slurm Web Plus
 
-  This file is part of Slurm-web.
+  This file is part of Slurm Web Plus.
 
   SPDX-License-Identifier: MIT
 -->
@@ -24,6 +24,7 @@ import JobResources from '@/components/jobs/JobResources.vue'
 import InfoAlert from '@/components/InfoAlert.vue'
 import ErrorAlert from '@/components/ErrorAlert.vue'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
+import PageHeader from '@/components/PageHeader.vue'
 
 import { ChevronLeftIcon, ChevronRightIcon } from '@heroicons/vue/20/solid'
 import { PlusSmallIcon, WindowIcon } from '@heroicons/vue/24/outline'
@@ -37,20 +38,19 @@ const { data, unable, loaded, setCluster } = useClusterDataPoller<ClusterJob[]>(
   5000
 )
 
+const router = useRouter()
+const runtimeStore = useRuntimeStore()
+
 function compareClusterJob(a: ClusterJob, b: ClusterJob): number {
   return compareClusterJobSortOrder(a, b, runtimeStore.jobs.sort, runtimeStore.jobs.order)
 }
 
 const sortedJobs = computed(() => {
   if (data.value) {
-    // https://vuejs.org/guide/essentials/list.html#displaying-filtered-sorted-results
-    const result = [...data.value].filter((job) => {
-      return runtimeStore.jobs.matchesFilters(job)
-    })
+    const result = [...data.value].filter((job) => runtimeStore.jobs.matchesFilters(job))
     return result.sort(compareClusterJob)
-  } else {
-    return []
   }
+  return []
 })
 
 const lastpage = computed(() => {
@@ -63,10 +63,6 @@ const lastjob = computed(() => {
   return Math.min(firstjob.value + 100, sortedJobs.value.length)
 })
 
-const router = useRouter()
-
-const runtimeStore = useRuntimeStore()
-
 function jobPriority(job: ClusterJob): string {
   if (!job.job_state.includes('PENDING')) return '-'
   if (job.priority.set) {
@@ -75,81 +71,51 @@ function jobPriority(job: ClusterJob): string {
     }
     return job.priority.number.toString()
   }
-  return '∅'
+  return '-'
 }
 
 function sortJobs() {
-  /*
-   * Triggered by sort emit of JobsSorter component to update route and resort
-   * the jobs with the new criteria.
-   */
   updateQueryParameters()
-  console.log(`Sorting jobs by ${runtimeStore.jobs.sort} ordered ${runtimeStore.jobs.order}`)
 }
 
 function updateQueryParameters() {
   router.push({ name: 'jobs', query: runtimeStore.jobs.query() as LocationQueryRaw })
 }
 
-/*
- * Watch states and users filters in Pinia store to update route query
- * accordingly.
- *
- * This is not explained in Pinia documentation but to watch Pinia store nested
- * attribute, the solution is to used watch getter. This solution has been found
- * here: https://stackoverflow.com/a/71937507
- */
 watch(
   () => runtimeStore.jobs.filters.states,
-  () => {
-    updateQueryParameters()
-  }
+  () => updateQueryParameters()
 )
 watch(
   () => runtimeStore.jobs.filters.users,
-  () => {
-    updateQueryParameters()
-  }
+  () => updateQueryParameters()
 )
 watch(
   () => runtimeStore.jobs.filters.accounts,
-  () => {
-    updateQueryParameters()
-  }
+  () => updateQueryParameters()
 )
 watch(
   () => runtimeStore.jobs.filters.qos,
-  () => {
-    updateQueryParameters()
-  }
+  () => updateQueryParameters()
 )
 watch(
   () => runtimeStore.jobs.filters.partitions,
-  () => {
-    updateQueryParameters()
-  }
+  () => updateQueryParameters()
 )
 watch(
   () => runtimeStore.jobs.page,
-  () => {
-    updateQueryParameters()
-  }
+  () => updateQueryParameters()
 )
 watch(
   () => cluster,
-  (new_cluster) => {
-    setCluster(new_cluster)
+  (newCluster) => {
+    setCluster(newCluster)
   }
 )
 
-/*
- * Set current page to last page if last page changes to a value lower than
- * current page.
- */
-watch(lastpage, (new_last_page) => {
-  console.log(`lastpage changed ${new_last_page}`)
-  runtimeStore.jobs.page = Math.min(runtimeStore.jobs.page, new_last_page)
-  if (route.query.page && parseInt(route.query.page as string) > new_last_page) {
+watch(lastpage, (newLastPage) => {
+  runtimeStore.jobs.page = Math.min(runtimeStore.jobs.page, newLastPage)
+  if (route.query.page && parseInt(route.query.page as string) > newLastPage) {
     updateQueryParameters()
   }
 })
@@ -187,7 +153,6 @@ onMounted(() => {
       (parameter) => parameter in route.query
     )
   ) {
-    /* Reinitialize filters if route has query parameters */
     runtimeStore.jobs.filters = {
       states: [],
       users: [],
@@ -197,50 +162,30 @@ onMounted(() => {
     }
 
     if (route.query.sort && runtimeStore.jobs.isValidSortCriterion(route.query.sort)) {
-      /* Retrieve the sort criteria from query and update the store */
       runtimeStore.jobs.sort = route.query.sort as JobSortCriterion
     }
     if (route.query.order && runtimeStore.jobs.isValidSortOrder(route.query.order)) {
-      /* Retrieve the sort order from query and update the store */
       runtimeStore.jobs.order = route.query.order as JobSortOrder
     }
     if (route.query.page) {
-      /* Retrieve the page number from query and update the store. If the
-       * lastpage is lower than the page query, set store to lastpage and update
-       * query parameters. */
-      //console.log(`lastpage ${lastpage.value}`)
       runtimeStore.jobs.page = parseInt(route.query.page as string)
-      /*
-      if (lastpage.value < runtimeStore.jobs.page) {
-        runtimeStore.jobs.page = lastpage.value
-        updateQueryParameters()
-      }
-      */
     }
     if (route.query.states) {
-      /* Retrieve the states filters from query and update the store */
       runtimeStore.jobs.filters.states = (route.query.states as string).split(',')
     }
     if (route.query.users) {
-      /* Retrieve the users filters from query and update the store */
       runtimeStore.jobs.filters.users = (route.query.users as string).split(',')
     }
     if (route.query.accounts) {
-      /* Retrieve the account filters from query and update the store */
       runtimeStore.jobs.filters.accounts = (route.query.accounts as string).split(',')
     }
     if (route.query.qos) {
-      /* Retrieve the qos filters from query and update the store */
       runtimeStore.jobs.filters.qos = (route.query.qos as string).split(',')
     }
     if (route.query.partitions) {
-      /* Retrieve the partitions filters from query and update the store */
       runtimeStore.jobs.filters.partitions = (route.query.partitions as string).split(',')
     }
   } else {
-    /* Route has no query parameter. Update query parameters to match those that
-     * can be defined in runtime store. This typically happens when user define
-     * filters, leave jobs route (eg. in left menu) and comes back. */
     updateQueryParameters()
   }
 })
@@ -248,36 +193,24 @@ onMounted(() => {
 
 <template>
   <ClusterMainLayout menu-entry="jobs" :cluster="cluster" :breadcrumb="[{ title: 'Jobs' }]">
-    <div>
+    <div class="ui-page ui-page-wide">
       <JobsFiltersPanel :cluster="cluster" :nb-jobs="sortedJobs.length" />
-      <div class="mx-auto flex items-center justify-between">
-        <div class="px-4 py-16 sm:px-6 lg:px-8">
-          <h1 class="text-3xl font-bold tracking-tight text-gray-900 dark:text-gray-100">Jobs</h1>
-          <p class="mt-4 max-w-xl text-sm font-light text-gray-600 dark:text-gray-300">
-            Jobs in cluster queue
-          </p>
-        </div>
 
-        <div v-if="loaded" class="mt-4 text-right text-gray-600 dark:text-gray-300">
-          <div class="text-5xl font-bold">{{ sortedJobs.length }}</div>
-          <div class="text-sm font-light">job{{ sortedJobs.length > 1 ? 's' : '' }} found</div>
-        </div>
-        <div v-else class="flex animate-pulse space-x-4">
-          <div class="h-14 w-14 rounded-2xl bg-slate-200 dark:bg-slate-800"></div>
-        </div>
-      </div>
+      <PageHeader
+        title="Jobs"
+        description="Queue visibility, active states, account context and fast drill-down into job details."
+        :metric-value="loaded ? sortedJobs.length : undefined"
+        :metric-label="`job${sortedJobs.length > 1 ? 's' : ''} found`"
+      />
+
       <section aria-labelledby="filter-heading" class="-mx-4 -my-2 sm:-mx-6 lg:-mx-8">
         <h2 id="filter-heading" class="sr-only">Filters</h2>
 
-        <div class="border-gray-200 pb-4">
+        <div class="pb-4">
           <div class="mx-auto flex items-center justify-between px-4 sm:px-6 lg:px-8">
             <JobsSorter @sort="sortJobs" />
 
-            <button
-              type="button"
-              class="bg-slurmweb dark:bg-slurmweb-verydark hover:bg-slurmweb-darker focus-visible:outline-slurmweb inline-flex items-center gap-x-1.5 rounded-md px-3 py-2 text-sm font-semibold text-white shadow-xs focus-visible:outline-2 focus-visible:outline-offset-2"
-              @click="runtimeStore.jobs.openFiltersPanel = true"
-            >
+            <button type="button" class="ui-button-primary" @click="runtimeStore.jobs.openFiltersPanel = true">
               <PlusSmallIcon class="-ml-0.5 h-5 w-5" aria-hidden="true" />
               Add filters
             </button>
@@ -291,16 +224,16 @@ onMounted(() => {
           >Unable to retrieve jobs from cluster
           <span class="font-medium">{{ cluster }}</span></ErrorAlert
         >
-        <div v-else-if="!loaded" class="text-gray-400 sm:pl-6 lg:pl-8">
+        <div v-else-if="!loaded" class="text-[var(--color-brand-muted)] sm:pl-6 lg:pl-8">
           <LoadingSpinner :size="5" />
-          Loading jobs…
+          Loading jobs...
         </div>
         <InfoAlert v-else-if="data?.length == 0"
           >No jobs found on cluster <span class="font-medium">{{ cluster }}</span></InfoAlert
         >
-        <div v-else class="-mx-4 -my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
+        <div v-else class="ui-table-shell -mx-4 overflow-x-auto sm:-mx-6 lg:-mx-8">
           <div class="inline-block min-w-full py-2 align-middle">
-            <table class="min-w-full divide-y divide-gray-300 dark:divide-gray-500">
+            <table class="ui-table min-w-full">
               <thead>
                 <tr class="text-sm font-semibold text-gray-900 dark:text-gray-200">
                   <th scope="col" class="w-12 py-3.5 pr-3 text-left sm:pl-6 lg:pl-8">#ID</th>
@@ -310,10 +243,7 @@ onMounted(() => {
                   <th scope="col" class="hidden px-3 py-3.5 text-left xl:table-cell">Partition</th>
                   <th scope="col" class="hidden px-3 py-3.5 text-left xl:table-cell">QOS</th>
                   <th scope="col" class="hidden px-3 py-3.5 text-center sm:table-cell">Priority</th>
-                  <th
-                    scope="col"
-                    class="hidden px-3 py-3.5 text-left 2xl:table-cell 2xl:min-w-[100px]"
-                  >
+                  <th scope="col" class="hidden px-3 py-3.5 text-left 2xl:table-cell 2xl:min-w-[100px]">
                     Reason
                   </th>
                   <th scope="col" class="max-w-fit py-3.5 pr-4 pl-3 sm:pr-6 lg:pr-8">
@@ -321,13 +251,9 @@ onMounted(() => {
                   </th>
                 </tr>
               </thead>
-              <tbody
-                class="divide-y divide-gray-200 text-sm text-gray-500 dark:divide-gray-700 dark:text-gray-300"
-              >
+              <tbody class="divide-y divide-gray-200 text-sm text-gray-500 dark:divide-gray-700 dark:text-gray-300">
                 <tr v-for="job in sortedJobs.slice(firstjob, lastjob)" :key="job.job_id">
-                  <td
-                    class="py-4 pr-3 font-medium whitespace-nowrap text-gray-900 sm:pl-6 lg:pl-8 dark:text-gray-100"
-                  >
+                  <td class="py-4 pr-3 font-medium whitespace-nowrap text-[var(--color-brand-ink-strong)] sm:pl-6 lg:pl-8">
                     {{ job.job_id }}
                   </td>
                   <td class="px-3 py-4 whitespace-nowrap">
@@ -356,7 +282,7 @@ onMounted(() => {
                   <td class="h-full text-right font-medium">
                     <RouterLink
                       :to="{ name: 'job', params: { cluster: cluster, id: job.job_id } }"
-                      class="hover:text-slurmweb-dark hover:dark:text-slurmweb"
+                      class="text-[var(--color-brand-blue)] transition hover:text-[var(--color-brand-ink-strong)]"
                     >
                       <WindowIcon class="mr-4 inline-block h-5 w-5 lg:mr-6" aria-hidden="true" />
                       <span class="sr-only">View {{ job.job_id }}</span>
@@ -365,50 +291,36 @@ onMounted(() => {
                 </tr>
               </tbody>
             </table>
-            <div
-              class="flex items-center justify-between border-t border-gray-200 px-4 py-3 sm:px-6 dark:border-gray-700"
-            >
+
+            <div class="flex items-center justify-between border-t border-[rgba(80,105,127,0.08)] px-4 py-3 sm:px-6">
               <div class="flex flex-1 justify-between sm:hidden">
-                <a
-                  href="#"
-                  class="relative inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 hover:dark:bg-gray-600"
-                  >Previous</a
-                >
-                <a
-                  href="#"
-                  class="relative ml-3 inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 hover:dark:bg-gray-600"
-                  >Next</a
-                >
+                <a href="#" class="ui-button-secondary text-sm">Previous</a>
+                <a href="#" class="ui-button-secondary relative ml-3 text-sm">Next</a>
               </div>
               <div class="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
                 <div>
-                  <p class="text-sm text-gray-700 dark:text-gray-300">
+                  <p class="text-sm text-[var(--color-brand-muted)]">
                     Showing
-                    {{ ' ' }}
                     <span class="font-medium">{{ firstjob }}</span>
-                    {{ ' ' }}
                     to
-                    {{ ' ' }}
                     <span class="font-medium">{{ lastjob }}</span>
-                    {{ ' ' }}
                     of
-                    {{ ' ' }}
                     <span class="font-medium">{{ sortedJobs.length }}</span>
-                    {{ ' ' }} jobs
+                    jobs
                   </p>
                 </div>
                 <div>
                   <nav
                     v-if="lastpage > 1"
-                    class="isolate inline-flex -space-x-px rounded-md shadow-xs"
+                    class="isolate inline-flex -space-x-px rounded-full shadow-[var(--shadow-soft)]"
                     aria-label="Pagination"
                   >
                     <button
                       :class="[
                         runtimeStore.jobs.page == 1
-                          ? 'cursor-default bg-gray-100 text-gray-100 dark:bg-gray-900 dark:text-gray-900'
-                          : 'text-gray-400 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 hover:dark:bg-gray-700',
-                        'relative inline-flex items-center rounded-l-md px-2 py-2 ring-1 ring-gray-300 ring-inset focus:z-20 focus:outline-offset-0 dark:ring-gray-700'
+                          ? 'cursor-default bg-gray-100 text-gray-100'
+                          : 'bg-white text-[var(--color-brand-muted)] hover:bg-[rgba(182,232,44,0.12)]',
+                        'relative inline-flex items-center rounded-l-full px-3 py-2 ring-1 ring-[rgba(80,105,127,0.16)] ring-inset focus:z-20 focus:outline-offset-0'
                       ]"
                       @click="runtimeStore.jobs.page > 1 && (runtimeStore.jobs.page -= 1)"
                     >
@@ -419,18 +331,18 @@ onMounted(() => {
                       <button
                         v-if="page.ellipsis"
                         aria-current="page"
-                        class="relative z-10 inline-flex items-center bg-white px-4 py-2 text-xs font-semibold text-gray-600 ring-1 ring-gray-300 ring-inset focus:z-20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 dark:bg-gray-800 dark:ring-gray-700"
+                        class="relative z-10 inline-flex items-center bg-white px-4 py-2 text-xs font-semibold text-[var(--color-brand-muted)] ring-1 ring-[rgba(80,105,127,0.16)] ring-inset focus:z-20"
                       >
-                        …
+                        ...
                       </button>
                       <button
                         v-else
                         aria-current="page"
                         :class="[
                           page.id == runtimeStore.jobs.page
-                            ? 'bg-slurmweb dark:bg-slurmweb-dark text-white'
-                            : 'bg-white text-black ring-1 ring-gray-300 ring-inset hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:ring-gray-700 hover:dark:bg-gray-700',
-                          'relative z-10 inline-flex items-center px-4 py-2 text-sm font-semibold focus:z-20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600'
+                            ? 'bg-[linear-gradient(135deg,rgba(182,232,44,0.95),rgba(152,201,31,0.95))] text-[var(--color-brand-deep)]'
+                            : 'bg-white text-[var(--color-brand-ink-strong)] ring-1 ring-[rgba(80,105,127,0.16)] ring-inset hover:bg-[rgba(182,232,44,0.12)]',
+                          'relative z-10 inline-flex items-center px-4 py-2 text-sm font-semibold focus:z-20'
                         ]"
                         @click="runtimeStore.jobs.page = page.id"
                       >
@@ -440,9 +352,9 @@ onMounted(() => {
                     <button
                       :class="[
                         runtimeStore.jobs.page == lastpage
-                          ? 'cursor-default bg-gray-100 text-gray-100 dark:bg-gray-900 dark:text-gray-900'
-                          : 'text-gray-400 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 hover:dark:bg-gray-700',
-                        'relative inline-flex items-center rounded-r-md px-2 py-2 ring-1 ring-gray-300 ring-inset focus:z-20 focus:outline-offset-0 dark:ring-gray-700'
+                          ? 'cursor-default bg-gray-100 text-gray-100'
+                          : 'bg-white text-[var(--color-brand-muted)] hover:bg-[rgba(182,232,44,0.12)]',
+                        'relative inline-flex items-center rounded-r-full px-3 py-2 ring-1 ring-[rgba(80,105,127,0.16)] ring-inset focus:z-20 focus:outline-offset-0'
                       ]"
                       @click="runtimeStore.jobs.page < lastpage && (runtimeStore.jobs.page += 1)"
                     >

@@ -1,7 +1,7 @@
 <!--
-  Copyright (c) 2023-2024 Rackslab
+  Copyright (c) 2023-2026 Slurm Web Plus
 
-  This file is part of Slurm-web.
+  This file is part of Slurm Web Plus.
 
   SPDX-License-Identifier: MIT
 -->
@@ -14,7 +14,10 @@ const runtimeStore = useRuntimeStore()
 </script>
 
 <template>
-  <div aria-live="assertive" class="fixed top-2 right-4 z-50 flex w-96 flex-col space-y-4">
+  <div
+    aria-live="assertive"
+    class="pointer-events-none fixed top-4 right-4 z-50 flex w-[min(24rem,calc(100vw-2rem))] flex-col space-y-4"
+  >
     <TransitionGroup
       move-class="transition-all ease-in-out duration-500"
       enter-active-class="transform transition ease-out duration-300"

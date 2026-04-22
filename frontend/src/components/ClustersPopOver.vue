@@ -1,7 +1,7 @@
 <!--
-  Copyright (c) 2023-2024 Rackslab
+  Copyright (c) 2023-2026 Slurm Web Plus
 
-  This file is part of Slurm-web.
+  This file is part of Slurm Web Plus.
 
   SPDX-License-Identifier: MIT
 -->
@@ -13,6 +13,7 @@ import { useRuntimeStore } from '@/stores/runtime'
 import { Popover, PopoverButton, PopoverPanel } from '@headlessui/vue'
 import { ChevronDownIcon } from '@heroicons/vue/20/solid'
 import { ServerIcon } from '@heroicons/vue/24/outline'
+
 const { cluster } = defineProps<{ cluster: string }>()
 
 const route = useRoute()
@@ -23,10 +24,10 @@ const runtimeStore = useRuntimeStore()
   <template v-if="runtimeStore.getAllowedClusters().length > 1">
     <Popover class="relative">
       <PopoverButton
-        class="hover:bg-slurmweb-light hover:dark:bg-slurmweb-dark/30 inline-flex items-center gap-x-1 rounded-sm p-3 leading-6 font-bold text-transparent hover:text-gray-900 focus:outline-hidden hover:dark:text-gray-200"
+        class="ui-frost inline-flex items-center gap-x-2 rounded-full px-3.5 py-2.5 text-sm font-semibold text-[var(--color-brand-ink-strong)] shadow-[var(--shadow-soft)] focus:outline-hidden"
       >
         <ChevronDownIcon class="h-5 w-5" aria-hidden="true" />
-        <span class="text-gray-700 dark:text-gray-400">{{ cluster }}</span>
+        <span>{{ cluster }}</span>
       </PopoverButton>
 
       <transition
@@ -42,13 +43,13 @@ const runtimeStore = useRuntimeStore()
           class="absolute left-0 z-10 mt-5 flex w-screen max-w-max px-0"
         >
           <div
-            class="w-screen max-w-md flex-auto overflow-hidden rounded-3xl bg-white text-sm leading-6 shadow-lg ring-1 ring-gray-900/5 dark:bg-gray-700"
+            class="w-screen max-w-md flex-auto overflow-hidden rounded-[28px] border border-white/70 bg-[rgba(255,255,255,0.94)] text-sm leading-6 shadow-[var(--shadow-panel)]"
           >
             <div class="p-4">
               <div
                 v-for="cluster in runtimeStore.getAllowedClusters()"
                 :key="cluster.name"
-                class="group relative flex gap-x-6 rounded-lg p-4 hover:bg-gray-50 hover:dark:bg-gray-800"
+                class="group relative flex gap-x-6 rounded-[20px] p-4 transition hover:bg-[rgba(182,232,44,0.12)]"
               >
                 <div
                   v-if="cluster.permissions.actions.length > 0"
@@ -56,13 +57,13 @@ const runtimeStore = useRuntimeStore()
                 >
                   <div
                     :class="[
-                      cluster.error ? 'bg-orange-500/20' : 'bg-emerald-500/20',
-                      'flex-none rounded-full p-1'
+                      cluster.error ? 'bg-[rgba(239,155,40,0.18)]' : 'bg-[rgba(123,191,31,0.16)]',
+                      'flex-none rounded-full p-1.5'
                     ]"
                   >
                     <div
                       :class="[
-                        cluster.error ? 'bg-orange-500' : 'bg-emerald-500',
+                        cluster.error ? 'bg-[var(--color-brand-warning)]' : 'bg-[var(--color-brand-success)]',
                         'h-1.5 w-1.5 rounded-full'
                       ]"
                     />
@@ -75,7 +76,7 @@ const runtimeStore = useRuntimeStore()
                     params: { cluster: cluster.name },
                     query: route.query
                   }"
-                  class="flex grow font-semibold text-gray-900 dark:text-gray-200"
+                  class="flex grow font-semibold text-[var(--color-brand-ink-strong)]"
                   @click="close()"
                 >
                   {{ cluster.name }}
@@ -84,7 +85,7 @@ const runtimeStore = useRuntimeStore()
 
                 <span
                   v-if="cluster.stats"
-                  class="mt-1 flex w-30 text-xs leading-5 text-gray-500 dark:text-gray-400"
+                  class="mt-1 flex w-30 text-xs leading-5 text-[var(--color-brand-muted)]"
                 >
                   <ServerIcon class="mx-1 h-5" />
                   {{ cluster.stats.resources.nodes }} node{{

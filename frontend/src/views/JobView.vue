@@ -1,7 +1,7 @@
 <!--
-  Copyright (c) 2023-2024 Rackslab
+  Copyright (c) 2023-2026 Slurm Web Plus
 
-  This file is part of Slurm-web.
+  This file is part of Slurm Web Plus.
 
   SPDX-License-Identifier: MIT
 -->
@@ -19,6 +19,7 @@ import JobProgress from '@/components/job/JobProgress.vue'
 import JobBackButton from '@/components/job/JobBackButton.vue'
 import ErrorAlert from '@/components/ErrorAlert.vue'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
+import PageHeader from '@/components/PageHeader.vue'
 import { HashtagIcon } from '@heroicons/vue/24/outline'
 import JobFieldRaw from '@/components/job/JobFieldRaw.vue'
 import JobFieldComment from '@/components/job/JobFieldComment.vue'
@@ -29,7 +30,7 @@ const { cluster, id } = defineProps<{ cluster: string; id: number }>()
 
 const route = useRoute()
 
-const JobsFields = [
+const jobsFields = [
   'user',
   'group',
   'account',
@@ -47,10 +48,11 @@ const JobsFields = [
   'tres-requested',
   'tres-allocated'
 ] as const
-type JobField = (typeof JobsFields)[number]
+
+type JobField = (typeof jobsFields)[number]
 
 function isValidJobField(key: string): key is JobField {
-  return typeof key === 'string' && JobsFields.includes(key as JobField)
+  return typeof key === 'string' && jobsFields.includes(key as JobField)
 }
 
 const { data, unable, loaded, setCluster } = useClusterDataPoller<ClusterIndividualJob>(
@@ -172,7 +174,6 @@ const jobFieldsContent = computed(
   }
 )
 
-/* highlight this field for some time */
 function highlightField(field: JobField) {
   displayTags.value[field].highlight = true
   setTimeout(() => {
@@ -182,18 +183,16 @@ function highlightField(field: JobField) {
 
 watch(
   () => cluster,
-  (new_cluster) => {
-    setCluster(new_cluster)
+  (newCluster) => {
+    setCluster(newCluster)
   }
 )
 
 onMounted(() => {
-  /* If a job field is in route hash, highlight this field. */
-  if (route.hash) {
-    const field = route.hash.slice(1) // remove initial hash
-    if (isValidJobField(field)) {
-      highlightField(field)
-    }
+  if (!route.hash) return
+  const field = route.hash.slice(1)
+  if (isValidJobField(field)) {
+    highlightField(field)
   }
 })
 </script>
@@ -204,77 +203,99 @@ onMounted(() => {
     :cluster="cluster"
     :breadcrumb="[{ title: 'Jobs', routeName: 'jobs' }, { title: `Job ${id}` }]"
   >
-    <JobBackButton :cluster="cluster" />
-    <ErrorAlert v-if="unable"
-      >Unable to retrieve job {{ id }} from cluster
-      <span class="font-medium">{{ cluster }}</span></ErrorAlert
-    >
-    <div v-else-if="!loaded" class="text-gray-400 sm:pl-6 lg:pl-8">
-      <LoadingSpinner :size="5" />
-      Loading job {{ id }}
-    </div>
-    <div v-else-if="data">
-      <div class="flex justify-between">
-        <div class="px-4 pb-8 sm:px-0">
-          <h3 class="text-base leading-7 font-semibold text-gray-900 dark:text-gray-100">
-            Job {{ id }}
-          </h3>
-          <p class="mt-1 max-w-2xl text-sm leading-6 text-gray-500 dark:text-gray-300">
-            All job settings
-          </p>
-        </div>
-        <div>
-          <JobStatusBadge :status="data.state.current" :large="true" />
-          <span v-if="data.state.reason != 'None'">{{ data.state.reason }}</span>
-        </div>
+    <div class="ui-page ui-page-readable">
+      <JobBackButton :cluster="cluster" />
+
+      <ErrorAlert v-if="unable"
+        >Unable to retrieve job {{ id }} from cluster
+        <span class="font-medium">{{ cluster }}</span></ErrorAlert
+      >
+      <div v-else-if="!loaded" class="text-[var(--color-brand-muted)]">
+        <LoadingSpinner :size="5" />
+        Loading job {{ id }}...
       </div>
-      <div class="flex flex-wrap">
-        <div class="w-full lg:w-1/3">
-          <JobProgress v-if="data" :job="data" />
-        </div>
-        <div class="w-full lg:w-2/3">
-          <div class="border-t border-gray-100 dark:border-gray-700">
-            <dl class="divide-y divide-gray-100 dark:divide-gray-700">
-              <div
-                v-for="field in jobFieldsContent"
-                :key="field.id"
-                :id="`${field.id}`"
-                :class="[
-                  displayTags[field.id].highlight ? 'bg-slurmweb-light dark:bg-slurmweb-dark' : '',
-                  'px-4 py-2 transition-colors duration-700 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0'
-                ]"
+      <div v-else-if="data" class="space-y-6">
+        <PageHeader
+          kicker="Job Detail"
+          :title="`Job ${id}`"
+          description="Execution state, request metadata and allocated resources for the selected job."
+        >
+          <template #actions>
+            <div class="flex flex-wrap items-center justify-end gap-3">
+              <JobStatusBadge :status="data.state.current" :large="true" />
+              <span
+                v-if="data.state.reason != 'None'"
+                class="ui-chip border-[rgba(216,75,80,0.18)] bg-[rgba(216,75,80,0.08)] text-[var(--color-brand-danger)]"
               >
-                <dt class="text-sm leading-6 font-medium text-gray-900 dark:text-gray-100">
-                  <a :href="`#${field.id}`">
-                    <span
-                      class="flex items-center"
-                      @mouseover="displayTags[field.id].show = true"
-                      @mouseleave="displayTags[field.id].show = false"
-                    >
-                      <HashtagIcon
-                        v-show="displayTags[field.id].show"
-                        class="mr-2 -ml-5 h-3 w-3 text-gray-500"
-                        aria-hidden="true"
-                      />
-                      {{ field.label }}
-                    </span>
-                  </a>
-                </dt>
-                <!--
-                  If the account is empty, do not render the component. This is actually a
-                  workaround for this Slurm bug:
+                {{ data.state.reason }}
+              </span>
+            </div>
+          </template>
+        </PageHeader>
 
-                  https://support.schedmd.com/show_bug.cgi?id=24215
+        <div class="grid gap-6 xl:grid-cols-[minmax(280px,0.76fr)_minmax(0,1.24fr)]">
+          <div class="ui-panel ui-section">
+            <div class="mb-5">
+              <h2 class="ui-panel-title">Execution Timeline</h2>
+              <p class="ui-panel-description mt-2">
+                Submission, scheduling and runtime milestones for this job.
+              </p>
+            </div>
+            <JobProgress :job="data" />
+          </div>
 
-                   With Slurm REST API v0.0.43 and v0.0.44, this field is always empty.
-                -->
-                <component
-                  v-if="!(field.id === 'account' && data.association.account === '')"
-                  :is="field.component"
-                  v-bind="field.props"
-                />
-              </div>
-            </dl>
+          <div class="ui-panel ui-section">
+            <div class="mb-5">
+              <h2 class="ui-panel-title">Job Configuration</h2>
+              <p class="ui-panel-description mt-2">
+                Core identity, command context and requested versus allocated resources.
+              </p>
+            </div>
+            <div class="ui-detail-list">
+              <dl>
+                <div
+                  v-for="field in jobFieldsContent"
+                  :key="field.id"
+                  :id="field.id"
+                  :class="[
+                    displayTags[field.id].highlight
+                      ? 'rounded-[18px] bg-slurmweb-light bg-[rgba(182,232,44,0.16)] px-4 sm:px-5'
+                      : '',
+                    'px-4 py-3 transition-colors duration-700 sm:grid sm:grid-cols-3 sm:gap-5 sm:px-0'
+                  ]"
+                >
+                  <dt class="text-sm leading-6 font-semibold text-[var(--color-brand-ink-strong)]">
+                    <a :href="`#${field.id}`">
+                      <span
+                        class="flex items-center"
+                        @mouseover="displayTags[field.id].show = true"
+                        @mouseleave="displayTags[field.id].show = false"
+                      >
+                        <HashtagIcon
+                          v-show="displayTags[field.id].show"
+                          class="mr-2 -ml-5 h-3.5 w-3.5 text-[var(--color-brand-muted)]"
+                          aria-hidden="true"
+                        />
+                        {{ field.label }}
+                      </span>
+                    </a>
+                  </dt>
+                  <!--
+                    If the account is empty, do not render the component. This is actually a
+                    workaround for this Slurm bug:
+
+                    https://support.schedmd.com/show_bug.cgi?id=24215
+
+                    With Slurm REST API v0.0.43 and v0.0.44, this field is always empty.
+                  -->
+                  <component
+                    v-if="!(field.id === 'account' && data.association.account === '')"
+                    :is="field.component"
+                    v-bind="field.props"
+                  />
+                </div>
+              </dl>
+            </div>
           </div>
         </div>
       </div>

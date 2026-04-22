@@ -33,7 +33,7 @@ describe('SettingsCacheMetrics.vue', () => {
         cluster: useRuntimeStore().availableClusters[0]
       }
     })
-    const placeholder = wrapper.get('img[alt="Loading chart"]')
+    const placeholder = wrapper.get('.ui-chart-skeleton')
     const canvas = wrapper.get({ ref: 'chartCanvas' })
 
     // Start with unloaded data
@@ -67,7 +67,7 @@ describe('SettingsCacheMetrics.vue', () => {
     expect(wrapper.getComponent(ErrorAlert).text()).toBe('Unable to retrieve cache metrics.')
     // Check chart and placeholder are not present in DOM
     expect(wrapper.find({ ref: 'chartCanvas' }).exists()).toBeFalsy()
-    expect(wrapper.find('img[alt="Loading chart"]').exists()).toBeFalsy()
+    expect(wrapper.find('.ui-chart-skeleton').exists()).toBeFalsy()
   })
   test('range button changes should change datapoller callback param', async () => {
     mockClusterDataPoller.unable.value = false

@@ -1,7 +1,7 @@
 <!--
-  Copyright (c) 2025 Rackslab
+  Copyright (c) 2023-2026 Slurm Web Plus
 
-  This file is part of Slurm-web.
+  This file is part of Slurm Web Plus.
 
   SPDX-License-Identifier: MIT
 -->
@@ -59,23 +59,23 @@ onMounted(() => {
   <li
     :class="[
       cluster.permissions.actions.length > 0
-        ? 'cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700'
-        : 'cursor-not-allowed bg-gray-100 dark:bg-gray-900',
-      'relative flex h-20 items-center justify-between px-4 py-5 sm:px-6'
+        ? 'cursor-pointer hover:bg-[rgba(182,232,44,0.12)]'
+        : 'cursor-not-allowed bg-[rgba(239,244,246,0.8)]',
+      'relative flex min-h-24 items-center justify-between px-5 py-5 sm:px-6'
     ]"
     @click="
       cluster.permissions.actions.length > 0 &&
         router.push({ name: 'dashboard', params: { cluster: cluster.name } })
     "
   >
-    <span class="w-64 text-sm leading-6 font-semibold text-gray-900 dark:text-gray-300">
+    <span class="w-64 text-sm leading-6 font-semibold text-[var(--color-brand-ink-strong)]">
       <RouterLink :to="{ name: 'dashboard', params: { cluster: cluster.name } }">
         <span class="inset-x-0 -top-px bottom-0" />
         {{ cluster.name }}
       </RouterLink>
       <span
         v-if="cluster.versions"
-        class="dark:bg-slurmweb-dark ml-2 hidden items-center gap-x-1.5 rounded-full bg-gray-100 px-1.5 py-0.5 text-xs font-normal text-gray-600 md:inline-flex dark:text-gray-300"
+        class="ui-chip ml-2 hidden md:inline-flex"
       >
         <TagIcon class="h-3" />
         Slurm {{ cluster.versions.slurm }}
@@ -90,34 +90,34 @@ onMounted(() => {
     <div class="mr-0 w-64 shrink-0 items-end gap-x-4">
       <div class="hidden sm:flex sm:flex-col sm:items-end">
         <div v-if="loading" class="mt-1 flex items-center gap-x-1.5">
-          <div class="flex-none rounded-full bg-gray-500/20 p-1">
-            <div class="h-1.5 w-1.5 rounded-full bg-gray-500" />
+          <div class="flex-none rounded-full bg-[rgba(80,105,127,0.16)] p-1.5">
+            <div class="h-1.5 w-1.5 rounded-full bg-[var(--color-brand-muted)]" />
           </div>
-          <p class="text-xs leading-5 text-gray-500 dark:text-gray-300">Loading</p>
-          <ChevronRightIcon class="h-5 w-5 flex-none text-gray-400" aria-hidden="true" />
+          <p class="text-xs leading-5 text-[var(--color-brand-muted)]">Loading</p>
+          <ChevronRightIcon class="h-5 w-5 flex-none text-[var(--color-brand-muted)]" aria-hidden="true" />
         </div>
         <div
           v-else-if="cluster.permissions.actions.length == 0"
           class="mt-1 flex items-center gap-x-1.5"
         >
-          <div class="flex-none rounded-full bg-red-500/20 p-1">
-            <div class="h-1.5 w-1.5 rounded-full bg-red-500" />
+          <div class="flex-none rounded-full bg-[rgba(216,75,80,0.16)] p-1.5">
+            <div class="h-1.5 w-1.5 rounded-full bg-[var(--color-brand-danger)]" />
           </div>
-          <p class="text-xs leading-5 text-gray-500 dark:text-gray-300">Denied</p>
+          <p class="text-xs leading-5 text-[var(--color-brand-muted)]">Denied</p>
         </div>
         <div v-else-if="cluster.error" class="mt-1 flex items-center gap-x-1.5">
-          <div class="flex-none rounded-full bg-orange-500/20 p-1">
-            <div class="h-1.5 w-1.5 rounded-full bg-orange-500" />
+          <div class="flex-none rounded-full bg-[rgba(239,155,40,0.18)] p-1.5">
+            <div class="h-1.5 w-1.5 rounded-full bg-[var(--color-brand-warning)]" />
           </div>
-          <p class="text-xs leading-5 text-gray-500 dark:text-gray-300">Ongoing issue</p>
-          <ChevronRightIcon class="h-5 w-5 flex-none text-gray-400" aria-hidden="true" />
+          <p class="text-xs leading-5 text-[var(--color-brand-muted)]">Ongoing issue</p>
+          <ChevronRightIcon class="h-5 w-5 flex-none text-[var(--color-brand-muted)]" aria-hidden="true" />
         </div>
         <div v-else class="mt-1 flex items-center gap-x-1.5">
-          <div class="flex-none rounded-full bg-emerald-500/20 p-1">
-            <div class="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+          <div class="flex-none rounded-full bg-[rgba(123,191,31,0.16)] p-1.5">
+            <div class="h-1.5 w-1.5 rounded-full bg-[var(--color-brand-success)]" />
           </div>
-          <p class="text-xs leading-5 text-gray-500 dark:text-gray-300">Available</p>
-          <ChevronRightIcon class="h-5 w-5 flex-none text-gray-400" aria-hidden="true" />
+          <p class="text-xs leading-5 text-[var(--color-brand-muted)]">Available</p>
+          <ChevronRightIcon class="h-5 w-5 flex-none text-[var(--color-brand-muted)]" aria-hidden="true" />
         </div>
       </div>
     </div>

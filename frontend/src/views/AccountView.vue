@@ -1,7 +1,7 @@
 <!--
-  Copyright (c) 2025 Rackslab
+  Copyright (c) 2023-2026 Slurm Web Plus
 
-  This file is part of Slurm-web.
+  This file is part of Slurm Web Plus.
 
   SPDX-License-Identifier: MIT
 -->
@@ -14,6 +14,7 @@ import ClusterMainLayout from '@/components/ClusterMainLayout.vue'
 import InfoAlert from '@/components/InfoAlert.vue'
 import ErrorAlert from '@/components/ErrorAlert.vue'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
+import PageHeader from '@/components/PageHeader.vue'
 import AccountBreadcrumb from '@/components/accounts/AccountBreadcrumb.vue'
 import { useClusterDataPoller } from '@/composables/DataPoller'
 import type { ClusterAssociation } from '@/composables/GatewayAPI'
@@ -43,139 +44,115 @@ watch(
   }
 )
 
-/* Find account-level association (without user) */
 const accountAssociation = computed<ClusterAssociation | undefined>(() => {
-  if (!data.value) {
-    return undefined
-  }
+  if (!data.value) return undefined
   return data.value.find((association) => association.account === account && !association.user)
 })
 
-/* Find subaccounts (accounts where parent_account === current account) */
 const subaccounts = computed(() => {
-  if (!data.value) {
-    return []
-  }
+  if (!data.value) return []
   const subaccountsList: string[] = []
   const seen = new Set<string>()
 
-  for (const assoc of data.value) {
-    if (!assoc.user && assoc.parent_account === account && !seen.has(assoc.account)) {
-      subaccountsList.push(assoc.account)
-      seen.add(assoc.account)
+  for (const association of data.value) {
+    if (!association.user && association.parent_account === account && !seen.has(association.account)) {
+      subaccountsList.push(association.account)
+      seen.add(association.account)
     }
   }
 
   return subaccountsList.sort()
 })
 
-/* User associations directly attached to this account */
 const userAssociations = computed(() => {
-  if (!data.value) {
-    return []
-  }
+  if (!data.value) return []
   return data.value
     .filter((association) => association.account === account && association.user)
     .sort((a, b) => (a.user ?? '').localeCompare(b.user ?? ''))
 })
 
-/* Check if the account is known to the cluster */
 const accountKnown = computed(() => {
-  if (!data.value) {
-    return false
-  }
+  if (!data.value) return false
   return data.value.some((association) => association.account === account)
 })
 
 const jobLimits = computed(() => {
-  if (!accountAssociation.value) {
-    return []
-  }
-  const account = accountAssociation.value
+  if (!accountAssociation.value) return []
+  const currentAccount = accountAssociation.value
   return [
-    { id: 'GrpJobs', label: 'Running', value: account.max.jobs.per.count },
-    { id: 'GrpSubmit', label: 'Submitted', value: account.max.jobs.per.submitted },
-    { id: 'MaxJobs', label: 'Running / user', value: account.max.jobs.active },
-    { id: 'MaxSubmit', label: 'Submitted / user', value: account.max.jobs.total }
+    { id: 'GrpJobs', label: 'Running', value: currentAccount.max.jobs.per.count },
+    { id: 'GrpSubmit', label: 'Submitted', value: currentAccount.max.jobs.per.submitted },
+    { id: 'MaxJobs', label: 'Running / user', value: currentAccount.max.jobs.active },
+    { id: 'MaxSubmit', label: 'Submitted / user', value: currentAccount.max.jobs.total }
   ]
 })
 
 const resourceLimits = computed(() => {
-  if (!accountAssociation.value) {
-    return []
-  }
-  const account = accountAssociation.value
+  if (!accountAssociation.value) return []
+  const currentAccount = accountAssociation.value
   return [
-    { id: 'GrpTRES', label: 'Total', value: account.max.tres.total },
-    { id: 'MaxTRES', label: 'Per job', value: account.max.tres.per.job },
-    { id: 'MaxTRESPerNode', label: 'Per node', value: account.max.tres.per.node }
+    { id: 'GrpTRES', label: 'Total', value: currentAccount.max.tres.total },
+    { id: 'MaxTRES', label: 'Per job', value: currentAccount.max.tres.per.job },
+    { id: 'MaxTRESPerNode', label: 'Per node', value: currentAccount.max.tres.per.node }
   ]
 })
 
 const timeLimits = computed(() => {
-  if (!accountAssociation.value) {
-    return []
-  }
-  const account = accountAssociation.value
+  if (!accountAssociation.value) return []
+  const currentAccount = accountAssociation.value
   return [
-    { id: 'GrpWall', label: 'Total', value: account.max.per.account.wall_clock },
-    { id: 'MaxWall', label: 'Per job', value: account.max.jobs.per.wall_clock }
+    { id: 'GrpWall', label: 'Total', value: currentAccount.max.per.account.wall_clock },
+    { id: 'MaxWall', label: 'Per job', value: currentAccount.max.jobs.per.wall_clock }
   ]
 })
 
 function userJobLimits(association: ClusterAssociation) {
-  if (!accountAssociation.value) {
-    return []
-  }
-  const account = accountAssociation.value
+  if (!accountAssociation.value) return []
+  const currentAccount = accountAssociation.value
   return [
     {
       id: 'MaxJobs',
       label: 'Running / user',
       value: association.max.jobs.active,
-      different: !compareOptionalNumber(association.max.jobs.active, account.max.jobs.active)
+      different: !compareOptionalNumber(association.max.jobs.active, currentAccount.max.jobs.active)
     },
     {
       id: 'MaxSubmit',
       label: 'Submitted / user',
       value: association.max.jobs.total,
-      different: !compareOptionalNumber(association.max.jobs.total, account.max.jobs.total)
+      different: !compareOptionalNumber(association.max.jobs.total, currentAccount.max.jobs.total)
     }
   ]
 }
 
 function userResourceLimits(association: ClusterAssociation) {
-  if (!accountAssociation.value) {
-    return []
-  }
-  const account = accountAssociation.value
+  if (!accountAssociation.value) return []
+  const currentAccount = accountAssociation.value
   return [
     {
       id: 'GrpTRES',
       label: 'Total',
       value: association.max.tres.total,
-      different: !compareTRES(association.max.tres.total, account.max.tres.total, true)
+      different: !compareTRES(association.max.tres.total, currentAccount.max.tres.total, true)
     },
     {
       id: 'MaxTRES',
       label: 'Per job',
       value: association.max.tres.per.job,
-      different: !compareTRES(association.max.tres.per.job, account.max.tres.per.job)
+      different: !compareTRES(association.max.tres.per.job, currentAccount.max.tres.per.job)
     },
     {
       id: 'MaxTRESPerNode',
       label: 'Per node',
       value: association.max.tres.per.node,
-      different: !compareTRES(association.max.tres.per.node, account.max.tres.per.node)
+      different: !compareTRES(association.max.tres.per.node, currentAccount.max.tres.per.node)
     }
   ]
 }
 
 function userTimeLimits(association: ClusterAssociation) {
-  if (!accountAssociation.value) {
-    return []
-  }
-  const account = accountAssociation.value
+  if (!accountAssociation.value) return []
+  const currentAccount = accountAssociation.value
   return [
     {
       id: 'GrpWall',
@@ -183,7 +160,7 @@ function userTimeLimits(association: ClusterAssociation) {
       value: association.max.per.account.wall_clock,
       different: !compareOptionalNumber(
         association.max.per.account.wall_clock,
-        account.max.per.account.wall_clock,
+        currentAccount.max.per.account.wall_clock,
         true
       )
     },
@@ -193,17 +170,16 @@ function userTimeLimits(association: ClusterAssociation) {
       value: association.max.jobs.per.wall_clock,
       different: !compareOptionalNumber(
         association.max.jobs.per.wall_clock,
-        account.max.jobs.per.wall_clock
+        currentAccount.max.jobs.per.wall_clock
       )
     }
   ]
 }
 
-// Compare two ClusterOptionalNumber values
 function compareOptionalNumber(
   a: ClusterAssociation['max']['jobs']['total'],
   b: ClusterAssociation['max']['jobs']['total'],
-  acceptUnset: boolean = false
+  acceptUnset = false
 ): boolean {
   if (a.set !== b.set) return acceptUnset
   if (!a.set && !b.set) return true
@@ -212,22 +188,17 @@ function compareOptionalNumber(
   return a.number === b.number
 }
 
-// Compare two TRES arrays
 function compareTRES(
   a: ClusterAssociation['max']['tres']['total'],
   b: ClusterAssociation['max']['tres']['total'],
-  acceptAZero: boolean = false
+  acceptAZero = false
 ): boolean {
   if (a.length === 0 && b.length !== 0) return acceptAZero
   if (a.length !== b.length) return false
   const aMap = new Map<string, number>()
   const bMap = new Map<string, number>()
-  for (const t of a) {
-    aMap.set(t.type, t.count)
-  }
-  for (const t of b) {
-    bMap.set(t.type, t.count)
-  }
+  for (const tres of a) aMap.set(tres.type, tres.count)
+  for (const tres of b) bMap.set(tres.type, tres.count)
   if (aMap.size !== bMap.size) return false
   for (const [key, value] of aMap) {
     if (bMap.get(key) !== value) return false
@@ -235,15 +206,13 @@ function compareTRES(
   return true
 }
 
-// Check if user association has different QOS than account
-function hasDifferentQos(userAssoc: ClusterAssociation): boolean {
+function hasDifferentQos(userAssociation: ClusterAssociation): boolean {
   if (!accountAssociation.value) return true
 
   const accountQos = new Set(accountAssociation.value.qos || [])
-  const userQos = new Set(userAssoc.qos || [])
+  const userQos = new Set(userAssociation.qos || [])
 
   if (accountQos.size !== userQos.size) return true
-
   for (const qos of accountQos) {
     if (!userQos.has(qos)) return true
   }
@@ -257,80 +226,100 @@ function hasDifferentQos(userAssoc: ClusterAssociation): boolean {
     :cluster="cluster"
     :breadcrumb="[{ title: 'Accounts', routeName: 'accounts' }, { title: `${account}` }]"
   >
-    <button
-      @click="router.push({ name: 'accounts', params: { cluster } })"
-      type="button"
-      class="bg-slurmweb dark:bg-slurmweb-verydark hover:bg-slurmweb-dark focus-visible:outline-slurmweb-dark mt-8 mb-16 inline-flex items-center gap-x-2 rounded-md px-3.5 py-2.5 text-sm font-semibold text-white shadow-xs focus-visible:outline-2 focus-visible:outline-offset-2"
-    >
-      <ChevronLeftIcon class="-ml-0.5 h-5 w-5" aria-hidden="true" />
-      Back to accounts
-    </button>
+    <div class="ui-page ui-page-readable">
+      <button
+        @click="router.push({ name: 'accounts', params: { cluster } })"
+        type="button"
+        class="ui-button-secondary self-start"
+      >
+        <ChevronLeftIcon class="-ml-0.5 h-5 w-5" aria-hidden="true" />
+        Back to accounts
+      </button>
 
-    <ErrorAlert v-if="unable" class="mt-6">
-      Unable to retrieve associations for cluster
-      <span class="font-medium">{{ cluster }}</span>
-    </ErrorAlert>
-    <div v-else-if="!loaded" class="mt-6 text-gray-400 dark:text-gray-500">
-      <LoadingSpinner :size="5" />
-      Loading account details...
-    </div>
-    <InfoAlert v-else-if="!accountKnown" class="mt-6">
-      Account <span class="font-semibold">{{ account }}</span> does not exist on this cluster.
-    </InfoAlert>
-    <div v-else-if="accountAssociation" id="account-heading">
-      <div class="flex flex-wrap items-start justify-between gap-4">
-        <div class="px-4 pb-8 sm:px-0">
-          <h3 class="text-base leading-7 font-semibold text-gray-900 dark:text-gray-100">
-            Account {{ account }}
-          </h3>
-          <p class="mt-1 max-w-2xl text-sm leading-6 text-gray-500 dark:text-gray-300">
-            Account information, limits, and user associations.
-          </p>
-        </div>
-        <RouterLink
-          :to="{ name: 'jobs', params: { cluster }, query: { accounts: account } }"
-          class="bg-slurmweb dark:bg-slurmweb-verydark hover:bg-slurmweb-dark focus-visible:outline-slurmweb-dark inline-flex items-center gap-x-2 rounded-md px-3.5 py-2.5 text-sm font-semibold text-white shadow-xs focus-visible:outline-2 focus-visible:outline-offset-2"
-        >
-          View jobs
-        </RouterLink>
+      <ErrorAlert v-if="unable">
+        Unable to retrieve associations for cluster
+        <span class="font-medium">{{ cluster }}</span>
+      </ErrorAlert>
+      <div v-else-if="!loaded" class="text-[var(--color-brand-muted)]">
+        <LoadingSpinner :size="5" />
+        Loading account details...
       </div>
-      <div class="flex flex-wrap">
-        <div class="w-full">
-          <div class="border-t border-gray-100 dark:border-gray-700">
-            <dl class="divide-y divide-gray-100 dark:divide-gray-700">
-              <!-- Parent accounts breadcrumb -->
-              <div id="parents" class="px-4 py-2 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0">
-                <dt class="text-sm leading-6 font-medium text-gray-900 dark:text-gray-100">
-                  Parent accounts
-                </dt>
-                <dd
-                  class="mt-1 text-sm leading-6 text-gray-700 sm:col-span-2 sm:mt-0 dark:text-gray-300"
-                >
-                  <AccountBreadcrumb
-                    :cluster="cluster"
-                    :account="account"
-                    :associations="data ?? []"
-                  />
+      <InfoAlert v-else-if="!accountKnown">
+        Account <span class="font-semibold">{{ account }}</span> does not exist on this cluster.
+      </InfoAlert>
+      <div v-else-if="accountAssociation" class="space-y-6">
+        <div id="account-heading">
+          <span class="sr-only">Account {{ account }}</span>
+          <PageHeader
+            kicker="Account Detail"
+            :title="account"
+            description="Hierarchy, inherited policy and per-user overrides for the selected Slurm account."
+            :metric-value="userAssociations.length"
+            :metric-label="`user association${userAssociations.length === 1 ? '' : 's'}`"
+          >
+            <template #actions>
+              <RouterLink
+                :to="{ name: 'jobs', params: { cluster }, query: { accounts: account } }"
+                class="ui-button-primary"
+              >
+                View jobs
+              </RouterLink>
+            </template>
+          </PageHeader>
+        </div>
+
+        <div class="ui-stat-grid">
+          <div class="ui-stat-card">
+            <div class="ui-stat-label">Parent Chain</div>
+            <div class="ui-stat-value">{{ subaccounts.length }}</div>
+            <div class="ui-stat-subtle">Direct subaccounts</div>
+          </div>
+          <div class="ui-stat-card">
+            <div class="ui-stat-label">QoS Scope</div>
+            <div class="mt-3 text-lg font-bold text-[var(--color-brand-ink-strong)]">
+              {{ renderQosLabel(accountAssociation.qos) }}
+            </div>
+            <div class="ui-stat-subtle">Applied at account level</div>
+          </div>
+          <div class="ui-stat-card">
+            <div class="ui-stat-label">Job Limits</div>
+            <div class="ui-stat-value">{{ jobLimits.length }}</div>
+            <div class="ui-stat-subtle">Configured limit entries</div>
+          </div>
+          <div class="ui-stat-card">
+            <div class="ui-stat-label">Time Limits</div>
+            <div class="ui-stat-value">{{ timeLimits.length }}</div>
+            <div class="ui-stat-subtle">Walltime policies</div>
+          </div>
+        </div>
+
+        <div class="ui-panel ui-section">
+          <div class="mb-5">
+            <h2 class="ui-panel-title">Account Overview</h2>
+            <p class="ui-panel-description mt-2">
+              Parent hierarchy, scoped QoS and inherited account-wide limits.
+            </p>
+          </div>
+
+          <div class="ui-detail-list">
+            <dl>
+              <div id="parents" class="ui-detail-row">
+                <dt class="ui-detail-term">Parent accounts</dt>
+                <dd class="ui-detail-value">
+                  <AccountBreadcrumb :cluster="cluster" :account="account" :associations="data ?? []" />
                 </dd>
               </div>
 
-              <!-- Subaccounts -->
-              <div id="subaccounts" class="px-4 py-2 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0">
-                <dt class="text-sm leading-6 font-medium text-gray-900 dark:text-gray-100">
-                  Subaccounts
-                </dt>
-                <dd
-                  class="mt-1 text-sm leading-6 text-gray-700 sm:col-span-2 sm:mt-0 dark:text-gray-300"
-                >
-                  <div v-if="subaccounts.length === 0" class="text-gray-400 dark:text-gray-500">
-                    ∅
-                  </div>
+              <div id="subaccounts" class="ui-detail-row">
+                <dt class="ui-detail-term">Subaccounts</dt>
+                <dd class="ui-detail-value">
+                  <div v-if="subaccounts.length === 0">∅</div>
                   <div v-else class="flex flex-wrap gap-2">
                     <RouterLink
                       v-for="subaccount in subaccounts"
                       :key="subaccount"
                       :to="{ name: 'account', params: { cluster, account: subaccount } }"
-                      class="bg-slurmweb hover:bg-slurmweb-dark focus:bg-slurmweb-dark dark:bg-slurmweb-dark dark:text-slurmweb-light focus:outline-slurmweb-dark rounded-md px-2 py-1 text-sm font-semibold text-white"
+                      class="ui-chip"
                     >
                       {{ subaccount }}
                     </RouterLink>
@@ -338,89 +327,45 @@ function hasDifferentQos(userAssoc: ClusterAssociation): boolean {
                 </dd>
               </div>
 
-              <!-- QOS directly attached to account -->
-              <div id="qos" class="px-4 py-2 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0">
-                <dt class="text-sm leading-6 font-medium text-gray-900 dark:text-gray-100">QoS</dt>
-                <dd
-                  class="mt-1 text-sm leading-6 text-gray-700 sm:col-span-2 sm:mt-0 dark:text-gray-300"
-                >
-                  {{ renderQosLabel(accountAssociation.qos) }}
-                </dd>
+              <div id="qos" class="ui-detail-row">
+                <dt class="ui-detail-term">QoS</dt>
+                <dd class="ui-detail-value">{{ renderQosLabel(accountAssociation.qos) }}</dd>
               </div>
 
-              <!-- Job limits -->
-              <div id="limits-jobs" class="px-4 py-2 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0">
-                <dt class="text-sm leading-6 font-medium text-gray-900 dark:text-gray-100">
-                  Job limits
-                </dt>
-                <dd
-                  class="mt-1 text-sm leading-6 text-gray-700 sm:col-span-2 sm:mt-0 dark:text-gray-300"
-                >
-                  <div v-if="jobLimits.length === 0" class="text-gray-400 dark:text-gray-500">
-                    ∅
-                  </div>
-                  <dl v-else>
-                    <div
-                      v-for="limit in jobLimits"
-                      :key="limit.id"
-                      class="flex items-baseline leading-relaxed"
-                    >
-                      <dt class="text-gray-500 dark:text-gray-400">{{ limit.label }}:</dt>
-                      <dd class="ml-2">
-                        {{ renderClusterOptionalNumber(limit.value) }}
-                      </dd>
+              <div id="limits-jobs" class="ui-detail-row">
+                <dt class="ui-detail-term">Job limits</dt>
+                <dd class="ui-detail-value">
+                  <div v-if="jobLimits.length === 0">-</div>
+                  <dl v-else class="space-y-2">
+                    <div v-for="limit in jobLimits" :key="limit.id" class="flex flex-wrap items-center gap-2">
+                      <dt class="font-semibold text-[var(--color-brand-ink-strong)]">{{ limit.label }}:</dt>
+                      <dd>{{ renderClusterOptionalNumber(limit.value) }}</dd>
                     </div>
                   </dl>
                 </dd>
               </div>
 
-              <!-- Resource limits -->
-              <div id="limits-resources" class="px-4 py-2 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0">
-                <dt class="text-sm leading-6 font-medium text-gray-900 dark:text-gray-100">
-                  Resource limits
-                </dt>
-                <dd
-                  class="mt-1 text-sm leading-6 text-gray-700 sm:col-span-2 sm:mt-0 dark:text-gray-300"
-                >
-                  <div v-if="resourceLimits.length === 0" class="text-gray-400 dark:text-gray-500">
-                    ∅
-                  </div>
-                  <dl v-else>
-                    <div
-                      v-for="limit in resourceLimits"
-                      :key="limit.id"
-                      class="flex items-baseline leading-relaxed"
-                    >
-                      <dt class="text-gray-500 dark:text-gray-400">{{ limit.label }}:</dt>
-                      <dd class="ml-2 font-mono">
-                        {{ renderClusterTRES(limit.value) }}
-                      </dd>
+              <div id="limits-resources" class="ui-detail-row">
+                <dt class="ui-detail-term">Resource limits</dt>
+                <dd class="ui-detail-value">
+                  <div v-if="resourceLimits.length === 0">-</div>
+                  <dl v-else class="space-y-2">
+                    <div v-for="limit in resourceLimits" :key="limit.id" class="flex flex-wrap items-center gap-2">
+                      <dt class="font-semibold text-[var(--color-brand-ink-strong)]">{{ limit.label }}:</dt>
+                      <dd class="font-mono text-xs">{{ renderClusterTRES(limit.value) }}</dd>
                     </div>
                   </dl>
                 </dd>
               </div>
 
-              <!-- Time limits -->
-              <div id="limits-time" class="px-4 py-2 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0">
-                <dt class="text-sm leading-6 font-medium text-gray-900 dark:text-gray-100">
-                  Time limits
-                </dt>
-                <dd
-                  class="mt-1 text-sm leading-6 text-gray-700 sm:col-span-2 sm:mt-0 dark:text-gray-300"
-                >
-                  <div v-if="timeLimits.length === 0" class="text-gray-400 dark:text-gray-500">
-                    ∅
-                  </div>
-                  <dl v-else>
-                    <div
-                      v-for="limit in timeLimits"
-                      :key="limit.id"
-                      class="flex items-baseline leading-relaxed"
-                    >
-                      <dt class="text-gray-500 dark:text-gray-400">{{ limit.label }}:</dt>
-                      <dd class="font ml-2">
-                        {{ renderWalltime(limit.value) }}
-                      </dd>
+              <div id="limits-time" class="ui-detail-row">
+                <dt class="ui-detail-term">Time limits</dt>
+                <dd class="ui-detail-value">
+                  <div v-if="timeLimits.length === 0">-</div>
+                  <dl v-else class="space-y-2">
+                    <div v-for="limit in timeLimits" :key="limit.id" class="flex flex-wrap items-center gap-2">
+                      <dt class="font-semibold text-[var(--color-brand-ink-strong)]">{{ limit.label }}:</dt>
+                      <dd>{{ renderWalltime(limit.value) }}</dd>
                     </div>
                   </dl>
                 </dd>
@@ -428,162 +373,97 @@ function hasDifferentQos(userAssoc: ClusterAssociation): boolean {
             </dl>
           </div>
         </div>
-      </div>
 
-      <!-- User associations table -->
-      <div v-if="userAssociations.length > 0" class="mt-8 flow-root">
-        <div class="mt-8 flow-root">
-          <div class="-mx-4 -my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
-            <div class="inline-block min-w-full py-2 align-middle">
-              <table class="min-w-full divide-y divide-gray-300 dark:divide-gray-500">
-                <thead>
-                  <tr class="text-sm font-semibold text-gray-900 dark:text-gray-200">
-                    <th
-                      scope="col"
-                      class="py-3.5 pr-3 pl-6 text-left align-top lg:min-w-[250px] lg:pl-8"
-                    >
-                      User Associations
-                    </th>
-                    <th scope="col" class="hidden w-72 px-3 py-3.5 text-left sm:table-cell">
-                      Job limits
-                    </th>
-                    <th scope="col" class="hidden w-72 px-3 py-3.5 text-left lg:table-cell">
-                      Resource limits
-                    </th>
-                    <th scope="col" class="hidden w-72 px-3 py-3.5 text-left md:table-cell">
-                      Time limits
-                    </th>
-                    <th
-                      scope="col"
-                      class="hidden w-48 px-3 py-3.5 text-left align-top 2xl:table-cell"
-                    >
-                      QOS
-                    </th>
-                  </tr>
-                </thead>
+        <InfoAlert v-if="userAssociations.length === 0">
+          Account <span class="font-semibold">{{ account }}</span> has no end-user associations.
+        </InfoAlert>
 
-                <tbody
-                  class="divide-y divide-gray-200 text-sm text-gray-600 dark:divide-gray-700 dark:text-gray-300"
+        <div v-else class="ui-table-shell overflow-x-auto">
+          <div class="border-b border-[rgba(80,105,127,0.08)] px-6 py-5">
+            <h2 class="ui-panel-title">User Associations</h2>
+            <p class="ui-panel-description mt-2">
+              User associations attached to this account, with inherited values visually de-emphasized.
+            </p>
+          </div>
+
+          <div class="inline-block min-w-full align-middle">
+            <table class="ui-table min-w-full">
+              <thead>
+                <tr>
+                  <th scope="col" class="py-3.5 pr-3 pl-6 text-left lg:min-w-[250px]">User</th>
+                  <th scope="col" class="hidden w-72 px-3 py-3.5 text-left sm:table-cell">Job limits</th>
+                  <th scope="col" class="hidden w-72 px-3 py-3.5 text-left lg:table-cell">Resource limits</th>
+                  <th scope="col" class="hidden w-72 px-3 py-3.5 text-left md:table-cell">Time limits</th>
+                  <th scope="col" class="hidden w-48 px-3 py-3.5 text-left 2xl:table-cell">QoS</th>
+                </tr>
+              </thead>
+              <tbody class="text-sm text-[var(--color-brand-muted)]">
+                <tr
+                  v-for="association in userAssociations"
+                  :key="`${association.account}-${association.user}`"
                 >
-                  <tr
-                    v-for="association in userAssociations"
-                    :key="`${association.account}-${association.user}`"
-                  >
-                    <td
-                      class="py-4 pr-3 pl-4 text-sm font-semibold whitespace-nowrap text-gray-900 sm:pl-6 dark:text-gray-100"
+                  <td class="py-4 pr-3 pl-6 align-top font-semibold text-[var(--color-brand-ink-strong)]">
+                    <RouterLink
+                      v-if="association.user"
+                      :to="{ name: 'user', params: { cluster, user: association.user } }"
+                      class="text-[var(--color-brand-blue)] transition hover:text-[var(--color-brand-ink-strong)]"
                     >
-                      <RouterLink
-                        v-if="association.user"
-                        :to="{
-                          name: 'user',
-                          params: { cluster, user: association.user }
-                        }"
-                        class="text-slurmweb hover:text-slurmweb-dark dark:text-slurmweb-light"
-                      >
-                        {{ association.user }}
-                      </RouterLink>
-                    </td>
-                    <td
-                      class="hidden px-3 py-4 align-top text-sm text-gray-700 sm:table-cell dark:text-gray-300"
-                    >
+                      {{ association.user }}
+                    </RouterLink>
+                  </td>
+                  <td class="hidden px-3 py-4 align-top sm:table-cell">
+                    <div v-if="userJobLimits(association).length === 0">-</div>
+                    <dl v-else class="space-y-2">
                       <div
-                        v-if="userJobLimits(association).length === 0"
-                        class="text-gray-400 dark:text-gray-500"
+                        v-for="limit in userJobLimits(association)"
+                        :key="limit.id"
+                        :class="limit.different ? '' : 'opacity-40'"
+                        class="flex flex-wrap items-center gap-2"
                       >
-                        ∅
+                        <dt class="font-semibold text-[var(--color-brand-ink-strong)]">{{ limit.label }}:</dt>
+                        <dd>{{ renderClusterOptionalNumber(limit.value) }}</dd>
                       </div>
-                      <dl v-else>
-                        <div
-                          v-for="limit in userJobLimits(association)"
-                          :key="limit.id"
-                          :class="[
-                            'flex items-baseline rounded-md px-1 py-0.5 leading-relaxed',
-                            limit.different ? '' : 'text-gray-300 dark:text-gray-600'
-                          ]"
-                        >
-                          <dt :class="limit.different ? 'text-gray-500 dark:text-gray-400' : ''">
-                            {{ limit.label }}:
-                          </dt>
-                          <dd class="ml-2">
-                            {{ renderClusterOptionalNumber(limit.value) }}
-                          </dd>
-                        </div>
-                      </dl>
-                    </td>
-                    <td
-                      class="hidden px-3 py-4 align-top text-sm text-gray-700 lg:table-cell dark:text-gray-300"
-                    >
+                    </dl>
+                  </td>
+                  <td class="hidden px-3 py-4 align-top lg:table-cell">
+                    <div v-if="userResourceLimits(association).length === 0">-</div>
+                    <dl v-else class="space-y-2">
                       <div
-                        v-if="userResourceLimits(association).length === 0"
-                        class="text-gray-400 dark:text-gray-500"
+                        v-for="limit in userResourceLimits(association)"
+                        :key="limit.id"
+                        :class="limit.different ? '' : 'opacity-40'"
+                        class="flex flex-wrap items-center gap-2"
                       >
-                        ∅
+                        <dt class="font-semibold text-[var(--color-brand-ink-strong)]">{{ limit.label }}:</dt>
+                        <dd class="font-mono text-xs">{{ renderClusterTRES(limit.value) }}</dd>
                       </div>
-                      <dl v-else>
-                        <div
-                          v-for="limit in userResourceLimits(association)"
-                          :key="limit.id"
-                          :class="[
-                            'flex items-baseline rounded-md px-1 py-0.5 leading-relaxed',
-                            limit.different ? '' : 'text-gray-300 dark:text-gray-600'
-                          ]"
-                        >
-                          <dt :class="limit.different ? 'text-gray-500 dark:text-gray-400' : ''">
-                            {{ limit.label }}:
-                          </dt>
-                          <dd class="ml-2 font-mono text-xs">
-                            {{ renderClusterTRES(limit.value) }}
-                          </dd>
-                        </div>
-                      </dl>
-                    </td>
-                    <td
-                      class="hidden px-3 py-4 align-top text-sm text-gray-700 md:table-cell dark:text-gray-300"
-                    >
+                    </dl>
+                  </td>
+                  <td class="hidden px-3 py-4 align-top md:table-cell">
+                    <div v-if="userTimeLimits(association).length === 0">-</div>
+                    <dl v-else class="space-y-2">
                       <div
-                        v-if="userTimeLimits(association).length === 0"
-                        class="text-gray-400 dark:text-gray-500"
+                        v-for="limit in userTimeLimits(association)"
+                        :key="limit.id"
+                        :class="limit.different ? '' : 'opacity-40'"
+                        class="flex flex-wrap items-center gap-2"
                       >
-                        ∅
+                        <dt class="font-semibold text-[var(--color-brand-ink-strong)]">{{ limit.label }}:</dt>
+                        <dd>{{ renderWalltime(limit.value) }}</dd>
                       </div>
-                      <dl v-else>
-                        <div
-                          v-for="limit in userTimeLimits(association)"
-                          :key="limit.id"
-                          :class="[
-                            'flex items-baseline rounded-md px-1 py-0.5 leading-relaxed',
-                            limit.different ? '' : 'text-gray-300 dark:text-gray-600'
-                          ]"
-                        >
-                          <dt :class="limit.different ? 'text-gray-500 dark:text-gray-400' : ''">
-                            {{ limit.label }}:
-                          </dt>
-                          <dd class="ml-2">
-                            {{ renderWalltime(limit.value) }}
-                          </dd>
-                        </div>
-                      </dl>
-                    </td>
-                    <td
-                      class="hidden px-3 py-4 text-sm 2xl:table-cell"
-                      :class="
-                        hasDifferentQos(association)
-                          ? 'text-gray-700 dark:text-gray-300'
-                          : 'text-gray-300 dark:text-gray-600'
-                      "
-                    >
+                    </dl>
+                  </td>
+                  <td class="hidden px-3 py-4 align-top 2xl:table-cell">
+                    <span :class="hasDifferentQos(association) ? '' : 'opacity-40'">
                       {{ renderQosLabel(association.qos) }}
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
+                    </span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </div>
       </div>
-      <InfoAlert v-else class="mt-6">
-        Account <span class="font-semibold">{{ account }}</span> has no end-user associations.
-      </InfoAlert>
     </div>
   </ClusterMainLayout>
 </template>

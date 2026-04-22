@@ -1,7 +1,7 @@
 <!--
-  Copyright (c) 2023-2024 Rackslab
+  Copyright (c) 2023-2026 Slurm Web Plus
 
-  This file is part of Slurm-web.
+  This file is part of Slurm Web Plus.
 
   SPDX-License-Identifier: MIT
 -->
@@ -14,6 +14,7 @@ import { useRuntimeStore } from '@/stores/runtime'
 import { useRuntimeConfiguration } from '@/plugins/runtimeConfiguration'
 import { useGatewayAPI } from '@/composables/GatewayAPI'
 import { AuthenticationError } from '@/composables/HTTPErrors'
+import BrandLogo from '@/components/BrandLogo.vue'
 
 const msg: Ref<string> = ref('')
 
@@ -46,15 +47,26 @@ onMounted(async () => {
 </script>
 
 <template>
-  <main>
-    <section class="bg-slurmweb-light dark:bg-gray-900">
-      <div class="mx-auto flex h-screen flex-col items-center justify-center px-6 py-4 lg:py-0">
-        <div
-          class="w-full rounded-lg bg-white shadow-sm sm:max-w-md md:mt-0 xl:p-0 dark:border dark:border-gray-700 dark:bg-gray-800"
-        >
-          <div class="space-y-4 p-6 sm:p-8 md:space-y-6">
-            {{ msg }}
+  <main class="ui-public-shell">
+    <section class="ui-public-grid">
+      <aside class="ui-public-aside">
+        <div class="space-y-6">
+          <BrandLogo size="lg" />
+          <div class="space-y-4">
+            <p class="ui-page-kicker">Anonymous Access</p>
+            <h1 class="text-4xl font-bold text-white md:text-5xl">Preparing public session access.</h1>
+            <p class="max-w-xl text-sm leading-7 text-white/72 md:text-base">
+              When authentication is disabled, Slurm-web can still route visitors into the control
+              center with a lightweight anonymous session.
+            </p>
           </div>
+        </div>
+      </aside>
+      <div class="ui-public-panel flex items-center justify-center px-5 py-6 sm:px-8">
+        <div class="max-w-lg space-y-4 text-center">
+          <BrandLogo size="sm" />
+          <p class="ui-page-kicker mx-auto w-fit">Status</p>
+          <p class="text-2xl font-bold text-[var(--color-brand-ink-strong)]">{{ msg }}</p>
         </div>
       </div>
     </section>

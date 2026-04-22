@@ -1,7 +1,7 @@
 <!--
-  Copyright (c) 2023-2024 Rackslab
+  Copyright (c) 2023-2026 Slurm Web Plus
 
-  This file is part of Slurm-web.
+  This file is part of Slurm Web Plus.
 
   SPDX-License-Identifier: MIT
 -->
@@ -44,13 +44,13 @@ onMounted(() => {
 
 <template>
   <MainMenu :entry="menuEntry" v-model="sidebarOpen" />
-  <div class="lg:pl-72">
+  <div class="ui-shell lg:pl-80">
     <div
-      class="sticky top-0 z-40 flex h-16 shrink-0 items-center gap-x-4 border-b border-gray-200 bg-white shadow-xs sm:gap-x-6 lg:px-4 dark:border-gray-700 dark:bg-gray-900"
+      class="sticky top-0 z-40 mx-3 mt-3 flex h-18 shrink-0 items-center gap-x-4 rounded-[28px] border border-white/60 bg-[rgba(255,255,255,0.8)] px-4 shadow-[var(--shadow-soft)] backdrop-blur-xl sm:gap-x-6 lg:mx-4 lg:px-5"
     >
       <button
         type="button"
-        class="-m-2.5 p-2.5 text-gray-700 lg:hidden dark:text-gray-300"
+        class="-m-2.5 rounded-full p-2.5 text-[var(--color-brand-ink)] transition hover:bg-[rgba(182,232,44,0.14)] lg:hidden"
         @click="sidebarOpen = true"
       >
         <span class="sr-only">Open sidebar</span>
@@ -58,20 +58,24 @@ onMounted(() => {
       </button>
 
       <!-- Separator -->
-      <div class="h-6 w-px bg-gray-900/10 lg:hidden" aria-hidden="true" />
+      <div class="h-6 w-px bg-[rgba(80,105,127,0.16)] lg:hidden" aria-hidden="true" />
 
       <div class="flex flex-1 gap-x-4 self-stretch lg:gap-x-6">
-        <div class="relative mt-1 flex flex-1 items-center">
+        <div class="relative mt-1 flex flex-1 items-center gap-2 overflow-hidden">
           <ClustersPopOver :cluster="cluster" />
-          <span v-for="breadcrumbPart in breadcrumb" :key="breadcrumbPart.title" class="flex">
-            <ChevronRightIcon class="h-5 w-10 shrink-0 text-gray-400" aria-hidden="true" />
+          <span
+            v-for="breadcrumbPart in breadcrumb"
+            :key="breadcrumbPart.title"
+            class="flex min-w-0 items-center"
+          >
+            <ChevronRightIcon class="h-5 w-8 shrink-0 text-[var(--color-brand-muted)]/70" aria-hidden="true" />
             <router-link
               v-if="breadcrumbPart.routeName"
               :to="{ name: breadcrumbPart.routeName }"
-              class="text-black dark:text-gray-200"
+              class="truncate text-sm font-medium text-[var(--color-brand-blue)] transition hover:text-[var(--color-brand-ink-strong)]"
               >{{ breadcrumbPart.title }}</router-link
             >
-            <span v-else class="text-black dark:text-gray-200">{{ breadcrumbPart.title }}</span>
+            <span v-else class="truncate text-sm font-semibold text-[var(--color-brand-ink-strong)]">{{ breadcrumbPart.title }}</span>
           </span>
         </div>
         <div class="flex items-center gap-x-4 lg:gap-x-6">
@@ -81,19 +85,19 @@ onMounted(() => {
               v-if="runtimeStore.getAllowedClusters().length > 1"
               @click="navigate"
               role="link"
-              class="p-2.5 text-gray-400 hover:text-gray-500 lg:-m-2.5 dark:text-gray-400 hover:dark:text-gray-200"
+              class="rounded-full p-2.5 text-[var(--color-brand-muted)] transition hover:bg-[rgba(182,232,44,0.14)] hover:text-[var(--color-brand-ink-strong)] lg:-m-2.5"
             >
               <ServerStackIcon class="h-6 w-6" />
             </button>
           </RouterLink>
 
           <!-- Separator -->
-          <div class="hidden lg:block lg:h-6 lg:w-px lg:bg-gray-900/10" aria-hidden="true" />
+          <div class="hidden lg:block lg:h-6 lg:w-px lg:bg-[rgba(80,105,127,0.16)]" aria-hidden="true" />
 
           <!-- Profile -->
           <span v-if="runtimeConfiguration.authentication" class="hidden lg:flex lg:items-center">
             <span
-              class="m-2 text-sm leading-6 font-semibold text-gray-900 dark:text-gray-200"
+              class="m-2 rounded-full bg-[rgba(239,244,246,0.92)] px-3 py-1.5 text-sm leading-6 font-semibold text-[var(--color-brand-ink-strong)]"
               aria-hidden="true"
             >
               {{ authStore.fullname }}
@@ -110,7 +114,7 @@ onMounted(() => {
             <button
               @click="navigate"
               role="link"
-              class="p-2.5 text-gray-400 hover:text-gray-500 lg:-m-2.5 dark:text-gray-400 hover:dark:text-gray-200"
+              class="rounded-full p-2.5 text-[var(--color-brand-muted)] transition hover:bg-[rgba(182,232,44,0.14)] hover:text-[var(--color-brand-ink-strong)] lg:-m-2.5"
             >
               <ArrowRightOnRectangleIcon class="h-6 w-6" />
             </button>
@@ -119,10 +123,10 @@ onMounted(() => {
       </div>
     </div>
 
-    <main class="py-10">
-      <div class="px-4 sm:px-6 lg:px-8">
+    <main class="px-2 py-5 sm:px-3 lg:px-4 lg:py-8 xl:px-5 2xl:px-6">
+      <div class="rounded-[36px] border border-white/60 bg-[rgba(255,255,255,0.5)] px-3 py-4 shadow-[var(--shadow-soft)] backdrop-blur-sm sm:px-5 sm:py-5 lg:px-6 lg:py-7 xl:px-7 2xl:px-8">
         <div v-if="clusterNotFound">Cluster not found</div>
-        <div v-else class="home">
+        <div v-else class="home ui-page ui-page-wide">
           <slot></slot>
         </div>
       </div>

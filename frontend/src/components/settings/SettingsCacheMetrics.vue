@@ -1,7 +1,7 @@
 <!--
-  Copyright (c) 2025 Rackslab
+  Copyright (c) 2023-2026 Slurm Web Plus
 
-  This file is part of Slurm-web.
+  This file is part of Slurm Web Plus.
 
   SPDX-License-Identifier: MIT
 -->
@@ -10,6 +10,7 @@
 import { useTemplateRef, ref } from 'vue'
 import type { ClusterDescription, MetricCacheResult } from '@/composables/GatewayAPI'
 import { useLiveHistogram } from '@/composables/charts/LiveHistogram'
+import ChartSkeleton from '@/components/ChartSkeleton.vue'
 import ErrorAlert from '@/components/ErrorAlert.vue'
 
 const { cluster } = defineProps<{ cluster: ClusterDescription }>()
@@ -21,20 +22,19 @@ function setRange(newRange: string) {
   chart.setRange(newRange)
 }
 
-/* Note that order of keys determines the stack of metrics in histogram */
 const labels: Record<string, { group: MetricCacheResult[]; color: string; invert?: boolean }> = {
   hit: {
     group: ['hit'],
-    color: 'rgba(51, 204, 51, 0.7)' // green
+    color: 'rgba(123, 191, 31, 0.78)'
   },
   miss: {
     group: ['miss'],
-    color: 'rgba(214, 93, 11, 0.7)', // dark orange
+    color: 'rgba(216, 75, 80, 0.72)',
     invert: true
   }
 }
 
-const chartCanvas = useTemplateRef<HTMLCanvasElement>(`chartCanvas`)
+const chartCanvas = useTemplateRef<HTMLCanvasElement>('chartCanvas')
 const chart = useLiveHistogram<MetricCacheResult>(
   cluster.name,
   'metrics_cache',
@@ -45,65 +45,61 @@ const chart = useLiveHistogram<MetricCacheResult>(
 </script>
 
 <template>
-  <div class="mb-16">
-    <ErrorAlert v-if="chart.metrics.unable.value" class="mt-4"
-      >Unable to retrieve cache metrics.</ErrorAlert
-    >
-    <template v-else>
-      <div class="border-gray-200p dark:border-gray-700">
-        <div class="mt-3 text-right sm:mt-0">
-          <span class="isolate inline-flex rounded-md shadow-xs">
-            <button
-              type="button"
-              id="range-week"
-              :class="[
-                range == 'week'
-                  ? 'bg-slurmweb dark:bg-slurmweb-dark text-white'
-                  : 'bg-white text-gray-900 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-200 hover:dark:bg-gray-700',
-                'relative inline-flex items-center rounded-l-md px-3 py-2 text-xs font-semibold ring-1 ring-gray-300 ring-inset focus:z-10 dark:ring-gray-600'
-              ]"
-              @click="setRange('week')"
-            >
-              week
-            </button>
-            <button
-              type="button"
-              id="range-day"
-              :class="[
-                range == 'day'
-                  ? 'bg-slurmweb dark:bg-slurmweb-dark text-white'
-                  : 'bg-white text-gray-900 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-200 hover:dark:bg-gray-700',
-                'relative inline-flex items-center px-3 py-2 text-xs font-semibold ring-1 ring-gray-300 ring-inset focus:z-10 dark:ring-gray-600'
-              ]"
-              @click="setRange('day')"
-            >
-              day
-            </button>
-            <button
-              type="button"
-              id="range-hour"
-              :class="[
-                range == 'hour'
-                  ? 'bg-slurmweb dark:bg-slurmweb-dark text-white'
-                  : 'bg-white text-gray-900 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-200 hover:dark:bg-gray-700',
-                'relative inline-flex items-center rounded-r-md px-3 py-2 text-xs font-semibold ring-1 ring-gray-300 ring-inset focus:z-10 dark:ring-gray-600'
-              ]"
-              @click="setRange('hour')"
-            >
-              hour
-            </button>
-          </span>
-        </div>
+  <div class="ui-panel ui-section mt-6">
+    <div class="mb-5 flex flex-wrap items-start justify-between gap-4">
+      <div>
+        <h3 class="ui-panel-title">Cache Metrics</h3>
+        <p class="ui-panel-description mt-2">Live hit and miss activity across cache operations.</p>
       </div>
-      <div class="relative h-96 w-full">
-        <img
-          v-show="!chart.metrics.loaded.value"
-          class="h-full object-fill"
-          src="/chart_placeholder.svg"
-          alt="Loading chart"
-        />
-        <canvas v-show="chart.metrics.loaded.value" ref="chartCanvas"></canvas>
+      <div class="isolate inline-flex rounded-full shadow-[var(--shadow-soft)]">
+        <button
+          type="button"
+          id="range-week"
+          :class="[
+            range === 'week'
+              ? 'bg-[linear-gradient(135deg,rgba(182,232,44,0.95),rgba(152,201,31,0.95))] text-[var(--color-brand-deep)]'
+              : 'bg-white text-[var(--color-brand-muted)] hover:bg-[rgba(182,232,44,0.12)]',
+            'relative inline-flex items-center rounded-l-full px-4 py-2 text-xs font-semibold ring-1 ring-[rgba(80,105,127,0.16)] ring-inset'
+          ]"
+          @click="setRange('week')"
+        >
+          week
+        </button>
+        <button
+          type="button"
+          id="range-day"
+          :class="[
+            range === 'day'
+              ? 'bg-[linear-gradient(135deg,rgba(182,232,44,0.95),rgba(152,201,31,0.95))] text-[var(--color-brand-deep)]'
+              : 'bg-white text-[var(--color-brand-muted)] hover:bg-[rgba(182,232,44,0.12)]',
+            'relative inline-flex items-center px-4 py-2 text-xs font-semibold ring-1 ring-[rgba(80,105,127,0.16)] ring-inset'
+          ]"
+          @click="setRange('day')"
+        >
+          day
+        </button>
+        <button
+          type="button"
+          id="range-hour"
+          :class="[
+            range === 'hour'
+              ? 'bg-[linear-gradient(135deg,rgba(182,232,44,0.95),rgba(152,201,31,0.95))] text-[var(--color-brand-deep)]'
+              : 'bg-white text-[var(--color-brand-muted)] hover:bg-[rgba(182,232,44,0.12)]',
+            'relative inline-flex items-center rounded-r-full px-4 py-2 text-xs font-semibold ring-1 ring-[rgba(80,105,127,0.16)] ring-inset'
+          ]"
+          @click="setRange('hour')"
+        >
+          hour
+        </button>
       </div>
-    </template>
+    </div>
+
+    <ErrorAlert v-if="chart.metrics.unable.value" class="mt-4">
+      Unable to retrieve cache metrics.
+    </ErrorAlert>
+    <div v-else class="ui-chart-shell">
+      <ChartSkeleton v-show="!chart.metrics.loaded.value" />
+      <canvas v-show="chart.metrics.loaded.value" ref="chartCanvas" class="h-full w-full"></canvas>
+    </div>
   </div>
 </template>

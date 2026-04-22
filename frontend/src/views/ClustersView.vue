@@ -1,14 +1,13 @@
 <!--
-  Copyright (c) 2023-2024 Rackslab
+  Copyright (c) 2023-2026 Slurm Web Plus
 
-  This file is part of Slurm-web.
+  This file is part of Slurm Web Plus.
 
   SPDX-License-Identifier: MIT
 -->
 
 <script setup lang="ts">
-import { onMounted, ref, computed } from 'vue'
-import type { Ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { useRuntimeStore } from '@/stores/runtime'
 import { useRuntimeConfiguration } from '@/plugins/runtimeConfiguration'
@@ -19,42 +18,36 @@ import ClusterListItem from '@/components/clusters/ClustersListItem.vue'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
 import InfoAlert from '@/components/InfoAlert.vue'
 import ErrorAlert from '@/components/ErrorAlert.vue'
+import BrandLogo from '@/components/BrandLogo.vue'
+import PageHeader from '@/components/PageHeader.vue'
 import { ArrowRightOnRectangleIcon } from '@heroicons/vue/24/outline'
 
 const runtimeStore = useRuntimeStore()
 const runtimeConfiguration = useRuntimeConfiguration()
 const gateway = useGatewayAPI()
 const { reportAuthenticationError, reportServerError } = useErrorsHandler()
-const clusters: Ref<Array<ClusterDescription>> = ref([])
-const loaded: Ref<boolean> = ref(false)
-const unable: Ref<boolean> = ref(false)
 const router = useRouter()
-const awaitingAutoRedirect = ref<boolean>(false)
+
+const clusters = ref<ClusterDescription[]>([])
+const loaded = ref(false)
+const unable = ref(false)
+const awaitingAutoRedirect = ref(false)
 const awaitingClusterName = ref<string | null>(null)
-/* Check if there is at least one cluster with error. This is useful when there
- * is only one cluster with permissions but this cluster is not available. In
- * this case, we want to display the list of clusters with the error to the
- * user. */
-const clusterWithError = computed(() => {
-  return clusters.value.find((cluster) => cluster.error)
-})
+
+const clusterCount = computed(() => clusters.value?.length ?? 0)
+const clusterWithError = computed(() => clusters.value.find((cluster) => cluster.error))
 
 async function getClustersDescriptions() {
   try {
-    clusters.value = await gateway.clusters()
+    const clusterList = await gateway.clusters()
+    clusters.value = Array.isArray(clusterList) ? clusterList : []
     runtimeStore.availableClusters = []
-    clusters.value.forEach((element) => {
-      /* Consider this cluster does not have error at this stage. It could be
-       * set to true if stats retrieval fail later on.
-       */
-      element.error = false
-      runtimeStore.addCluster(element)
+    clusters.value.forEach((cluster) => {
+      cluster.error = false
+      runtimeStore.addCluster(cluster)
     })
     loaded.value = true
 
-    /* Get list of clusters with permissions. If there is only one, set some
-     * refs to make handleClusterPing() redirect automatically to the
-     * dashboard of this cluster. */
     const clustersWithPermissions = clusters.value.filter(
       (cluster) => cluster.permissions.actions.length > 0
     )
@@ -72,33 +65,26 @@ async function getClustersDescriptions() {
   }
 }
 
-/* Handle cluster ping response. If there is only one cluster with permissions,
- * redirect to the dashboard of this cluster if the ping response is successful. */
 function handleClusterPing(cluster: ClusterDescription) {
-  /* If we are not awaiting auto redirect or the cluster name is not the one
-   * we are awaiting, return. */
   if (!awaitingAutoRedirect.value || awaitingClusterName.value !== cluster.name) {
     return
   }
 
-  /* If the cluster has an error, set loaded to true to remove the loading spinner
-   * and skip the redirect. */
   if (cluster.error) {
     loaded.value = true
     return
   }
 
-  /* Redirect to the dashboard of the cluster. */
   router.push({ name: 'dashboard', params: { cluster: cluster.name } })
 }
 
 onMounted(() => {
-  getClustersDescriptions()
+  void getClustersDescriptions()
 })
 </script>
 
 <template>
-  <main>
+  <main class="ui-public-shell">
     <RouterLink
       v-if="runtimeConfiguration.authentication"
       :to="{ name: 'signout' }"
@@ -108,55 +94,88 @@ onMounted(() => {
       <button
         @click="navigate"
         role="link"
-        class="absolute right-0 m-2 flex p-2 text-gray-600 hover:text-gray-800 dark:text-gray-400 hover:dark:text-gray-200"
+        class="absolute top-4 right-4 z-20 flex items-center gap-2 rounded-full border border-white/70 bg-white/80 px-4 py-2 text-sm font-semibold text-[var(--color-brand-ink)] shadow-[var(--shadow-soft)] backdrop-blur-lg transition hover:bg-white"
       >
         Signout
         <ArrowRightOnRectangleIcon class="h-6 w-6" />
       </button>
     </RouterLink>
-    <section
-      class="bg-slurmweb-light flex h-screen items-center justify-center gap-y-6 dark:bg-gray-900"
-    >
-      <div v-if="unable" class="w-full lg:w-[60%]">
-        <ErrorAlert :show-errors-link="false">
-          <strong>Unable to load cluster list</strong>
-          <br />
-          Try to refresh…
-        </ErrorAlert>
-      </div>
-      <div
-        v-else-if="!loaded"
-        class="flex h-24 w-full animate-pulse items-center justify-center rounded-xl bg-slate-200 text-sm text-gray-600 lg:w-[60%] dark:text-gray-400"
-      >
-        <LoadingSpinner :size="5" />
-        Loading clusters…
-      </div>
-      <div v-else-if="!clusters.length" class="w-full lg:w-[60%]">
-        <InfoAlert>
-          <strong>Empty cluster list</strong>
-          <br />
-          Try to refresh…
-        </InfoAlert>
-      </div>
-      <div
-        v-else
-        v-show="!awaitingAutoRedirect || clusterWithError"
-        class="flex w-full flex-col lg:w-[80%] xl:w-[60%]"
-      >
-        <h1 class="flex px-4 text-left text-lg font-medium text-gray-700 dark:text-gray-400">
-          Select a cluster
-        </h1>
-        <ul
-          role="list"
-          class="divide-y divide-gray-100 overflow-hidden bg-white shadow-xs ring-1 ring-gray-100 lg:rounded-xl dark:divide-gray-700 dark:bg-gray-800 dark:ring-gray-700"
+
+    <section class="ui-public-grid">
+      <aside class="ui-public-aside">
+        <div class="space-y-6">
+          <BrandLogo size="lg" />
+          <div class="space-y-4">
+            <p class="ui-page-kicker">Cluster Gateway</p>
+            <h1 class="text-4xl font-bold text-white md:text-5xl">Select a cluster</h1>
+            <p class="max-w-xl text-sm leading-7 text-white/72 md:text-base">
+              Compare visible environments, inspect availability and jump straight into the shared
+              operations console.
+            </p>
+          </div>
+        </div>
+        <div class="grid gap-3 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
+          <div class="rounded-[22px] border border-white/10 bg-white/6 p-4">
+            <p class="text-xs font-semibold tracking-[0.14em] text-white/50 uppercase">Clusters</p>
+            <p class="mt-2 text-3xl font-bold text-white">{{ clusterCount }}</p>
+            <p class="mt-1 text-sm text-white/70">Visible to this session.</p>
+          </div>
+          <div class="rounded-[22px] border border-white/10 bg-white/6 p-4">
+            <p class="text-xs font-semibold tracking-[0.14em] text-white/50 uppercase">Routing</p>
+            <p class="mt-2 text-sm text-white/80">
+              Permission-aware entry and single-cluster auto redirect.
+            </p>
+          </div>
+          <div class="rounded-[22px] border border-white/10 bg-white/6 p-4">
+            <p class="text-xs font-semibold tracking-[0.14em] text-white/50 uppercase">Signals</p>
+            <p class="mt-2 text-sm text-white/80">
+              Status, version and runtime context before you enter.
+            </p>
+          </div>
+        </div>
+      </aside>
+
+      <div class="ui-public-panel px-5 py-6 sm:px-8">
+        <PageHeader
+          kicker="Cluster Entry"
+          title="Select a cluster"
+          description="Pick an available environment to open the control surface."
+          :metric-value="clusterCount"
+          metric-label="clusters visible"
+        />
+
+        <div v-if="unable" class="mt-6">
+          <ErrorAlert :show-errors-link="false">
+            <strong>Unable to load cluster list</strong>
+            <br />
+            Try to refresh…
+          </ErrorAlert>
+        </div>
+        <div
+          v-else-if="!loaded"
+          class="ui-panel-soft mt-6 flex min-h-28 items-center justify-center gap-3 rounded-[24px] px-5 text-sm text-[var(--color-brand-muted)]"
         >
-          <ClusterListItem
-            v-for="cluster in clusters"
-            :key="cluster.name"
-            :cluster-name="cluster.name"
-            @pinged="handleClusterPing"
-          />
-        </ul>
+          <LoadingSpinner :size="5" />
+          <span>Loading clusters…</span>
+        </div>
+        <div v-else-if="clusterCount === 0" class="mt-6">
+          <InfoAlert>
+            <strong>Empty cluster list</strong>
+            <br />
+            Try to refresh…
+          </InfoAlert>
+        </div>
+        <div v-else v-show="!awaitingAutoRedirect || clusterWithError" class="mt-6">
+          <h1 class="sr-only">Select a cluster</h1>
+          <ul role="list" class="ui-table-shell divide-y divide-[rgba(80,105,127,0.08)]">
+            <ClusterListItem
+              v-for="clusterItem in clusters"
+              :key="clusterItem.name"
+              :cluster-name="clusterItem.name"
+              @pinged="handleClusterPing"
+            />
+          </ul>
+        </div>
       </div>
     </section>
   </main>

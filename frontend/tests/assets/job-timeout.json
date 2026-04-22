@@ -1,0 +1,350 @@
+{
+  "accrue_time": {
+    "infinite": false,
+    "number": 1763129115,
+    "set": true
+  },
+  "association": {
+    "account": "",
+    "cluster": "hpc",
+    "id": 17,
+    "partition": "",
+    "user": ""
+  },
+  "batch_flag": true,
+  "command": "",
+  "comment": {
+    "administrator": "",
+    "job": "",
+    "system": ""
+  },
+  "cpus": {
+    "infinite": false,
+    "number": 1,
+    "set": true
+  },
+  "current_working_directory": "/home/rcarson",
+  "derived_exit_code": {
+    "return_code": {
+      "infinite": false,
+      "number": 0,
+      "set": true
+    },
+    "signal": {
+      "id": {
+        "infinite": false,
+        "number": 0,
+        "set": false
+      },
+      "name": ""
+    },
+    "status": [
+      "SUCCESS"
+    ]
+  },
+  "exit_code": {
+    "return_code": {
+      "infinite": false,
+      "number": 0,
+      "set": true
+    },
+    "signal": {
+      "id": {
+        "infinite": false,
+        "number": 0,
+        "set": false
+      },
+      "name": ""
+    },
+    "status": [
+      "SUCCESS"
+    ]
+  },
+  "gres_detail": [],
+  "group": "scientists",
+  "last_sched_evaluation": {
+    "infinite": false,
+    "number": 1763129115,
+    "set": true
+  },
+  "name": "wrap",
+  "node_count": {
+    "infinite": false,
+    "number": 1,
+    "set": true
+  },
+  "nodes": "cn1",
+  "partition": "normal",
+  "priority": {
+    "infinite": false,
+    "number": 909,
+    "set": true
+  },
+  "qos": "normal",
+  "script": "",
+  "shared": [],
+  "sockets_per_node": {
+    "infinite": false,
+    "number": 0,
+    "set": false
+  },
+  "state": {
+    "current": [
+      "TIMEOUT"
+    ],
+    "reason": "None"
+  },
+  "stderr_expanded": "",
+  "stdin_expanded": "/dev/null",
+  "stdout_expanded": "/home/rcarson/slurm-35.out",
+  "steps": [
+    {
+      "CPU": {
+        "governor": "0",
+        "requested_frequency": {
+          "max": {
+            "infinite": false,
+            "number": 0,
+            "set": true
+          },
+          "min": {
+            "infinite": false,
+            "number": 0,
+            "set": true
+          }
+        }
+      },
+      "exit_code": {
+        "return_code": {
+          "infinite": false,
+          "number": 0,
+          "set": false
+        },
+        "signal": {
+          "id": {
+            "infinite": false,
+            "number": 15,
+            "set": true
+          },
+          "name": "TERM"
+        },
+        "status": [
+          "SIGNALED"
+        ]
+      },
+      "kill_request_user": "",
+      "nodes": {
+        "count": 1,
+        "list": [
+          "cn1"
+        ],
+        "range": "cn1"
+      },
+      "pid": "",
+      "state": [
+        "CANCELLED"
+      ],
+      "statistics": {
+        "CPU": {
+          "actual_frequency": 0
+        },
+        "energy": {
+          "consumed": {
+            "infinite": false,
+            "number": 0,
+            "set": true
+          }
+        }
+      },
+      "step": {
+        "id": "35.batch",
+        "name": "batch",
+        "stderr": "",
+        "stderr_expanded": "",
+        "stdin": "",
+        "stdin_expanded": "",
+        "stdout": "",
+        "stdout_expanded": ""
+      },
+      "task": {
+        "distribution": "Unknown"
+      },
+      "tasks": {
+        "count": 1
+      },
+      "time": {
+        "elapsed": 75,
+        "end": {
+          "infinite": false,
+          "number": 1763129190,
+          "set": true
+        },
+        "limit": {
+          "infinite": true,
+          "number": 0,
+          "set": false
+        },
+        "start": {
+          "infinite": false,
+          "number": 1763129115,
+          "set": true
+        },
+        "suspended": 0,
+        "system": {
+          "microseconds": 0,
+          "seconds": 0
+        },
+        "total": {
+          "microseconds": 0,
+          "seconds": 0
+        },
+        "user": {
+          "microseconds": 0,
+          "seconds": 0
+        }
+      },
+      "tres": {
+        "allocated": [
+          {
+            "count": 1,
+            "id": 1,
+            "name": "",
+            "type": "cpu"
+          },
+          {
+            "count": 512,
+            "id": 2,
+            "name": "",
+            "type": "mem"
+          },
+          {
+            "count": 1,
+            "id": 4,
+            "name": "",
+            "type": "node"
+          }
+        ],
+        "consumed": {
+          "average": [],
+          "max": [],
+          "min": [],
+          "total": []
+        },
+        "requested": {
+          "average": [],
+          "max": [],
+          "min": [],
+          "total": []
+        }
+      }
+    }
+  ],
+  "submit_line": "sbatch --time 1 --wrap sleep 90 && true --ntasks 1",
+  "tasks": {
+    "infinite": false,
+    "number": 1,
+    "set": true
+  },
+  "time": {
+    "elapsed": 74,
+    "eligible": 1763129115,
+    "end": 1763129189,
+    "limit": {
+      "infinite": false,
+      "number": 1,
+      "set": true
+    },
+    "planned": {
+      "infinite": false,
+      "number": 0,
+      "set": true
+    },
+    "start": 1763129115,
+    "submission": 1763129115,
+    "suspended": 0,
+    "system": {
+      "microseconds": 0,
+      "seconds": 0
+    },
+    "total": {
+      "microseconds": 0,
+      "seconds": 0
+    },
+    "user": {
+      "microseconds": 0,
+      "seconds": 0
+    }
+  },
+  "tres": {
+    "allocated": [
+      {
+        "count": 1,
+        "id": 1,
+        "name": "",
+        "type": "cpu"
+      },
+      {
+        "count": 512,
+        "id": 2,
+        "name": "",
+        "type": "mem"
+      },
+      {
+        "count": -2,
+        "id": 3,
+        "name": "",
+        "type": "energy"
+      },
+      {
+        "count": 1,
+        "id": 4,
+        "name": "",
+        "type": "node"
+      },
+      {
+        "count": 1,
+        "id": 5,
+        "name": "",
+        "type": "billing"
+      }
+    ],
+    "requested": [
+      {
+        "count": 1,
+        "id": 1,
+        "name": "",
+        "type": "cpu"
+      },
+      {
+        "count": 512,
+        "id": 2,
+        "name": "",
+        "type": "mem"
+      },
+      {
+        "count": 1,
+        "id": 4,
+        "name": "",
+        "type": "node"
+      },
+      {
+        "count": 1,
+        "id": 5,
+        "name": "",
+        "type": "billing"
+      }
+    ]
+  },
+  "tres_per_job": "",
+  "tres_per_node": "",
+  "tres_per_socket": "",
+  "tres_per_task": "",
+  "tres_req_str": "cpu=1,mem=512M,node=1,billing=1",
+  "used_gres": "",
+  "user": "rcarson",
+  "wckey": {
+    "flags": [],
+    "wckey": ""
+  },
+  "working_directory": "/home/rcarson"
+}

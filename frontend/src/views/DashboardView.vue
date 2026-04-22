@@ -1,7 +1,7 @@
 <!--
-  Copyright (c) 2023-2024 Rackslab
+  Copyright (c) 2023-2026 Slurm Web Plus
 
-  This file is part of Slurm-web.
+  This file is part of Slurm Web Plus.
 
   SPDX-License-Identifier: MIT
 -->
@@ -15,6 +15,7 @@ import { useClusterDataPoller } from '@/composables/DataPoller'
 import ClusterMainLayout from '@/components/ClusterMainLayout.vue'
 import DashboardCharts from '@/components/dashboard/DashboardCharts.vue'
 import ErrorAlert from '@/components/ErrorAlert.vue'
+import PageHeader from '@/components/PageHeader.vue'
 
 const runtimeStore = useRuntimeStore()
 
@@ -28,8 +29,8 @@ const { data, unable, loaded, setCluster } = useClusterDataPoller<ClusterStats>(
 
 watch(
   () => cluster,
-  (new_cluster) => {
-    setCluster(new_cluster)
+  (newCluster) => {
+    setCluster(newCluster)
   }
 )
 </script>
@@ -40,99 +41,82 @@ watch(
     :cluster="cluster"
     :breadcrumb="[{ title: 'Dashboard' }]"
   >
-    <div class="mx-auto max-w-7xl">
+    <div class="ui-page ui-page-wide">
+      <PageHeader
+        title="Dashboard"
+        description="Live cluster statistics, workload activity and metric trends in a unified control view."
+        :metric-value="loaded && data ? data.jobs.total : undefined"
+        metric-label="total jobs"
+      />
+
       <ErrorAlert v-if="unable"
         >Unable to retrieve statistics from cluster
         <span class="font-medium">{{ cluster }}</span></ErrorAlert
       >
-      <div
-        v-else
-        class="grid grid-cols-2 gap-px bg-gray-200 md:grid-cols-3 xl:grid-cols-6 dark:bg-gray-700"
-      >
-        <div class="bg-white px-4 py-6 sm:px-6 lg:px-8 dark:bg-gray-900">
-          <p class="text-sm leading-6 font-medium text-gray-400 dark:text-gray-200">Nodes</p>
-          <span
-            v-if="loaded && data"
-            id="metric-nodes"
-            class="text-4xl font-semibold tracking-tight text-gray-600 dark:text-gray-500"
-          >
+
+      <div v-else class="ui-stat-grid">
+        <div class="ui-stat-card">
+          <p class="ui-stat-label">Nodes</p>
+          <span v-if="loaded && data" id="metric-nodes" class="ui-stat-value">
             {{ data.resources.nodes }}
           </span>
           <div v-else class="flex animate-pulse space-x-4">
-            <div class="h-10 w-10 rounded-full bg-slate-200 dark:bg-slate-800"></div>
+            <div class="h-10 w-10 rounded-full bg-slate-200"></div>
           </div>
         </div>
-        <div class="bg-white px-4 py-6 sm:px-6 lg:px-8 dark:bg-gray-900">
-          <p class="text-sm leading-6 font-medium text-gray-400 dark:text-gray-200">Cores</p>
-          <span
-            v-if="loaded && data"
-            id="metric-cores"
-            class="text-4xl font-semibold tracking-tight text-gray-600 dark:text-gray-500"
-          >
+        <div class="ui-stat-card">
+          <p class="ui-stat-label">Cores</p>
+          <span v-if="loaded && data" id="metric-cores" class="ui-stat-value">
             {{ data.resources.cores }}
           </span>
           <div v-else class="flex animate-pulse space-x-4">
-            <div class="h-10 w-10 rounded-full bg-slate-200 dark:bg-slate-800"></div>
+            <div class="h-10 w-10 rounded-full bg-slate-200"></div>
           </div>
         </div>
-        <div class="bg-white px-4 py-6 sm:px-6 lg:px-8 dark:bg-gray-900">
-          <p class="text-sm leading-6 font-medium text-gray-400 dark:text-gray-200">Memory</p>
-          <span
-            v-if="loaded && data"
-            id="metric-cores"
-            class="text-4xl font-semibold tracking-tight text-gray-600 dark:text-gray-500"
-          >
+        <div class="ui-stat-card">
+          <p class="ui-stat-label">Memory</p>
+          <span v-if="loaded && data" id="metric-memory" class="ui-stat-value">
             {{ getMBHumanUnit(data.resources.memory) }}
           </span>
           <div v-else class="flex animate-pulse space-x-4">
-            <div class="h-10 w-10 rounded-full bg-slate-200 dark:bg-slate-800"></div>
+            <div class="h-10 w-10 rounded-full bg-slate-200"></div>
           </div>
         </div>
-        <div class="bg-white px-4 py-6 sm:px-6 lg:px-8 dark:bg-gray-900">
-          <p class="text-sm leading-6 font-medium text-gray-400 dark:text-gray-200">GPU</p>
+        <div class="ui-stat-card">
+          <p class="ui-stat-label">GPU</p>
           <span
             v-if="loaded && data"
-            id="metric-cores"
+            id="metric-gpus"
             :class="[
-              data.resources.gpus
-                ? 'text-gray-600 dark:text-gray-500'
-                : 'text-gray-200 dark:text-gray-700',
-              'text-4xl font-semibold tracking-tight'
+              data.resources.gpus ? 'ui-stat-value' : 'ui-stat-value text-[var(--color-brand-muted)]/35'
             ]"
           >
             {{ data.resources.gpus }}
           </span>
           <div v-else class="flex animate-pulse space-x-4">
-            <div class="h-10 w-10 rounded-full bg-slate-200 dark:bg-slate-800"></div>
+            <div class="h-10 w-10 rounded-full bg-slate-200"></div>
           </div>
         </div>
-        <div class="bg-white px-4 py-6 sm:px-6 lg:px-8 dark:bg-gray-900">
-          <p class="text-sm leading-6 font-medium text-gray-400 dark:text-gray-200">Running jobs</p>
-          <span
-            v-if="loaded && data"
-            id="metric-jobs-running"
-            class="text-4xl font-semibold tracking-tight text-gray-600 dark:text-gray-500"
-          >
+        <div class="ui-stat-card">
+          <p class="ui-stat-label">Running jobs</p>
+          <span v-if="loaded && data" id="metric-jobs-running" class="ui-stat-value">
             {{ data.jobs.running }}
           </span>
           <div v-else class="flex animate-pulse space-x-4">
-            <div class="h-10 w-10 rounded-full bg-slate-200 dark:bg-slate-800"></div>
+            <div class="h-10 w-10 rounded-full bg-slate-200"></div>
           </div>
         </div>
-        <div class="bg-white px-4 py-6 sm:px-6 lg:px-8 dark:bg-gray-900">
-          <p class="text-sm leading-6 font-medium text-gray-400 dark:text-gray-200">Total jobs</p>
-          <span
-            v-if="loaded && data"
-            id="metric-jobs-total"
-            class="text-4xl font-semibold tracking-tight text-gray-600 dark:text-gray-500"
-          >
+        <div class="ui-stat-card">
+          <p class="ui-stat-label">Total jobs</p>
+          <span v-if="loaded && data" id="metric-jobs-total" class="ui-stat-value">
             {{ data.jobs.total }}
           </span>
           <div v-else class="flex animate-pulse space-x-4">
-            <div class="h-10 w-10 rounded-full bg-slate-200 dark:bg-slate-800"></div>
+            <div class="h-10 w-10 rounded-full bg-slate-200"></div>
           </div>
         </div>
       </div>
+
       <DashboardCharts v-if="runtimeStore.getCluster(cluster).metrics" :cluster="cluster" />
     </div>
   </ClusterMainLayout>

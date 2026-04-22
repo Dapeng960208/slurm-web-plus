@@ -1,7 +1,7 @@
 <!--
-  Copyright (c) 2023-2024 Rackslab
+  Copyright (c) 2023-2026 Slurm Web Plus
 
-  This file is part of Slurm-web.
+  This file is part of Slurm Web Plus.
 
   SPDX-License-Identifier: MIT
 -->
@@ -13,7 +13,8 @@ const { size } = defineProps<{
 </script>
 <template>
   <svg
-    :class="`animate-spin h-${size} w-${size} mx-2 -ml-2 inline-block`"
+    class="mx-2 -ml-2 inline-block animate-spin text-current"
+    :style="{ width: `${size * 0.25}rem`, height: `${size * 0.25}rem` }"
     xmlns="http://www.w3.org/2000/svg"
     fill="none"
     viewBox="0 0 24 24"

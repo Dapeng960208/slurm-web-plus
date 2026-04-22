@@ -1,7 +1,7 @@
 <!--
-  Copyright (c) 2025 Rackslab
+  Copyright (c) 2023-2026 Slurm Web Plus
 
-  This file is part of Slurm-web.
+  This file is part of Slurm Web Plus.
 
   SPDX-License-Identifier: MIT
 -->
@@ -14,12 +14,13 @@ defineProps<{
 </script>
 
 <template>
-  <div class="sm:flex sm:items-center">
-    <div class="sm:flex-auto">
-      <h1 class="text-base leading-6 font-semibold text-gray-900 dark:text-gray-100">
+  <div class="ui-page-header">
+    <div class="ui-page-copy">
+      <p class="ui-page-kicker">Settings Center</p>
+      <h1 class="text-3xl font-bold text-[var(--color-brand-ink-strong)]">
         {{ title }}
       </h1>
-      <p v-if="description" class="mt-2 text-sm text-gray-700 dark:text-gray-300">
+      <p v-if="description" class="ui-page-description">
         {{ description }}
       </p>
     </div>

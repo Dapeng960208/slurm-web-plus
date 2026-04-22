@@ -1,7 +1,7 @@
 <!--
-  Copyright (c) 2023-2024 Rackslab
+  Copyright (c) 2023-2026 Slurm Web Plus
 
-  This file is part of Slurm-web.
+  This file is part of Slurm Web Plus.
 
   SPDX-License-Identifier: MIT
 -->
@@ -24,6 +24,7 @@ import { TagIcon } from '@heroicons/vue/16/solid'
 
 import { useRuntimeStore } from '@/stores/runtime'
 import { useRuntimeConfiguration } from '@/plugins/runtimeConfiguration'
+import BrandLogo from '@/components/BrandLogo.vue'
 
 const { entry } = defineProps<{
   entry: string
@@ -75,7 +76,7 @@ function isFeatureEnabled(feature: string | undefined): boolean {
         leave-from="opacity-100"
         leave-to="opacity-0"
       >
-        <div class="fixed inset-0 bg-gray-900/80" />
+        <div class="fixed inset-0 bg-[rgba(32,42,53,0.7)] backdrop-blur-sm" />
       </TransitionChild>
 
       <div class="fixed inset-0 flex">
@@ -88,7 +89,7 @@ function isFeatureEnabled(feature: string | undefined): boolean {
           leave-from="translate-x-0"
           leave-to="-translate-x-full"
         >
-          <DialogPanel class="relative mr-16 flex w-full max-w-xs flex-1">
+          <DialogPanel class="relative mr-16 flex w-full max-w-sm flex-1">
             <TransitionChild
               as="template"
               enter="ease-in-out duration-300"
@@ -108,30 +109,29 @@ function isFeatureEnabled(feature: string | undefined): boolean {
 
             <!-- Sidebar component -->
             <div
-              class="bg-slurmweb flex grow flex-col gap-y-5 overflow-y-auto px-6 pb-4 dark:bg-gray-700"
+              class="flex grow flex-col gap-y-6 overflow-y-auto rounded-r-[32px] border-r border-white/10 bg-[linear-gradient(180deg,rgba(32,42,53,0.98),rgba(56,59,64,0.94))] px-6 pb-6 text-white shadow-[var(--shadow-panel)]"
             >
-              <div class="flex h-16 shrink-0 items-center justify-center">
-                <img class="flex h-12" src="/logo/slurm-web_horizontal.png" alt="Slurm-web" />
+              <div class="flex shrink-0 items-center justify-center pt-7">
+                <BrandLogo size="sm" />
               </div>
-              <div
-                class="text-slurmweb-dark dark:text-slurmweb mx-8 -mt-10 mb-6 text-right text-xs"
-              >
+              <div class="mx-2 flex items-center justify-between rounded-full border border-white/10 bg-white/6 px-3 py-2 text-xs text-white/70">
+                <span class="font-semibold tracking-[0.18em] uppercase">Cluster Ops</span>
                 <TagIcon class="inline size-3" aria-hidden="true" />
                 {{ runtimeConfiguration.version }}
               </div>
               <nav class="flex flex-1 flex-col">
                 <ul role="list" class="flex flex-1 flex-col gap-y-7">
                   <li>
-                    <ul role="list" class="-mx-2 space-y-1">
+                    <ul role="list" class="space-y-1.5">
                       <li v-for="item in navigation" :key="item.name">
                         <RouterLink
                           v-if="runtimeStore.hasPermission(item.permission) && isFeatureEnabled(item.feature)"
                           :to="{ name: item.route }"
                           :class="[
                             item.route == entry
-                              ? 'bg-slurmweb-dark dark:bg-slurmweb-verydark text-white'
-                              : 'text-slurmweb-font-disabled dark:text-slurmweb-font-disabled/80 hover:text-white',
-                            'group flex gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold'
+                              ? 'bg-[linear-gradient(135deg,rgba(182,232,44,0.95),rgba(152,201,31,0.95))] text-[var(--color-brand-deep)]'
+                              : 'text-white/70 hover:bg-white/8 hover:text-white',
+                            'group flex items-center gap-x-3 rounded-[18px] px-3.5 py-3 text-sm leading-6 font-semibold transition'
                           ]"
                           @click="sidebarOpen = false"
                         >
@@ -139,8 +139,8 @@ function isFeatureEnabled(feature: string | undefined): boolean {
                             :is="item.icon"
                             :class="[
                               item.route == entry
-                                ? 'text-white'
-                                : 'text-slurmweb-font-disabled group-hover:text-white',
+                                ? 'text-[var(--color-brand-deep)]'
+                                : 'text-white/60 group-hover:text-white',
                               'h-6 w-6 shrink-0'
                             ]"
                             aria-hidden="true"
@@ -153,10 +153,10 @@ function isFeatureEnabled(feature: string | undefined): boolean {
                   <li class="mt-auto">
                     <RouterLink
                       :to="{ name: 'settings' }"
-                      class="text-slurmweb-light hover:bg-slurmweb-dark hover:dark:bg-slurmweb-verydark group -mx-2 flex gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold hover:text-white"
+                      class="group flex items-center gap-x-3 rounded-[18px] border border-white/10 bg-white/6 px-3.5 py-3 text-sm leading-6 font-semibold text-white/80 transition hover:bg-white/12 hover:text-white"
                     >
                       <Cog6ToothIcon
-                        class="text-slurmweb-font-disabled h-6 w-6 shrink-0 group-hover:text-white"
+                        class="h-6 w-6 shrink-0 text-white/60 group-hover:text-white"
                         aria-hidden="true"
                       />
                       Settings
@@ -172,32 +172,38 @@ function isFeatureEnabled(feature: string | undefined): boolean {
   </TransitionRoot>
 
   <!-- Static sidebar for desktop -->
-  <div class="hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-72 lg:flex-col">
-    <!-- Sidebar component, swap this element with another sidebar if you like -->
-    <div class="bg-slurmweb flex grow flex-col gap-y-5 overflow-y-auto px-6 pb-4 dark:bg-gray-700">
-      <div class="flex h-24 shrink-0 items-center">
-        <img src="/logo/slurm-web_horizontal.png" alt="Slurm-web" class="block dark:hidden" />
-        <img src="/logo/slurm-web_horizontal_dark.png" alt="Slurm-web" class="hidden dark:block" />
+  <div class="hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-80 lg:flex-col lg:p-4">
+    <div class="flex grow flex-col gap-y-6 overflow-y-auto rounded-[32px] border border-white/10 bg-[linear-gradient(180deg,rgba(32,42,53,0.98),rgba(56,59,64,0.95))] px-6 pb-6 text-white shadow-[var(--shadow-panel)]">
+      <div class="flex shrink-0 items-center justify-center pt-7">
+        <BrandLogo size="sm" />
       </div>
-      <div class="text-slurmweb-dark dark:text-slurmweb -mt-12 mb-4 text-right text-xs">
-        <TagIcon class="inline size-3" aria-hidden="true" /> {{ runtimeConfiguration.version }}
+      <div class="flex items-center justify-between rounded-full border border-white/10 bg-white/6 px-3 py-2 text-xs text-white/70">
+        <span class="font-semibold tracking-[0.18em] uppercase">Slurm Monitor</span>
+        <span><TagIcon class="mr-1 inline size-3" aria-hidden="true" /> {{ runtimeConfiguration.version }}</span>
       </div>
       <nav class="flex flex-1 flex-col">
         <ul role="list" class="flex flex-1 flex-col gap-y-7">
           <li>
-            <ul role="list" class="-mx-2 space-y-1">
+            <ul role="list" class="space-y-1.5">
               <li v-for="item in navigation" :key="item.name">
                 <RouterLink
                   v-if="runtimeStore.hasPermission(item.permission) && isFeatureEnabled(item.feature)"
                   :to="{ name: item.route }"
                   :class="[
                     item.route == entry
-                      ? 'bg-slurmweb-dark dark:bg-slurmweb-verydark text-white'
-                      : 'hover:slurmweb-dark text-slurmweb-font-disabled dark:text-slurmweb-font-disabled/80 hover:text-white',
-                    'group flex gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold'
+                      ? 'bg-[linear-gradient(135deg,rgba(182,232,44,0.95),rgba(152,201,31,0.95))] text-[var(--color-brand-deep)]'
+                      : 'text-white/70 hover:bg-white/8 hover:text-white',
+                    'group flex items-center gap-x-3 rounded-[18px] px-3.5 py-3 text-sm leading-6 font-semibold transition'
                   ]"
                 >
-                  <component :is="item.icon" :class="['h-6 w-6 shrink-0']" aria-hidden="true" />
+                  <component
+                    :is="item.icon"
+                    :class="[
+                      item.route == entry ? 'text-[var(--color-brand-deep)]' : 'text-white/60 group-hover:text-white',
+                      'h-6 w-6 shrink-0 transition'
+                    ]"
+                    aria-hidden="true"
+                  />
                   {{ item.name }}
                 </RouterLink>
               </li>
@@ -206,9 +212,9 @@ function isFeatureEnabled(feature: string | undefined): boolean {
           <li class="mt-auto">
             <RouterLink
               :to="{ name: 'settings' }"
-              class="text-slurmweb-light hover:bg-slurmweb-dark hover:dark:bg-slurmweb-verydark group -mx-2 flex gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold hover:text-white"
+              class="group flex items-center gap-x-3 rounded-[18px] border border-white/10 bg-white/6 px-3.5 py-3 text-sm leading-6 font-semibold text-white/80 transition hover:bg-white/12 hover:text-white"
             >
-              <Cog6ToothIcon class="h-6 w-6 shrink-0" aria-hidden="true" />
+              <Cog6ToothIcon class="h-6 w-6 shrink-0 text-white/60 group-hover:text-white" aria-hidden="true" />
               Settings
             </RouterLink>
           </li>

@@ -1,7 +1,7 @@
 <!--
-  Copyright (c) 2023-2024 Rackslab
+  Copyright (c) 2023-2026 Slurm Web Plus
 
-  This file is part of Slurm-web.
+  This file is part of Slurm Web Plus.
 
   SPDX-License-Identifier: MIT
 -->
@@ -18,61 +18,66 @@ const authStore = useAuthStore()
 
 <template>
   <SettingsTabs entry="Account" />
-  <div class="px-4 pt-16 sm:px-6 lg:px-8">
-    <SettingsHeader title="Account" description="Personal account information and permissions." />
-    <div class="mt-6 border-t border-gray-100 dark:border-gray-700">
-      <dl class="divide-y divide-gray-100 dark:divide-gray-700">
-        <div class="px-4 py-6 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0">
-          <dt class="text-sm leading-6 font-medium text-gray-900 dark:text-gray-100">Username</dt>
-          <dd class="mt-1 text-sm leading-6 text-gray-700 sm:col-span-2 sm:mt-0 dark:text-gray-300">
-            {{ authStore.username }}
-          </dd>
+  <div class="ui-panel ui-section">
+    <SettingsHeader title="Account" description="Personal identity, group membership and cluster-level permissions." />
+
+    <div class="ui-detail-list mt-6">
+      <dl>
+        <div class="ui-detail-row">
+          <dt class="ui-detail-term">Username</dt>
+          <dd class="ui-detail-value">{{ authStore.username }}</dd>
         </div>
-        <div class="px-4 py-6 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0">
-          <dt class="text-sm leading-6 font-medium text-gray-900 dark:text-gray-100">Full name</dt>
-          <dd class="mt-1 text-sm leading-6 text-gray-700 sm:col-span-2 sm:mt-0 dark:text-gray-300">
-            {{ authStore.fullname }}
-          </dd>
+        <div class="ui-detail-row">
+          <dt class="ui-detail-term">Full name</dt>
+          <dd class="ui-detail-value">{{ authStore.fullname }}</dd>
         </div>
-        <div class="px-4 py-6 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0">
-          <dt class="text-sm leading-6 font-medium text-gray-900 dark:text-gray-100">Groups</dt>
-          <dd class="mt-1 text-sm leading-6 text-gray-700 sm:col-span-2 sm:mt-0 dark:text-gray-300">
-            {{ authStore.groups?.join(', ') }}
-          </dd>
+        <div class="ui-detail-row">
+          <dt class="ui-detail-term">Groups</dt>
+          <dd class="ui-detail-value">{{ authStore.groups?.join(', ') }}</dd>
         </div>
       </dl>
     </div>
-    <div class="pt-16 sm:flex sm:items-center">
-      <div class="sm:flex-auto">
-        <h1 class="text-base leading-6 font-semibold text-gray-900 dark:text-gray-100">
-          Clusters permissions
-        </h1>
-      </div>
+  </div>
+
+  <div class="ui-table-shell overflow-x-auto">
+    <div class="border-b border-[rgba(80,105,127,0.08)] px-6 py-5">
+      <h2 class="ui-panel-title">Cluster Permissions</h2>
+      <p class="ui-panel-description mt-2">
+        Roles and actions currently granted for each accessible cluster.
+      </p>
     </div>
-    <div class="mt-6 border-t border-gray-100 dark:border-gray-700">
-      <dl class="divide-y divide-gray-100 dark:divide-gray-700">
-        <div
-          v-for="cluster in runtimeStore.getAllowedClusters()"
-          :key="cluster.name"
-          class="px-4 py-6 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0"
-        >
-          <dt class="text-sm leading-6 font-medium text-gray-900 dark:text-gray-100">
-            {{ cluster.name }}
-          </dt>
-          <dd class="mt-1 text-sm leading-6 text-gray-700 sm:col-span-2 sm:mt-0 dark:text-gray-300">
-            Roles :
-            <ul class="mb-4 ml-6 list-disc">
-              <li v-for="role in cluster.permissions.roles.sort()" :key="role">{{ role }}</li>
-            </ul>
-            Actions :
-            <ul class="ml-6 list-disc">
-              <li v-for="action in cluster.permissions.actions.sort()" :key="action">
-                {{ action }}
-              </li>
-            </ul>
-          </dd>
-        </div>
-      </dl>
+
+    <div class="inline-block min-w-full align-middle">
+      <table class="ui-table min-w-full">
+        <thead>
+          <tr>
+            <th scope="col" class="py-3.5 pr-3 pl-6 text-left">Cluster</th>
+            <th scope="col" class="px-3 py-3.5 text-left">Roles</th>
+            <th scope="col" class="px-3 py-3.5 text-left">Actions</th>
+          </tr>
+        </thead>
+        <tbody class="text-sm text-[var(--color-brand-muted)]">
+          <tr v-for="cluster in runtimeStore.getAllowedClusters()" :key="cluster.name">
+            <td class="py-4 pr-3 pl-6 align-top font-semibold text-[var(--color-brand-ink-strong)]">
+              {{ cluster.name }}
+            </td>
+            <td class="px-3 py-4 align-top">
+              <div class="flex flex-wrap gap-2">
+                <span v-for="role in cluster.permissions.roles.sort()" :key="role" class="ui-chip">
+                  {{ role }}
+                </span>
+              </div>
+            </td>
+            <td class="px-3 py-4 align-top">
+              <div class="flex flex-wrap gap-2">
+                <span v-for="action in cluster.permissions.actions.sort()" :key="action" class="ui-chip">
+                  {{ action }}
+                </span>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
     </div>
   </div>
 </template>

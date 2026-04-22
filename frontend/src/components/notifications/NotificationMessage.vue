@@ -1,7 +1,7 @@
 <!--
-  Copyright (c) 2024 Rackslab
+  Copyright (c) 2023-2026 Slurm Web Plus
 
-  This file is part of Slurm-web.
+  This file is part of Slurm Web Plus.
 
   SPDX-License-Identifier: MIT
 -->
@@ -19,31 +19,32 @@ const { notification } = defineProps<{ notification: Notification }>()
 
 <template>
   <div
-    class="pointer-events-auto w-full max-w-sm overflow-hidden rounded-lg bg-white shadow-lg ring-1 ring-black/5 dark:bg-gray-700 dark:shadow-gray-100/20"
-    style="margin-top: 50"
+    class="pointer-events-auto w-full overflow-hidden rounded-[24px] border border-white/70 bg-[rgba(255,255,255,0.92)] shadow-[var(--shadow-panel)] backdrop-blur-xl"
   >
     <div class="flex items-start p-4">
-      <div class="shrink-0">
+      <div class="shrink-0 rounded-full p-2" :class="notification.type == 'INFO' ? 'bg-[rgba(123,191,31,0.12)]' : 'bg-[rgba(216,75,80,0.12)]'">
         <CheckCircleIcon
           v-if="notification.type == 'INFO'"
-          class="h-6 w-6 text-green-700"
+          class="h-6 w-6 text-[var(--color-brand-success)]"
           aria-hidden="true"
         />
         <XCircleIcon
           v-else-if="notification.type == 'ERROR'"
-          class="h-6 w-6 text-red-400"
+          class="h-6 w-6 text-[var(--color-brand-danger)]"
           aria-hidden="true"
         />
       </div>
       <div class="ml-3 w-0 flex-1 pt-0.5">
-        <p class="text-sm font-medium text-gray-900 dark:text-gray-100">{{ notification.type }}</p>
-        <p class="mt-1 text-sm text-gray-500 dark:text-gray-200">{{ notification.message }}</p>
+        <p class="text-sm font-semibold tracking-[0.14em] text-[var(--color-brand-muted)] uppercase">
+          {{ notification.type }}
+        </p>
+        <p class="mt-1 text-sm leading-6 text-[var(--color-brand-ink)]">{{ notification.message }}</p>
       </div>
       <div class="ml-4 flex shrink-0">
         <button
           type="button"
           @click="runtimeStore.removeNotification(notification)"
-          class="focus:ring-slurmweb inline-flex rounded-md bg-white text-gray-400 hover:text-gray-500 focus:ring-2 focus:ring-offset-2 focus:outline-hidden dark:bg-gray-700 hover:dark:text-gray-100"
+          class="inline-flex rounded-full bg-[rgba(239,244,246,0.88)] p-2 text-[var(--color-brand-muted)] transition hover:bg-white hover:text-[var(--color-brand-ink-strong)] focus:outline-hidden"
         >
           <span class="sr-only">Close</span>
           <XMarkIcon class="h-5 w-5" aria-hidden="true" />

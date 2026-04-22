@@ -1,7 +1,7 @@
 <!--
-  Copyright (c) 2025 Rackslab
+  Copyright (c) 2023-2026 Slurm Web Plus
 
-  This file is part of Slurm-web.
+  This file is part of Slurm Web Plus.
 
   SPDX-License-Identifier: MIT
 -->
@@ -42,15 +42,15 @@ onMounted(() => {
 </script>
 
 <template>
-  <LoadingSpinner v-if="loading" class="animate-pulse text-gray-400" :size="5" />
-  <span v-else-if="cluster.stats" class="hidden text-center md:flex">
-    <span class="mt-1 w-20 text-xs leading-5 text-gray-500">
+  <LoadingSpinner v-if="loading" class="animate-pulse text-[var(--color-brand-muted)]" :size="5" />
+  <span v-else-if="cluster.stats" class="hidden gap-2 text-center md:flex">
+    <span class="ui-panel-soft mt-1 w-24 rounded-[16px] px-2 py-2 text-xs leading-5 text-[var(--color-brand-muted)]">
       <ServerIcon class="h-6 w-full" />
       <p class="w-full">
         {{ cluster.stats.resources.nodes }} node{{ cluster.stats.resources.nodes > 1 ? 's' : '' }}
       </p>
     </span>
-    <span class="mt-1 w-20 text-xs leading-5 text-gray-500">
+    <span class="ui-panel-soft mt-1 w-24 rounded-[16px] px-2 py-2 text-xs leading-5 text-[var(--color-brand-muted)]">
       <PlayCircleIcon class="h-6 w-full" />
       <p class="w-full">
         {{ cluster.stats.jobs.running }} job{{ cluster.stats.jobs.running > 1 ? 's' : '' }}

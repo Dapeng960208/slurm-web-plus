@@ -109,12 +109,6 @@ chmod 755 /usr/share/slurm-web/html
 │   ├── index-1kC13rNr.css
 │   ├── index-D1_rxi9c.js
 │   └── vendor-CiGd9Lby.js
-├── logo/
-│   ├── slurm-web_horizontal.png
-│   ├── slurm-web_horizontal_dark.png
-│   ├── slurm-web_logo.png
-│   └── slurm-web_logo_dark.png
-├── chart_placeholder.svg
 ├── config.json
 └── favicon.ico
 ```

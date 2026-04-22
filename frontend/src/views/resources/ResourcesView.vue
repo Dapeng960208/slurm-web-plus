@@ -1,7 +1,7 @@
 <!--
-  Copyright (c) 2023-2024 Rackslab
+  Copyright (c) 2023-2026 Slurm Web Plus
 
-  This file is part of Slurm-web.
+  This file is part of Slurm Web Plus.
 
   SPDX-License-Identifier: MIT
 -->
@@ -25,6 +25,7 @@ import ResourcesFiltersPanel from '@/components/resources/ResourcesFiltersPanel.
 import ResourcesFiltersBar from '@/components/resources/ResourcesFiltersBar.vue'
 import { foldNodeset, expandNodeset } from '@/composables/Nodeset'
 import ErrorAlert from '@/components/ErrorAlert.vue'
+import PageHeader from '@/components/PageHeader.vue'
 import { ChevronRightIcon, MagnifyingGlassPlusIcon } from '@heroicons/vue/20/solid'
 
 const { cluster } = defineProps<{ cluster: string }>()
@@ -43,12 +44,6 @@ function arraysEqual<CType>(a: Array<CType>, b: Array<CType>): boolean {
   if (a === b) return true
   if (a == null || b == null) return false
   if (a.length !== b.length) return false
-
-  // If you don't care about the order of the elements inside
-  // the array, you should sort both arrays here.
-  // Please note that calling sort on an array will modify that array.
-  // you might want to clone your array first.
-
   for (let i = 0; i < a.length; ++i) {
     if (a[i] !== b[i]) return false
   }
@@ -91,14 +86,11 @@ const foldedNodes: Ref<FoldedClusterNode[]> = computed(() => {
       similarNodes.push(currentNode.name)
     } else {
       finishSet()
-      // Prepare next iteration
       previousNode = { ...currentNode, number: 1 }
       similarNodes = [currentNode.name]
-      // Push next folded node in result
       result.push(previousNode)
     }
   }
-  // handle last node
   finishSet()
   return result
 })
@@ -107,36 +99,18 @@ function updateQueryParameters() {
   router.push({ name: 'resources', query: runtimeStore.resources.query() as LocationQueryRaw })
 }
 
-/*
- * Watch states and users filters in Pinia store to update route query
- * accordingly.
- *
- * This is not explained in Pinia documentation but to watch Pinia store nested
- * attribute, the solution is to used watch getter. This solution has been found
- * here: https://stackoverflow.com/a/71937507
- */
 watch(
   () => runtimeStore.resources.filters.states,
-  () => {
-    updateQueryParameters()
-  }
+  () => updateQueryParameters()
 )
 watch(
   () => runtimeStore.resources.filters.partitions,
-  () => {
-    updateQueryParameters()
-  }
+  () => updateQueryParameters()
 )
-/*
- * Update foldedNodesShow record when foldedNodes.value is updated. This is not
- * a computed ref because computed refs are read-only and we need to modify
- * foldedNodesShow values in template.
- */
 watch(
   () => foldedNodes.value,
   () => {
     const newFoldedNodesShow: Record<string, boolean> = {}
-
     for (const foldedNodeset of foldedNodes.value) {
       if (foldedNodesShow.value && foldedNodeset.name in foldedNodesShow.value) {
         newFoldedNodesShow[foldedNodeset.name] = foldedNodesShow.value[foldedNodeset.name]
@@ -150,57 +124,39 @@ watch(
 
 watch(
   () => cluster,
-  (new_cluster) => {
-    setCluster(new_cluster)
+  (newCluster) => {
+    setCluster(newCluster)
   }
 )
 
 onMounted(() => {
   if (['states', 'partitions'].some((parameter) => parameter in route.query)) {
     if (route.query.states) {
-      /* Retrieve the states filters from query and update the store */
       runtimeStore.resources.filters.states = []
       ;(route.query.states as string).split(',').forEach((state: string) => {
         if (isFiltersClusterNodeMainState(state)) runtimeStore.resources.filters.states.push(state)
       })
     }
     if (route.query.partitions) {
-      /* Retrieve the partitions filters from query and update the store */
       runtimeStore.resources.filters.partitions = (route.query.partitions as string).split(',')
     }
   } else {
-    /* Route has no query parameter. Update query parameters to match those that
-     * can be defined in runtime store. This typically happens when user define
-     * filters, leave jobs route (eg. in left menu) and comes back. */
     updateQueryParameters()
   }
 })
 </script>
 
 <template>
-  <ClusterMainLayout
-    menu-entry="resources"
-    :cluster="cluster"
-    :breadcrumb="[{ title: 'Resources' }]"
-  >
-    <div>
+  <ClusterMainLayout menu-entry="resources" :cluster="cluster" :breadcrumb="[{ title: 'Resources' }]">
+    <div class="ui-page ui-page-wide">
       <ResourcesFiltersPanel :cluster="cluster" :nbNodes="filteredNodes.length" />
 
-      <div class="mx-auto flex items-center justify-between px-4 py-16 sm:px-6 lg:px-8">
-        <div>
-          <h1 class="text-3xl font-bold tracking-tight text-gray-900 dark:text-gray-100">Nodes</h1>
-          <p class="mt-4 max-w-xl text-sm text-gray-700 dark:text-gray-300">
-            State of nodes on cluster
-          </p>
-        </div>
-        <div v-if="loaded" class="mt-4 text-right text-gray-600 dark:text-gray-300">
-          <div class="text-5xl font-bold">{{ filteredNodes.length }}</div>
-          <div class="text-sm font-light">node{{ filteredNodes.length > 1 ? 's' : '' }} found</div>
-        </div>
-        <div v-else class="flex animate-pulse space-x-4">
-          <div class="h-14 w-14 rounded-2xl bg-slate-200 dark:bg-slate-800"></div>
-        </div>
-      </div>
+      <PageHeader
+        title="Nodes"
+        description="Current node state, allocation pressure and partition visibility across the cluster."
+        :metric-value="loaded ? filteredNodes.length : undefined"
+        :metric-label="`node${filteredNodes.length > 1 ? 's' : ''} found`"
+      />
 
       <ResourcesDiagramThumbnail
         v-if="runtimeStore.getCluster(cluster).racksdb"
@@ -215,9 +171,9 @@ onMounted(() => {
         <span class="font-medium">{{ cluster }}</span></ErrorAlert
       >
       <div v-else class="mt-8 flow-root">
-        <div class="-mx-4 -my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
+        <div class="ui-table-shell -mx-4 overflow-x-auto sm:-mx-6 lg:-mx-8">
           <div class="inline-block min-w-full py-2 align-middle">
-            <table class="min-w-full divide-y divide-gray-300 dark:divide-gray-500">
+            <table class="ui-table min-w-full">
               <thead>
                 <tr class="text-sm font-semibold text-gray-900 dark:text-gray-200">
                   <th scope="col" colspan="2" class="w-12 py-3.5 pr-3 text-left sm:pl-6 lg:pl-8">
@@ -231,15 +187,13 @@ onMounted(() => {
                   <th scope="col" class="px-3 py-3.5 text-left">Partitions</th>
                 </tr>
               </thead>
-              <tbody
-                class="divide-y divide-gray-200 text-sm text-gray-500 dark:divide-gray-700 dark:text-gray-300"
-              >
+              <tbody class="divide-y divide-gray-200 text-sm text-gray-500 dark:divide-gray-700 dark:text-gray-300">
                 <template v-for="node in foldedNodes" :key="node.name">
                   <tr>
                     <td class="w-4">
                       <button
                         v-if="node.number > 1"
-                        class="-mr-2 flex h-10 w-10 items-center justify-center rounded-md p-2 text-gray-400"
+                        class="-mr-2 flex h-10 w-10 items-center justify-center rounded-full p-2 text-[var(--color-brand-muted)] transition hover:bg-[rgba(182,232,44,0.12)]"
                         @click="foldedNodesShow[node.name] = !foldedNodesShow[node.name]"
                       >
                         <span class="sr-only">Toggle folded nodes {{ node.name }}</span>
@@ -253,30 +207,24 @@ onMounted(() => {
                     <td class="py-4 text-sm whitespace-nowrap">
                       <RouterLink
                         v-if="node.number == 1"
-                        class="inline-flex text-white hover:font-bold hover:text-gray-500 dark:text-gray-900 hover:dark:text-gray-300"
+                        class="inline-flex text-[var(--color-brand-blue)] transition hover:text-[var(--color-brand-ink-strong)]"
                         :to="{
                           name: 'node',
                           params: { cluster: cluster, nodeName: node.name },
                           query: { returnTo: 'resources' }
                         }"
                       >
-                        <span class="pr-4 font-mono text-black dark:text-gray-100">{{
-                          node.name
-                        }}</span>
+                        <span class="pr-4 font-mono text-[var(--color-brand-ink-strong)]">{{ node.name }}</span>
                         <MagnifyingGlassPlusIcon class="h-4 w-4" />
                       </RouterLink>
                       <button
                         v-else
                         @click="foldedNodesShow[node.name] = !foldedNodesShow[node.name]"
-                        class="hover:font-bold"
+                        class="transition hover:text-[var(--color-brand-ink-strong)]"
                       >
                         <span class="sr-only">Toggle folded nodes {{ node.name }}</span>
-                        <span class="font-mono text-gray-900 dark:text-gray-100">{{
-                          node.name
-                        }}</span>
-                        <span class="px-1 font-normal text-gray-500 italic"
-                          >({{ node.number }})</span
-                        >
+                        <span class="font-mono text-[var(--color-brand-ink-strong)]">{{ node.name }}</span>
+                        <span class="px-1 font-normal text-[var(--color-brand-muted)] italic">({{ node.number }})</span>
                       </button>
                     </td>
                     <td class="px-3 py-4 whitespace-nowrap">
@@ -295,12 +243,9 @@ onMounted(() => {
                       <NodeGPU :node="node" />
                     </td>
                     <td class="px-3 py-4 whitespace-nowrap">
-                      <span
-                        v-for="partition in node.partitions"
-                        :key="partition"
-                        class="rounded-sm bg-gray-500 px-2 py-1 font-medium text-white"
-                        >{{ partition }}</span
-                      >
+                      <span v-for="partition in node.partitions" :key="partition" class="ui-chip mr-1">
+                        {{ partition }}
+                      </span>
                     </td>
                   </tr>
                   <template v-if="node.number > 1">
@@ -313,7 +258,7 @@ onMounted(() => {
                       leave-to-class="-translate-y-6 opacity-0"
                     >
                       <tr v-show="foldedNodesShow[node.name]">
-                        <td colspan="8" class="z-0 bg-gray-300 dark:bg-gray-800">
+                        <td colspan="8" class="z-0 bg-[rgba(239,244,246,0.92)]">
                           <ul
                             role="list"
                             class="m-4 grid grid-cols-1 gap-5 sm:grid-cols-2 sm:gap-4 md:grid-cols-4 xl:grid-cols-8 2xl:grid-cols-16"
@@ -321,10 +266,10 @@ onMounted(() => {
                             <li
                               v-for="_node in expandNodeset(node.name)"
                               :key="_node"
-                              class="col-span-1 divide-y divide-gray-200 rounded-md bg-white text-left font-mono text-xs shadow-xs transition-transform hover:scale-105 dark:bg-gray-700"
+                              class="col-span-1 divide-y divide-[rgba(80,105,127,0.08)] rounded-[18px] border border-white/70 bg-white text-left font-mono text-xs shadow-[var(--shadow-soft)] transition-transform hover:scale-[1.03]"
                             >
                               <button
-                                class="flex w-full items-center justify-between space-x-6 px-4 py-2 text-white hover:text-gray-500 dark:text-gray-700"
+                                class="flex w-full items-center justify-between space-x-6 px-4 py-3 text-[var(--color-brand-blue)] transition hover:text-[var(--color-brand-ink-strong)]"
                                 @click="
                                   router.push({
                                     name: 'node',
@@ -333,10 +278,7 @@ onMounted(() => {
                                   })
                                 "
                               >
-                                <span
-                                  class="visible mr-0 grow text-left text-gray-500 dark:text-gray-100"
-                                  >{{ _node }}</span
-                                >
+                                <span class="visible mr-0 grow text-left text-[var(--color-brand-ink-strong)]">{{ _node }}</span>
                                 <MagnifyingGlassPlusIcon class="h-4 w-4" />
                               </button>
                             </li>

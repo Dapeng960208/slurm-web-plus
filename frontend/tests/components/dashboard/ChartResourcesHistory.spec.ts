@@ -25,7 +25,7 @@ describe('ChartJobsHistogram.vue', () => {
         cluster: 'foo'
       }
     })
-    const placeholder = wrapper.get('img[alt="Loading chart"]')
+    const placeholder = wrapper.get('.ui-chart-skeleton')
     const canvas = wrapper.get({ ref: 'chartCanvas' })
 
     // Start with unloaded data
@@ -62,7 +62,7 @@ describe('ChartJobsHistogram.vue', () => {
     expect(wrapper.getComponent(ErrorAlert).text()).toBe('Unable to retrieve resource metrics.')
     // Chart chart and placeholder are present in DOM
     expect(wrapper.find({ ref: 'chartCanvas' }).exists()).toBeFalsy()
-    expect(wrapper.find('img[alt="Loading chart"]').exists()).toBeFalsy()
+    expect(wrapper.find('.ui-chart-skeleton').exists()).toBeFalsy()
   })
   test('resources types button changes should change datapoller callback with route query update', async () => {
     mount(ChartResourcesHistogram, {

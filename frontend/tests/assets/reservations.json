@@ -1,0 +1,26 @@
+[
+  {
+    "accounts": "acoustic",
+    "end_time": {
+      "infinite": false,
+      "number": 1763907891,
+      "set": true
+    },
+    "flags": [
+      "IGNORE_JOBS",
+      "ANY_NODES",
+      "PART_NODES",
+      "SPEC_NODES",
+      "FLEX"
+    ],
+    "name": "training",
+    "node_count": 4,
+    "node_list": "cn[1-4]",
+    "start_time": {
+      "infinite": false,
+      "number": 1763821491,
+      "set": true
+    },
+    "users": "mcarrillo,dperez"
+  }
+]

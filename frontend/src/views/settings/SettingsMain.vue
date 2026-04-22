@@ -1,7 +1,7 @@
 <!--
-  Copyright (c) 2023-2024 Rackslab
+  Copyright (c) 2023-2026 Slurm Web Plus
 
-  This file is part of Slurm-web.
+  This file is part of Slurm Web Plus.
 
   SPDX-License-Identifier: MIT
 -->
@@ -17,21 +17,19 @@ const runtimeStore = useRuntimeStore()
 
 <template>
   <SettingsTabs entry="General" />
-  <div class="px-4 pt-16 sm:px-6 lg:px-8">
+  <div class="ui-panel ui-section">
     <SettingsHeader
       title="General Settings"
       description="Configure general application preferences."
     />
-    <div>
-      <dl
-        class="mt-6 divide-y divide-gray-100 border-t border-gray-200 text-sm/6 dark:divide-gray-700 dark:border-gray-700"
-      >
+    <div class="ui-panel-soft mt-6 rounded-[24px] px-5">
+      <dl class="divide-y divide-[rgba(80,105,127,0.1)] text-sm/6">
         <div class="py-6 sm:flex">
-          <dt class="font-medium text-gray-900 sm:w-72 sm:flex-none sm:pr-6 dark:text-gray-100">
+          <dt class="font-medium text-[var(--color-brand-ink-strong)] sm:w-72 sm:flex-none sm:pr-6">
             Show node names on cluster diagram
           </dt>
           <dd class="mt-1 flex justify-between gap-x-6 sm:mt-0 sm:flex-auto">
-            <p class="mt-1 text-xs text-gray-600 dark:text-gray-400">
+            <p class="mt-1 text-xs text-[var(--color-brand-muted)]">
               When enabled, node names are displayed on the cluster diagram, provided there is
               enough space. Names are shown with adaptive sizing and automatically positioned based
               on node dimensions.
@@ -40,9 +38,9 @@ const runtimeStore = useRuntimeStore()
               v-model="runtimeStore.resources.showNodeNames"
               :class="[
                 runtimeStore.resources.showNodeNames
-                  ? 'bg-slurmweb dark:bg-slurmweb'
-                  : 'bg-gray-200 dark:bg-gray-600',
-                'focus:ring-slurmweb relative mt-1 inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:ring-2 focus:ring-offset-2 focus:outline-none'
+                  ? 'bg-[linear-gradient(135deg,rgba(182,232,44,0.95),rgba(152,201,31,0.95))]'
+                  : 'bg-[rgba(80,105,127,0.16)]',
+                'relative mt-1 inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none'
               ]"
             >
               <span class="sr-only">Use setting</span>

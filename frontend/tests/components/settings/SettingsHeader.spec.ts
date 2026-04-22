@@ -13,7 +13,7 @@ describe('SettingsHeader.vue', () => {
     const heading = wrapper.get('h1')
     expect(heading.text()).toBe('Test Title')
 
-    const description = wrapper.get('p')
+    const description = wrapper.get('.ui-page-description')
     expect(description.text()).toBe('Test description')
   })
 })

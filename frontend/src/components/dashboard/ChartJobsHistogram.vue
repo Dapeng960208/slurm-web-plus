@@ -1,7 +1,7 @@
 <!--
-  Copyright (c) 2024 Rackslab
+  Copyright (c) 2023-2026 Slurm Web Plus
 
-  This file is part of Slurm-web.
+  This file is part of Slurm Web Plus.
 
   SPDX-License-Identifier: MIT
 -->
@@ -11,6 +11,7 @@ import { useTemplateRef, watch } from 'vue'
 import { useLiveHistogram } from '@/composables/charts/LiveHistogram'
 import type { MetricJobState } from '@/composables/GatewayAPI'
 import { useRuntimeStore } from '@/stores/runtime'
+import ChartSkeleton from '@/components/ChartSkeleton.vue'
 import ErrorAlert from '@/components/ErrorAlert.vue'
 
 const { cluster } = defineProps<{ cluster: string }>()
@@ -90,13 +91,12 @@ watch(
   <ErrorAlert v-if="liveChart.metrics.unable.value" class="mt-4"
     >Unable to retrieve jobs metrics.</ErrorAlert
   >
-  <div v-else class="h-96 w-full">
-    <img
-      v-show="!liveChart.metrics.loaded.value"
-      class="h-full object-fill"
-      src="/chart_placeholder.svg"
-      alt="Loading chart"
-    />
-    <canvas v-show="liveChart.metrics.loaded.value" ref="chartCanvas"></canvas>
+  <div v-else class="ui-chart-shell">
+    <ChartSkeleton v-show="!liveChart.metrics.loaded.value" />
+    <canvas
+      v-show="liveChart.metrics.loaded.value"
+      ref="chartCanvas"
+      class="h-full w-full"
+    ></canvas>
   </div>
 </template>

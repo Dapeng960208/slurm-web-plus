@@ -41,7 +41,7 @@ describe('DashboardView.vue', () => {
       }
     })
     // Check presence of metrics and values.
-    expect(wrapper.findAll('p').map((element) => element.text())).toStrictEqual([
+    expect(wrapper.findAll('.ui-stat-label').map((element) => element.text())).toStrictEqual([
       'Nodes',
       'Cores',
       'Memory',
