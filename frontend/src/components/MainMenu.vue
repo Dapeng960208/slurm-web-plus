@@ -112,7 +112,7 @@ function isFeatureEnabled(feature: string | undefined): boolean {
               class="flex grow flex-col gap-y-6 overflow-y-auto rounded-r-[32px] border-r border-white/10 bg-[linear-gradient(180deg,rgba(32,42,53,0.98),rgba(56,59,64,0.94))] px-6 pb-6 text-white shadow-[var(--shadow-panel)]"
             >
               <div class="flex shrink-0 items-center justify-center pt-7">
-                <BrandLogo size="sm" />
+                <BrandLogo size="sm" :framed="false" />
               </div>
               <div class="mx-2 flex items-center justify-between rounded-full border border-white/10 bg-white/6 px-3 py-2 text-xs text-white/70">
                 <span class="font-semibold tracking-[0.18em] uppercase">Cluster Ops</span>
@@ -175,7 +175,7 @@ function isFeatureEnabled(feature: string | undefined): boolean {
   <div class="hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-80 lg:flex-col lg:p-4">
     <div class="flex grow flex-col gap-y-6 overflow-y-auto rounded-[32px] border border-white/10 bg-[linear-gradient(180deg,rgba(32,42,53,0.98),rgba(56,59,64,0.95))] px-6 pb-6 text-white shadow-[var(--shadow-panel)]">
       <div class="flex shrink-0 items-center justify-center pt-7">
-        <BrandLogo size="sm" />
+        <BrandLogo size="sm" :framed="false" />
       </div>
       <div class="flex items-center justify-between rounded-full border border-white/10 bg-white/6 px-3 py-2 text-xs text-white/70">
         <span class="font-semibold tracking-[0.18em] uppercase">Slurm Monitor</span>
