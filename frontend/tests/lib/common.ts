@@ -45,6 +45,9 @@ interface MockClusterDataPoller<ResultType> {
   data: Ref<ResultType | undefined>
   unable: Ref<boolean>
   loaded: Ref<boolean>
+  initialLoading: Ref<boolean>
+  refreshing: Ref<boolean>
+  setCluster: (newCluster: string) => void
   setCallback: (newCallback: GatewayAnyClusterApiKey) => void
   setParam: (newOtherParam: string | number) => void
 }
@@ -54,6 +57,9 @@ export function getMockClusterDataPoller<ResultType>(): MockClusterDataPoller<Re
     data: ref(undefined),
     unable: ref(false),
     loaded: ref(true),
+    initialLoading: ref(false),
+    refreshing: ref(false),
+    setCluster: vi.fn(),
     setCallback: vi.fn(),
     setParam: vi.fn()
   }

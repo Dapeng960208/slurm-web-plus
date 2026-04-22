@@ -7,6 +7,7 @@ import type { ClusterJob } from '@/composables/GatewayAPI'
 import jobs from '../assets/jobs.json'
 import ErrorAlert from '@/components/ErrorAlert.vue'
 import InfoAlert from '@/components/InfoAlert.vue'
+import TableSkeletonRows from '@/components/TableSkeletonRows.vue'
 
 const mockClusterDataPoller = getMockClusterDataPoller<ClusterJob[]>()
 
@@ -28,7 +29,10 @@ describe('JobView.vue', () => {
       }
     ]
     // Reset mockClusterDataPoller unable to its default value before every tests.
+    mockClusterDataPoller.data.value = undefined
     mockClusterDataPoller.unable.value = false
+    mockClusterDataPoller.loaded.value = true
+    mockClusterDataPoller.initialLoading.value = false
   })
   test('display jobs', () => {
     mockClusterDataPoller.data.value = jobs
@@ -78,5 +82,19 @@ describe('JobView.vue', () => {
     expect(wrapper.getComponent(InfoAlert).text()).toBe('No jobs found on cluster foo')
     // Check absence of main table
     expect(wrapper.find('main table').exists()).toBeFalsy()
+  })
+  test('show table skeleton while jobs are loading', () => {
+    mockClusterDataPoller.loaded.value = false
+    mockClusterDataPoller.initialLoading.value = true
+
+    const wrapper = mount(JobsView, {
+      props: {
+        cluster: 'foo'
+      }
+    })
+
+    expect(wrapper.find('main table').exists()).toBeTruthy()
+    expect(wrapper.findComponent(TableSkeletonRows).exists()).toBe(true)
+    expect(wrapper.findAll('[data-testid="table-skeleton-row"]').length).toBeGreaterThan(0)
   })
 })

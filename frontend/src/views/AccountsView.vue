@@ -14,12 +14,12 @@ import type { ClusterAssociation, ClusterAccountTreeNode } from '@/composables/G
 import InfoAlert from '@/components/InfoAlert.vue'
 import ErrorAlert from '@/components/ErrorAlert.vue'
 import AccountTreeNode from '@/components/accounts/AccountTreeNode.vue'
-import LoadingSpinner from '@/components/LoadingSpinner.vue'
 import PageHeader from '@/components/PageHeader.vue'
+import PanelSkeleton from '@/components/PanelSkeleton.vue'
 
 const { cluster } = defineProps<{ cluster: string }>()
 
-const { data, unable, loaded } = useClusterDataPoller<ClusterAssociation[]>(
+const { data, unable, loaded, initialLoading } = useClusterDataPoller<ClusterAssociation[]>(
   cluster,
   'associations',
   120000
@@ -153,25 +153,24 @@ watch(
       >Unable to retrieve associations from cluster
       <span class="font-medium">{{ cluster }}</span></ErrorAlert
     >
-    <div v-else-if="!loaded" class="mt-6 text-[var(--color-brand-muted)]">
-      <LoadingSpinner :size="5" />
-      Loading accounts…
-    </div>
-    <InfoAlert v-else-if="data?.length == 0"
+    <InfoAlert v-else-if="loaded && data?.length == 0"
       >No association defined on cluster <span class="font-medium">{{ cluster }}</span></InfoAlert
     >
-    <div v-else class="ui-panel ui-section mt-8">
-      <ul role="list" class="space-y-4">
-        <AccountTreeNode
-          v-for="(node, index) in accountTree"
-          :key="node.account"
-          :node="node"
-          :expanded-accounts="expandedAccounts"
-          :is-last="index === accountTree.length - 1"
-          :cluster="cluster"
-          @toggle="toggleAccount"
-        />
-      </ul>
+    <div v-else class="mt-8">
+      <PanelSkeleton v-if="initialLoading" :rows="7" />
+      <div v-else class="ui-panel ui-section">
+        <ul role="list" class="space-y-4">
+          <AccountTreeNode
+            v-for="(node, index) in accountTree"
+            :key="node.account"
+            :node="node"
+            :expanded-accounts="expandedAccounts"
+            :is-last="index === accountTree.length - 1"
+            :cluster="cluster"
+            @toggle="toggleAccount"
+          />
+        </ul>
+      </div>
     </div>
   </ClusterMainLayout>
 </template>

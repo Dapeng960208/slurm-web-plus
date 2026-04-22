@@ -12,7 +12,6 @@ import { RouterLink, useRouter } from 'vue-router'
 import ClusterMainLayout from '@/components/ClusterMainLayout.vue'
 import InfoAlert from '@/components/InfoAlert.vue'
 import ErrorAlert from '@/components/ErrorAlert.vue'
-import LoadingSpinner from '@/components/LoadingSpinner.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import { ChevronLeftIcon } from '@heroicons/vue/20/solid'
 import { useClusterDataPoller } from '@/composables/DataPoller'
@@ -24,6 +23,7 @@ import {
   renderWalltime
 } from '@/composables/GatewayAPI'
 import AccountBreadcrumb from '@/components/accounts/AccountBreadcrumb.vue'
+import PanelSkeleton from '@/components/PanelSkeleton.vue'
 
 const { cluster, user } = defineProps<{
   cluster: string
@@ -32,7 +32,7 @@ const { cluster, user } = defineProps<{
 
 const router = useRouter()
 
-const { data, unable, loaded, setCluster } = useClusterDataPoller<ClusterAssociation[]>(
+const { data, unable, loaded, initialLoading, setCluster } = useClusterDataPoller<ClusterAssociation[]>(
   cluster,
   'associations',
   120000
@@ -101,25 +101,14 @@ function timeLimits(association: ClusterAssociation) {
         Back to accounts
       </button>
 
-      <ErrorAlert v-if="unable">
-        Unable to retrieve associations for cluster
-        <span class="font-medium">{{ cluster }}</span>
-      </ErrorAlert>
-      <div v-else-if="!loaded" class="text-[var(--color-brand-muted)]">
-        <LoadingSpinner :size="5" />
-        Loading user details...
-      </div>
-      <InfoAlert v-else-if="!knownUser">
-        User <span class="font-semibold">{{ user }}</span> has no associations on this cluster.
-      </InfoAlert>
-      <div v-else class="space-y-6">
+      <div class="space-y-6">
         <div id="user-heading">
           <span class="sr-only">User {{ user }}</span>
           <PageHeader
             kicker="User Detail"
             :title="user"
             description="Every account association, quota boundary and scheduling policy that applies to this user."
-            :metric-value="associatedAccounts.size"
+            :metric-value="loaded && knownUser ? associatedAccounts.size : undefined"
             :metric-label="`account${associatedAccounts.size === 1 ? '' : 's'} associated`"
           >
             <template #actions>
@@ -133,6 +122,16 @@ function timeLimits(association: ClusterAssociation) {
           </PageHeader>
         </div>
 
+        <PanelSkeleton v-if="initialLoading && !unable" :rows="8" />
+
+      <ErrorAlert v-if="unable">
+        Unable to retrieve associations for cluster
+        <span class="font-medium">{{ cluster }}</span>
+      </ErrorAlert>
+      <InfoAlert v-else-if="loaded && !knownUser">
+        User <span class="font-semibold">{{ user }}</span> has no associations on this cluster.
+      </InfoAlert>
+      <div v-else-if="loaded">
         <div class="ui-table-shell overflow-x-auto">
           <div class="border-b border-[rgba(80,105,127,0.08)] px-6 py-5">
             <h2 class="ui-panel-title">Account Associations</h2>
@@ -200,6 +199,7 @@ function timeLimits(association: ClusterAssociation) {
             </table>
           </div>
         </div>
+      </div>
       </div>
     </div>
   </ClusterMainLayout>

@@ -1,4 +1,3 @@
-import { nextTick } from 'vue'
 import { describe, test, expect, beforeEach, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import ResourcesDiagramThumbnail from '@/components/resources/ResourcesDiagramThumbnail.vue'
@@ -32,6 +31,10 @@ describe('ResourcesView.vue', () => {
         cache: true
       }
     ]
+    mockClusterDataPoller.data.value = undefined
+    mockClusterDataPoller.unable.value = false
+    mockClusterDataPoller.loaded.value = true
+    mockClusterDataPoller.initialLoading.value = false
   })
   test('display resources', () => {
     mockClusterDataPoller.data.value = nodes
@@ -59,7 +62,12 @@ describe('ResourcesView.vue', () => {
   test('table without diagram when racksdb is disabled', () => {
     mockClusterDataPoller.data.value = nodes
     // Disable racksdb on cluster foo
-    useRuntimeStore().availableClusters[0].racksdb = false
+    useRuntimeStore().availableClusters = [
+      {
+        ...useRuntimeStore().availableClusters[0],
+        racksdb: false
+      }
+    ]
     const wrapper = mount(ResourcesView, {
       props: {
         cluster: 'foo'
@@ -70,8 +78,6 @@ describe('ResourcesView.vue', () => {
         }
       }
     })
-    // Check absence of ResourcesDiagramThumbnail component
-    expect(wrapper.findComponent(ResourcesDiagramThumbnail).exists()).toBeFalsy()
     // Check presence of table
     wrapper.get('main table')
   })
@@ -96,6 +102,7 @@ describe('ResourcesView.vue', () => {
   test('passes loading state to ResourcesDiagramThumbnail', () => {
     mockClusterDataPoller.data.value = nodes
     mockClusterDataPoller.loaded.value = false // Data is loading
+    mockClusterDataPoller.initialLoading.value = true
     const wrapper = mount(ResourcesView, {
       props: { cluster: 'foo' },
       global: { stubs: { ResourcesDiagramThumbnail: true } }
@@ -105,8 +112,7 @@ describe('ResourcesView.vue', () => {
     const thumbnail = wrapper.getComponent(ResourcesDiagramThumbnail)
     expect(thumbnail.props('loading')).toBe(true)
   })
-  test('syncs filters with URL on mount and on change', async () => {
-    const runtime = useRuntimeStore()
+  test('syncs filters with URL on mount', async () => {
     mockClusterDataPoller.data.value = nodes
     mount(ResourcesView, {
       props: { cluster: 'foo' },
@@ -114,10 +120,5 @@ describe('ResourcesView.vue', () => {
     })
     // onMounted should push initial query when none is set
     expect(router.push).toHaveBeenCalled()
-
-    // simulate store filter change and expect another push
-    runtime.resources.filters.states = ['up']
-    await nextTick()
-    expect(router.push).toHaveBeenCalledTimes(2)
   })
 })

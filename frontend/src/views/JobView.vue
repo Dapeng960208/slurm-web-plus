@@ -18,8 +18,9 @@ import JobStatusBadge from '@/components/job/JobStatusBadge.vue'
 import JobProgress from '@/components/job/JobProgress.vue'
 import JobBackButton from '@/components/job/JobBackButton.vue'
 import ErrorAlert from '@/components/ErrorAlert.vue'
-import LoadingSpinner from '@/components/LoadingSpinner.vue'
 import PageHeader from '@/components/PageHeader.vue'
+import DetailSkeletonList from '@/components/DetailSkeletonList.vue'
+import PanelSkeleton from '@/components/PanelSkeleton.vue'
 import { HashtagIcon } from '@heroicons/vue/24/outline'
 import JobFieldRaw from '@/components/job/JobFieldRaw.vue'
 import JobFieldComment from '@/components/job/JobFieldComment.vue'
@@ -55,7 +56,8 @@ function isValidJobField(key: string): key is JobField {
   return typeof key === 'string' && jobsFields.includes(key as JobField)
 }
 
-const { data, unable, loaded, setCluster } = useClusterDataPoller<ClusterIndividualJob>(
+const { data, unable, loaded, initialLoading, setCluster, setParam } =
+  useClusterDataPoller<ClusterIndividualJob>(
   cluster,
   'job',
   5000,
@@ -188,6 +190,13 @@ watch(
   }
 )
 
+watch(
+  () => id,
+  (newId) => {
+    setParam(newId)
+  }
+)
+
 onMounted(() => {
   if (!route.hash) return
   const field = route.hash.slice(1)
@@ -206,15 +215,7 @@ onMounted(() => {
     <div class="ui-page ui-page-readable">
       <JobBackButton :cluster="cluster" />
 
-      <ErrorAlert v-if="unable"
-        >Unable to retrieve job {{ id }} from cluster
-        <span class="font-medium">{{ cluster }}</span></ErrorAlert
-      >
-      <div v-else-if="!loaded" class="text-[var(--color-brand-muted)]">
-        <LoadingSpinner :size="5" />
-        Loading job {{ id }}...
-      </div>
-      <div v-else-if="data" class="space-y-6">
+      <div class="space-y-6">
         <PageHeader
           kicker="Job Detail"
           :title="`Job ${id}`"
@@ -222,17 +223,41 @@ onMounted(() => {
         >
           <template #actions>
             <div class="flex flex-wrap items-center justify-end gap-3">
-              <JobStatusBadge :status="data.state.current" :large="true" />
-              <span
-                v-if="data.state.reason != 'None'"
-                class="ui-chip border-[rgba(216,75,80,0.18)] bg-[rgba(216,75,80,0.08)] text-[var(--color-brand-danger)]"
-              >
-                {{ data.state.reason }}
-              </span>
+              <template v-if="data">
+                <JobStatusBadge :status="data.state.current" :large="true" />
+                <span
+                  v-if="data.state.reason != 'None'"
+                  class="ui-chip border-[rgba(216,75,80,0.18)] bg-[rgba(216,75,80,0.08)] text-[var(--color-brand-danger)]"
+                >
+                  {{ data.state.reason }}
+                </span>
+              </template>
+              <div
+                v-else-if="initialLoading"
+                class="h-10 w-28 animate-pulse rounded-full bg-[rgba(80,105,127,0.12)]"
+              />
             </div>
           </template>
         </PageHeader>
 
+        <div v-if="!loaded && !unable" class="grid gap-6 xl:grid-cols-[minmax(280px,0.76fr)_minmax(0,1.24fr)]">
+          <PanelSkeleton :rows="5" />
+          <div class="ui-panel ui-section">
+            <div class="mb-5">
+              <h2 class="ui-panel-title">Job Configuration</h2>
+              <p class="ui-panel-description mt-2">
+                Core identity, command context and requested versus allocated resources.
+              </p>
+            </div>
+            <DetailSkeletonList :rows="10" />
+          </div>
+        </div>
+
+      <ErrorAlert v-if="unable"
+        >Unable to retrieve job {{ id }} from cluster
+        <span class="font-medium">{{ cluster }}</span></ErrorAlert
+      >
+      <div v-else-if="data">
         <div class="grid gap-6 xl:grid-cols-[minmax(280px,0.76fr)_minmax(0,1.24fr)]">
           <div class="ui-panel ui-section">
             <div class="mb-5">
@@ -298,6 +323,7 @@ onMounted(() => {
             </div>
           </div>
         </div>
+      </div>
       </div>
     </div>
   </ClusterMainLayout>

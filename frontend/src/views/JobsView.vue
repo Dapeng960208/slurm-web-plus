@@ -23,8 +23,8 @@ import JobsFiltersBar from '@/components/jobs/JobsFiltersBar.vue'
 import JobResources from '@/components/jobs/JobResources.vue'
 import InfoAlert from '@/components/InfoAlert.vue'
 import ErrorAlert from '@/components/ErrorAlert.vue'
-import LoadingSpinner from '@/components/LoadingSpinner.vue'
 import PageHeader from '@/components/PageHeader.vue'
+import TableSkeletonRows from '@/components/TableSkeletonRows.vue'
 
 import { ChevronLeftIcon, ChevronRightIcon } from '@heroicons/vue/20/solid'
 import { PlusSmallIcon, WindowIcon } from '@heroicons/vue/24/outline'
@@ -32,7 +32,7 @@ import { PlusSmallIcon, WindowIcon } from '@heroicons/vue/24/outline'
 const { cluster } = defineProps<{ cluster: string }>()
 
 const route = useRoute()
-const { data, unable, loaded, setCluster } = useClusterDataPoller<ClusterJob[]>(
+const { data, unable, loaded, initialLoading, setCluster } = useClusterDataPoller<ClusterJob[]>(
   cluster,
   'jobs',
   5000
@@ -224,11 +224,7 @@ onMounted(() => {
           >Unable to retrieve jobs from cluster
           <span class="font-medium">{{ cluster }}</span></ErrorAlert
         >
-        <div v-else-if="!loaded" class="text-[var(--color-brand-muted)] sm:pl-6 lg:pl-8">
-          <LoadingSpinner :size="5" />
-          Loading jobs...
-        </div>
-        <InfoAlert v-else-if="data?.length == 0"
+        <InfoAlert v-else-if="loaded && data?.length == 0"
           >No jobs found on cluster <span class="font-medium">{{ cluster }}</span></InfoAlert
         >
         <div v-else class="ui-table-shell -mx-4 overflow-x-auto sm:-mx-6 lg:-mx-8">
@@ -251,7 +247,10 @@ onMounted(() => {
                   </th>
                 </tr>
               </thead>
-              <tbody class="divide-y divide-gray-200 text-sm text-gray-500 dark:divide-gray-700 dark:text-gray-300">
+              <tbody
+                v-if="loaded"
+                class="divide-y divide-gray-200 text-sm text-gray-500 dark:divide-gray-700 dark:text-gray-300"
+              >
                 <tr v-for="job in sortedJobs.slice(firstjob, lastjob)" :key="job.job_id">
                   <td class="py-4 pr-3 font-medium whitespace-nowrap text-[var(--color-brand-ink-strong)] sm:pl-6 lg:pl-8">
                     {{ job.job_id }}
@@ -290,6 +289,13 @@ onMounted(() => {
                   </td>
                 </tr>
               </tbody>
+              <TableSkeletonRows
+                v-else
+                :columns="9"
+                :rows="8"
+                first-cell-class="sm:pl-6 lg:pl-8"
+                cell-class="px-3"
+              />
             </table>
 
             <div class="flex items-center justify-between border-t border-[rgba(80,105,127,0.08)] px-4 py-3 sm:px-6">
@@ -299,7 +305,7 @@ onMounted(() => {
               </div>
               <div class="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
                 <div>
-                  <p class="text-sm text-[var(--color-brand-muted)]">
+                  <p v-if="loaded" class="text-sm text-[var(--color-brand-muted)]">
                     Showing
                     <span class="font-medium">{{ firstjob }}</span>
                     to
@@ -308,10 +314,11 @@ onMounted(() => {
                     <span class="font-medium">{{ sortedJobs.length }}</span>
                     jobs
                   </p>
+                  <div v-else class="h-4 w-40 animate-pulse rounded-full bg-[rgba(80,105,127,0.12)]" />
                 </div>
                 <div>
                   <nav
-                    v-if="lastpage > 1"
+                    v-if="loaded && lastpage > 1"
                     class="isolate inline-flex -space-x-px rounded-full shadow-[var(--shadow-soft)]"
                     aria-label="Pagination"
                   >
@@ -362,6 +369,10 @@ onMounted(() => {
                       <ChevronRightIcon class="h-5 w-5" aria-hidden="true" />
                     </button>
                   </nav>
+                  <div
+                    v-else-if="initialLoading"
+                    class="h-10 w-56 animate-pulse rounded-full bg-[rgba(80,105,127,0.12)]"
+                  />
                 </div>
               </div>
             </div>

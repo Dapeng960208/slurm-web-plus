@@ -7,7 +7,7 @@ import type { ClusterAssociation } from '@/composables/GatewayAPI'
 import associations from '../assets/associations.json'
 import ErrorAlert from '@/components/ErrorAlert.vue'
 import InfoAlert from '@/components/InfoAlert.vue'
-import LoadingSpinner from '@/components/LoadingSpinner.vue'
+import PanelSkeleton from '@/components/PanelSkeleton.vue'
 import AccountTreeNode from '@/components/accounts/AccountTreeNode.vue'
 
 const mockClusterDataPoller = getMockClusterDataPoller<ClusterAssociation[]>()
@@ -32,10 +32,12 @@ describe('AccountsView.vue', () => {
     mockClusterDataPoller.data.value = undefined
     mockClusterDataPoller.unable.value = false
     mockClusterDataPoller.loaded.value = false
+    mockClusterDataPoller.initialLoading.value = false
   })
 
   test('displays accounts page', () => {
     mockClusterDataPoller.loaded.value = true
+    mockClusterDataPoller.initialLoading.value = false
     mockClusterDataPoller.data.value = associations
 
     const wrapper = mount(AccountsView, {
@@ -44,24 +46,20 @@ describe('AccountsView.vue', () => {
       }
     })
 
-    // Check page title and description
     expect(wrapper.get('h1').text()).toBe('Accounts')
     expect(wrapper.text()).toContain('Accounts defined on cluster')
 
-    // Count unique accounts (excluding user associations)
     const uniqueAccounts = associations.filter((a) => !a.user).length
-
-    // Check account count
     expect(wrapper.text()).toContain(uniqueAccounts.toString())
     expect(wrapper.text()).toContain('account' + (uniqueAccounts > 1 ? 's' : ''))
 
-    // Check tree nodes
     const treeNodes = wrapper.findAllComponents(AccountTreeNode)
     expect(treeNodes.length).toBeGreaterThan(0)
   })
 
-  test('shows loading spinner when data is not loaded', () => {
+  test('shows skeleton when data is not loaded', () => {
     mockClusterDataPoller.loaded.value = false
+    mockClusterDataPoller.initialLoading.value = true
 
     const wrapper = mount(AccountsView, {
       props: {
@@ -69,13 +67,14 @@ describe('AccountsView.vue', () => {
       }
     })
 
-    wrapper.getComponent(LoadingSpinner)
-    expect(wrapper.text()).toContain('Loading accounts…')
+    wrapper.getComponent(PanelSkeleton)
+    expect(wrapper.text()).toContain('Accounts')
   })
 
   test('shows error alert when unable to retrieve associations', () => {
     mockClusterDataPoller.unable.value = true
     mockClusterDataPoller.loaded.value = true
+    mockClusterDataPoller.initialLoading.value = false
 
     const wrapper = mount(AccountsView, {
       props: {
@@ -90,6 +89,7 @@ describe('AccountsView.vue', () => {
 
   test('shows info alert when no associations', () => {
     mockClusterDataPoller.loaded.value = true
+    mockClusterDataPoller.initialLoading.value = false
     mockClusterDataPoller.data.value = []
 
     const wrapper = mount(AccountsView, {

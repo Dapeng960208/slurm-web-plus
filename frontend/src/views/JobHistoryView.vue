@@ -7,7 +7,7 @@
 -->
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useGatewayAPI } from '@/composables/GatewayAPI'
 import type { ClusterTRES, JobHistoryRecord } from '@/composables/GatewayAPI'
@@ -17,8 +17,9 @@ import JobStatusBadge from '@/components/job/JobStatusBadge.vue'
 import JobBackButton from '@/components/job/JobBackButton.vue'
 import JobResources from '@/components/job/JobResources.vue'
 import ErrorAlert from '@/components/ErrorAlert.vue'
-import LoadingSpinner from '@/components/LoadingSpinner.vue'
 import PageHeader from '@/components/PageHeader.vue'
+import DetailSkeletonList from '@/components/DetailSkeletonList.vue'
+import PanelSkeleton from '@/components/PanelSkeleton.vue'
 import { HashtagIcon } from '@heroicons/vue/24/outline'
 import { CheckIcon } from '@heroicons/vue/20/solid'
 
@@ -26,7 +27,7 @@ const props = defineProps<{ cluster: string; id: number }>()
 
 const route = useRoute()
 const gateway = useGatewayAPI()
-const loading = ref(true)
+const initialLoading = ref(true)
 const error = ref<string | null>(null)
 const job = ref<JobHistoryRecord | null>(null)
 
@@ -249,7 +250,7 @@ const fields = (record: JobHistoryRecord): HistoryFieldRow[] => [
 
 const timeline = computed(() => (job.value ? timelineSteps(job.value) : []))
 
-onMounted(async () => {
+async function loadJobHistory() {
   try {
     job.value = await gateway.job_history_detail(props.cluster, props.id)
     if (!route.hash) return
@@ -260,9 +261,20 @@ onMounted(async () => {
   } catch (caughtError: unknown) {
     error.value = caughtError instanceof Error ? caughtError.message : String(caughtError)
   } finally {
-    loading.value = false
+    initialLoading.value = false
   }
-})
+}
+
+watch(
+  () => [props.cluster, props.id],
+  () => {
+    job.value = null
+    error.value = null
+    initialLoading.value = true
+    void loadJobHistory()
+  },
+  { immediate: true }
+)
 </script>
 
 <template>
@@ -277,24 +289,40 @@ onMounted(async () => {
     <div class="ui-page ui-page-readable">
       <JobBackButton :cluster="cluster" route-name="jobs-history" />
 
-      <ErrorAlert v-if="error">Unable to retrieve job history record {{ id }}: {{ error }}</ErrorAlert>
-
-      <div v-else-if="loading" class="text-[var(--color-brand-muted)]">
-        <LoadingSpinner :size="5" />
-        Loading job history record {{ id }}...
-      </div>
-
-      <div v-else-if="job" class="space-y-6">
+      <div class="space-y-6">
         <PageHeader
           kicker="Job History"
-          :title="`Job ${job.job_id}`"
+          :title="`Job ${job?.job_id ?? id}`"
           description="Recorded timeline, scheduler context and resource details captured for this finished job."
         >
           <template #actions>
-            <JobStatusBadge :status="splitJobHistoryState(job.job_state)" :large="true" />
+            <JobStatusBadge
+              v-if="job"
+              :status="splitJobHistoryState(job.job_state)"
+              :large="true"
+            />
+            <div
+              v-else-if="initialLoading"
+              class="h-10 w-28 animate-pulse rounded-full bg-[rgba(80,105,127,0.12)]"
+            />
           </template>
         </PageHeader>
 
+        <div v-if="initialLoading && !error" class="grid gap-6 xl:grid-cols-[minmax(280px,0.72fr)_minmax(0,1.28fr)]">
+          <PanelSkeleton :rows="5" />
+          <div class="ui-panel ui-section">
+            <div class="mb-5">
+              <h2 class="ui-panel-title">Recorded Fields</h2>
+              <p class="ui-panel-description mt-2">
+                Scheduler metadata and accounting values archived for this historical record.
+              </p>
+            </div>
+            <DetailSkeletonList :rows="11" />
+          </div>
+        </div>
+
+      <ErrorAlert v-if="error">Unable to retrieve job history record {{ id }}: {{ error }}</ErrorAlert>
+      <div v-else-if="job">
         <div class="grid gap-6 xl:grid-cols-[minmax(280px,0.72fr)_minmax(0,1.28fr)]">
           <div class="ui-panel ui-section">
             <div class="mb-5">
@@ -421,6 +449,7 @@ onMounted(async () => {
             </div>
           </div>
         </div>
+      </div>
       </div>
     </div>
   </ClusterMainLayout>

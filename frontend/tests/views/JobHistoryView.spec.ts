@@ -3,6 +3,7 @@ import { flushPromises, mount } from '@vue/test-utils'
 import JobHistoryView from '@/views/JobHistoryView.vue'
 import JobStatusBadge from '@/components/job/JobStatusBadge.vue'
 import { init_plugins } from '../lib/common'
+import PanelSkeleton from '@/components/PanelSkeleton.vue'
 
 const mockGatewayAPI = {
   job_history_detail: vi.fn()
@@ -263,5 +264,22 @@ describe('JobHistoryView.vue', () => {
     await flushPromises()
 
     expect(wrapper.get('#exit-code').text()).toContain('SIGNALED (TERM/15)')
+  })
+
+  test('renders job history skeleton before the API resolves', () => {
+    mockGatewayAPI.job_history_detail.mockReturnValue(new Promise(() => {}))
+
+    const wrapper = mount(JobHistoryView, {
+      props: { cluster: 'foo', id: 5 },
+      global: {
+        stubs: {
+          ClusterMainLayout: { template: '<div><slot /></div>' },
+          JobBackButton: { template: '<button>Back</button>' }
+        }
+      }
+    })
+
+    expect(wrapper.text()).toContain('Job 5')
+    expect(wrapper.findComponent(PanelSkeleton).exists()).toBe(true)
   })
 })

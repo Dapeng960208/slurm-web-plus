@@ -26,6 +26,7 @@ import ResourcesFiltersBar from '@/components/resources/ResourcesFiltersBar.vue'
 import { foldNodeset, expandNodeset } from '@/composables/Nodeset'
 import ErrorAlert from '@/components/ErrorAlert.vue'
 import PageHeader from '@/components/PageHeader.vue'
+import TableSkeletonRows from '@/components/TableSkeletonRows.vue'
 import { ChevronRightIcon, MagnifyingGlassPlusIcon } from '@heroicons/vue/20/solid'
 
 const { cluster } = defineProps<{ cluster: string }>()
@@ -34,7 +35,7 @@ const foldedNodesShow: Ref<Record<string, boolean>> = ref({})
 const runtimeStore = useRuntimeStore()
 const route = useRoute()
 const router = useRouter()
-const { data, unable, loaded, setCluster } = useClusterDataPoller<ClusterNode[]>(
+const { data, unable, loaded, initialLoading, setCluster } = useClusterDataPoller<ClusterNode[]>(
   cluster,
   'nodes',
   10000
@@ -162,7 +163,7 @@ onMounted(() => {
         v-if="runtimeStore.getCluster(cluster).racksdb"
         :cluster="cluster"
         :nodes="filteredNodes"
-        :loading="!loaded"
+        :loading="initialLoading"
       />
       <ResourcesFiltersBar />
 
@@ -187,7 +188,10 @@ onMounted(() => {
                   <th scope="col" class="px-3 py-3.5 text-left">Partitions</th>
                 </tr>
               </thead>
-              <tbody class="divide-y divide-gray-200 text-sm text-gray-500 dark:divide-gray-700 dark:text-gray-300">
+              <tbody
+                v-if="loaded"
+                class="divide-y divide-gray-200 text-sm text-gray-500 dark:divide-gray-700 dark:text-gray-300"
+              >
                 <template v-for="node in foldedNodes" :key="node.name">
                   <tr>
                     <td class="w-4">
@@ -289,6 +293,13 @@ onMounted(() => {
                   </template>
                 </template>
               </tbody>
+              <TableSkeletonRows
+                v-else
+                :columns="8"
+                :rows="8"
+                first-cell-class="sm:pl-6 lg:pl-8"
+                cell-class="px-3"
+              />
             </table>
           </div>
         </div>

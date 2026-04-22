@@ -19,9 +19,12 @@ import NodeMainState from '@/components/resources/NodeMainState.vue'
 import NodeAllocationState from '@/components/resources/NodeAllocationState.vue'
 import JobStatusBadge from '@/components/job/JobStatusBadge.vue'
 import ErrorAlert from '@/components/ErrorAlert.vue'
-import LoadingSpinner from '@/components/LoadingSpinner.vue'
 import BackToResourcesButton from '@/components/resources/BackToResourcesButton.vue'
 import PageHeader from '@/components/PageHeader.vue'
+import DetailSkeletonList from '@/components/DetailSkeletonList.vue'
+import PanelSkeleton from '@/components/PanelSkeleton.vue'
+import StatCardSkeleton from '@/components/StatCardSkeleton.vue'
+import LoadingSpinner from '@/components/LoadingSpinner.vue'
 import { XCircleIcon } from '@heroicons/vue/20/solid'
 
 const { cluster, nodeName } = defineProps<{ cluster: string; nodeName: string }>()
@@ -126,6 +129,19 @@ watch(
 )
 
 watch(
+  () => nodeName,
+  (newNodeName) => {
+    node.setParam(newNodeName)
+    jobs?.setParam(newNodeName)
+    if (runtimeStore.currentCluster?.node_metrics) {
+      nodeMetrics.value = null
+      nodeMetricsError.value = false
+      void fetchNodeMetrics()
+    }
+  }
+)
+
+watch(
   () => runtimeStore.currentCluster?.node_metrics,
   (enabled) => {
     stopMetricsPolling()
@@ -156,15 +172,7 @@ onUnmounted(() => {
     <div class="ui-page ui-page-readable">
       <BackToResourcesButton :cluster="cluster" />
 
-      <ErrorAlert v-if="node.unable.value"
-        >Unable to retrieve node {{ nodeName }} from cluster
-        <span class="font-medium">{{ cluster }}</span></ErrorAlert
-      >
-      <div v-else-if="!node.loaded.value" class="text-[var(--color-brand-muted)]">
-        <LoadingSpinner :size="5" />
-        Loading node {{ nodeName }}...
-      </div>
-      <div v-else-if="node.data.value" class="space-y-6">
+      <div class="space-y-6">
         <PageHeader
           kicker="Node Detail"
           :title="`Node ${nodeName}`"
@@ -172,18 +180,45 @@ onUnmounted(() => {
         >
           <template #actions>
             <div class="flex flex-wrap items-center justify-end gap-3">
-              <NodeMainState :status="node.data.value.state" />
-              <NodeAllocationState :status="node.data.value.state" />
-              <span
-                v-if="node.data.value.reason"
-                class="ui-chip border-[rgba(216,75,80,0.16)] bg-[rgba(216,75,80,0.08)] text-[var(--color-brand-danger)]"
-              >
-                {{ node.data.value.reason }}
-              </span>
+              <template v-if="node.data.value">
+                <NodeMainState :status="node.data.value.state" />
+                <NodeAllocationState :status="node.data.value.state" />
+                <span
+                  v-if="node.data.value.reason"
+                  class="ui-chip border-[rgba(216,75,80,0.16)] bg-[rgba(216,75,80,0.08)] text-[var(--color-brand-danger)]"
+                >
+                  {{ node.data.value.reason }}
+                </span>
+              </template>
+              <div
+                v-else-if="node.initialLoading.value"
+                class="h-10 w-32 animate-pulse rounded-full bg-[rgba(80,105,127,0.12)]"
+              />
             </div>
           </template>
         </PageHeader>
 
+        <template v-if="node.initialLoading.value && !node.unable.value">
+          <StatCardSkeleton :cards="4" />
+          <div class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(320px,0.9fr)]">
+            <div class="ui-panel ui-section">
+              <div class="mb-5">
+                <h2 class="ui-panel-title">Node Overview</h2>
+                <p class="ui-panel-description mt-2">
+                  Scheduling status, hardware layout, assigned partitions and currently running jobs.
+                </p>
+              </div>
+              <DetailSkeletonList :rows="10" />
+            </div>
+            <PanelSkeleton :rows="4" />
+          </div>
+        </template>
+
+      <ErrorAlert v-if="node.unable.value"
+        >Unable to retrieve node {{ nodeName }} from cluster
+        <span class="font-medium">{{ cluster }}</span></ErrorAlert
+      >
+      <div v-else-if="node.data.value">
         <div class="ui-stat-grid">
           <div class="ui-stat-card">
             <div class="ui-stat-label">CPU Capacity</div>
@@ -427,6 +462,7 @@ onUnmounted(() => {
             </div>
           </div>
         </div>
+      </div>
       </div>
     </div>
   </ClusterMainLayout>

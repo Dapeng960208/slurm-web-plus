@@ -173,4 +173,23 @@ describe('JobsHistoryView.vue', () => {
       })
     )
   })
+
+  test('renders history table skeleton before the API resolves', async () => {
+    mockGatewayAPI.jobs_history.mockReturnValue(new Promise(() => {}))
+
+    const wrapper = mount(JobsHistoryView, {
+      props: { cluster: 'foo' },
+      global: {
+        stubs: {
+          ClusterMainLayout: { template: '<div><slot /></div>' },
+          JobsHistoryFiltersPanel: { template: '<div />' },
+          JobsHistoryFiltersBar: { template: '<div />' },
+          JobsHistorySorter: { template: '<div />' }
+        }
+      }
+    })
+
+    expect(wrapper.text()).toContain('Jobs History')
+    expect(wrapper.findAll('[data-testid="table-skeleton-row"]').length).toBeGreaterThan(0)
+  })
 })

@@ -9,6 +9,7 @@ import NodeMainState from '@/components/resources/NodeMainState.vue'
 import nodeAllocated from '../assets/node-allocated.json'
 import jobsNode from '../assets/jobs-node.json'
 import { nextTick } from 'vue'
+import PanelSkeleton from '@/components/PanelSkeleton.vue'
 
 const mockNodeDataPoller = getMockClusterDataPoller<ClusterNode>()
 const mockJobsDataPoller = getMockClusterDataPoller<ClusterJob[]>()
@@ -21,6 +22,7 @@ vi.mock('@/composables/DataPoller', () => ({
 describe('NodeView.vue', () => {
   beforeEach(() => {
     init_plugins()
+    useClusterDataPoller.mockReset()
     useRuntimeStore().availableClusters = [
       {
         name: 'foo',
@@ -31,6 +33,14 @@ describe('NodeView.vue', () => {
         cache: true
       }
     ]
+    mockNodeDataPoller.data.value = undefined
+    mockNodeDataPoller.unable.value = false
+    mockNodeDataPoller.loaded.value = true
+    mockNodeDataPoller.initialLoading.value = false
+    mockJobsDataPoller.data.value = undefined
+    mockJobsDataPoller.unable.value = false
+    mockJobsDataPoller.loaded.value = true
+    mockJobsDataPoller.initialLoading.value = false
   })
   test('display node details', async () => {
     useClusterDataPoller.mockReturnValueOnce(mockNodeDataPoller)
@@ -167,5 +177,22 @@ describe('NodeView.vue', () => {
     // Memory: 5000/16000 = 31.25% -> 31.3%
     const memoryPercentage = wrapper.get('dl div#allocation dd ul li:nth-child(2) span').text()
     expect(memoryPercentage).toBe('(31.3%)')
+  })
+
+  test('renders node skeleton before node data arrives', () => {
+    useClusterDataPoller.mockReturnValueOnce(mockNodeDataPoller)
+    useClusterDataPoller.mockReturnValueOnce(mockJobsDataPoller)
+    mockNodeDataPoller.loaded.value = false
+    mockNodeDataPoller.initialLoading.value = true
+
+    const wrapper = mount(NodeView, {
+      props: {
+        cluster: 'foo',
+        nodeName: 'cn1'
+      }
+    })
+
+    expect(wrapper.text()).toContain('Node cn1')
+    expect(wrapper.findComponent(PanelSkeleton).exists()).toBe(true)
   })
 })

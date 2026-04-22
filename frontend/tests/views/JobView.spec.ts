@@ -9,6 +9,7 @@ import type { ClusterIndividualJob } from '@/composables/GatewayAPI'
 import jobRunning from '../assets/job-running.json'
 import type { RouterMock } from 'vue-router-mock'
 import JobFieldRaw from '@/components/job/JobFieldRaw.vue'
+import PanelSkeleton from '@/components/PanelSkeleton.vue'
 
 const mockClusterDataPoller = getMockClusterDataPoller<ClusterIndividualJob>()
 
@@ -31,10 +32,15 @@ describe('JobView.vue', () => {
         cache: true
       }
     ]
+    mockClusterDataPoller.data.value = undefined
+    mockClusterDataPoller.unable.value = false
+    mockClusterDataPoller.loaded.value = true
+    mockClusterDataPoller.initialLoading.value = false
   })
   test('display job details', () => {
     mockClusterDataPoller.data.value = jobRunning
     mockClusterDataPoller.loaded.value = true
+    mockClusterDataPoller.initialLoading.value = false
     const wrapper = mount(JobView, {
       props: {
         cluster: 'foo',
@@ -90,5 +96,19 @@ describe('JobView.vue', () => {
     // #user hash in route while group field is not highlighted.
     expect(wrapper.get('dl div#user').classes('bg-slurmweb-light')).toBe(true)
     expect(wrapper.get('dl div#group').classes('bg-slurmweb-light')).toBe(false)
+  })
+  test('renders job skeleton before data arrives', () => {
+    mockClusterDataPoller.loaded.value = false
+    mockClusterDataPoller.initialLoading.value = true
+
+    const wrapper = mount(JobView, {
+      props: {
+        cluster: 'foo',
+        id: 1234
+      }
+    })
+
+    expect(wrapper.text()).toContain('Job 1234')
+    expect(wrapper.findComponent(PanelSkeleton).exists()).toBe(true)
   })
 })

@@ -21,7 +21,6 @@ import type {
 import { splitJobHistoryState } from '@/composables/GatewayAPI'
 import { useRuntimeStore } from '@/stores/runtime'
 import ClusterMainLayout from '@/components/ClusterMainLayout.vue'
-import LoadingSpinner from '@/components/LoadingSpinner.vue'
 import ErrorAlert from '@/components/ErrorAlert.vue'
 import InfoAlert from '@/components/InfoAlert.vue'
 import PageHeader from '@/components/PageHeader.vue'
@@ -30,6 +29,7 @@ import JobHistoryResources from '@/components/jobs/JobHistoryResources.vue'
 import JobsHistoryFiltersPanel from '@/components/jobs/JobsHistoryFiltersPanel.vue'
 import JobsHistoryFiltersBar from '@/components/jobs/JobsHistoryFiltersBar.vue'
 import JobsHistorySorter from '@/components/jobs/JobsHistorySorter.vue'
+import TableSkeletonRows from '@/components/TableSkeletonRows.vue'
 import { WindowIcon } from '@heroicons/vue/24/outline'
 import { ChevronLeftIcon, ChevronRightIcon } from '@heroicons/vue/20/solid'
 import { PlusSmallIcon } from '@heroicons/vue/24/outline'
@@ -43,7 +43,8 @@ const runtimeStore = useRuntimeStore()
 const historyStore = runtimeStore.jobsHistory
 const { filters, page, sort, order } = storeToRefs(historyStore)
 
-const loading = ref(false)
+const initialLoading = ref(true)
+const refreshing = ref(false)
 const error = ref<string | null>(null)
 const jobs = ref<JobHistoryRecord[]>([])
 const total = ref(0)
@@ -51,7 +52,7 @@ const pageSize = 50
 const filtersOpen = ref(false)
 
 async function fetchHistory() {
-  loading.value = true
+  refreshing.value = !initialLoading.value
   error.value = null
   try {
     const payload: JobHistoryFilters = {
@@ -70,7 +71,8 @@ async function fetchHistory() {
   } catch (caughtError: unknown) {
     error.value = caughtError instanceof Error ? caughtError.message : String(caughtError)
   } finally {
-    loading.value = false
+    initialLoading.value = false
+    refreshing.value = false
   }
 }
 
@@ -131,7 +133,7 @@ watch(
   () => route.query,
   () => {
     historyStore.hydrate(route.query)
-    fetchHistory()
+    void fetchHistory()
   },
   { immediate: true }
 )
@@ -139,7 +141,11 @@ watch(
 watch(
   () => props.cluster,
   () => {
-    fetchHistory()
+    jobs.value = []
+    total.value = 0
+    initialLoading.value = true
+    refreshing.value = false
+    void fetchHistory()
   }
 )
 </script>
@@ -162,7 +168,7 @@ watch(
       <PageHeader
         title="Jobs History"
         description="Historical job records with scheduler context, state transitions and searchable execution metadata."
-        :metric-value="loading || error ? undefined : total"
+        :metric-value="initialLoading || error ? undefined : total"
         :metric-label="`record${total === 1 ? '' : 's'} found`"
       />
 
@@ -187,11 +193,7 @@ watch(
 
       <div class="mt-8 flow-root">
         <ErrorAlert v-if="error">{{ error }}</ErrorAlert>
-        <div v-else-if="loading" class="text-[var(--color-brand-muted)] sm:pl-6 lg:pl-8">
-          <LoadingSpinner :size="5" />
-          Loading job history...
-        </div>
-        <InfoAlert v-else-if="jobs.length === 0">
+        <InfoAlert v-else-if="!initialLoading && jobs.length === 0">
           No job history records found on cluster <span class="font-medium">{{ cluster }}</span>
         </InfoAlert>
         <div v-else class="ui-table-shell -mx-4 overflow-x-auto sm:-mx-6 lg:-mx-8">
@@ -213,7 +215,7 @@ watch(
                   </th>
                 </tr>
               </thead>
-              <tbody class="text-sm text-[var(--color-brand-muted)]">
+              <tbody v-if="!initialLoading" class="text-sm text-[var(--color-brand-muted)]">
                 <tr v-for="job in jobs" :key="job.id">
                   <td class="py-4 pr-3 font-medium whitespace-nowrap text-[var(--color-brand-ink-strong)] sm:pl-6 lg:pl-8">
                     {{ job.job_id }}
@@ -255,12 +257,19 @@ watch(
                   </td>
                 </tr>
               </tbody>
+              <TableSkeletonRows
+                v-else
+                :columns="10"
+                :rows="8"
+                first-cell-class="sm:pl-6 lg:pl-8"
+                cell-class="px-3"
+              />
             </table>
 
             <div class="flex items-center justify-between border-t border-[rgba(80,105,127,0.08)] px-4 py-3 sm:px-6">
               <div class="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
                 <div>
-                  <p class="text-sm text-[var(--color-brand-muted)]">
+                  <p v-if="!initialLoading" class="text-sm text-[var(--color-brand-muted)]">
                     Showing
                     <span class="font-medium">{{ (page - 1) * pageSize + 1 }}</span>
                     to
@@ -269,10 +278,11 @@ watch(
                     <span class="font-medium">{{ total }}</span>
                     records
                   </p>
+                  <div v-else class="h-4 w-44 animate-pulse rounded-full bg-[rgba(80,105,127,0.12)]" />
                 </div>
                 <div>
                   <nav
-                    v-if="lastpage() > 1"
+                    v-if="!initialLoading && lastpage() > 1"
                     class="isolate inline-flex -space-x-px rounded-full shadow-[var(--shadow-soft)]"
                     aria-label="Pagination"
                   >
@@ -321,6 +331,10 @@ watch(
                       <ChevronRightIcon class="h-5 w-5" aria-hidden="true" />
                     </button>
                   </nav>
+                  <div
+                    v-else-if="initialLoading"
+                    class="h-10 w-56 animate-pulse rounded-full bg-[rgba(80,105,127,0.12)]"
+                  />
                 </div>
               </div>
             </div>

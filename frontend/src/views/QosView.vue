@@ -23,11 +23,16 @@ import ErrorAlert from '@/components/ErrorAlert.vue'
 import QosHelpModal from '@/components/qos/QosHelpModal.vue'
 import type { QosModalLimitDescription } from '@/components/qos/QosHelpModal.vue'
 import PageHeader from '@/components/PageHeader.vue'
+import TableSkeletonRows from '@/components/TableSkeletonRows.vue'
 import { QuestionMarkCircleIcon } from '@heroicons/vue/20/solid'
 
 const { cluster } = defineProps<{ cluster: string }>()
 
-const { data, unable, setCluster } = useClusterDataPoller<ClusterQos[]>(cluster, 'qos', 10000)
+const { data, unable, loaded, setCluster } = useClusterDataPoller<ClusterQos[]>(
+  cluster,
+  'qos',
+  10000
+)
 
 const helpModalShow: Ref<boolean> = ref(false)
 const modalQosLimit: Ref<QosModalLimitDescription | undefined> = ref()
@@ -83,7 +88,7 @@ watch(
     <PageHeader
       title="QOS"
       description="Quality-of-service policies, resource ceilings and scheduling constraints defined on this cluster."
-      :metric-value="data?.length"
+      :metric-value="loaded ? data?.length : undefined"
       metric-label="qos policies"
     />
     <QosHelpModal
@@ -95,7 +100,7 @@ watch(
       >Unable to retrieve qos from cluster
       <span class="font-medium">{{ cluster }}</span></ErrorAlert
     >
-    <InfoAlert v-else-if="data?.length == 0"
+    <InfoAlert v-else-if="loaded && data?.length == 0"
       >No qos defined on cluster <span class="font-medium">{{ cluster }}</span></InfoAlert
     >
     <div v-else class="mt-8 flow-root">
@@ -115,7 +120,10 @@ watch(
                 <th scope="col" class="w-12"></th>
               </tr>
             </thead>
-            <tbody class="divide-y divide-gray-200 text-sm text-gray-600 dark:divide-gray-700 dark:text-gray-300">
+            <tbody
+              v-if="loaded"
+              class="divide-y divide-gray-200 text-sm text-gray-600 dark:divide-gray-700 dark:text-gray-300"
+            >
               <tr v-for="qos in data" :key="qos.name">
                 <td class="py-4 pr-3 whitespace-nowrap text-[var(--color-brand-ink-strong)] sm:pl-6 lg:pl-8">
                   <p class="text-base font-medium">{{ qos.name }}</p>
@@ -180,6 +188,13 @@ watch(
                 </td>
               </tr>
             </tbody>
+            <TableSkeletonRows
+              v-else
+              :columns="7"
+              :rows="6"
+              first-cell-class="sm:pl-6 lg:pl-8"
+              cell-class="px-3"
+            />
           </table>
         </div>
       </div>

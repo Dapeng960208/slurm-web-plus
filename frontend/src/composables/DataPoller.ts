@@ -22,6 +22,8 @@ export interface ClusterDataPoller<ResponseType> {
   data: Ref<ResponseType | undefined>
   unable: Ref<boolean>
   loaded: Ref<boolean>
+  initialLoading: Ref<boolean>
+  refreshing: Ref<boolean>
   setCluster: (newCluster: string) => void
   setCallback: (newCallback: GatewayAnyClusterApiKey) => void
   setParam: (newOtherParam: string | number) => void
@@ -38,6 +40,8 @@ export function useClusterDataPoller<Type>(
   const data: Ref<Type | undefined> = ref()
   const unable: Ref<boolean> = ref(false)
   const loaded: Ref<boolean> = ref(false)
+  const initialLoading: Ref<boolean> = ref(true)
+  const refreshing: Ref<boolean> = ref(false)
   let _stop: boolean = false
   const gateway = useGatewayAPI()
   const runtime = useRuntimeStore()
@@ -50,6 +54,8 @@ export function useClusterDataPoller<Type>(
   }
 
   async function poll() {
+    initialLoading.value = !loaded.value
+    refreshing.value = loaded.value
     try {
       unable.value = false
       if (gateway.isValidGatewayClusterWithStringAPIKey(callback)) {
@@ -72,6 +78,9 @@ export function useClusterDataPoller<Type>(
         /* Ignore canceled requests errors */
         reportOtherError(error)
       }
+    } finally {
+      initialLoading.value = false
+      refreshing.value = false
     }
   }
 
@@ -94,21 +103,33 @@ export function useClusterDataPoller<Type>(
   function setCluster(newCluster: string) {
     stop()
     cluster = newCluster
+    data.value = undefined
+    unable.value = false
     loaded.value = false
+    initialLoading.value = true
+    refreshing.value = false
     start()
   }
 
   function setCallback(newCallback: GatewayAnyClusterApiKey) {
     stop()
     callback = newCallback
+    data.value = undefined
+    unable.value = false
     loaded.value = false
+    initialLoading.value = true
+    refreshing.value = false
     start()
   }
 
   function setParam(newOtherParam: string | number) {
     stop()
     otherParam = newOtherParam
+    data.value = undefined
+    unable.value = false
     loaded.value = false
+    initialLoading.value = true
+    refreshing.value = false
     start()
   }
 
@@ -119,5 +140,14 @@ export function useClusterDataPoller<Type>(
     stop()
   })
 
-  return { data, unable, loaded, setCluster, setCallback, setParam }
+  return {
+    data,
+    unable,
+    loaded,
+    initialLoading,
+    refreshing,
+    setCluster,
+    setCallback,
+    setParam
+  }
 }

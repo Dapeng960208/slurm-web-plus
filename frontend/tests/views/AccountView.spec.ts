@@ -8,8 +8,8 @@ import type { ClusterAssociation } from '@/composables/GatewayAPI'
 import associations from '../assets/associations.json'
 import ErrorAlert from '@/components/ErrorAlert.vue'
 import InfoAlert from '@/components/InfoAlert.vue'
-import LoadingSpinner from '@/components/LoadingSpinner.vue'
 import AccountBreadcrumb from '@/components/accounts/AccountBreadcrumb.vue'
+import PanelSkeleton from '@/components/PanelSkeleton.vue'
 
 const mockClusterDataPoller = getMockClusterDataPoller<ClusterAssociation[]>()
 
@@ -33,10 +33,12 @@ describe('AccountView.vue', () => {
     mockClusterDataPoller.data.value = undefined
     mockClusterDataPoller.unable.value = false
     mockClusterDataPoller.loaded.value = false
+    mockClusterDataPoller.initialLoading.value = false
   })
 
   test('displays account details', () => {
     mockClusterDataPoller.loaded.value = true
+    mockClusterDataPoller.initialLoading.value = false
     mockClusterDataPoller.data.value = associations as ClusterAssociation[]
 
     const wrapper = mount(AccountView, {
@@ -51,7 +53,8 @@ describe('AccountView.vue', () => {
     expect(backButton).toBeDefined()
 
     const accountHeading = wrapper.get('div#account-heading')
-    expect(accountHeading.text()).toContain('Account root')
+    expect(accountHeading.text()).toContain('root')
+    expect(accountHeading.text()).toContain('Account Detail')
 
     const viewJobsLink = accountHeading.getComponent(RouterLink)
     expect(viewJobsLink.props('to')).toEqual({
@@ -96,8 +99,9 @@ describe('AccountView.vue', () => {
     expect(userAssociationsTable.findAll('tbody tr').length).toBeGreaterThan(0)
   })
 
-  test('shows loading spinner when data is not loaded', () => {
+  test('shows account skeleton when data is not loaded', () => {
     mockClusterDataPoller.loaded.value = false
+    mockClusterDataPoller.initialLoading.value = true
 
     const wrapper = mount(AccountView, {
       props: {
@@ -106,13 +110,14 @@ describe('AccountView.vue', () => {
       }
     })
 
-    expect(wrapper.findComponent(LoadingSpinner).exists()).toBe(true)
-    expect(wrapper.text()).toContain('Loading account details...')
+    expect(wrapper.findComponent(PanelSkeleton).exists()).toBe(true)
+    expect(wrapper.get('#account-heading').text()).toContain('root')
   })
 
   test('shows error alert when unable to retrieve associations', () => {
     mockClusterDataPoller.unable.value = true
     mockClusterDataPoller.loaded.value = true
+    mockClusterDataPoller.initialLoading.value = false
 
     const wrapper = mount(AccountView, {
       props: {
@@ -129,6 +134,7 @@ describe('AccountView.vue', () => {
 
   test('shows info alert when account does not exist', () => {
     mockClusterDataPoller.loaded.value = true
+    mockClusterDataPoller.initialLoading.value = false
     mockClusterDataPoller.data.value = []
 
     const wrapper = mount(AccountView, {
@@ -155,6 +161,7 @@ describe('AccountView.vue', () => {
     ]
 
     mockClusterDataPoller.loaded.value = true
+    mockClusterDataPoller.initialLoading.value = false
     mockClusterDataPoller.data.value = accountData
 
     const wrapper = mount(AccountView, {
@@ -181,6 +188,7 @@ describe('AccountView.vue', () => {
     ]
 
     mockClusterDataPoller.loaded.value = true
+    mockClusterDataPoller.initialLoading.value = false
     mockClusterDataPoller.data.value = accountData
 
     const wrapper = mount(AccountView, {

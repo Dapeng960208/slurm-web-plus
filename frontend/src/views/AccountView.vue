@@ -13,11 +13,13 @@ import { ChevronLeftIcon } from '@heroicons/vue/20/solid'
 import ClusterMainLayout from '@/components/ClusterMainLayout.vue'
 import InfoAlert from '@/components/InfoAlert.vue'
 import ErrorAlert from '@/components/ErrorAlert.vue'
-import LoadingSpinner from '@/components/LoadingSpinner.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import AccountBreadcrumb from '@/components/accounts/AccountBreadcrumb.vue'
 import { useClusterDataPoller } from '@/composables/DataPoller'
 import type { ClusterAssociation } from '@/composables/GatewayAPI'
+import DetailSkeletonList from '@/components/DetailSkeletonList.vue'
+import PanelSkeleton from '@/components/PanelSkeleton.vue'
+import StatCardSkeleton from '@/components/StatCardSkeleton.vue'
 import {
   renderClusterOptionalNumber,
   renderClusterTRES,
@@ -31,7 +33,7 @@ const { cluster, account } = defineProps<{
 }>()
 
 const router = useRouter()
-const { data, unable, loaded, setCluster } = useClusterDataPoller<ClusterAssociation[]>(
+const { data, unable, loaded, initialLoading, setCluster } = useClusterDataPoller<ClusterAssociation[]>(
   cluster,
   'associations',
   120000
@@ -236,25 +238,13 @@ function hasDifferentQos(userAssociation: ClusterAssociation): boolean {
         Back to accounts
       </button>
 
-      <ErrorAlert v-if="unable">
-        Unable to retrieve associations for cluster
-        <span class="font-medium">{{ cluster }}</span>
-      </ErrorAlert>
-      <div v-else-if="!loaded" class="text-[var(--color-brand-muted)]">
-        <LoadingSpinner :size="5" />
-        Loading account details...
-      </div>
-      <InfoAlert v-else-if="!accountKnown">
-        Account <span class="font-semibold">{{ account }}</span> does not exist on this cluster.
-      </InfoAlert>
-      <div v-else-if="accountAssociation" class="space-y-6">
+      <div class="space-y-6">
         <div id="account-heading">
-          <span class="sr-only">Account {{ account }}</span>
           <PageHeader
             kicker="Account Detail"
             :title="account"
             description="Hierarchy, inherited policy and per-user overrides for the selected Slurm account."
-            :metric-value="userAssociations.length"
+            :metric-value="loaded && accountAssociation ? userAssociations.length : undefined"
             :metric-label="`user association${userAssociations.length === 1 ? '' : 's'}`"
           >
             <template #actions>
@@ -268,6 +258,30 @@ function hasDifferentQos(userAssociation: ClusterAssociation): boolean {
           </PageHeader>
         </div>
 
+        <template v-if="initialLoading && !unable">
+          <StatCardSkeleton :cards="4" />
+          <div class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+            <div class="ui-panel ui-section">
+              <div class="mb-5">
+                <h2 class="ui-panel-title">Account Overview</h2>
+                <p class="ui-panel-description mt-2">
+                  Parent hierarchy, scoped QoS and inherited account-wide limits.
+                </p>
+              </div>
+              <DetailSkeletonList :rows="6" />
+            </div>
+            <PanelSkeleton :rows="8" />
+          </div>
+        </template>
+
+      <ErrorAlert v-if="unable">
+        Unable to retrieve associations for cluster
+        <span class="font-medium">{{ cluster }}</span>
+      </ErrorAlert>
+      <InfoAlert v-else-if="loaded && !accountKnown">
+        Account <span class="font-semibold">{{ account }}</span> does not exist on this cluster.
+      </InfoAlert>
+      <div v-else-if="accountAssociation">
         <div class="ui-stat-grid">
           <div class="ui-stat-card">
             <div class="ui-stat-label">Parent Chain</div>
@@ -463,6 +477,7 @@ function hasDifferentQos(userAssociation: ClusterAssociation): boolean {
             </table>
           </div>
         </div>
+      </div>
       </div>
     </div>
   </ClusterMainLayout>

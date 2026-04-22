@@ -15,11 +15,12 @@ import { representDuration } from '@/composables/TimeDuration'
 import InfoAlert from '@/components/InfoAlert.vue'
 import ErrorAlert from '@/components/ErrorAlert.vue'
 import PageHeader from '@/components/PageHeader.vue'
+import TableSkeletonRows from '@/components/TableSkeletonRows.vue'
 import { XMarkIcon } from '@heroicons/vue/24/outline'
 
 const { cluster } = defineProps<{ cluster: string }>()
 
-const { data, unable, setCluster } = useClusterDataPoller<ClusterReservation[]>(
+const { data, unable, loaded, setCluster } = useClusterDataPoller<ClusterReservation[]>(
   cluster,
   'reservations',
   10000
@@ -38,14 +39,14 @@ watch(
     <PageHeader
       title="Reservations"
       description="Advanced reservations, affected nodes and account or user access windows."
-      :metric-value="data?.length"
+      :metric-value="loaded ? data?.length : undefined"
       metric-label="reservations"
     />
     <ErrorAlert v-if="unable"
       >Unable to retrieve reservations from cluster
       <span class="font-medium">{{ cluster }}</span></ErrorAlert
     >
-    <InfoAlert v-else-if="data?.length == 0"
+    <InfoAlert v-else-if="loaded && data?.length == 0"
       >No reservation defined on cluster <span class="font-medium">{{ cluster }}</span></InfoAlert
     >
     <div v-else class="mt-8 flow-root">
@@ -65,7 +66,7 @@ watch(
                 <th scope="col" class="w-12"></th>
               </tr>
             </thead>
-            <tbody class="divide-y divide-gray-200 text-[var(--color-brand-ink-strong)]">
+            <tbody v-if="loaded" class="divide-y divide-gray-200 text-[var(--color-brand-ink-strong)]">
               <tr v-for="reservation in data" :key="reservation.name">
                 <td class="pr-3 sm:pl-6 lg:pl-8">{{ reservation.name }}</td>
                 <td class="hidden px-3 text-sm break-all 2xl:table-cell">
@@ -105,6 +106,13 @@ watch(
                 </td>
               </tr>
             </tbody>
+            <TableSkeletonRows
+              v-else
+              :columns="7"
+              :rows="6"
+              first-cell-class="sm:pl-6 lg:pl-8"
+              cell-class="px-3"
+            />
           </table>
         </div>
       </div>
