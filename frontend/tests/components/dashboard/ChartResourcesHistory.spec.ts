@@ -155,8 +155,8 @@ describe('ChartJobsHistogram.vue', () => {
 
     expect(yTickCallback?.(12.5)).toBe('12.5GB')
     expect(
-      tooltipCallback?.({ parsed: { y: 12.5 }, dataset: { label: 'allocated-idle' } })
-    ).toBe('allocated-idle: 12.5GB')
+      tooltipCallback?.({ parsed: { y: 12.5 }, dataset: { label: 'Allocated Memory' } })
+    ).toBe('Allocated Memory: 12.5GB')
   })
 
   test('memory mode stacks datasets in expected order and colors', async () => {
@@ -170,8 +170,7 @@ describe('ChartJobsHistogram.vue', () => {
     await flushPromises()
 
     mockClusterDataPoller.data.value = {
-      used: [[1748004750000, 1.5]],
-      allocated_idle: [[1748004750000, 2.5]],
+      allocated: [[1748004750000, 4.0]],
       idle: [[1748004750000, 3.5]]
     } as Record<ChartMetricState, MetricValue[]>
     await flushPromises()
@@ -181,14 +180,12 @@ describe('ChartJobsHistogram.vue', () => {
 
     expect(chart).toBeDefined()
     expect(chart?.data.datasets.map((dataset) => dataset.label)).toEqual([
-      'used',
-      'allocated-idle',
-      'idle'
+      'Allocated Memory',
+      'Available Memory'
     ])
     expect(chart?.data.datasets.map((dataset) => dataset.backgroundColor)).toEqual([
-      'rgb(204, 0, 0, 0.7)',
-      'rgb(214, 93, 11, 0.7)',
-      'rgb(51, 204, 51, 0.7)'
+      'rgb(212, 154, 62, 0.78)',
+      'rgb(82, 170, 78, 0.76)'
     ])
   })
 })

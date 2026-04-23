@@ -77,7 +77,7 @@ class TestAgentMetricsRequest(TestAgentBase):
         self.assertEqual(response.status_code, 200)
         self.assertCountEqual(
             response.json.keys(),
-            ["allocated_idle", "idle", "used"],
+            ["allocated", "idle"],
         )
 
     @mock.patch("slurmweb.metrics.db.aiohttp.ClientSession.get")

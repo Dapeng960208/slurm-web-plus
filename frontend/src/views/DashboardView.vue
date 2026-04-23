@@ -40,20 +40,20 @@ const statsCards = computed(() => {
     { id: 'nodes', label: 'Nodes', value: String(data.value.resources.nodes) },
     { id: 'cores', label: 'Cores', value: String(data.value.resources.cores) },
     {
-      id: 'memory-used',
-      label: 'Used Memory',
-      value: getMBHumanUnit(data.value.resources.memory_used),
-      subtle: `Of ${getMBHumanUnit(data.value.resources.memory)} total`
+      id: 'memory-total',
+      label: 'Total Memory',
+      value: getMBHumanUnit(data.value.resources.memory),
+      subtle: 'Cluster capacity'
     },
     {
-      id: 'memory-allocated-unused',
-      label: 'Allocated Unused',
-      value: getMBHumanUnit(data.value.resources.memory_allocated_unused),
-      subtle: 'Allocated but not consumed'
+      id: 'memory-allocated',
+      label: 'Allocated Memory',
+      value: getMBHumanUnit(data.value.resources.memory_allocated),
+      subtle: 'Requested by jobs'
     },
     {
       id: 'memory-available',
-      label: 'Unallocated Memory',
+      label: 'Available Memory',
       value: getMBHumanUnit(data.value.resources.memory_available),
       subtle: 'Total minus allocated'
     },

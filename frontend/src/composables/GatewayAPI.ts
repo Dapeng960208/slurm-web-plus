@@ -69,14 +69,8 @@ interface ClusterStatsResponse {
     nodes: number
     cores: number
     memory: number
-    real_memory?: number
-    memory_allocated?: number
-    alloc_memory?: number
-    memory_allocated_unused?: number
-    memory_available?: number
-    memory_used?: number
-    memory_free?: number
-    free_mem?: number
+    memory_allocated: number
+    memory_available: number
     gpus: number
   }
   jobs: {
@@ -90,11 +84,8 @@ export interface ClusterStats {
     nodes: number
     cores: number
     memory: number
-    memory_used: number
     memory_allocated: number
-    memory_allocated_unused: number
     memory_available: number
-    memory_free: number
     gpus: number
   }
   jobs: {
@@ -924,7 +915,7 @@ export type MetricResourceState =
   | 'error'
   | 'fail'
   | 'unknown'
-export type MetricMemoryState = 'idle' | 'allocated_idle' | 'used'
+export type MetricMemoryState = 'idle' | 'allocated'
 export type MetricJobState =
   | 'running'
   | 'pending'
@@ -1126,24 +1117,13 @@ export function useGatewayAPI() {
 
   async function stats(cluster: string): Promise<ClusterStats> {
     const result = await restAPI.get<ClusterStatsResponse>(`/agents/${cluster}/stats`)
-    const memoryAllocated =
-      result.resources.memory_allocated ?? result.resources.alloc_memory ?? result.resources.memory_used ?? 0
-    const memoryUsed = result.resources.memory_used ?? memoryAllocated
-    const memoryAllocatedUnused =
-      result.resources.memory_allocated_unused ?? Math.max(memoryAllocated - memoryUsed, 0)
-    const memoryAvailable =
-      result.resources.memory_available ?? result.resources.memory_free ?? 0
-    const memoryFree = result.resources.memory_free ?? result.resources.free_mem ?? 0
     return {
       resources: {
         nodes: result.resources.nodes,
         cores: result.resources.cores,
-        memory: result.resources.memory ?? result.resources.real_memory ?? 0,
-        memory_used: memoryUsed,
-        memory_allocated: memoryAllocated,
-        memory_allocated_unused: memoryAllocatedUnused,
-        memory_available: memoryAvailable,
-        memory_free: memoryFree,
+        memory: result.resources.memory,
+        memory_allocated: result.resources.memory_allocated,
+        memory_available: result.resources.memory_available,
         gpus: result.resources.gpus
       },
       jobs: result.jobs

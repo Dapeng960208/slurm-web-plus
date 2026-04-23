@@ -291,7 +291,6 @@ class TestSlurmrestd(TestSlurmrestdBase):
                 "alloc_memory": 1024,
                 "alloc_cpus": 0,
                 "alloc_idle_cpus": 8,
-                "free_mem": {"set": True, "infinite": False, "number": 3072},
             },
             {
                 "cpus": 8,
@@ -302,7 +301,6 @@ class TestSlurmrestd(TestSlurmrestdBase):
                 "alloc_memory": 1024,
                 "alloc_cpus": 8,
                 "alloc_idle_cpus": 0,
-                "free_mem": {"set": True, "infinite": False, "number": 1536},
             },
             {
                 "cpus": 8,
@@ -313,15 +311,13 @@ class TestSlurmrestd(TestSlurmrestdBase):
                 "alloc_memory": 256,
                 "alloc_cpus": 2,
                 "alloc_idle_cpus": 6,
-                "free_mem": {"set": True, "infinite": False, "number": 256},
             },
         ]
 
         (_, _, _, memory_states, _, _, _, memory_total) = self.slurmrestd.resources_states()
 
         self.assertEqual(memory_states["idle"], 4.75)
-        self.assertEqual(memory_states["allocated_idle"], 0.5)
-        self.assertEqual(memory_states["used"], 1.75)
+        self.assertEqual(memory_states["allocated"], 2.25)
         self.assertEqual(sum(memory_states.values()), memory_total)
         self.assertEqual(memory_total, 7.0)
 
