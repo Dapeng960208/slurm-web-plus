@@ -889,6 +889,7 @@ export type MetricResourceState =
   | 'error'
   | 'fail'
   | 'unknown'
+export type MetricMemoryState = 'idle' | 'allocated_idle' | 'used'
 export type MetricJobState =
   | 'running'
   | 'pending'
@@ -1187,8 +1188,8 @@ export function useGatewayAPI() {
   async function metrics_memory(
     cluster: string,
     last: string
-  ): Promise<Record<MetricResourceState, MetricValue[]>> {
-    return await restAPI.get<Record<MetricResourceState, MetricValue[]>>(
+  ): Promise<Record<MetricMemoryState, MetricValue[]>> {
+    return await restAPI.get<Record<MetricMemoryState, MetricValue[]>>(
       `/agents/${cluster}/metrics/memory?range=${last}`
     )
   }

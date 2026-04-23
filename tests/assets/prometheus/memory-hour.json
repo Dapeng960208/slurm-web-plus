@@ -7,7 +7,7 @@
         "metric": {
           "instance": "localhost:80",
           "job": "slurm",
-          "state": "allocated"
+          "state": "allocated_idle"
         },
         "values": [
           [1747754490, "32"],
@@ -29,7 +29,7 @@
         "metric": {
           "instance": "localhost:80",
           "job": "slurm",
-          "state": "mixed"
+          "state": "used"
         },
         "values": [
           [1747754490, "128"],

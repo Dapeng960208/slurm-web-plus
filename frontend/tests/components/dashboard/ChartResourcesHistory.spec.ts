@@ -5,10 +5,12 @@ import { useRuntimeStore } from '@/stores/runtime'
 import { init_plugins, getMockClusterDataPoller } from '../../lib/common'
 import ChartResourcesHistogram from '@/components/dashboard/ChartResourcesHistogram.vue'
 import metricsNodesHour from '../../assets/metrics-nodes-hour.json'
-import type { MetricResourceState, MetricValue } from '@/composables/GatewayAPI'
+import type { MetricMemoryState, MetricResourceState, MetricValue } from '@/composables/GatewayAPI'
 import ErrorAlert from '@/components/ErrorAlert.vue'
 
-const mockClusterDataPoller = getMockClusterDataPoller<Record<MetricResourceState, MetricValue[]>>()
+type ChartMetricState = MetricResourceState | MetricMemoryState
+
+const mockClusterDataPoller = getMockClusterDataPoller<Record<ChartMetricState, MetricValue[]>>()
 
 vi.mock('@/composables/DataPoller', () => ({
   useClusterDataPoller: () => mockClusterDataPoller
@@ -47,10 +49,7 @@ describe('ChartJobsHistogram.vue', () => {
     expect(canvas.attributes('style')).toContain('display: none;')
 
     // now load data
-    mockClusterDataPoller.data.value = metricsNodesHour as Record<
-      MetricResourceState,
-      MetricValue[]
-    >
+    mockClusterDataPoller.data.value = metricsNodesHour as Record<ChartMetricState, MetricValue[]>
 
     mockClusterDataPoller.loaded.value = true
     await flushPromises()
@@ -79,10 +78,7 @@ describe('ChartJobsHistogram.vue', () => {
         cluster: 'foo'
       }
     })
-    mockClusterDataPoller.data.value = metricsNodesHour as Record<
-      MetricResourceState,
-      MetricValue[]
-    >
+    mockClusterDataPoller.data.value = metricsNodesHour as Record<ChartMetricState, MetricValue[]>
     useRuntimeStore().dashboard.chartResourcesType = 'cores'
     await flushPromises()
     expect(mockClusterDataPoller.setCallback).toHaveBeenCalledWith('metrics_cores')
@@ -158,8 +154,41 @@ describe('ChartJobsHistogram.vue', () => {
       | undefined
 
     expect(yTickCallback?.(12.5)).toBe('12.5GB')
-    expect(tooltipCallback?.({ parsed: { y: 12.5 }, dataset: { label: 'mixed' } })).toBe(
-      'mixed: 12.5GB'
-    )
+    expect(
+      tooltipCallback?.({ parsed: { y: 12.5 }, dataset: { label: 'allocated-idle' } })
+    ).toBe('allocated-idle: 12.5GB')
+  })
+
+  test('memory mode stacks datasets in expected order and colors', async () => {
+    const wrapper = mount(ChartResourcesHistogram, {
+      props: {
+        cluster: 'foo'
+      }
+    })
+
+    useRuntimeStore().dashboard.chartResourcesType = 'memory'
+    await flushPromises()
+
+    mockClusterDataPoller.data.value = {
+      used: [[1748004750000, 1.5]],
+      allocated_idle: [[1748004750000, 2.5]],
+      idle: [[1748004750000, 3.5]]
+    } as Record<ChartMetricState, MetricValue[]>
+    await flushPromises()
+
+    const canvas = wrapper.get({ ref: 'chartCanvas' }).element as HTMLCanvasElement
+    const chart = Chart.getChart(canvas)
+
+    expect(chart).toBeDefined()
+    expect(chart?.data.datasets.map((dataset) => dataset.label)).toEqual([
+      'used',
+      'allocated-idle',
+      'idle'
+    ])
+    expect(chart?.data.datasets.map((dataset) => dataset.backgroundColor)).toEqual([
+      'rgb(204, 0, 0, 0.7)',
+      'rgb(214, 93, 11, 0.7)',
+      'rgb(51, 204, 51, 0.7)'
+    ])
   })
 })

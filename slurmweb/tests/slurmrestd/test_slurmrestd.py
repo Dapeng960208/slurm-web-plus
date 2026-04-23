@@ -320,8 +320,8 @@ class TestSlurmrestd(TestSlurmrestdBase):
         (_, _, _, memory_states, _, _, _, memory_total) = self.slurmrestd.resources_states()
 
         self.assertEqual(memory_states["idle"], 4.75)
-        self.assertEqual(memory_states["allocated"], 0.5)
-        self.assertEqual(memory_states["mixed"], 2.25)
+        self.assertEqual(memory_states["allocated_idle"], 0.5)
+        self.assertEqual(memory_states["used"], 2.25)
         self.assertEqual(memory_total, 7.0)
 
     @all_slurm_api_versions

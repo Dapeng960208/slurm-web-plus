@@ -24,17 +24,21 @@ export interface DashboardLiveChart<MetricKeyType extends string> {
   setCluster: (cluster: string) => void
   setRange: (range: string) => void
   setCallback: (callback: GatewayAnyClusterApiKey) => void
+  setLabels: (
+    labels: Record<string, { group: MetricKeyType[]; color: string; invert?: boolean }>
+  ) => void
 }
 
 export function useLiveHistogram<MetricKeyType extends string>(
   cluster: string,
   callback: GatewayAnyClusterApiKey,
   chartCanvas: Ref<HTMLCanvasElement | null>,
-  labels: Record<string, { group: MetricKeyType[]; color: string; invert?: boolean }>,
+  originalLabels: Record<string, { group: MetricKeyType[]; color: string; invert?: boolean }>,
   originalRange: string,
   valueFormatter?: HistogramValueFormatter
 ): DashboardLiveChart<MetricKeyType> {
   let range = originalRange
+  let labels = originalLabels
 
   const metrics = useClusterDataPoller<Record<MetricKeyType, MetricValue[]>>(
     cluster,
@@ -242,6 +246,13 @@ export function useLiveHistogram<MetricKeyType extends string>(
     metrics.setCallback(callback)
   }
 
+  function setLabels(
+    newLabels: Record<string, { group: MetricKeyType[]; color: string; invert?: boolean }>
+  ) {
+    labels = newLabels
+    if (chart) chart.data.datasets = []
+  }
+
   onMounted(() => {
     if (chartCanvas.value) {
       chart = new Chart(chartCanvas.value, {
@@ -252,5 +263,5 @@ export function useLiveHistogram<MetricKeyType extends string>(
     }
   })
 
-  return { metrics, setCluster, setRange, setCallback }
+  return { metrics, setCluster, setRange, setCallback, setLabels }
 }

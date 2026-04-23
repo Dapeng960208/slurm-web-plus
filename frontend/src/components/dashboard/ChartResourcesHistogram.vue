@@ -15,7 +15,11 @@ import type { ChartResourcesType } from '@/stores/runtime/dashboard'
 import { isChartResourcesType } from '@/stores/runtime/dashboard'
 import { useLiveHistogram } from '@/composables/charts/LiveHistogram'
 import { formatGigabytes } from '@/composables/charts/formatters'
-import type { GatewayAnyClusterApiKey, MetricResourceState } from '@/composables/GatewayAPI'
+import type {
+  GatewayAnyClusterApiKey,
+  MetricMemoryState,
+  MetricResourceState
+} from '@/composables/GatewayAPI'
 import ChartSkeleton from '@/components/ChartSkeleton.vue'
 import ErrorAlert from '@/components/ErrorAlert.vue'
 
@@ -26,8 +30,10 @@ const route = useRoute()
 const runtimeStore = useRuntimeStore()
 const chartCanvas = useTemplateRef<HTMLCanvasElement>('chartCanvas')
 
+type ChartResourceMetricState = MetricResourceState | MetricMemoryState
+
 /* Note that order of keys determines the stack of metrics in histogram */
-const labels: Record<string, { group: MetricResourceState[]; color: string }> = {
+const resourceLabels: Record<string, { group: MetricResourceState[]; color: string }> = {
   unknown: {
     group: ['unknown'],
     color: 'rgb(192, 191, 188, 0.7)' // grey
@@ -62,6 +68,21 @@ const labels: Record<string, { group: MetricResourceState[]; color: string }> = 
   }
 }
 
+const memoryLabels: Record<string, { group: MetricMemoryState[]; color: string }> = {
+  used: {
+    group: ['used'],
+    color: 'rgb(204, 0, 0, 0.7)' // red
+  },
+  'allocated-idle': {
+    group: ['allocated_idle'],
+    color: 'rgb(214, 93, 11, 0.7)' // orange
+  },
+  idle: {
+    group: ['idle'],
+    color: 'rgb(51, 204, 51, 0.7)' // green
+  }
+}
+
 function resourcesTypeCallback(): GatewayAnyClusterApiKey {
   if (runtimeStore.dashboard.chartResourcesType == 'cores') {
     return 'metrics_cores'
@@ -80,11 +101,21 @@ function formatResourceValue(value: number): string | undefined {
   }
 }
 
-const liveChart = useLiveHistogram<MetricResourceState>(
+function resourcesLabels(): Record<
+  string,
+  { group: ChartResourceMetricState[]; color: string }
+> {
+  if (runtimeStore.dashboard.chartResourcesType == 'memory') {
+    return memoryLabels as Record<string, { group: ChartResourceMetricState[]; color: string }>
+  }
+  return resourceLabels as Record<string, { group: ChartResourceMetricState[]; color: string }>
+}
+
+const liveChart = useLiveHistogram<ChartResourceMetricState>(
   cluster,
   resourcesTypeCallback(),
   chartCanvas,
-  labels,
+  resourcesLabels(),
   runtimeStore.dashboard.range,
   formatResourceValue
 )
@@ -100,6 +131,7 @@ watch(
   () => runtimeStore.dashboard.chartResourcesType,
   () => {
     router.push({ name: 'dashboard', query: runtimeStore.dashboard.query() as LocationQueryRaw })
+    liveChart.setLabels(resourcesLabels())
     liveChart.setCallback(resourcesTypeCallback())
   }
 )
@@ -160,7 +192,7 @@ onBeforeMount(() => {
         <button
           type="button"
           :class="[
-            runtimeStore.dashboard.chartResourcesType == 'gpus'
+            runtimeStore.dashboard.chartResourcesType == 'memory'
               ? 'bg-slurmweb dark:bg-slurmweb-dark text-white'
               : 'bg-white text-gray-900 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-200 hover:dark:bg-gray-700',
             'relative inline-flex items-center px-3 py-2 text-xs font-semibold ring-1 ring-gray-300 ring-inset focus:z-10 dark:ring-gray-600'

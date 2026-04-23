@@ -324,8 +324,8 @@ class Slurmrestd:
         }
         memory_states = {
             "idle": 0.0,
-            "mixed": 0.0,
-            "allocated": 0.0,
+            "used": 0.0,
+            "allocated_idle": 0.0,
         }
         nodes_total = 0
         cores_total = 0
@@ -340,13 +340,13 @@ class Slurmrestd:
             alloc_memory = max(0, node.get("alloc_memory", 0))
             free_memory = self._optional_number_value(node.get("free_mem"), 0)
             free_memory = max(0, min(real_memory, free_memory))
-            mixed_memory = max(real_memory - free_memory, 0)
-            allocated_memory = max(alloc_memory - mixed_memory, 0)
+            used_memory = max(real_memory - free_memory, 0)
+            allocated_idle_memory = max(alloc_memory - used_memory, 0)
             idle_memory = max(real_memory - alloc_memory, 0)
 
             memory_states["idle"] += idle_memory / 1024
-            memory_states["allocated"] += allocated_memory / 1024
-            memory_states["mixed"] += mixed_memory / 1024
+            memory_states["allocated_idle"] += allocated_idle_memory / 1024
+            memory_states["used"] += used_memory / 1024
 
             if "ERROR" in node["state"]:
                 nodes_states["error"] += 1

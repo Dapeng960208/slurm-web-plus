@@ -117,7 +117,7 @@ function isFeatureEnabled(feature: string | undefined): boolean {
               <div class="mx-2 flex items-center justify-between rounded-full border border-white/10 bg-white/6 px-3 py-2 text-xs text-white/70">
                 <span class="font-semibold tracking-[0.18em] uppercase">Cluster Ops</span>
                 <TagIcon class="inline size-3" aria-hidden="true" />
-                {{ runtimeConfiguration.version }}
+                <!-- {{ runtimeConfiguration.version }} -->
               </div>
               <nav class="flex flex-1 flex-col">
                 <ul role="list" class="flex flex-1 flex-col gap-y-7">
