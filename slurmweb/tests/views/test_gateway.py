@@ -264,6 +264,29 @@ class TestGatewayViews(TestGatewayBase):
         self.assertEqual(mock_proxy_agent.call_args.args[:2], ("foo", "users/cache"))
         self.assertTrue(mock_proxy_agent.call_args.args[2])
 
+    @mock.patch("slurmweb.views.gateway.proxy_agent")
+    def test_node_metrics_history(self, mock_proxy_agent):
+        self.app_set_agents({"foo": fake_slurmweb_agent("foo")})
+        mock_proxy_agent.return_value = (
+            self.app.response_class(
+                response='{"cpu_usage": [], "memory_usage": [], "disk_usage": []}',
+                status=200,
+                mimetype="application/json",
+            ),
+            200,
+        )
+        response = self.client.get("/api/agents/foo/node/cn1/metrics/history?range=hour")
+        self.assertEqual(response.status_code, 200)
+        self.assertCountEqual(
+            response.json.keys(),
+            ["cpu_usage", "memory_usage", "disk_usage"],
+        )
+        mock_proxy_agent.assert_called_once()
+        self.assertEqual(
+            mock_proxy_agent.call_args.args[:2], ("foo", "node/cn1/metrics/history")
+        )
+        self.assertTrue(mock_proxy_agent.call_args.args[2])
+
     @mock.patch("slurmweb.views.gateway.aiohttp.ClientSession.post")
     def test_cache_reset(self, mock_post):
         self.app_set_agents({"foo": fake_slurmweb_agent("foo")})

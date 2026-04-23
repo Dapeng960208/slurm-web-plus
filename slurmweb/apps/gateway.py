@@ -153,6 +153,10 @@ class SlurmwebAppGateway(SlurmwebWebApp, RFLTokenizedWebApp):
         SlurmwebAppRoute(
             "/api/agents/<cluster>/node/<name>/metrics", views.node_metrics
         ),
+        SlurmwebAppRoute(
+            "/api/agents/<cluster>/node/<name>/metrics/history",
+            views.node_metrics_history,
+        ),
     }
 
     def get_agent_connector(self):

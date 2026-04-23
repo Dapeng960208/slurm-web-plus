@@ -34,6 +34,40 @@ class TestSlurmwebMetricsDB(unittest.TestCase):
         self.assertCountEqual(result.keys(), ["allocated_idle", "idle", "used"])
 
     @mock.patch("slurmweb.metrics.db.aiohttp.ClientSession.get")
+    def test_request_node_history_metrics(self, mock_get):
+        _, response = mock_prometheus_response("node-history-hour")
+        mock_get.side_effect = [response, response, response]
+        result = self.db.node_history_metrics("cn01", "hour")
+        self.assertCountEqual(result.keys(), ["cpu_usage", "memory_usage", "disk_usage"])
+        self.assertEqual(len(result["cpu_usage"]), 3)
+
+    def test_request_node_history_metrics_unsupported_range(self):
+        with self.assertRaisesRegex(
+            SlurmwebMetricsDBError, "^Unsupported metric range fail$"
+        ):
+            self.db.node_history_metrics("cn01", "fail")
+
+    @mock.patch("slurmweb.metrics.db.aiohttp.ClientSession.get")
+    def test_request_node_history_metrics_empty_result(self, mock_get):
+        _, response = mock_prometheus_response("unknown-metric")
+        mock_get.side_effect = [response, response, response]
+        with self.assertRaisesRegex(
+            SlurmwebMetricsDBError, "^Empty result for query .*$"
+        ):
+            self.db.node_history_metrics("cn01", "hour")
+
+    @mock.patch("slurmweb.metrics.db.aiohttp.ClientSession.get")
+    def test_request_node_history_metrics_connection_error(self, mock_get):
+        mock_get.side_effect = aiohttp.client_exceptions.ClientConnectionError(
+            "fake connection error"
+        )
+        with self.assertRaisesRegex(
+            SlurmwebMetricsDBError,
+            "^Metrics database connection error: fake connection error$",
+        ):
+            self.db.node_history_metrics("cn01", "hour")
+
+    @mock.patch("slurmweb.metrics.db.aiohttp.ClientSession.get")
     def test_request_empty_result(self, mock_get):
         _, mock_get.return_value = mock_prometheus_response("unknown-metric")
         with self.assertRaisesRegex(

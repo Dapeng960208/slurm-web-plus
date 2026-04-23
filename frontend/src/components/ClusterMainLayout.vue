@@ -68,14 +68,21 @@ onMounted(() => {
             :key="breadcrumbPart.title"
             class="flex min-w-0 items-center"
           >
-            <ChevronRightIcon class="h-5 w-8 shrink-0 text-[var(--color-brand-muted)]/70" aria-hidden="true" />
+            <ChevronRightIcon
+              class="h-5 w-8 shrink-0 text-[var(--color-brand-muted)]/70"
+              aria-hidden="true"
+            />
             <router-link
               v-if="breadcrumbPart.routeName"
               :to="{ name: breadcrumbPart.routeName }"
               class="truncate text-sm font-medium text-[var(--color-brand-blue)] transition hover:text-[var(--color-brand-ink-strong)]"
               >{{ breadcrumbPart.title }}</router-link
             >
-            <span v-else class="truncate text-sm font-semibold text-[var(--color-brand-ink-strong)]">{{ breadcrumbPart.title }}</span>
+            <span
+              v-else
+              class="truncate text-sm font-semibold text-[var(--color-brand-ink-strong)]"
+              >{{ breadcrumbPart.title }}</span
+            >
           </span>
         </div>
         <div class="flex items-center gap-x-4 lg:gap-x-6">
@@ -92,7 +99,10 @@ onMounted(() => {
           </RouterLink>
 
           <!-- Separator -->
-          <div class="hidden lg:block lg:h-6 lg:w-px lg:bg-[rgba(80,105,127,0.16)]" aria-hidden="true" />
+          <div
+            class="hidden lg:block lg:h-6 lg:w-px lg:bg-[rgba(80,105,127,0.16)]"
+            aria-hidden="true"
+          />
 
           <!-- Profile -->
           <span v-if="runtimeConfiguration.authentication" class="hidden lg:flex lg:items-center">
@@ -123,8 +133,10 @@ onMounted(() => {
       </div>
     </div>
 
-    <main class="px-2 py-5 sm:px-3 lg:px-4 lg:py-8 xl:px-5 2xl:px-6">
-      <div class="rounded-[36px] border border-white/60 bg-[rgba(255,255,255,0.5)] px-3 py-4 shadow-[var(--shadow-soft)] backdrop-blur-sm sm:px-5 sm:py-5 lg:px-6 lg:py-7 xl:px-7 2xl:px-8">
+    <main class="px-2 py-3 sm:px-3 lg:px-4 lg:py-4 xl:px-5 2xl:px-6">
+      <div
+        class="rounded-[36px] border border-white/60 bg-[rgba(255,255,255,0.5)] px-3 py-2.5 shadow-[var(--shadow-soft)] backdrop-blur-sm sm:px-5 sm:py-3 lg:px-6 lg:py-4 xl:px-6 xl:py-4 2xl:px-7"
+      >
         <div v-if="clusterNotFound">Cluster not found</div>
         <div v-else class="home ui-page ui-page-wide">
           <slot></slot>

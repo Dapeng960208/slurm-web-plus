@@ -1,10 +1,11 @@
 import { describe, test, expect, beforeEach, vi } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { mount, flushPromises } from '@vue/test-utils'
 import NodeView from '@/views/NodeView.vue'
 import { init_plugins, getMockClusterDataPoller } from '../lib/common'
 import { useRuntimeStore } from '@/stores/runtime'
 import { getMBHumanUnit } from '@/composables/GatewayAPI'
 import type { ClusterJob, ClusterNode } from '@/composables/GatewayAPI'
+import * as GatewayAPI from '@/composables/GatewayAPI'
 import NodeMainState from '@/components/resources/NodeMainState.vue'
 import nodeAllocated from '../assets/node-allocated.json'
 import jobsNode from '../assets/jobs-node.json'
@@ -13,6 +14,10 @@ import PanelSkeleton from '@/components/PanelSkeleton.vue'
 
 const mockNodeDataPoller = getMockClusterDataPoller<ClusterNode>()
 const mockJobsDataPoller = getMockClusterDataPoller<ClusterJob[]>()
+const mockGatewayAPI = {
+  node_metrics: vi.fn(),
+  node_metrics_history: vi.fn()
+}
 
 const useClusterDataPoller = vi.hoisted(() => vi.fn())
 vi.mock('@/composables/DataPoller', () => ({
@@ -22,6 +27,20 @@ vi.mock('@/composables/DataPoller', () => ({
 describe('NodeView.vue', () => {
   beforeEach(() => {
     init_plugins()
+    vi.restoreAllMocks()
+    vi.spyOn(GatewayAPI, 'useGatewayAPI').mockReturnValue(
+      mockGatewayAPI as unknown as ReturnType<typeof GatewayAPI.useGatewayAPI>
+    )
+    mockGatewayAPI.node_metrics.mockResolvedValue({
+      cpu_usage: 33.3,
+      memory_usage: 45.6,
+      disk_usage: 22.1
+    })
+    mockGatewayAPI.node_metrics_history.mockResolvedValue({
+      cpu_usage: [[1748004750000, 33.3]],
+      memory_usage: [[1748004750000, 45.6]],
+      disk_usage: [[1748004750000, 22.1]]
+    })
     useClusterDataPoller.mockReset()
     useRuntimeStore().availableClusters = [
       {
@@ -30,7 +49,8 @@ describe('NodeView.vue', () => {
         racksdb: true,
         infrastructure: 'foo',
         metrics: true,
-        cache: true
+        cache: true,
+        node_metrics: false
       }
     ]
     mockNodeDataPoller.data.value = undefined
@@ -42,6 +62,76 @@ describe('NodeView.vue', () => {
     mockJobsDataPoller.loaded.value = true
     mockJobsDataPoller.initialLoading.value = false
   })
+
+  test('hides realtime metrics section when node metrics are disabled', async () => {
+    useClusterDataPoller.mockReturnValueOnce(mockNodeDataPoller)
+    useClusterDataPoller.mockReturnValueOnce(mockJobsDataPoller)
+    mockNodeDataPoller.data.value = nodeAllocated
+    mockJobsDataPoller.data.value = jobsNode
+
+    const wrapper = mount(NodeView, {
+      props: {
+        cluster: 'foo',
+        nodeName: 'cn1'
+      },
+      global: {
+        stubs: {
+          NodeMetricsHistoryChart: true
+        }
+      }
+    })
+    await flushPromises()
+
+    expect(wrapper.text()).not.toContain('Realtime Metrics')
+    expect(mockGatewayAPI.node_metrics).not.toHaveBeenCalled()
+    expect(mockGatewayAPI.node_metrics_history).not.toHaveBeenCalled()
+  })
+
+  test('shows realtime metrics and switches history range when enabled', async () => {
+    useRuntimeStore().availableClusters = [
+      {
+        ...useRuntimeStore().availableClusters[0],
+        node_metrics: true
+      }
+    ]
+    useClusterDataPoller.mockReturnValueOnce(mockNodeDataPoller)
+    useClusterDataPoller.mockReturnValueOnce(mockJobsDataPoller)
+    mockNodeDataPoller.data.value = nodeAllocated
+    mockJobsDataPoller.data.value = jobsNode
+
+    const wrapper = mount(NodeView, {
+      props: {
+        cluster: 'foo',
+        nodeName: 'cn1'
+      }
+    })
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Realtime Metrics')
+    expect(wrapper.text()).toContain('Actual:')
+    expect(mockGatewayAPI.node_metrics_history).toHaveBeenCalledWith('foo', 'cn1', 'hour')
+
+    const dayButton = wrapper
+      .findAll('button[type="button"]')
+      .find((button) => button.text().trim() === 'day')
+    if (!dayButton) {
+      throw new Error('day button not found')
+    }
+    await dayButton.trigger('click')
+    await flushPromises()
+    expect(mockGatewayAPI.node_metrics_history).toHaveBeenCalledWith('foo', 'cn1', 'day')
+
+    const weekButton = wrapper
+      .findAll('button[type="button"]')
+      .find((button) => button.text().trim() === 'week')
+    if (!weekButton) {
+      throw new Error('week button not found')
+    }
+    await weekButton.trigger('click')
+    await flushPromises()
+    expect(mockGatewayAPI.node_metrics_history).toHaveBeenCalledWith('foo', 'cn1', 'week')
+  })
+
   test('display node details', async () => {
     useClusterDataPoller.mockReturnValueOnce(mockNodeDataPoller)
     useClusterDataPoller.mockReturnValueOnce(mockJobsDataPoller)

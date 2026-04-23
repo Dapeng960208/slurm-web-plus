@@ -60,6 +60,11 @@ jwt_key={{ slurmrestd_key }}
 enabled=yes
 {% endif %}
 
+{% if node_metrics %}
+[node_metrics]
+enabled=yes
+{% endif %}
+
 {% if cache %}
 [cache]
 enabled=yes
@@ -100,6 +105,7 @@ class TestAgentConfBase(unittest.TestCase):
         slurmrestd_parameters=None,
         racksdb=True,
         metrics=False,
+        node_metrics=False,
         cache=False,
         database=False,
         persistence=False,
@@ -138,6 +144,7 @@ class TestAgentConfBase(unittest.TestCase):
                 slurmrestd_parameters=slurmrestd_parameters,
                 racksdb=racksdb,
                 metrics=metrics,
+                node_metrics=node_metrics,
                 cache=cache,
                 database=database,
                 persistence=persistence,
@@ -170,6 +177,7 @@ class TestAgentBase(TestSlurmrestdClient):
         slurmrestd_parameters=None,
         racksdb=True,
         metrics=False,
+        node_metrics=False,
         cache=False,
         database=False,
         persistence=False,
@@ -190,6 +198,7 @@ class TestAgentBase(TestSlurmrestdClient):
             slurmrestd_parameters=slurmrestd_parameters,
             racksdb=racksdb,
             metrics=metrics,
+            node_metrics=node_metrics,
             cache=cache,
             database=database,
             persistence=persistence,

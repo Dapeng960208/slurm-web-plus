@@ -7,7 +7,7 @@
 -->
 
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import type { LocationQueryRaw } from 'vue-router'
 import { storeToRefs } from 'pinia'
@@ -31,8 +31,9 @@ import JobsHistoryFiltersBar from '@/components/jobs/JobsHistoryFiltersBar.vue'
 import JobsHistorySorter from '@/components/jobs/JobsHistorySorter.vue'
 import TableSkeletonRows from '@/components/TableSkeletonRows.vue'
 import { WindowIcon } from '@heroicons/vue/24/outline'
-import { ChevronLeftIcon, ChevronRightIcon } from '@heroicons/vue/20/solid'
 import { PlusSmallIcon } from '@heroicons/vue/24/outline'
+import PaginationControls from '@/components/PaginationControls.vue'
+import { lastPage, type PageSizeOption } from '@/composables/Pagination'
 
 const props = defineProps<{ cluster: string }>()
 
@@ -41,15 +42,15 @@ const router = useRouter()
 const route = useRoute()
 const runtimeStore = useRuntimeStore()
 const historyStore = runtimeStore.jobsHistory
-const { filters, page, sort, order } = storeToRefs(historyStore)
+const { filters, page, pageSize, sort, order } = storeToRefs(historyStore)
 
 const initialLoading = ref(true)
 const refreshing = ref(false)
 const error = ref<string | null>(null)
 const jobs = ref<JobHistoryRecord[]>([])
 const total = ref(0)
-const pageSize = 50
 const filtersOpen = ref(false)
+const totalPages = computed(() => lastPage(total.value, pageSize.value))
 
 async function fetchHistory() {
   refreshing.value = !initialLoading.value
@@ -58,7 +59,7 @@ async function fetchHistory() {
     const payload: JobHistoryFilters = {
       ...filters.value,
       page: page.value,
-      page_size: pageSize,
+      page_size: pageSize.value,
       sort: sort.value,
       order: order.value
     }
@@ -96,8 +97,6 @@ function sortHistory(newSort?: JobHistorySortCriterion, newOrder?: JobHistorySor
   updateQueryParameters()
 }
 
-const lastpage = () => Math.max(Math.ceil(total.value / pageSize), 1)
-
 function historyJobPriority(job: JobHistoryRecord): string {
   const states = splitJobHistoryState(job.job_state)
   if (!states.includes('PENDING')) return '-'
@@ -109,24 +108,15 @@ function fmtTime(value: string | null | undefined) {
   return new Date(value).toLocaleString()
 }
 
-function jobsPages(): { id: number; ellipsis: boolean }[] {
-  const result: { id: number; ellipsis: boolean }[] = []
-  let ellipsis = false
-  const last = lastpage()
-  for (let currentPage = 1; currentPage <= last; currentPage++) {
-    if (
-      currentPage < 3 ||
-      currentPage > last - 2 ||
-      (currentPage >= page.value - 1 && currentPage <= page.value + 1)
-    ) {
-      ellipsis = false
-      result.push({ id: currentPage, ellipsis: false })
-    } else if (!ellipsis) {
-      ellipsis = true
-      result.push({ id: currentPage, ellipsis: true })
-    }
-  }
-  return result
+function updatePage(newPage: number) {
+  page.value = newPage
+  updateQueryParameters()
+}
+
+function updatePageSize(newPageSize: PageSizeOption) {
+  pageSize.value = newPageSize
+  page.value = 1
+  updateQueryParameters()
 }
 
 watch(
@@ -148,6 +138,13 @@ watch(
     void fetchHistory()
   }
 )
+
+watch(totalPages, (newLastPage) => {
+  if (page.value > newLastPage) {
+    page.value = newLastPage
+    updateQueryParameters()
+  }
+})
 </script>
 
 <template>
@@ -191,7 +188,7 @@ watch(
         <JobsHistoryFiltersBar :filters="filters" @search="applyFilters" />
       </section>
 
-      <div class="mt-8 flow-root">
+      <div class="mt-5 flow-root">
         <ErrorAlert v-if="error">{{ error }}</ErrorAlert>
         <InfoAlert v-else-if="!initialLoading && jobs.length === 0">
           No job history records found on cluster <span class="font-medium">{{ cluster }}</span>
@@ -217,31 +214,31 @@ watch(
               </thead>
               <tbody v-if="!initialLoading" class="text-sm text-[var(--color-brand-muted)]">
                 <tr v-for="job in jobs" :key="job.id">
-                  <td class="py-4 pr-3 font-medium whitespace-nowrap text-[var(--color-brand-ink-strong)] sm:pl-6 lg:pl-8">
+                  <td class="py-3 pr-3 font-medium whitespace-nowrap text-[var(--color-brand-ink-strong)] sm:pl-6 lg:pl-8">
                     {{ job.job_id }}
                   </td>
-                  <td class="px-3 py-4 text-xs tabular-nums whitespace-nowrap">
+                  <td class="px-3 py-3 text-xs tabular-nums whitespace-nowrap">
                     {{ fmtTime(job.submit_time) }}
                   </td>
-                  <td class="px-3 py-4 whitespace-nowrap">
+                  <td class="px-3 py-3 whitespace-nowrap">
                     <JobStatusBadge :status="splitJobHistoryState(job.job_state)" />
                   </td>
-                  <td class="px-3 py-4 whitespace-nowrap">
+                  <td class="px-3 py-3 whitespace-nowrap">
                     {{ job.user_name ?? '-' }} ({{ job.account ?? '-' }})
                   </td>
-                  <td class="hidden px-3 py-4 whitespace-nowrap sm:table-cell">
+                  <td class="hidden px-3 py-3 whitespace-nowrap sm:table-cell">
                     <JobHistoryResources :job="job" />
                   </td>
-                  <td class="hidden px-3 py-4 whitespace-nowrap xl:table-cell">
+                  <td class="hidden px-3 py-3 whitespace-nowrap xl:table-cell">
                     {{ job.partition ?? '-' }}
                   </td>
-                  <td class="hidden px-3 py-4 whitespace-nowrap xl:table-cell">
+                  <td class="hidden px-3 py-3 whitespace-nowrap xl:table-cell">
                     {{ job.qos ?? '-' }}
                   </td>
-                  <td class="hidden px-3 py-4 text-center whitespace-nowrap sm:table-cell">
+                  <td class="hidden px-3 py-3 text-center whitespace-nowrap sm:table-cell">
                     {{ historyJobPriority(job) }}
                   </td>
-                  <td class="hidden px-3 py-4 whitespace-nowrap 2xl:table-cell">
+                  <td class="hidden px-3 py-3 whitespace-nowrap 2xl:table-cell">
                     <template v-if="job.state_reason != 'None'">
                       {{ job.state_reason }}
                     </template>
@@ -266,78 +263,15 @@ watch(
               />
             </table>
 
-            <div class="flex items-center justify-between border-t border-[rgba(80,105,127,0.08)] px-4 py-3 sm:px-6">
-              <div class="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
-                <div>
-                  <p v-if="!initialLoading" class="text-sm text-[var(--color-brand-muted)]">
-                    Showing
-                    <span class="font-medium">{{ (page - 1) * pageSize + 1 }}</span>
-                    to
-                    <span class="font-medium">{{ Math.min(page * pageSize, total) }}</span>
-                    of
-                    <span class="font-medium">{{ total }}</span>
-                    records
-                  </p>
-                  <div v-else class="h-4 w-44 animate-pulse rounded-full bg-[rgba(80,105,127,0.12)]" />
-                </div>
-                <div>
-                  <nav
-                    v-if="!initialLoading && lastpage() > 1"
-                    class="isolate inline-flex -space-x-px rounded-full shadow-[var(--shadow-soft)]"
-                    aria-label="Pagination"
-                  >
-                    <button
-                      :class="[
-                        page === 1
-                          ? 'cursor-default bg-gray-100 text-gray-100'
-                          : 'bg-white text-[var(--color-brand-muted)] hover:bg-[rgba(182,232,44,0.12)]',
-                        'relative inline-flex items-center rounded-l-full px-3 py-2 ring-1 ring-[rgba(80,105,127,0.16)] ring-inset focus:z-20 focus:outline-offset-0'
-                      ]"
-                      @click="page > 1 && (page--, updateQueryParameters())"
-                    >
-                      <span class="sr-only">Previous</span>
-                      <ChevronLeftIcon class="h-5 w-5" aria-hidden="true" />
-                    </button>
-                    <template v-for="historyPage in jobsPages()" :key="historyPage.id">
-                      <button
-                        v-if="historyPage.ellipsis"
-                        class="relative z-10 inline-flex items-center bg-white px-4 py-2 text-xs font-semibold text-[var(--color-brand-muted)] ring-1 ring-[rgba(80,105,127,0.16)] ring-inset focus:z-20"
-                      >
-                        ...
-                      </button>
-                      <button
-                        v-else
-                        :class="[
-                          historyPage.id === page
-                            ? 'bg-[linear-gradient(135deg,rgba(182,232,44,0.95),rgba(152,201,31,0.95))] text-[var(--color-brand-deep)]'
-                            : 'bg-white text-[var(--color-brand-ink-strong)] ring-1 ring-[rgba(80,105,127,0.16)] ring-inset hover:bg-[rgba(182,232,44,0.12)]',
-                          'relative z-10 inline-flex items-center px-4 py-2 text-sm font-semibold focus:z-20'
-                        ]"
-                        @click="page = historyPage.id; updateQueryParameters()"
-                      >
-                        {{ historyPage.id }}
-                      </button>
-                    </template>
-                    <button
-                      :class="[
-                        page === lastpage()
-                          ? 'cursor-default bg-gray-100 text-gray-100'
-                          : 'bg-white text-[var(--color-brand-muted)] hover:bg-[rgba(182,232,44,0.12)]',
-                        'relative inline-flex items-center rounded-r-full px-3 py-2 ring-1 ring-[rgba(80,105,127,0.16)] ring-inset focus:z-20 focus:outline-offset-0'
-                      ]"
-                      @click="page < lastpage() && (page++, updateQueryParameters())"
-                    >
-                      <span class="sr-only">Next</span>
-                      <ChevronRightIcon class="h-5 w-5" aria-hidden="true" />
-                    </button>
-                  </nav>
-                  <div
-                    v-else-if="initialLoading"
-                    class="h-10 w-56 animate-pulse rounded-full bg-[rgba(80,105,127,0.12)]"
-                  />
-                </div>
-              </div>
-            </div>
+            <PaginationControls
+              v-if="!initialLoading"
+              :page="page"
+              :page-size="pageSize"
+              :total="total"
+              item-label="record"
+              @update:page="updatePage"
+              @update:page-size="updatePageSize"
+            />
           </div>
         </div>
       </div>

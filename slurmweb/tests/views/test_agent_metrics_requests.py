@@ -254,3 +254,55 @@ class TestAgentMetricsRequestDisabled(TestAgentBase):
                 "name": "Not Implemented",
             },
         )
+
+
+class TestAgentNodeMetricsHistoryRequest(TestAgentBase):
+    def setUp(self):
+        self.setup_client(node_metrics=True)
+
+    @mock.patch("slurmweb.metrics.db.aiohttp.ClientSession.get")
+    def test_request_node_metrics_history(self, mock_get):
+        _, response = mock_prometheus_response("node-history-hour")
+        mock_get.side_effect = [response, response, response]
+        response = self.client.get(
+            f"/v{get_version()}/node/cn01/metrics/history?range=hour"
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertCountEqual(
+            response.json.keys(),
+            ["cpu_usage", "memory_usage", "disk_usage"],
+        )
+        self.assertGreater(len(response.json["cpu_usage"]), 0)
+
+    def test_request_node_metrics_history_invalid_range(self):
+        response = self.client.get(
+            f"/v{get_version()}/node/cn01/metrics/history?range=fail"
+        )
+        self.assertEqual(response.status_code, 500)
+        self.assertEqual(
+            response.json,
+            {
+                "code": 500,
+                "description": "Unsupported metric range fail",
+                "name": "Internal Server Error",
+            },
+        )
+
+
+class TestAgentNodeMetricsHistoryRequestDisabled(TestAgentBase):
+    def setUp(self):
+        self.setup_client(node_metrics=False)
+
+    def test_request_node_metrics_history_disabled(self):
+        response = self.client.get(
+            f"/v{get_version()}/node/cn01/metrics/history?range=hour"
+        )
+        self.assertEqual(response.status_code, 501)
+        self.assertEqual(
+            response.json,
+            {
+                "code": 501,
+                "description": "Node real-time metrics is disabled",
+                "name": "Not Implemented",
+            },
+        )

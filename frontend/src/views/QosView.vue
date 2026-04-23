@@ -7,8 +7,10 @@
 -->
 
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import type { Ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import type { LocationQueryRaw } from 'vue-router'
 import ClusterMainLayout from '@/components/ClusterMainLayout.vue'
 import { useClusterDataPoller } from '@/composables/DataPoller'
 import {
@@ -24,9 +26,13 @@ import QosHelpModal from '@/components/qos/QosHelpModal.vue'
 import type { QosModalLimitDescription } from '@/components/qos/QosHelpModal.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import TableSkeletonRows from '@/components/TableSkeletonRows.vue'
+import PaginationControls from '@/components/PaginationControls.vue'
+import { lastPage, parsePageSize, parsePositivePage, type PageSizeOption } from '@/composables/Pagination'
 import { QuestionMarkCircleIcon } from '@heroicons/vue/20/solid'
 
 const { cluster } = defineProps<{ cluster: string }>()
+const route = useRoute()
+const router = useRouter()
 
 const { data, unable, loaded, setCluster } = useClusterDataPoller<ClusterQos[]>(
   cluster,
@@ -36,6 +42,33 @@ const { data, unable, loaded, setCluster } = useClusterDataPoller<ClusterQos[]>(
 
 const helpModalShow: Ref<boolean> = ref(false)
 const modalQosLimit: Ref<QosModalLimitDescription | undefined> = ref()
+const page = ref(1)
+const pageSize = ref(25)
+
+const pagedQos = computed(() => {
+  const items = data.value ?? []
+  const start = (page.value - 1) * pageSize.value
+  return items.slice(start, start + pageSize.value)
+})
+const totalPages = computed(() => lastPage(data.value?.length ?? 0, pageSize.value))
+
+function updateQueryParameters() {
+  const query: LocationQueryRaw = {}
+  if (page.value !== 1) query.page = page.value
+  if (pageSize.value !== 25) query.page_size = pageSize.value
+  router.push({ name: 'qos', params: { cluster }, query })
+}
+
+function updatePage(newPage: number) {
+  page.value = newPage
+  updateQueryParameters()
+}
+
+function updatePageSize(newPageSize: PageSizeOption) {
+  pageSize.value = newPageSize
+  page.value = 1
+  updateQueryParameters()
+}
 
 function openHelpModal(qos: string, limit: string, value: ClusterOptionalNumber | ClusterTRES[]) {
   modalQosLimit.value = { id: limit, qos: qos, value: value }
@@ -81,6 +114,20 @@ watch(
     setCluster(newCluster)
   }
 )
+
+watch(totalPages, (newLastPage) => {
+  if (page.value > newLastPage) {
+    page.value = newLastPage
+    updateQueryParameters()
+  }
+})
+
+if (route.query.page) {
+  page.value = parsePositivePage(route.query.page)
+}
+if (route.query.page_size) {
+  pageSize.value = parsePageSize(route.query.page_size)
+}
 </script>
 
 <template>
@@ -103,7 +150,7 @@ watch(
     <InfoAlert v-else-if="loaded && data?.length == 0"
       >No qos defined on cluster <span class="font-medium">{{ cluster }}</span></InfoAlert
     >
-    <div v-else class="mt-8 flow-root">
+    <div v-else class="mt-5 flow-root">
       <div class="ui-table-shell -mx-4 overflow-x-auto sm:-mx-6 lg:-mx-8">
         <div class="inline-block min-w-full py-2 align-middle">
           <table class="ui-table min-w-full">
@@ -124,13 +171,13 @@ watch(
               v-if="loaded"
               class="divide-y divide-gray-200 text-sm text-gray-600 dark:divide-gray-700 dark:text-gray-300"
             >
-              <tr v-for="qos in data" :key="qos.name">
-                <td class="py-4 pr-3 whitespace-nowrap text-[var(--color-brand-ink-strong)] sm:pl-6 lg:pl-8">
+              <tr v-for="qos in pagedQos" :key="qos.name">
+                <td class="py-3 pr-3 whitespace-nowrap text-[var(--color-brand-ink-strong)] sm:pl-6 lg:pl-8">
                   <p class="text-base font-medium">{{ qos.name }}</p>
                   <p class="text-gray-500 text-[var(--color-brand-muted)]">{{ qos.description }}</p>
                 </td>
-                <td class="px-3 py-4 whitespace-nowrap">{{ qos.priority.number }}</td>
-                <td class="hidden px-3 py-4 whitespace-nowrap lg:table-cell">
+                <td class="px-3 py-3 whitespace-nowrap">{{ qos.priority.number }}</td>
+                <td class="hidden px-3 py-3 whitespace-nowrap lg:table-cell">
                   <dl>
                     <div
                       v-for="limit in qosJobLimits(qos)"
@@ -145,7 +192,7 @@ watch(
                     </div>
                   </dl>
                 </td>
-                <td class="hidden px-3 py-4 whitespace-nowrap lg:table-cell">
+                <td class="hidden px-3 py-3 whitespace-nowrap lg:table-cell">
                   <dl>
                     <div
                       v-for="limit in qosResourcesLimits(qos)"
@@ -160,7 +207,7 @@ watch(
                     </div>
                   </dl>
                 </td>
-                <td class="px-3 py-4 whitespace-nowrap">
+                <td class="px-3 py-3 whitespace-nowrap">
                   <div
                     :class="[
                       qos.limits.max.wall_clock.per.job.set ? '' : 'text-[var(--color-brand-muted)]/35',
@@ -176,7 +223,7 @@ watch(
                     <span class="visible">{{ renderWalltime(qos.limits.max.wall_clock.per.job) }}</span>
                   </div>
                 </td>
-                <td class="hidden px-3 py-4 2xl:table-cell">
+                <td class="hidden px-3 py-3 2xl:table-cell">
                   <span v-for="flag in qos.flags" :key="flag" class="ui-chip m-1">{{ renderQosFlag(flag) }}</span>
                 </td>
                 <td class="py-4 pl-3 text-right whitespace-nowrap sm:pr-6 lg:pr-8">
@@ -195,9 +242,18 @@ watch(
               first-cell-class="sm:pl-6 lg:pl-8"
               cell-class="px-3"
             />
-          </table>
+            </table>
+            <PaginationControls
+              v-if="loaded"
+              :page="page"
+              :page-size="pageSize"
+              :total="data?.length ?? 0"
+              item-label="qos policy"
+              @update:page="updatePage"
+              @update:page-size="updatePageSize"
+            />
+          </div>
         </div>
       </div>
-    </div>
   </ClusterMainLayout>
 </template>

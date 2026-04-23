@@ -17,7 +17,7 @@ defineProps<{
   <div class="ui-page-header">
     <div class="ui-page-copy">
       <p class="ui-page-kicker">Settings Center</p>
-      <h1 class="text-3xl font-bold text-[var(--color-brand-ink-strong)]">
+      <h1 class="ui-page-title">
         {{ title }}
       </h1>
       <p v-if="description" class="ui-page-description">

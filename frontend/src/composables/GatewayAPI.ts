@@ -774,7 +774,9 @@ export function isClusterJobExitCode(value: unknown): value is ClusterJobExitCod
   return typeof returnCode === 'object' && returnCode !== null && 'number' in returnCode
 }
 
-export function formatJobExitCode(exitCode: JobHistoryExitCode | ClusterJobExitCode | null): string {
+export function formatJobExitCode(
+  exitCode: JobHistoryExitCode | ClusterJobExitCode | null
+): string {
   if (exitCode == null) return '-'
 
   if (typeof exitCode === 'string') {
@@ -812,7 +814,8 @@ export function formatJobExitCode(exitCode: JobHistoryExitCode | ClusterJobExitC
   const signalLabel =
     signalId && signalId > 0 ? (signalName ? `${signalName}/${signalId}` : String(signalId)) : null
   const effectiveStatus =
-    status ?? (signalLabel ? 'SIGNALED' : returnCode === 0 ? 'SUCCESS' : returnCode != null ? 'FAILED' : null)
+    status ??
+    (signalLabel ? 'SIGNALED' : returnCode === 0 ? 'SUCCESS' : returnCode != null ? 'FAILED' : null)
 
   if (signalLabel && returnCode != null) {
     return `${effectiveStatus ?? 'UNKNOWN'} (rc=${returnCode}, sig=${signalLabel})`
@@ -864,6 +867,12 @@ export interface NodeInstantMetrics {
   cpu_usage: number | null
   memory_usage: number | null
   disk_usage: number | null
+}
+
+export interface NodeMetricsHistory {
+  cpu_usage: MetricValue[]
+  memory_usage: MetricValue[]
+  disk_usage: MetricValue[]
 }
 
 export interface CacheStatistics {
@@ -1073,7 +1082,9 @@ export function useGatewayAPI() {
     console.log('[GatewayAPI] 集群列表已加载:')
     result.forEach((c) => {
       console.log(
-        `[GatewayAPI]   集群 "${c.name}": persistence=${c.persistence ?? false}, node_metrics=${c.node_metrics ?? false}`
+        `[GatewayAPI]   集群 "${c.name}": persistence=${c.persistence ?? false}, node_metrics=${
+          c.node_metrics ?? false
+        }`
       )
     })
     return result
@@ -1250,6 +1261,18 @@ export function useGatewayAPI() {
     return result
   }
 
+  async function node_metrics_history(
+    cluster: string,
+    nodeName: string,
+    range: MetricRange
+  ): Promise<NodeMetricsHistory> {
+    const url = `/agents/${cluster}/node/${nodeName}/metrics/history?range=${range}`
+    console.log('[GatewayAPI] node_metrics_history 请求 URL:', url)
+    const result = await restAPI.get<NodeMetricsHistory>(url)
+    console.log('[GatewayAPI] node_metrics_history 响应:', result)
+    return result
+  }
+
   async function infrastructureImagePng(
     cluster: string,
     infrastructure: string,
@@ -1350,6 +1373,7 @@ export function useGatewayAPI() {
     jobs_history,
     job_history_detail,
     node_metrics,
+    node_metrics_history,
     infrastructureImagePng,
     abort,
     isValidGatewayGenericAPIKey,

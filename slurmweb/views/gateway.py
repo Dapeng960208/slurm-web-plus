@@ -493,3 +493,10 @@ def job_history_detail(cluster: str, record_id: int):
 def node_metrics(cluster: str, name: str):
     """Proxy node real-time metrics query to the agent."""
     return proxy_agent(cluster, f"node/{name}/metrics", request.token)
+
+
+@check_jwt
+@validate_cluster
+def node_metrics_history(cluster: str, name: str):
+    """Proxy node historical metrics query to the agent."""
+    return proxy_agent(cluster, f"node/{name}/metrics/history", request.token)

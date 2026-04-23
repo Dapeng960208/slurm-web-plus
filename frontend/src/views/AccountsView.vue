@@ -8,6 +8,8 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import type { LocationQueryRaw } from 'vue-router'
 import ClusterMainLayout from '@/components/ClusterMainLayout.vue'
 import { useClusterDataPoller } from '@/composables/DataPoller'
 import type { ClusterAssociation, ClusterAccountTreeNode } from '@/composables/GatewayAPI'
@@ -16,8 +18,12 @@ import ErrorAlert from '@/components/ErrorAlert.vue'
 import AccountTreeNode from '@/components/accounts/AccountTreeNode.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import PanelSkeleton from '@/components/PanelSkeleton.vue'
+import PaginationControls from '@/components/PaginationControls.vue'
+import { lastPage, parsePageSize, parsePositivePage, type PageSizeOption } from '@/composables/Pagination'
 
 const { cluster } = defineProps<{ cluster: string }>()
+const route = useRoute()
+const router = useRouter()
 
 const { data, unable, loaded, initialLoading } = useClusterDataPoller<ClusterAssociation[]>(
   cluster,
@@ -28,6 +34,8 @@ const { data, unable, loaded, initialLoading } = useClusterDataPoller<ClusterAss
 const expandedAccounts = ref<Set<string>>(new Set())
 const autoExpandedOnce = ref(false)
 const MAX_AUTO_EXPANDED = 10
+const page = ref(1)
+const pageSize = ref(25)
 
 function toggleAccount(account: string) {
   if (expandedAccounts.value.has(account)) {
@@ -86,6 +94,12 @@ const accountTree = computed<ClusterAccountTreeNode[]>(() => {
   return rootAccounts
 })
 
+const totalPages = computed(() => lastPage(accountTree.value.length, pageSize.value))
+const pagedAccountTree = computed(() => {
+  const start = (page.value - 1) * pageSize.value
+  return accountTree.value.slice(start, start + pageSize.value)
+})
+
 const availableAccounts = computed<Set<string>>(() => {
   const accounts = new Set<string>()
   if (!data.value) {
@@ -119,6 +133,24 @@ function autoExpandTree(nodes: ClusterAccountTreeNode[]) {
   }
 }
 
+function updateQueryParameters() {
+  const query: LocationQueryRaw = {}
+  if (page.value !== 1) query.page = page.value
+  if (pageSize.value !== 25) query.page_size = pageSize.value
+  router.push({ name: 'accounts', params: { cluster }, query })
+}
+
+function updatePage(newPage: number) {
+  page.value = newPage
+  updateQueryParameters()
+}
+
+function updatePageSize(newPageSize: PageSizeOption) {
+  pageSize.value = newPageSize
+  page.value = 1
+  updateQueryParameters()
+}
+
 watch(
   accountTree,
   (tree) => {
@@ -139,6 +171,20 @@ watch(
   },
   { immediate: true }
 )
+
+watch(totalPages, (newLastPage) => {
+  if (page.value > newLastPage) {
+    page.value = newLastPage
+    updateQueryParameters()
+  }
+})
+
+if (route.query.page) {
+  page.value = parsePositivePage(route.query.page)
+}
+if (route.query.page_size) {
+  pageSize.value = parsePageSize(route.query.page_size)
+}
 </script>
 
 <template>
@@ -156,20 +202,30 @@ watch(
     <InfoAlert v-else-if="loaded && data?.length == 0"
       >No association defined on cluster <span class="font-medium">{{ cluster }}</span></InfoAlert
     >
-    <div v-else class="mt-8">
+    <div v-else class="mt-5">
       <PanelSkeleton v-if="initialLoading" :rows="7" />
       <div v-else class="ui-panel ui-section">
         <ul role="list" class="space-y-4">
           <AccountTreeNode
-            v-for="(node, index) in accountTree"
+            v-for="(node, index) in pagedAccountTree"
             :key="node.account"
             :node="node"
             :expanded-accounts="expandedAccounts"
-            :is-last="index === accountTree.length - 1"
+            :is-last="index === pagedAccountTree.length - 1"
             :cluster="cluster"
             @toggle="toggleAccount"
           />
         </ul>
+      </div>
+      <div v-if="!initialLoading" class="ui-panel mt-3 overflow-hidden">
+        <PaginationControls
+          :page="page"
+          :page-size="pageSize"
+          :total="accountTree.length"
+          item-label="root account"
+          @update:page="updatePage"
+          @update:page-size="updatePageSize"
+        />
       </div>
     </div>
   </ClusterMainLayout>

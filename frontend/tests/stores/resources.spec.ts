@@ -14,6 +14,16 @@ describe('stores/runtime/resources.ts', () => {
     expect(store.showNodeNames).toBe(true)
   })
 
+  test('showRackDiagram defaults to false and is not persisted', async () => {
+    const store = useResourcesRuntimeStore()
+    expect(store.showRackDiagram).toBe(false)
+
+    store.showRackDiagram = true
+    await nextTick()
+    expect(store.showRackDiagram).toBe(true)
+    expect(localStorage.getItem('showRackDiagram')).toBeNull()
+  })
+
   test('showNodeNames updates state and persists to localStorage', async () => {
     const store = useResourcesRuntimeStore()
     store.showNodeNames = false

@@ -50,6 +50,7 @@ export interface JobsHistoryQueryParameters {
   state?: string
   job_id?: number
   page?: number
+  page_size?: number
   sort?: JobHistorySortCriterion
   order?: JobHistorySortOrder
 }
@@ -58,6 +59,7 @@ export const useJobsHistoryRuntimeStore = defineStore('jobsHistoryRuntime', () =
   const sort = ref<JobHistorySortCriterion>('submit_time')
   const order = ref<JobHistorySortOrder>('desc')
   const page = ref(1)
+  const pageSize = ref(25)
   const filters = ref<JobHistoryFilters>(defaultFilters())
 
   function resetFilters() {
@@ -83,6 +85,7 @@ export const useJobsHistoryRuntimeStore = defineStore('jobsHistoryRuntime', () =
     sort.value = 'submit_time'
     order.value = 'desc'
     page.value = 1
+    pageSize.value = 25
 
     if (isValidSortCriterion(query.sort)) {
       sort.value = query.sort
@@ -94,6 +97,10 @@ export const useJobsHistoryRuntimeStore = defineStore('jobsHistoryRuntime', () =
     if (typeof query.page === 'string') {
       const parsed = parseInt(query.page, 10)
       page.value = Number.isNaN(parsed) ? 1 : Math.max(parsed, 1)
+    }
+    if (typeof query.page_size === 'string') {
+      const parsed = parseInt(query.page_size, 10)
+      pageSize.value = [10, 25, 50, 100].includes(parsed) ? parsed : 25
     }
 
     const stringKeys: Array<
@@ -131,6 +138,7 @@ export const useJobsHistoryRuntimeStore = defineStore('jobsHistoryRuntime', () =
     if (filters.value.state) result.state = filters.value.state
     if (filters.value.job_id !== undefined) result.job_id = filters.value.job_id
     if (page.value !== 1) result.page = page.value
+    if (pageSize.value !== 25) result.page_size = pageSize.value
     if (sort.value !== 'submit_time') result.sort = sort.value
     if (order.value !== 'desc') result.order = order.value
     return result
@@ -140,6 +148,7 @@ export const useJobsHistoryRuntimeStore = defineStore('jobsHistoryRuntime', () =
     sort,
     order,
     page,
+    pageSize,
     filters,
     resetFilters,
     hydrate,

@@ -426,3 +426,22 @@ def node_metrics(name: str):
     except SlurmwebMetricsDBError as err:
         logger.warning("Node metrics query error for %s: %s", name, err)
         abort(500, str(err))
+
+
+@rbac_action("view-nodes")
+def node_metrics_history(name: str):
+    """Return historical resource metrics for a node from Prometheus."""
+    if current_app.node_metrics_db is None:
+        error = "Node real-time metrics is disabled"
+        logger.warning(error)
+        abort(501, error)
+    try:
+        result = current_app.node_metrics_db.node_history_metrics(
+            name,
+            request.args.get("range", "hour"),
+            current_app.settings.node_metrics.node_hostname_label,
+        )
+        return jsonify(result)
+    except SlurmwebMetricsDBError as err:
+        logger.warning("Node metrics history query error for %s: %s", name, err)
+        abort(500, str(err))

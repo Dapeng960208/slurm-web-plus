@@ -46,11 +46,16 @@ export interface ResourcesViewFilters {
 export interface ResourcesQueryParameters {
   states?: string
   partitions?: string
+  page?: number
+  page_size?: number
 }
 
 export const useResourcesRuntimeStore = defineStore('resourcesRuntime', () => {
   const openFiltersPanel = ref(false)
   const filters = ref<ResourcesViewFilters>({ states: [], partitions: [] })
+  const page = ref(1)
+  const pageSize = ref(25)
+  const showRackDiagram = ref(false)
   const showNodeNames = ref<boolean>(JSON.parse(localStorage.getItem('showNodeNames') || 'true'))
 
   function removeStateFilter(state: string) {
@@ -92,6 +97,12 @@ export const useResourcesRuntimeStore = defineStore('resourcesRuntime', () => {
     if (filters.value.partitions.length > 0) {
       result.partitions = filters.value.partitions.join()
     }
+    if (page.value !== 1) {
+      result.page = page.value
+    }
+    if (pageSize.value !== 25) {
+      result.page_size = pageSize.value
+    }
     return result
   }
 
@@ -102,6 +113,9 @@ export const useResourcesRuntimeStore = defineStore('resourcesRuntime', () => {
   return {
     openFiltersPanel,
     filters,
+    page,
+    pageSize,
+    showRackDiagram,
     showNodeNames,
     removeStateFilter,
     removePartitionFilter,

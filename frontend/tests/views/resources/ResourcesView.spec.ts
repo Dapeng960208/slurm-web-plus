@@ -49,11 +49,9 @@ describe('ResourcesView.vue', () => {
         }
       }
     })
-    // Check presence of ResourcesDiagramThumbnail component
-    const thumbnail = wrapper.getComponent(ResourcesDiagramThumbnail)
-    // Check that loading prop is passed correctly (should be false when loaded
-    // is true)
-    expect(thumbnail.props('loading')).toBe(false)
+    // Diagram is hidden by default until explicitly toggled by the user.
+    expect(wrapper.findComponent(ResourcesDiagramThumbnail).exists()).toBe(false)
+    expect(wrapper.text()).toContain('Show Rack Diagram')
     // Check presence of ResourcesFiltersBar component
     wrapper.getComponent(ResourcesFiltersBar)
     // Check presence of table
@@ -61,16 +59,18 @@ describe('ResourcesView.vue', () => {
   })
   test('table without diagram when racksdb is disabled', () => {
     mockClusterDataPoller.data.value = nodes
-    // Disable racksdb on cluster foo
+    // Disable racksdb on a dedicated cluster to avoid shared-state leakage.
     useRuntimeStore().availableClusters = [
       {
         ...useRuntimeStore().availableClusters[0],
+        name: 'bar',
+        infrastructure: 'bar',
         racksdb: false
       }
     ]
     const wrapper = mount(ResourcesView, {
       props: {
-        cluster: 'foo'
+        cluster: 'bar'
       },
       global: {
         stubs: {
@@ -78,6 +78,8 @@ describe('ResourcesView.vue', () => {
         }
       }
     })
+    expect(wrapper.text()).not.toContain('Show Rack Diagram')
+    expect(wrapper.findComponent(ResourcesDiagramThumbnail).exists()).toBe(false)
     // Check presence of table
     wrapper.get('main table')
   })
@@ -99,7 +101,7 @@ describe('ResourcesView.vue', () => {
     // Check absence of main table
     expect(wrapper.find('main table').exists()).toBeFalsy()
   })
-  test('passes loading state to ResourcesDiagramThumbnail', () => {
+  test('passes loading state to ResourcesDiagramThumbnail', async () => {
     mockClusterDataPoller.data.value = nodes
     mockClusterDataPoller.loaded.value = false // Data is loading
     mockClusterDataPoller.initialLoading.value = true
@@ -107,10 +109,35 @@ describe('ResourcesView.vue', () => {
       props: { cluster: 'foo' },
       global: { stubs: { ResourcesDiagramThumbnail: true } }
     })
+    const toggleButton = wrapper
+      .findAll('button[type="button"]')
+      .find((button) => button.text().includes('Show Rack Diagram'))
+    if (!toggleButton) {
+      throw new Error('Show Rack Diagram button not found')
+    }
+    await toggleButton.trigger('click')
     // Check that loading prop is passed correctly (should be true when loaded
     // is false)
     const thumbnail = wrapper.getComponent(ResourcesDiagramThumbnail)
     expect(thumbnail.props('loading')).toBe(true)
+  })
+
+  test('toggles rack diagram visibility', async () => {
+    mockClusterDataPoller.data.value = nodes
+    const wrapper = mount(ResourcesView, {
+      props: { cluster: 'foo' },
+      global: { stubs: { ResourcesDiagramThumbnail: true } }
+    })
+
+    const showButton = wrapper
+      .findAll('button[type="button"]')
+      .find((button) => button.text().includes('Show Rack Diagram'))
+    if (!showButton) {
+      throw new Error('Show Rack Diagram button not found')
+    }
+    await showButton.trigger('click')
+    expect(wrapper.findComponent(ResourcesDiagramThumbnail).exists()).toBe(true)
+    expect(wrapper.text()).toContain('Hide Rack Diagram')
   })
   test('syncs filters with URL on mount', async () => {
     mockClusterDataPoller.data.value = nodes

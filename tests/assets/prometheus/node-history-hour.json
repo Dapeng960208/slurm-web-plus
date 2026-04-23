@@ -1,0 +1,18 @@
+{
+  "status": "success",
+  "data": {
+    "resultType": "matrix",
+    "result": [
+      {
+        "metric": {
+          "hostname": "cn01"
+        },
+        "values": [
+          [1747754490, "18.5"],
+          [1747754520, "24.2"],
+          [1747754550, "37.1"]
+        ]
+      }
+    ]
+  }
+}

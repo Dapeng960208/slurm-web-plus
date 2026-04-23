@@ -254,3 +254,81 @@ class SlurmwebMetricsDB:
             return results
 
         return asyncio_run(_fetch_all())
+
+    def node_history_metrics(
+        self, node_name: str, last: str, hostname_label: str = "hostname"
+    ):
+        """
+        Query Prometheus for historical node_exporter metrics for a specific node.
+        Returns a dict with CPU, memory, and disk usage series.
+        """
+        try:
+            resolution = getattr(self.RANGE_RESOLUTIONS["30s"], last)
+        except AttributeError as err:
+            raise SlurmwebMetricsDBError(f"Unsupported metric range {last}") from err
+
+        end = datetime.now()
+        if last == "hour":
+            start = end - timedelta(hours=1)
+        elif last == "day":
+            start = end - timedelta(days=1)
+        elif last == "week":
+            start = end - timedelta(days=7)
+        else:
+            raise SlurmwebMetricsDBError(f"Unsupported metric range {last}")
+
+        def _rounded_timestamp(timestamp):
+            return int(timestamp - timestamp % resolution.rounding)
+
+        start_ts = _rounded_timestamp(start.timestamp())
+        end_ts = _rounded_timestamp(end.timestamp())
+
+        queries = {
+            "cpu_usage": f'100 - (avg(rate(node_cpu_seconds_total{{mode="idle",{hostname_label}="{node_name}"}}[1m])) * 100)',
+            "memory_usage": f'100 * (1 - (node_memory_MemAvailable_bytes{{{hostname_label}="{node_name}"}} / node_memory_MemTotal_bytes{{{hostname_label}="{node_name}"}}))',
+            "disk_usage": f'100 - ((node_filesystem_avail_bytes{{mountpoint="/",{hostname_label}="{node_name}"}} / node_filesystem_size_bytes{{mountpoint="/",{hostname_label}="{node_name}"}}) * 100)',
+        }
+
+        async def _fetch_all():
+            results = {}
+            async with aiohttp.ClientSession() as session:
+                for key, promql in queries.items():
+                    url = (
+                        f"{self.base_uri.geturl()}{self.REQUEST_BASE_PATH}query_range"
+                        f"?query={promql}&start={start_ts}&end={end_ts}&step={resolution.step}"
+                    )
+                    logger.debug("Node history metrics request: %s", url)
+                    try:
+                        async with session.get(url) as response:
+                            if response.status != 200:
+                                raise SlurmwebMetricsDBError(
+                                    "Unexpected response status "
+                                    f"{response.status} for metrics database request {url}"
+                                )
+                            try:
+                                json_data = await response.json()
+                            except aiohttp.client_exceptions.ContentTypeError as err:
+                                raise SlurmwebMetricsDBError(
+                                    "Unsupported Content-Type for metrics database request "
+                                    f"{url}"
+                                ) from err
+                    except aiohttp.ClientConnectionError as err:
+                        raise SlurmwebMetricsDBError(
+                            f"Metrics database connection error: {str(err)}"
+                        ) from err
+
+                    if not json_data["data"]["result"]:
+                        raise SlurmwebMetricsDBError(f"Empty result for query {promql}")
+
+                    try:
+                        results[key] = [
+                            [int(t_v_pair[0] * 1000), round(float(t_v_pair[1]), 2)]
+                            for t_v_pair in json_data["data"]["result"][0]["values"]
+                        ]
+                    except (TypeError, ValueError, IndexError, KeyError) as err:
+                        raise SlurmwebMetricsDBError(
+                            f"Unexpected result on metrics query {promql}"
+                        ) from err
+            return results
+
+        return asyncio_run(_fetch_all())

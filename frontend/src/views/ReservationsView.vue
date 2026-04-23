@@ -7,7 +7,9 @@
 -->
 
 <script setup lang="ts">
-import { watch } from 'vue'
+import { computed, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import type { LocationQueryRaw } from 'vue-router'
 import ClusterMainLayout from '@/components/ClusterMainLayout.vue'
 import { useClusterDataPoller } from '@/composables/DataPoller'
 import type { ClusterReservation } from '@/composables/GatewayAPI'
@@ -16,9 +18,13 @@ import InfoAlert from '@/components/InfoAlert.vue'
 import ErrorAlert from '@/components/ErrorAlert.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import TableSkeletonRows from '@/components/TableSkeletonRows.vue'
+import PaginationControls from '@/components/PaginationControls.vue'
+import { lastPage, parsePageSize, parsePositivePage, type PageSizeOption } from '@/composables/Pagination'
 import { XMarkIcon } from '@heroicons/vue/24/outline'
 
 const { cluster } = defineProps<{ cluster: string }>()
+const route = useRoute()
+const router = useRouter()
 
 const { data, unable, loaded, setCluster } = useClusterDataPoller<ClusterReservation[]>(
   cluster,
@@ -26,12 +32,53 @@ const { data, unable, loaded, setCluster } = useClusterDataPoller<ClusterReserva
   10000
 )
 
+const page = ref(1)
+const pageSize = ref(25)
+const pagedReservations = computed(() => {
+  const items = data.value ?? []
+  const start = (page.value - 1) * pageSize.value
+  return items.slice(start, start + pageSize.value)
+})
+const totalPages = computed(() => lastPage(data.value?.length ?? 0, pageSize.value))
+
+function updateQueryParameters() {
+  const query: LocationQueryRaw = {}
+  if (page.value !== 1) query.page = page.value
+  if (pageSize.value !== 25) query.page_size = pageSize.value
+  router.push({ name: 'reservations', params: { cluster }, query })
+}
+
+function updatePage(newPage: number) {
+  page.value = newPage
+  updateQueryParameters()
+}
+
+function updatePageSize(newPageSize: PageSizeOption) {
+  pageSize.value = newPageSize
+  page.value = 1
+  updateQueryParameters()
+}
+
 watch(
   () => cluster,
   (newCluster) => {
     setCluster(newCluster)
   }
 )
+
+watch(totalPages, (newLastPage) => {
+  if (page.value > newLastPage) {
+    page.value = newLastPage
+    updateQueryParameters()
+  }
+})
+
+if (route.query.page) {
+  page.value = parsePositivePage(route.query.page)
+}
+if (route.query.page_size) {
+  pageSize.value = parsePageSize(route.query.page_size)
+}
 </script>
 
 <template>
@@ -49,7 +96,7 @@ watch(
     <InfoAlert v-else-if="loaded && data?.length == 0"
       >No reservation defined on cluster <span class="font-medium">{{ cluster }}</span></InfoAlert
     >
-    <div v-else class="mt-8 flow-root">
+    <div v-else class="mt-5 flow-root">
       <div class="ui-table-shell -mx-4 overflow-x-auto sm:-mx-6 lg:-mx-8">
         <div class="inline-block min-w-full py-2 align-middle">
           <table class="ui-table min-w-full">
@@ -67,7 +114,7 @@ watch(
               </tr>
             </thead>
             <tbody v-if="loaded" class="divide-y divide-gray-200 text-[var(--color-brand-ink-strong)]">
-              <tr v-for="reservation in data" :key="reservation.name">
+              <tr v-for="reservation in pagedReservations" :key="reservation.name">
                 <td class="pr-3 sm:pl-6 lg:pl-8">{{ reservation.name }}</td>
                 <td class="hidden px-3 text-sm break-all 2xl:table-cell">
                   <p class="font-mono text-xs">{{ reservation.node_list }}</p>
@@ -114,6 +161,15 @@ watch(
               cell-class="px-3"
             />
           </table>
+          <PaginationControls
+            v-if="loaded"
+            :page="page"
+            :page-size="pageSize"
+            :total="data?.length ?? 0"
+            item-label="reservation"
+            @update:page="updatePage"
+            @update:page-size="updatePageSize"
+          />
         </div>
       </div>
     </div>

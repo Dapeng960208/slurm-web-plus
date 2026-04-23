@@ -7,7 +7,7 @@
 -->
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import type { Ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import type { LocationQueryRaw } from 'vue-router'
@@ -27,7 +27,10 @@ import { foldNodeset, expandNodeset } from '@/composables/Nodeset'
 import ErrorAlert from '@/components/ErrorAlert.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import TableSkeletonRows from '@/components/TableSkeletonRows.vue'
+import PaginationControls from '@/components/PaginationControls.vue'
+import { lastPage, parsePageSize, parsePositivePage, type PageSizeOption } from '@/composables/Pagination'
 import { ChevronRightIcon, MagnifyingGlassPlusIcon } from '@heroicons/vue/20/solid'
+import { EyeIcon, EyeSlashIcon } from '@heroicons/vue/24/outline'
 
 const { cluster } = defineProps<{ cluster: string }>()
 
@@ -35,6 +38,7 @@ const foldedNodesShow: Ref<Record<string, boolean>> = ref({})
 const runtimeStore = useRuntimeStore()
 const route = useRoute()
 const router = useRouter()
+const hydratingQuery = ref(false)
 const { data, unable, loaded, initialLoading, setCluster } = useClusterDataPoller<ClusterNode[]>(
   cluster,
   'nodes',
@@ -60,6 +64,10 @@ const filteredNodes: Ref<ClusterNode[]> = computed(() => {
     return []
   }
   return [...data.value].filter((node) => runtimeStore.resources.matchesFilters(node))
+})
+
+const clusterSupportsRacksdb = computed(() => {
+  return Boolean(runtimeStore.getCluster(cluster)?.racksdb)
 })
 
 const foldedNodes: Ref<FoldedClusterNode[]> = computed(() => {
@@ -96,17 +104,41 @@ const foldedNodes: Ref<FoldedClusterNode[]> = computed(() => {
   return result
 })
 
+const totalPages = computed(() => lastPage(foldedNodes.value.length, runtimeStore.resources.pageSize))
+const pagedFoldedNodes = computed(() => {
+  const start = (runtimeStore.resources.page - 1) * runtimeStore.resources.pageSize
+  const end = start + runtimeStore.resources.pageSize
+  return foldedNodes.value.slice(start, end)
+})
+
 function updateQueryParameters() {
   router.push({ name: 'resources', query: runtimeStore.resources.query() as LocationQueryRaw })
 }
 
+function resetPageAndUpdateQueryParameters() {
+  if (hydratingQuery.value) return
+  runtimeStore.resources.page = 1
+  updateQueryParameters()
+}
+
+function updatePage(page: number) {
+  runtimeStore.resources.page = page
+  updateQueryParameters()
+}
+
+function updatePageSize(pageSize: PageSizeOption) {
+  runtimeStore.resources.pageSize = pageSize
+  runtimeStore.resources.page = 1
+  updateQueryParameters()
+}
+
 watch(
   () => runtimeStore.resources.filters.states,
-  () => updateQueryParameters()
+  () => resetPageAndUpdateQueryParameters()
 )
 watch(
   () => runtimeStore.resources.filters.partitions,
-  () => updateQueryParameters()
+  () => resetPageAndUpdateQueryParameters()
 )
 watch(
   () => foldedNodes.value,
@@ -126,12 +158,15 @@ watch(
 watch(
   () => cluster,
   (newCluster) => {
+    runtimeStore.resources.showRackDiagram = false
     setCluster(newCluster)
   }
 )
 
-onMounted(() => {
-  if (['states', 'partitions'].some((parameter) => parameter in route.query)) {
+onMounted(async () => {
+  hydratingQuery.value = true
+  runtimeStore.resources.showRackDiagram = false
+  if (['states', 'partitions', 'page', 'page_size'].some((parameter) => parameter in route.query)) {
     if (route.query.states) {
       runtimeStore.resources.filters.states = []
       ;(route.query.states as string).split(',').forEach((state: string) => {
@@ -141,14 +176,33 @@ onMounted(() => {
     if (route.query.partitions) {
       runtimeStore.resources.filters.partitions = (route.query.partitions as string).split(',')
     }
+    if (route.query.page) {
+      runtimeStore.resources.page = parsePositivePage(route.query.page)
+    }
+    if (route.query.page_size) {
+      runtimeStore.resources.pageSize = parsePageSize(route.query.page_size)
+    }
   } else {
+    updateQueryParameters()
+  }
+  await nextTick()
+  hydratingQuery.value = false
+})
+
+watch(totalPages, (newLastPage) => {
+  if (runtimeStore.resources.page > newLastPage) {
+    runtimeStore.resources.page = newLastPage
     updateQueryParameters()
   }
 })
 </script>
 
 <template>
-  <ClusterMainLayout menu-entry="resources" :cluster="cluster" :breadcrumb="[{ title: 'Resources' }]">
+  <ClusterMainLayout
+    menu-entry="resources"
+    :cluster="cluster"
+    :breadcrumb="[{ title: 'Resources' }]"
+  >
     <div class="ui-page ui-page-wide">
       <ResourcesFiltersPanel :cluster="cluster" :nbNodes="filteredNodes.length" />
 
@@ -157,10 +211,29 @@ onMounted(() => {
         description="Current node state, allocation pressure and partition visibility across the cluster."
         :metric-value="loaded ? filteredNodes.length : undefined"
         :metric-label="`node${filteredNodes.length > 1 ? 's' : ''} found`"
-      />
+      >
+        <template #actions>
+          <button
+            v-if="clusterSupportsRacksdb"
+            type="button"
+            class="ui-button-secondary"
+            @click="
+              runtimeStore.resources.showRackDiagram = !runtimeStore.resources.showRackDiagram
+            "
+          >
+            <EyeSlashIcon
+              v-if="runtimeStore.resources.showRackDiagram"
+              class="h-4 w-4"
+              aria-hidden="true"
+            />
+            <EyeIcon v-else class="h-4 w-4" aria-hidden="true" />
+            {{ runtimeStore.resources.showRackDiagram ? 'Hide Rack Diagram' : 'Show Rack Diagram' }}
+          </button>
+        </template>
+      </PageHeader>
 
       <ResourcesDiagramThumbnail
-        v-if="runtimeStore.getCluster(cluster).racksdb"
+        v-if="clusterSupportsRacksdb && runtimeStore.resources.showRackDiagram"
         :cluster="cluster"
         :nodes="filteredNodes"
         :loading="initialLoading"
@@ -171,7 +244,7 @@ onMounted(() => {
         >Unable to retrieve nodes from cluster
         <span class="font-medium">{{ cluster }}</span></ErrorAlert
       >
-      <div v-else class="mt-8 flow-root">
+      <div v-else class="mt-5 flow-root">
         <div class="ui-table-shell -mx-4 overflow-x-auto sm:-mx-6 lg:-mx-8">
           <div class="inline-block min-w-full py-2 align-middle">
             <table class="ui-table min-w-full">
@@ -192,7 +265,7 @@ onMounted(() => {
                 v-if="loaded"
                 class="divide-y divide-gray-200 text-sm text-gray-500 dark:divide-gray-700 dark:text-gray-300"
               >
-                <template v-for="node in foldedNodes" :key="node.name">
+                <template v-for="node in pagedFoldedNodes" :key="node.name">
                   <tr>
                     <td class="w-4">
                       <button
@@ -208,7 +281,7 @@ onMounted(() => {
                         />
                       </button>
                     </td>
-                    <td class="py-4 text-sm whitespace-nowrap">
+                    <td class="py-3 text-sm whitespace-nowrap">
                       <RouterLink
                         v-if="node.number == 1"
                         class="inline-flex text-[var(--color-brand-blue)] transition hover:text-[var(--color-brand-ink-strong)]"
@@ -218,7 +291,9 @@ onMounted(() => {
                           query: { returnTo: 'resources' }
                         }"
                       >
-                        <span class="pr-4 font-mono text-[var(--color-brand-ink-strong)]">{{ node.name }}</span>
+                        <span class="pr-4 font-mono text-[var(--color-brand-ink-strong)]">{{
+                          node.name
+                        }}</span>
                         <MagnifyingGlassPlusIcon class="h-4 w-4" />
                       </RouterLink>
                       <button
@@ -227,27 +302,35 @@ onMounted(() => {
                         class="transition hover:text-[var(--color-brand-ink-strong)]"
                       >
                         <span class="sr-only">Toggle folded nodes {{ node.name }}</span>
-                        <span class="font-mono text-[var(--color-brand-ink-strong)]">{{ node.name }}</span>
-                        <span class="px-1 font-normal text-[var(--color-brand-muted)] italic">({{ node.number }})</span>
+                        <span class="font-mono text-[var(--color-brand-ink-strong)]">{{
+                          node.name
+                        }}</span>
+                        <span class="px-1 font-normal text-[var(--color-brand-muted)] italic"
+                          >({{ node.number }})</span
+                        >
                       </button>
                     </td>
-                    <td class="px-3 py-4 whitespace-nowrap">
+                    <td class="px-3 py-3 whitespace-nowrap">
                       <NodeMainState :status="node.state" />
                     </td>
-                    <td class="px-3 py-4 whitespace-nowrap">
+                    <td class="px-3 py-3 whitespace-nowrap">
                       <NodeAllocationState :status="node.state" />
                     </td>
-                    <td class="px-3 py-4 whitespace-nowrap">
+                    <td class="px-3 py-3 whitespace-nowrap">
                       {{ node.sockets }} x {{ node.cores }}
                     </td>
-                    <td class="px-3 py-4 whitespace-nowrap">
+                    <td class="px-3 py-3 whitespace-nowrap">
                       {{ getMBHumanUnit(node.real_memory) }}
                     </td>
-                    <td class="px-3 py-4 whitespace-nowrap">
+                    <td class="px-3 py-3 whitespace-nowrap">
                       <NodeGPU :node="node" />
                     </td>
-                    <td class="px-3 py-4 whitespace-nowrap">
-                      <span v-for="partition in node.partitions" :key="partition" class="ui-chip mr-1">
+                    <td class="px-3 py-3 whitespace-nowrap">
+                      <span
+                        v-for="partition in node.partitions"
+                        :key="partition"
+                        class="ui-chip mr-1"
+                      >
                         {{ partition }}
                       </span>
                     </td>
@@ -282,7 +365,10 @@ onMounted(() => {
                                   })
                                 "
                               >
-                                <span class="visible mr-0 grow text-left text-[var(--color-brand-ink-strong)]">{{ _node }}</span>
+                                <span
+                                  class="visible mr-0 grow text-left text-[var(--color-brand-ink-strong)]"
+                                  >{{ _node }}</span
+                                >
                                 <MagnifyingGlassPlusIcon class="h-4 w-4" />
                               </button>
                             </li>
@@ -301,6 +387,15 @@ onMounted(() => {
                 cell-class="px-3"
               />
             </table>
+            <PaginationControls
+              v-if="loaded"
+              :page="runtimeStore.resources.page"
+              :page-size="runtimeStore.resources.pageSize"
+              :total="foldedNodes.length"
+              item-label="node group"
+              @update:page="updatePage"
+              @update:page-size="updatePageSize"
+            />
           </div>
         </div>
       </div>

@@ -31,6 +31,7 @@ export interface JobsQueryParameters {
   qos?: string
   partitions?: string
   page?: number
+  page_size?: number
 }
 
 const JobSortOrders = ['asc', 'desc'] as const
@@ -42,6 +43,7 @@ export const useJobsRuntimeStore = defineStore('jobsRuntime', () => {
   const sort = ref<JobSortCriterion>('id')
   const order = ref<JobSortOrder>('asc')
   const page = ref(1)
+  const pageSize = ref(25)
   const openFiltersPanel = ref(false)
   const filters = ref<JobsViewFilters>({
     states: [],
@@ -153,6 +155,9 @@ export const useJobsRuntimeStore = defineStore('jobsRuntime', () => {
     if (page.value != 1) {
       result.page = page.value
     }
+    if (pageSize.value != 25) {
+      result.page_size = pageSize.value
+    }
     if (sort.value != 'id') {
       result.sort = sort.value
     }
@@ -180,6 +185,7 @@ export const useJobsRuntimeStore = defineStore('jobsRuntime', () => {
     sort,
     order,
     page,
+    pageSize,
     openFiltersPanel,
     filters,
     restoreSortDefault,

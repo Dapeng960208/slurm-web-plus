@@ -13,8 +13,19 @@ import { useRuntimeStore } from '@/stores/runtime'
 import ClusterMainLayout from '@/components/ClusterMainLayout.vue'
 import { useClusterDataPoller } from '@/composables/DataPoller'
 import type { ClusterDataPoller } from '@/composables/DataPoller'
-import { getMBHumanUnit, getNodeGPU, getNodeGPUFromGres, useGatewayAPI } from '@/composables/GatewayAPI'
-import type { ClusterIndividualNode, ClusterJob, NodeInstantMetrics } from '@/composables/GatewayAPI'
+import {
+  getMBHumanUnit,
+  getNodeGPU,
+  getNodeGPUFromGres,
+  useGatewayAPI
+} from '@/composables/GatewayAPI'
+import type {
+  ClusterIndividualNode,
+  ClusterJob,
+  MetricRange,
+  NodeInstantMetrics,
+  NodeMetricsHistory
+} from '@/composables/GatewayAPI'
 import NodeMainState from '@/components/resources/NodeMainState.vue'
 import NodeAllocationState from '@/components/resources/NodeAllocationState.vue'
 import JobStatusBadge from '@/components/job/JobStatusBadge.vue'
@@ -25,6 +36,7 @@ import DetailSkeletonList from '@/components/DetailSkeletonList.vue'
 import PanelSkeleton from '@/components/PanelSkeleton.vue'
 import StatCardSkeleton from '@/components/StatCardSkeleton.vue'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
+import NodeMetricsHistoryChart from '@/components/node/NodeMetricsHistoryChart.vue'
 import { XCircleIcon } from '@heroicons/vue/20/solid'
 
 const { cluster, nodeName } = defineProps<{ cluster: string; nodeName: string }>()
@@ -33,11 +45,21 @@ const runtimeStore = useRuntimeStore()
 const gateway = useGatewayAPI()
 
 const nodeMetrics = ref<NodeInstantMetrics | null>(null)
+const nodeMetricsHistory = ref<NodeMetricsHistory | null>(null)
 const nodeMetricsError = ref(false)
+const nodeMetricsHistoryError = ref(false)
+const nodeMetricsHistoryLoading = ref(false)
+const nodeMetricsRange = ref<MetricRange>('hour')
 let metricsTimer: ReturnType<typeof setInterval> | null = null
+let metricsHistoryTimer: ReturnType<typeof setInterval> | null = null
+
+const nodeMetricsEnabled = computed(() => {
+  const details = runtimeStore.availableClusters.find((value) => value.name === cluster)
+  return Boolean(details?.node_metrics)
+})
 
 async function fetchNodeMetrics() {
-  if (!runtimeStore.currentCluster?.node_metrics) {
+  if (!nodeMetricsEnabled.value) {
     nodeMetrics.value = null
     nodeMetricsError.value = false
     return
@@ -51,17 +73,48 @@ async function fetchNodeMetrics() {
   }
 }
 
+async function fetchNodeMetricsHistory() {
+  if (!nodeMetricsEnabled.value) {
+    nodeMetricsHistory.value = null
+    nodeMetricsHistoryError.value = false
+    nodeMetricsHistoryLoading.value = false
+    return
+  }
+
+  nodeMetricsHistoryLoading.value = true
+  try {
+    nodeMetricsHistory.value = await gateway.node_metrics_history(
+      cluster,
+      nodeName,
+      nodeMetricsRange.value
+    )
+    nodeMetricsHistoryError.value = false
+  } catch {
+    nodeMetricsHistoryError.value = true
+    nodeMetricsHistory.value = null
+  } finally {
+    nodeMetricsHistoryLoading.value = false
+  }
+}
+
 function startMetricsPolling() {
-  if (!runtimeStore.currentCluster?.node_metrics) return
-  fetchNodeMetrics()
+  if (!nodeMetricsEnabled.value) return
+  void fetchNodeMetrics()
+  void fetchNodeMetricsHistory()
   if (metricsTimer) clearInterval(metricsTimer)
+  if (metricsHistoryTimer) clearInterval(metricsHistoryTimer)
   metricsTimer = setInterval(fetchNodeMetrics, 15000)
+  metricsHistoryTimer = setInterval(fetchNodeMetricsHistory, 60000)
 }
 
 function stopMetricsPolling() {
   if (metricsTimer) {
     clearInterval(metricsTimer)
     metricsTimer = null
+  }
+  if (metricsHistoryTimer) {
+    clearInterval(metricsHistoryTimer)
+    metricsHistoryTimer = null
   }
 }
 
@@ -103,7 +156,9 @@ const allocationDetails = computed(() => {
     },
     {
       label: 'Memory',
-      text: `${getMBHumanUnit(node.data.value.alloc_memory)} / ${getMBHumanUnit(node.data.value.real_memory)}`,
+      text: `${getMBHumanUnit(node.data.value.alloc_memory)} / ${getMBHumanUnit(
+        node.data.value.real_memory
+      )}`,
       pct: roundToDecimal((node.data.value.alloc_memory / node.data.value.real_memory) * 100)
     }
   ]
@@ -117,13 +172,37 @@ const allocationDetails = computed(() => {
   return details
 })
 
+const actualCpuUsage = computed(() => {
+  if (!node.data.value || !nodeMetrics.value || nodeMetrics.value.cpu_usage === null) return null
+  return roundToDecimal((node.data.value.cpus * nodeMetrics.value.cpu_usage) / 100, 1)
+})
+
+const actualMemoryUsage = computed(() => {
+  if (!node.data.value || !nodeMetrics.value || nodeMetrics.value.memory_usage === null) return null
+  return roundToDecimal((node.data.value.real_memory * nodeMetrics.value.memory_usage) / 100, 0)
+})
+
+const nodeMetricsHistoryHasData = computed(() => {
+  if (!nodeMetricsHistory.value) return false
+  return (
+    nodeMetricsHistory.value.cpu_usage.length > 0 ||
+    nodeMetricsHistory.value.memory_usage.length > 0 ||
+    nodeMetricsHistory.value.disk_usage.length > 0
+  )
+})
+
+function setMetricsRange(range: MetricRange) {
+  nodeMetricsRange.value = range
+}
+
 watch(
   () => cluster,
   (newCluster) => {
     node.setCluster(newCluster)
     jobs?.setCluster(newCluster)
-    if (runtimeStore.currentCluster?.node_metrics) {
-      fetchNodeMetrics()
+    if (nodeMetricsEnabled.value) {
+      void fetchNodeMetrics()
+      void fetchNodeMetricsHistory()
     }
   }
 )
@@ -133,23 +212,40 @@ watch(
   (newNodeName) => {
     node.setParam(newNodeName)
     jobs?.setParam(newNodeName)
-    if (runtimeStore.currentCluster?.node_metrics) {
+    if (nodeMetricsEnabled.value) {
       nodeMetrics.value = null
+      nodeMetricsHistory.value = null
       nodeMetricsError.value = false
+      nodeMetricsHistoryError.value = false
       void fetchNodeMetrics()
+      void fetchNodeMetricsHistory()
     }
   }
 )
 
 watch(
-  () => runtimeStore.currentCluster?.node_metrics,
+  () => nodeMetricsEnabled.value,
   (enabled) => {
     stopMetricsPolling()
     if (enabled) {
       startMetricsPolling()
     } else {
       nodeMetrics.value = null
+      nodeMetricsHistory.value = null
       nodeMetricsError.value = false
+      nodeMetricsHistoryError.value = false
+      nodeMetricsHistoryLoading.value = false
+    }
+  }
+)
+
+watch(
+  () => nodeMetricsRange.value,
+  () => {
+    if (nodeMetricsEnabled.value) {
+      nodeMetricsHistory.value = null
+      nodeMetricsHistoryError.value = false
+      void fetchNodeMetricsHistory()
     }
   }
 )
@@ -172,7 +268,7 @@ onUnmounted(() => {
     <div class="ui-page ui-page-readable">
       <BackToResourcesButton :cluster="cluster" />
 
-      <div class="space-y-6">
+      <div class="space-y-4">
         <PageHeader
           kicker="Node Detail"
           :title="`Node ${nodeName}`"
@@ -200,12 +296,13 @@ onUnmounted(() => {
 
         <template v-if="node.initialLoading.value && !node.unable.value">
           <StatCardSkeleton :cards="4" />
-          <div class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(320px,0.9fr)]">
+          <div class="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(320px,0.9fr)]">
             <div class="ui-panel ui-section">
-              <div class="mb-5">
+              <div class="mb-3">
                 <h2 class="ui-panel-title">Node Overview</h2>
                 <p class="ui-panel-description mt-2">
-                  Scheduling status, hardware layout, assigned partitions and currently running jobs.
+                  Scheduling status, hardware layout, assigned partitions and currently running
+                  jobs.
                 </p>
               </div>
               <DetailSkeletonList :rows="10" />
@@ -214,255 +311,387 @@ onUnmounted(() => {
           </div>
         </template>
 
-      <ErrorAlert v-if="node.unable.value"
-        >Unable to retrieve node {{ nodeName }} from cluster
-        <span class="font-medium">{{ cluster }}</span></ErrorAlert
-      >
-      <div v-else-if="node.data.value">
-        <div class="ui-stat-grid">
-          <div class="ui-stat-card">
-            <div class="ui-stat-label">CPU Capacity</div>
-            <div class="ui-stat-value">{{ node.data.value.cpus }}</div>
-            <div class="ui-stat-subtle">{{ node.data.value.sockets }} sockets x {{ node.data.value.cores }} cores</div>
-          </div>
-          <div class="ui-stat-card">
-            <div class="ui-stat-label">Memory</div>
-            <div class="ui-stat-value">{{ getMBHumanUnit(node.data.value.real_memory) }}</div>
-            <div class="ui-stat-subtle">Allocated: {{ getMBHumanUnit(node.data.value.alloc_memory) }}</div>
-          </div>
-          <div class="ui-stat-card">
-            <div class="ui-stat-label">GPU Slots</div>
-            <div class="ui-stat-value">{{ gpuAvailable }}</div>
-            <div class="ui-stat-subtle">Allocated: {{ gpuAllocated }}</div>
-          </div>
-          <div class="ui-stat-card">
-            <div class="ui-stat-label">Realtime CPU</div>
-            <div class="ui-stat-value">
-              {{ nodeMetrics?.cpu_usage !== null && nodeMetrics?.cpu_usage !== undefined ? `${nodeMetrics.cpu_usage}%` : '--' }}
+        <ErrorAlert v-if="node.unable.value"
+          >Unable to retrieve node {{ nodeName }} from cluster
+          <span class="font-medium">{{ cluster }}</span></ErrorAlert
+        >
+        <div v-else-if="node.data.value" class="space-y-4">
+          <div class="ui-stat-grid">
+            <div class="ui-stat-card">
+              <div class="ui-stat-label">CPU Capacity</div>
+              <div class="ui-stat-value">{{ node.data.value.cpus }}</div>
+              <div class="ui-stat-subtle">
+                {{ node.data.value.sockets }} sockets x {{ node.data.value.cores }} cores
+              </div>
             </div>
-            <div class="ui-stat-subtle">
-              <template v-if="nodeMetricsError">Metrics unavailable</template>
-              <template v-else-if="runtimeStore.currentCluster?.node_metrics">Updated every 15s</template>
-              <template v-else>Metrics disabled</template>
+            <div class="ui-stat-card">
+              <div class="ui-stat-label">Memory</div>
+              <div class="ui-stat-value">{{ getMBHumanUnit(node.data.value.real_memory) }}</div>
+              <div class="ui-stat-subtle">
+                Allocated: {{ getMBHumanUnit(node.data.value.alloc_memory) }}
+              </div>
+            </div>
+            <div class="ui-stat-card">
+              <div class="ui-stat-label">GPU Slots</div>
+              <div class="ui-stat-value">{{ gpuAvailable }}</div>
+              <div class="ui-stat-subtle">Allocated: {{ gpuAllocated }}</div>
+            </div>
+            <div v-if="nodeMetricsEnabled" class="ui-stat-card">
+              <div class="ui-stat-label">Realtime CPU</div>
+              <div class="ui-stat-value">
+                {{
+                  nodeMetrics?.cpu_usage !== null && nodeMetrics?.cpu_usage !== undefined
+                    ? `${nodeMetrics.cpu_usage}%`
+                    : '--'
+                }}
+              </div>
+              <div class="ui-stat-subtle">
+                <template v-if="nodeMetricsError">Metrics unavailable</template>
+                <template v-else-if="actualCpuUsage !== null"
+                  >{{ actualCpuUsage }} / {{ node.data.value.cpus }} cores</template
+                >
+                <template v-else>Updated every 15s</template>
+              </div>
             </div>
           </div>
-        </div>
 
-        <div class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(320px,0.9fr)]">
-          <div class="ui-panel ui-section">
-            <div class="mb-5">
-              <h2 class="ui-panel-title">Node Overview</h2>
-              <p class="ui-panel-description mt-2">
-                Scheduling status, hardware layout, assigned partitions and currently running jobs.
-              </p>
-            </div>
+          <div class="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(320px,0.9fr)]">
+            <div class="ui-panel ui-section" :class="{ 'xl:col-span-2': !nodeMetricsEnabled }">
+              <div class="mb-3">
+                <h2 class="ui-panel-title">Node Overview</h2>
+                <p class="ui-panel-description mt-2">
+                  Scheduling status, hardware layout, assigned partitions and currently running
+                  jobs.
+                </p>
+              </div>
 
-            <div class="ui-detail-list">
-              <dl>
-                <div id="status" class="ui-detail-row">
-                  <dt class="ui-detail-term">Node status</dt>
-                  <dd class="ui-detail-value">
-                    <div class="flex flex-wrap items-center gap-3">
-                      <NodeMainState :status="node.data.value.state" />
-                      <span v-if="node.data.value.reason">reason: {{ node.data.value.reason }}</span>
-                    </div>
-                  </dd>
-                </div>
-
-                <div id="allocation" class="ui-detail-row">
-                  <dt class="ui-detail-term">Allocation status</dt>
-                  <dd class="ui-detail-value space-y-4">
-                    <NodeAllocationState :status="node.data.value.state" />
-                    <ul class="space-y-2">
-                      <li
-                        v-for="detail in allocationDetails"
-                        :key="detail.label"
-                        class="flex flex-wrap items-center gap-2"
-                      >
-                        <strong class="font-semibold text-[var(--color-brand-ink-strong)]">
-                          {{ detail.label }}:
-                        </strong>
-                        <span class="order-3 text-[var(--color-brand-muted)]">({{ detail.pct }}%)</span>
-                        <span class="order-2">{{ detail.text }}</span>
-                      </li>
-                    </ul>
-                  </dd>
-                </div>
-
-                <div v-if="jobs" id="jobs" class="ui-detail-row">
-                  <dt class="ui-detail-term">Current jobs</dt>
-                  <dd class="ui-detail-value">
-                    <div
-                      v-if="jobs.unable.value"
-                      class="flex items-center gap-2 text-[var(--color-brand-muted)]"
-                    >
-                      <XCircleIcon class="h-5 w-5" aria-hidden="true" />
-                      Unable to retrieve jobs
-                    </div>
-                    <div v-else-if="!jobs.loaded.value" class="text-[var(--color-brand-muted)]">
-                      <LoadingSpinner :size="4" />
-                      Loading jobs...
-                    </div>
-                    <ul v-else-if="jobs.data.value?.length" class="flex flex-wrap gap-2">
-                      <li v-for="job in jobs.data.value" :key="job.job_id">
-                        <RouterLink
-                          :to="{
-                            name: 'job',
-                            params: { cluster: cluster, id: job.job_id },
-                            query: { returnTo: 'node', nodeName: nodeName }
-                          }"
+              <div class="ui-detail-list">
+                <dl>
+                  <div id="status" class="ui-detail-row">
+                    <dt class="ui-detail-term">Node status</dt>
+                    <dd class="ui-detail-value">
+                      <div class="flex flex-wrap items-center gap-3">
+                        <NodeMainState :status="node.data.value.state" />
+                        <span v-if="node.data.value.reason"
+                          >reason: {{ node.data.value.reason }}</span
                         >
-                          <JobStatusBadge :status="job.job_state" :label="job.job_id.toString()" />
-                        </RouterLink>
-                      </li>
-                    </ul>
-                    <span v-else>-</span>
-                  </dd>
-                </div>
+                      </div>
+                    </dd>
+                  </div>
 
-                <div id="cpu" class="ui-detail-row">
-                  <dt class="ui-detail-term">CPU layout</dt>
-                  <dd class="ui-detail-value">
-                    {{ node.data.value.sockets }} x {{ node.data.value.cores }} = {{ node.data.value.cpus }}
-                  </dd>
-                </div>
+                  <div id="allocation" class="ui-detail-row">
+                    <dt class="ui-detail-term">Allocation status</dt>
+                    <dd class="ui-detail-value space-y-2">
+                      <NodeAllocationState :status="node.data.value.state" />
+                      <ul class="space-y-1.5">
+                        <li
+                          v-for="detail in allocationDetails"
+                          :key="detail.label"
+                          class="flex flex-wrap items-center gap-2"
+                        >
+                          <strong class="font-semibold text-[var(--color-brand-ink-strong)]">
+                            {{ detail.label }}:
+                          </strong>
+                          <span class="order-3 text-[var(--color-brand-muted)]"
+                            >({{ detail.pct }}%)</span
+                          >
+                          <span class="order-2">{{ detail.text }}</span>
+                        </li>
+                      </ul>
+                    </dd>
+                  </div>
 
-                <div class="ui-detail-row">
-                  <dt class="ui-detail-term">Threads/core</dt>
-                  <dd class="ui-detail-value">{{ node.data.value.threads }}</dd>
-                </div>
-
-                <div id="arch" class="ui-detail-row">
-                  <dt class="ui-detail-term">Architecture</dt>
-                  <dd class="ui-detail-value font-mono">{{ node.data.value.architecture }}</dd>
-                </div>
-
-                <div id="memory" class="ui-detail-row">
-                  <dt class="ui-detail-term">Memory</dt>
-                  <dd class="ui-detail-value">{{ getMBHumanUnit(node.data.value.real_memory) }}</dd>
-                </div>
-
-                <div v-if="node.data.value.gres" class="ui-detail-row">
-                  <dt class="ui-detail-term">GPU</dt>
-                  <dd class="ui-detail-value">
-                    <ul class="space-y-2">
-                      <li v-for="gpu in getNodeGPU(node.data.value.gres)" :key="gpu">{{ gpu }}</li>
-                    </ul>
-                  </dd>
-                </div>
-
-                <div id="partitions" class="ui-detail-row">
-                  <dt class="ui-detail-term">Partitions</dt>
-                  <dd class="ui-detail-value">
-                    <div class="flex flex-wrap gap-2">
-                      <span
-                        v-for="partition in node.data.value.partitions"
-                        :key="partition"
-                        class="ui-chip"
+                  <div v-if="jobs" id="jobs" class="ui-detail-row">
+                    <dt class="ui-detail-term">Current jobs</dt>
+                    <dd class="ui-detail-value">
+                      <div
+                        v-if="jobs.unable.value"
+                        class="flex items-center gap-2 text-[var(--color-brand-muted)]"
                       >
-                        {{ partition }}
-                      </span>
-                    </div>
-                  </dd>
-                </div>
+                        <XCircleIcon class="h-5 w-5" aria-hidden="true" />
+                        Unable to retrieve jobs
+                      </div>
+                      <div v-else-if="!jobs.loaded.value" class="text-[var(--color-brand-muted)]">
+                        <LoadingSpinner :size="4" />
+                        Loading jobs...
+                      </div>
+                      <ul v-else-if="jobs.data.value?.length" class="flex flex-wrap gap-2">
+                        <li v-for="job in jobs.data.value" :key="job.job_id">
+                          <RouterLink
+                            :to="{
+                              name: 'job',
+                              params: { cluster: cluster, id: job.job_id },
+                              query: { returnTo: 'node', nodeName: nodeName }
+                            }"
+                          >
+                            <JobStatusBadge
+                              :status="job.job_state"
+                              :label="job.job_id.toString()"
+                            />
+                          </RouterLink>
+                        </li>
+                      </ul>
+                      <span v-else>-</span>
+                    </dd>
+                  </div>
 
-                <div class="ui-detail-row">
-                  <dt class="ui-detail-term">OS Kernel</dt>
-                  <dd class="ui-detail-value font-mono">{{ node.data.value.operating_system }}</dd>
-                </div>
+                  <div id="cpu" class="ui-detail-row">
+                    <dt class="ui-detail-term">CPU layout</dt>
+                    <dd class="ui-detail-value">
+                      {{ node.data.value.sockets }} x {{ node.data.value.cores }} =
+                      {{ node.data.value.cpus }}
+                    </dd>
+                  </div>
 
-                <div class="ui-detail-row">
-                  <dt class="ui-detail-term">Reboot</dt>
-                  <dd class="ui-detail-value">
-                    {{ formatTimestamp(node.data.value.boot_time.set, node.data.value.boot_time.number) }}
-                  </dd>
-                </div>
+                  <div class="ui-detail-row">
+                    <dt class="ui-detail-term">Threads/core</dt>
+                    <dd class="ui-detail-value">{{ node.data.value.threads }}</dd>
+                  </div>
 
-                <div class="ui-detail-row">
-                  <dt class="ui-detail-term">Last busy</dt>
-                  <dd class="ui-detail-value">
-                    {{ formatTimestamp(node.data.value.last_busy.set, node.data.value.last_busy.number) }}
-                  </dd>
-                </div>
-              </dl>
+                  <div id="arch" class="ui-detail-row">
+                    <dt class="ui-detail-term">Architecture</dt>
+                    <dd class="ui-detail-value font-mono">{{ node.data.value.architecture }}</dd>
+                  </div>
+
+                  <div id="memory" class="ui-detail-row">
+                    <dt class="ui-detail-term">Memory</dt>
+                    <dd class="ui-detail-value">
+                      {{ getMBHumanUnit(node.data.value.real_memory) }}
+                    </dd>
+                  </div>
+
+                  <div v-if="node.data.value.gres" class="ui-detail-row">
+                    <dt class="ui-detail-term">GPU</dt>
+                    <dd class="ui-detail-value">
+                      <ul class="space-y-2">
+                        <li v-for="gpu in getNodeGPU(node.data.value.gres)" :key="gpu">
+                          {{ gpu }}
+                        </li>
+                      </ul>
+                    </dd>
+                  </div>
+
+                  <div id="partitions" class="ui-detail-row">
+                    <dt class="ui-detail-term">Partitions</dt>
+                    <dd class="ui-detail-value">
+                      <div class="flex flex-wrap gap-2">
+                        <span
+                          v-for="partition in node.data.value.partitions"
+                          :key="partition"
+                          class="ui-chip"
+                        >
+                          {{ partition }}
+                        </span>
+                      </div>
+                    </dd>
+                  </div>
+
+                  <div class="ui-detail-row">
+                    <dt class="ui-detail-term">OS Kernel</dt>
+                    <dd class="ui-detail-value font-mono">
+                      {{ node.data.value.operating_system }}
+                    </dd>
+                  </div>
+
+                  <div class="ui-detail-row">
+                    <dt class="ui-detail-term">Reboot</dt>
+                    <dd class="ui-detail-value">
+                      {{
+                        formatTimestamp(
+                          node.data.value.boot_time.set,
+                          node.data.value.boot_time.number
+                        )
+                      }}
+                    </dd>
+                  </div>
+
+                  <div class="ui-detail-row">
+                    <dt class="ui-detail-term">Last busy</dt>
+                    <dd class="ui-detail-value">
+                      {{
+                        formatTimestamp(
+                          node.data.value.last_busy.set,
+                          node.data.value.last_busy.number
+                        )
+                      }}
+                    </dd>
+                  </div>
+                </dl>
+              </div>
             </div>
-          </div>
 
-          <div class="ui-panel ui-section">
-            <div class="mb-5">
-              <h2 class="ui-panel-title">Realtime Metrics</h2>
-              <p class="ui-panel-description mt-2">
-                Instant Prometheus-backed usage signals when node metrics are enabled on the cluster.
-              </p>
-            </div>
-
-            <template v-if="!runtimeStore.currentCluster?.node_metrics">
-              <p class="ui-panel-description">Realtime metrics are disabled for this cluster.</p>
-            </template>
-            <template v-else-if="nodeMetricsError">
-              <ErrorAlert>Unable to retrieve realtime metrics for this node.</ErrorAlert>
-            </template>
-            <template v-else-if="!nodeMetrics">
-              <div class="text-[var(--color-brand-muted)]">
-                <LoadingSpinner :size="4" />
-                Loading realtime metrics...
+            <div v-if="nodeMetricsEnabled" class="ui-panel ui-section">
+              <div class="mb-3">
+                <h2 class="ui-panel-title">Realtime Metrics</h2>
+                <p class="ui-panel-description mt-2">
+                  Prometheus-backed realtime and historical usage signals for this node.
+                </p>
               </div>
-            </template>
-            <div v-else class="space-y-4">
-              <div class="ui-panel-soft px-5 py-4">
-                <div class="flex items-center justify-between gap-4">
-                  <div>
-                    <div class="ui-stat-label">CPU Usage</div>
-                    <div class="mt-3 text-3xl font-bold text-[var(--color-brand-ink-strong)]">
-                      {{ nodeMetrics.cpu_usage !== null ? `${nodeMetrics.cpu_usage}%` : 'N/A' }}
-                    </div>
-                  </div>
-                  <span
-                    class="ui-chip"
-                    :class="nodeMetrics.cpu_usage !== null && nodeMetrics.cpu_usage > 90 ? '!border-[rgba(216,75,80,0.25)] !bg-[rgba(216,75,80,0.08)] !text-[var(--color-brand-danger)]' : ''"
-                  >
-                    {{ nodeMetrics.cpu_usage !== null && nodeMetrics.cpu_usage > 90 ? 'High load' : 'Healthy' }}
-                  </span>
+
+              <template v-if="nodeMetricsError">
+                <ErrorAlert>Unable to retrieve realtime metrics for this node.</ErrorAlert>
+              </template>
+              <template v-else-if="!nodeMetrics">
+                <div class="text-[var(--color-brand-muted)]">
+                  <LoadingSpinner :size="4" />
+                  Loading realtime metrics...
                 </div>
-              </div>
-
-              <div class="ui-panel-soft px-5 py-4">
-                <div class="flex items-center justify-between gap-4">
-                  <div>
-                    <div class="ui-stat-label">Memory Usage</div>
-                    <div class="mt-3 text-3xl font-bold text-[var(--color-brand-ink-strong)]">
-                      {{ nodeMetrics.memory_usage !== null ? `${nodeMetrics.memory_usage}%` : 'N/A' }}
+              </template>
+              <div v-else class="space-y-3">
+                <div class="ui-panel-soft px-4 py-3">
+                  <div class="flex items-center justify-between gap-4">
+                    <div>
+                      <div class="ui-stat-label">CPU Usage</div>
+                      <div class="mt-2 text-2xl font-bold text-[var(--color-brand-ink-strong)]">
+                        {{ nodeMetrics.cpu_usage !== null ? `${nodeMetrics.cpu_usage}%` : 'N/A' }}
+                      </div>
+                      <div class="mt-1.5 text-sm text-[var(--color-brand-muted)]">
+                        Actual: {{ actualCpuUsage !== null ? `${actualCpuUsage} cores` : 'N/A' }}
+                      </div>
                     </div>
+                    <span
+                      class="ui-chip"
+                      :class="
+                        nodeMetrics.cpu_usage !== null && nodeMetrics.cpu_usage > 90
+                          ? '!border-[rgba(216,75,80,0.25)] !bg-[rgba(216,75,80,0.08)] !text-[var(--color-brand-danger)]'
+                          : ''
+                      "
+                    >
+                      {{
+                        nodeMetrics.cpu_usage !== null && nodeMetrics.cpu_usage > 90
+                          ? 'High load'
+                          : 'Healthy'
+                      }}
+                    </span>
                   </div>
-                  <span
-                    class="ui-chip"
-                    :class="nodeMetrics.memory_usage !== null && nodeMetrics.memory_usage > 90 ? '!border-[rgba(216,75,80,0.25)] !bg-[rgba(216,75,80,0.08)] !text-[var(--color-brand-danger)]' : ''"
-                  >
-                    {{ nodeMetrics.memory_usage !== null && nodeMetrics.memory_usage > 90 ? 'High usage' : 'Stable' }}
-                  </span>
                 </div>
-              </div>
 
-              <div class="ui-panel-soft px-5 py-4">
-                <div class="flex items-center justify-between gap-4">
-                  <div>
-                    <div class="ui-stat-label">Disk Usage</div>
-                    <div class="mt-3 text-3xl font-bold text-[var(--color-brand-ink-strong)]">
-                      {{ nodeMetrics.disk_usage !== null ? `${nodeMetrics.disk_usage}%` : 'N/A' }}
+                <div class="ui-panel-soft px-4 py-3">
+                  <div class="flex items-center justify-between gap-4">
+                    <div>
+                      <div class="ui-stat-label">Memory Usage</div>
+                      <div class="mt-2 text-2xl font-bold text-[var(--color-brand-ink-strong)]">
+                        {{
+                          nodeMetrics.memory_usage !== null ? `${nodeMetrics.memory_usage}%` : 'N/A'
+                        }}
+                      </div>
+                      <div class="mt-1.5 text-sm text-[var(--color-brand-muted)]">
+                        Actual:
+                        {{ actualMemoryUsage !== null ? getMBHumanUnit(actualMemoryUsage) : 'N/A' }}
+                      </div>
                     </div>
+                    <span
+                      class="ui-chip"
+                      :class="
+                        nodeMetrics.memory_usage !== null && nodeMetrics.memory_usage > 90
+                          ? '!border-[rgba(216,75,80,0.25)] !bg-[rgba(216,75,80,0.08)] !text-[var(--color-brand-danger)]'
+                          : ''
+                      "
+                    >
+                      {{
+                        nodeMetrics.memory_usage !== null && nodeMetrics.memory_usage > 90
+                          ? 'High usage'
+                          : 'Stable'
+                      }}
+                    </span>
                   </div>
-                  <span
-                    class="ui-chip"
-                    :class="nodeMetrics.disk_usage !== null && nodeMetrics.disk_usage > 90 ? '!border-[rgba(216,75,80,0.25)] !bg-[rgba(216,75,80,0.08)] !text-[var(--color-brand-danger)]' : ''"
-                  >
-                    {{ nodeMetrics.disk_usage !== null && nodeMetrics.disk_usage > 90 ? 'Attention' : 'Nominal' }}
-                  </span>
+                </div>
+
+                <div class="ui-panel-soft px-4 py-3">
+                  <div class="flex items-center justify-between gap-4">
+                    <div>
+                      <div class="ui-stat-label">Disk Usage</div>
+                      <div class="mt-2 text-2xl font-bold text-[var(--color-brand-ink-strong)]">
+                        {{ nodeMetrics.disk_usage !== null ? `${nodeMetrics.disk_usage}%` : 'N/A' }}
+                      </div>
+                    </div>
+                    <span
+                      class="ui-chip"
+                      :class="
+                        nodeMetrics.disk_usage !== null && nodeMetrics.disk_usage > 90
+                          ? '!border-[rgba(216,75,80,0.25)] !bg-[rgba(216,75,80,0.08)] !text-[var(--color-brand-danger)]'
+                          : ''
+                      "
+                    >
+                      {{
+                        nodeMetrics.disk_usage !== null && nodeMetrics.disk_usage > 90
+                          ? 'Attention'
+                          : 'Nominal'
+                      }}
+                    </span>
+                  </div>
+                </div>
+
+                <div class="ui-panel-soft px-4 py-3">
+                  <div class="flex flex-wrap items-end justify-between gap-3">
+                    <div>
+                      <div class="ui-stat-label">Usage History</div>
+                      <div class="mt-1.5 text-sm text-[var(--color-brand-muted)]">
+                        CPU, memory and disk usage trends across the selected interval.
+                      </div>
+                    </div>
+
+                    <span class="isolate inline-flex rounded-full shadow-[var(--shadow-soft)]">
+                      <button
+                        type="button"
+                        :class="[
+                          nodeMetricsRange == 'week'
+                            ? 'bg-[linear-gradient(135deg,rgba(182,232,44,0.95),rgba(152,201,31,0.95))] text-[var(--color-brand-deep)]'
+                            : 'bg-white/90 text-[var(--color-brand-muted)] hover:bg-white',
+                          'relative inline-flex items-center rounded-l-full px-3 py-1.5 text-xs font-semibold ring-1 ring-[rgba(80,105,127,0.16)] ring-inset focus:z-10'
+                        ]"
+                        @click="setMetricsRange('week')"
+                      >
+                        week
+                      </button>
+                      <button
+                        type="button"
+                        :class="[
+                          nodeMetricsRange == 'day'
+                            ? 'bg-[linear-gradient(135deg,rgba(182,232,44,0.95),rgba(152,201,31,0.95))] text-[var(--color-brand-deep)]'
+                            : 'bg-white/90 text-[var(--color-brand-muted)] hover:bg-white',
+                          'relative inline-flex items-center px-3 py-1.5 text-xs font-semibold ring-1 ring-[rgba(80,105,127,0.16)] ring-inset focus:z-10'
+                        ]"
+                        @click="setMetricsRange('day')"
+                      >
+                        day
+                      </button>
+                      <button
+                        type="button"
+                        :class="[
+                          nodeMetricsRange == 'hour'
+                            ? 'bg-[linear-gradient(135deg,rgba(182,232,44,0.95),rgba(152,201,31,0.95))] text-[var(--color-brand-deep)]'
+                            : 'bg-white/90 text-[var(--color-brand-muted)] hover:bg-white',
+                          'relative inline-flex items-center rounded-r-full px-3 py-1.5 text-xs font-semibold ring-1 ring-[rgba(80,105,127,0.16)] ring-inset focus:z-10'
+                        ]"
+                        @click="setMetricsRange('hour')"
+                      >
+                        hour
+                      </button>
+                    </span>
+                  </div>
+
+                  <div class="mt-3">
+                    <ErrorAlert v-if="nodeMetricsHistoryError">
+                      Unable to retrieve metrics history for this node.
+                    </ErrorAlert>
+                    <div
+                      v-else-if="nodeMetricsHistoryLoading"
+                      class="text-[var(--color-brand-muted)]"
+                    >
+                      <LoadingSpinner :size="4" />
+                      Loading history...
+                    </div>
+                    <p v-else-if="!nodeMetricsHistoryHasData" class="ui-panel-description">
+                      No metrics history is available for this range.
+                    </p>
+                    <NodeMetricsHistoryChart v-else :history="nodeMetricsHistory" />
+                  </div>
                 </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
       </div>
     </div>
   </ClusterMainLayout>

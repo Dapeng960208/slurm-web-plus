@@ -61,6 +61,9 @@ class SlurmwebAppAgent(SlurmwebWebApp, RFLTokenizedRBACWebApp):
             f"/v{get_version()}/users/cache", views.cache_authenticated_user, methods=["POST"]
         ),
         SlurmwebAppRoute(f"/v{get_version()}/node/<name>/metrics", views.node_metrics),
+        SlurmwebAppRoute(
+            f"/v{get_version()}/node/<name>/metrics/history", views.node_metrics_history
+        ),
     }
 
     def __init__(self, seed):
