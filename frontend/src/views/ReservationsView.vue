@@ -19,7 +19,13 @@ import ErrorAlert from '@/components/ErrorAlert.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import TableSkeletonRows from '@/components/TableSkeletonRows.vue'
 import PaginationControls from '@/components/PaginationControls.vue'
-import { lastPage, parsePageSize, parsePositivePage, type PageSizeOption } from '@/composables/Pagination'
+import {
+  DEFAULT_PAGE_SIZE,
+  lastPage,
+  parsePageSize,
+  parsePositivePage,
+  type PageSizeOption
+} from '@/composables/Pagination'
 import { XMarkIcon } from '@heroicons/vue/24/outline'
 
 const { cluster } = defineProps<{ cluster: string }>()
@@ -33,7 +39,7 @@ const { data, unable, loaded, setCluster } = useClusterDataPoller<ClusterReserva
 )
 
 const page = ref(1)
-const pageSize = ref(25)
+const pageSize = ref(DEFAULT_PAGE_SIZE)
 const pagedReservations = computed(() => {
   const items = data.value ?? []
   const start = (page.value - 1) * pageSize.value
@@ -44,7 +50,7 @@ const totalPages = computed(() => lastPage(data.value?.length ?? 0, pageSize.val
 function updateQueryParameters() {
   const query: LocationQueryRaw = {}
   if (page.value !== 1) query.page = page.value
-  if (pageSize.value !== 25) query.page_size = pageSize.value
+  if (pageSize.value !== DEFAULT_PAGE_SIZE) query.page_size = pageSize.value
   router.push({ name: 'reservations', params: { cluster }, query })
 }
 

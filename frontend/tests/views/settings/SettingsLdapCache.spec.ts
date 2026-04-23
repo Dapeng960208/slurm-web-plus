@@ -21,7 +21,7 @@ function paginatedUsersResponse(items: Array<{ username: string; fullname: strin
     items,
     total,
     page,
-    page_size: 25
+    page_size: 20
   }
 }
 
@@ -72,7 +72,7 @@ describe('settings/SettingsLdapCache.vue', () => {
     expect(mockGatewayAPI.ldap_cache_users).toHaveBeenCalledWith('foo', {
       username: undefined,
       page: 1,
-      page_size: 25
+      page_size: 20
     })
   })
 
@@ -141,7 +141,7 @@ describe('settings/SettingsLdapCache.vue', () => {
     expect(mockGatewayAPI.ldap_cache_users).toHaveBeenLastCalledWith('foo', {
       username: 'ali',
       page: 1,
-      page_size: 25
+      page_size: 20
     })
   })
 
@@ -180,7 +180,7 @@ describe('settings/SettingsLdapCache.vue', () => {
     expect(mockGatewayAPI.ldap_cache_users).toHaveBeenLastCalledWith('foo', {
       username: undefined,
       page: 2,
-      page_size: 25
+      page_size: 20
     })
 
     const resetButton = wrapper
@@ -192,7 +192,7 @@ describe('settings/SettingsLdapCache.vue', () => {
     expect(mockGatewayAPI.ldap_cache_users).toHaveBeenLastCalledWith('foo', {
       username: undefined,
       page: 1,
-      page_size: 25
+      page_size: 20
     })
   })
 
@@ -241,17 +241,17 @@ describe('settings/SettingsLdapCache.vue', () => {
     expect(mockGatewayAPI.ldap_cache_users).toHaveBeenNthCalledWith(1, 'foo', {
       username: undefined,
       page: 1,
-      page_size: 25
+      page_size: 20
     })
     expect(mockGatewayAPI.ldap_cache_users).toHaveBeenNthCalledWith(2, 'bar', {
       username: undefined,
       page: 1,
-      page_size: 25
+      page_size: 20
     })
     expect(mockGatewayAPI.ldap_cache_users).toHaveBeenNthCalledWith(3, 'foo', {
       username: 'ali',
       page: 1,
-      page_size: 25
+      page_size: 20
     })
   })
 

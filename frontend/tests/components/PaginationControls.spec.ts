@@ -7,13 +7,13 @@ describe('PaginationControls.vue', () => {
     const wrapper = mount(PaginationControls, {
       props: {
         page: 1,
-        pageSize: 25,
+        pageSize: 20,
         total: 80,
         itemLabel: 'job'
       }
     })
 
-    expect(wrapper.text()).toContain('Showing 1 to 25 of 80 jobs')
+    expect(wrapper.text()).toContain('Showing 1 to 20 of 80 jobs')
 
     await wrapper.get('select').setValue('50')
 
@@ -24,7 +24,7 @@ describe('PaginationControls.vue', () => {
     const wrapper = mount(PaginationControls, {
       props: {
         page: 1,
-        pageSize: 25,
+        pageSize: 20,
         total: 80,
         itemLabel: 'record'
       }

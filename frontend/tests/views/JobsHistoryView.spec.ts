@@ -100,7 +100,7 @@ describe('JobsHistoryView.vue', () => {
         sort: 'submit_time',
         order: 'desc',
         page: 1,
-        page_size: 25
+        page_size: 20
       })
     )
   })

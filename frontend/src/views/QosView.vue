@@ -27,7 +27,13 @@ import type { QosModalLimitDescription } from '@/components/qos/QosHelpModal.vue
 import PageHeader from '@/components/PageHeader.vue'
 import TableSkeletonRows from '@/components/TableSkeletonRows.vue'
 import PaginationControls from '@/components/PaginationControls.vue'
-import { lastPage, parsePageSize, parsePositivePage, type PageSizeOption } from '@/composables/Pagination'
+import {
+  DEFAULT_PAGE_SIZE,
+  lastPage,
+  parsePageSize,
+  parsePositivePage,
+  type PageSizeOption
+} from '@/composables/Pagination'
 import { QuestionMarkCircleIcon } from '@heroicons/vue/20/solid'
 
 const { cluster } = defineProps<{ cluster: string }>()
@@ -43,7 +49,7 @@ const { data, unable, loaded, setCluster } = useClusterDataPoller<ClusterQos[]>(
 const helpModalShow: Ref<boolean> = ref(false)
 const modalQosLimit: Ref<QosModalLimitDescription | undefined> = ref()
 const page = ref(1)
-const pageSize = ref(25)
+const pageSize = ref(DEFAULT_PAGE_SIZE)
 
 const pagedQos = computed(() => {
   const items = data.value ?? []
@@ -55,7 +61,7 @@ const totalPages = computed(() => lastPage(data.value?.length ?? 0, pageSize.val
 function updateQueryParameters() {
   const query: LocationQueryRaw = {}
   if (page.value !== 1) query.page = page.value
-  if (pageSize.value !== 25) query.page_size = pageSize.value
+  if (pageSize.value !== DEFAULT_PAGE_SIZE) query.page_size = pageSize.value
   router.push({ name: 'qos', params: { cluster }, query })
 }
 

@@ -9,6 +9,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import type { ClusterJob } from '@/composables/GatewayAPI'
+import { DEFAULT_PAGE_SIZE } from '@/composables/Pagination'
 
 /*
  * Jobs view settings
@@ -43,7 +44,7 @@ export const useJobsRuntimeStore = defineStore('jobsRuntime', () => {
   const sort = ref<JobSortCriterion>('id')
   const order = ref<JobSortOrder>('asc')
   const page = ref(1)
-  const pageSize = ref(25)
+  const pageSize = ref(DEFAULT_PAGE_SIZE)
   const openFiltersPanel = ref(false)
   const filters = ref<JobsViewFilters>({
     states: [],
@@ -155,7 +156,7 @@ export const useJobsRuntimeStore = defineStore('jobsRuntime', () => {
     if (page.value != 1) {
       result.page = page.value
     }
-    if (pageSize.value != 25) {
+    if (pageSize.value != DEFAULT_PAGE_SIZE) {
       result.page_size = pageSize.value
     }
     if (sort.value != 'id') {

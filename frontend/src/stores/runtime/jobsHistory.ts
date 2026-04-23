@@ -14,6 +14,7 @@ import type {
   JobHistorySortCriterion,
   JobHistorySortOrder
 } from '@/composables/GatewayAPI'
+import { DEFAULT_PAGE_SIZE, PAGE_SIZE_OPTIONS } from '@/composables/Pagination'
 
 const JobHistorySortCriteria = [
   'submit_time',
@@ -59,7 +60,7 @@ export const useJobsHistoryRuntimeStore = defineStore('jobsHistoryRuntime', () =
   const sort = ref<JobHistorySortCriterion>('submit_time')
   const order = ref<JobHistorySortOrder>('desc')
   const page = ref(1)
-  const pageSize = ref(25)
+  const pageSize = ref(DEFAULT_PAGE_SIZE)
   const filters = ref<JobHistoryFilters>(defaultFilters())
 
   function resetFilters() {
@@ -85,7 +86,7 @@ export const useJobsHistoryRuntimeStore = defineStore('jobsHistoryRuntime', () =
     sort.value = 'submit_time'
     order.value = 'desc'
     page.value = 1
-    pageSize.value = 25
+    pageSize.value = DEFAULT_PAGE_SIZE
 
     if (isValidSortCriterion(query.sort)) {
       sort.value = query.sort
@@ -100,7 +101,9 @@ export const useJobsHistoryRuntimeStore = defineStore('jobsHistoryRuntime', () =
     }
     if (typeof query.page_size === 'string') {
       const parsed = parseInt(query.page_size, 10)
-      pageSize.value = [10, 25, 50, 100].includes(parsed) ? parsed : 25
+      pageSize.value = PAGE_SIZE_OPTIONS.includes(parsed as (typeof PAGE_SIZE_OPTIONS)[number])
+        ? parsed
+        : DEFAULT_PAGE_SIZE
     }
 
     const stringKeys: Array<
@@ -138,7 +141,7 @@ export const useJobsHistoryRuntimeStore = defineStore('jobsHistoryRuntime', () =
     if (filters.value.state) result.state = filters.value.state
     if (filters.value.job_id !== undefined) result.job_id = filters.value.job_id
     if (page.value !== 1) result.page = page.value
-    if (pageSize.value !== 25) result.page_size = pageSize.value
+    if (pageSize.value !== DEFAULT_PAGE_SIZE) result.page_size = pageSize.value
     if (sort.value !== 'submit_time') result.sort = sort.value
     if (order.value !== 'desc') result.order = order.value
     return result

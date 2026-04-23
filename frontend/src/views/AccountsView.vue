@@ -19,7 +19,13 @@ import AccountTreeNode from '@/components/accounts/AccountTreeNode.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import PanelSkeleton from '@/components/PanelSkeleton.vue'
 import PaginationControls from '@/components/PaginationControls.vue'
-import { lastPage, parsePageSize, parsePositivePage, type PageSizeOption } from '@/composables/Pagination'
+import {
+  DEFAULT_PAGE_SIZE,
+  lastPage,
+  parsePageSize,
+  parsePositivePage,
+  type PageSizeOption
+} from '@/composables/Pagination'
 
 const { cluster } = defineProps<{ cluster: string }>()
 const route = useRoute()
@@ -35,7 +41,7 @@ const expandedAccounts = ref<Set<string>>(new Set())
 const autoExpandedOnce = ref(false)
 const MAX_AUTO_EXPANDED = 10
 const page = ref(1)
-const pageSize = ref(25)
+const pageSize = ref(DEFAULT_PAGE_SIZE)
 
 function toggleAccount(account: string) {
   if (expandedAccounts.value.has(account)) {
@@ -136,7 +142,7 @@ function autoExpandTree(nodes: ClusterAccountTreeNode[]) {
 function updateQueryParameters() {
   const query: LocationQueryRaw = {}
   if (page.value !== 1) query.page = page.value
-  if (pageSize.value !== 25) query.page_size = pageSize.value
+  if (pageSize.value !== DEFAULT_PAGE_SIZE) query.page_size = pageSize.value
   router.push({ name: 'accounts', params: { cluster }, query })
 }
 

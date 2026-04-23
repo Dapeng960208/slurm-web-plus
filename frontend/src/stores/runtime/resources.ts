@@ -10,6 +10,7 @@ import { defineStore } from 'pinia'
 import { ref, watch } from 'vue'
 import { getNodeMainState } from '@/composables/GatewayAPI'
 import type { ClusterNode, ClusterNodeMainState } from '@/composables/GatewayAPI'
+import { DEFAULT_PAGE_SIZE } from '@/composables/Pagination'
 
 /*
  * Resources view settings
@@ -54,7 +55,7 @@ export const useResourcesRuntimeStore = defineStore('resourcesRuntime', () => {
   const openFiltersPanel = ref(false)
   const filters = ref<ResourcesViewFilters>({ states: [], partitions: [] })
   const page = ref(1)
-  const pageSize = ref(25)
+  const pageSize = ref(DEFAULT_PAGE_SIZE)
   const showRackDiagram = ref(false)
   const showNodeNames = ref<boolean>(JSON.parse(localStorage.getItem('showNodeNames') || 'true'))
 
@@ -100,7 +101,7 @@ export const useResourcesRuntimeStore = defineStore('resourcesRuntime', () => {
     if (page.value !== 1) {
       result.page = page.value
     }
-    if (pageSize.value !== 25) {
+    if (pageSize.value !== DEFAULT_PAGE_SIZE) {
       result.page_size = pageSize.value
     }
     return result

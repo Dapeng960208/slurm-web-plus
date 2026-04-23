@@ -20,14 +20,14 @@ import InfoAlert from '@/components/InfoAlert.vue'
 import ErrorAlert from '@/components/ErrorAlert.vue'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
 import PaginationControls from '@/components/PaginationControls.vue'
-import { parsePageSize, type PageSizeOption } from '@/composables/Pagination'
+import { DEFAULT_PAGE_SIZE, parsePageSize, type PageSizeOption } from '@/composables/Pagination'
 
 const gateway = useGatewayAPI()
 const runtimeStore = useRuntimeStore()
 const runtimeConfiguration = useRuntimeConfiguration()
 const route = useRoute()
 const router = useRouter()
-const pageSize = ref(25)
+const pageSize = ref(DEFAULT_PAGE_SIZE)
 
 const clusterUsers = reactive<Record<string, CachedLdapUser[]>>({})
 const clusterTotals = reactive<Record<string, number>>({})
@@ -95,7 +95,7 @@ function lastPage(clusterName: string): number {
 
 function updateQueryParameters() {
   const query: LocationQueryRaw = {}
-  if (pageSize.value !== 25) {
+  if (pageSize.value !== DEFAULT_PAGE_SIZE) {
     query.page_size = pageSize.value
   }
   router.push({ name: 'settings-ldap-cache', query })
