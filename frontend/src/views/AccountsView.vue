@@ -208,7 +208,7 @@ if (route.query.page_size) {
     <InfoAlert v-else-if="loaded && data?.length == 0"
       >No association defined on cluster <span class="font-medium">{{ cluster }}</span></InfoAlert
     >
-    <div v-else class="mt-5">
+    <div v-else class="ui-section-stack">
       <PanelSkeleton v-if="initialLoading" :rows="7" />
       <div v-else class="ui-panel ui-section">
         <ul role="list" class="space-y-4">
@@ -223,7 +223,7 @@ if (route.query.page_size) {
           />
         </ul>
       </div>
-      <div v-if="!initialLoading" class="ui-panel mt-3 overflow-hidden">
+      <div v-if="!initialLoading" class="ui-panel overflow-hidden">
         <PaginationControls
           :page="page"
           :page-size="pageSize"

@@ -26,6 +26,7 @@ import { HashtagIcon } from '@heroicons/vue/24/outline'
 import JobFieldRaw from '@/components/job/JobFieldRaw.vue'
 import JobFieldComment from '@/components/job/JobFieldComment.vue'
 import JobResources from '@/components/job/JobResources.vue'
+import DetailSummaryStrip from '@/components/details/DetailSummaryStrip.vue'
 
 const { cluster, id } = defineProps<{ cluster: string; id: number }>()
 
@@ -194,6 +195,47 @@ const fullFields = computed((): JobComponentField[] =>
   jobFieldsContent.value.filter((field): field is JobComponentField => field.layout === 'full')
 )
 
+const summaryItems = computed(() => {
+  if (!data.value) return []
+  const account = data.value.association.account
+  const requestedGpu = jobRequestedGPU(data.value)
+  const allocatedGpu = jobAllocatedGPU(data.value)
+  return [
+    {
+      id: 'user',
+      label: 'User',
+      value: fmtField(data.value.user),
+      to: { name: 'user', params: { cluster, user: data.value.user } }
+    },
+    {
+      id: 'account',
+      label: 'Account',
+      value: fmtField(account),
+      to: account ? { name: 'account', params: { cluster, account } } : undefined
+    },
+    { id: 'partition', label: 'Partition', value: fmtField(data.value.partition) },
+    { id: 'nodes', label: 'Nodes', value: fmtField(data.value.nodes) },
+    {
+      id: 'tres-requested',
+      label: 'Requested',
+      value: `${data.value.tres.requested.length} TRES`,
+      subtle: requestedGpu.count >= 0 ? `${requestedGpu.count} GPU requested` : 'GPU request unavailable'
+    },
+    {
+      id: 'tres-allocated',
+      label: 'Allocated',
+      value: `${data.value.tres.allocated.length} TRES`,
+      subtle: allocatedGpu >= 0 ? `${allocatedGpu} GPU allocated` : 'GPU allocation unavailable'
+    },
+    { id: 'exit-code', label: 'Exit Code', value: formatJobExitCode(data.value.exit_code) },
+    {
+      id: 'state-reason',
+      label: 'State Reason',
+      value: data.value.state.reason && data.value.state.reason !== 'None' ? data.value.state.reason : '-'
+    }
+  ]
+})
+
 function highlightField(field: JobField) {
   displayTags.value[field].highlight = true
   setTimeout(() => {
@@ -237,7 +279,7 @@ watch(
     <div class="ui-page ui-page-readable">
       <JobBackButton :cluster="cluster" />
 
-      <div class="space-y-6">
+      <div class="ui-section-stack">
         <PageHeader
           kicker="Job Detail"
           :title="`Job ${id}`"
@@ -261,6 +303,7 @@ watch(
             </div>
           </template>
         </PageHeader>
+        <DetailSummaryStrip v-if="data" :items="summaryItems" />
 
         <div
           v-if="!loaded && !unable"
@@ -304,60 +347,6 @@ watch(
               <section class="space-y-6">
                 <div>
                   <div class="mb-4">
-                    <h3 class="ui-panel-title">Overview</h3>
-                    <p class="ui-panel-description mt-1">
-                      Key identifiers, scheduler state and the current execution summary.
-                    </p>
-                  </div>
-                  <dl class="ui-detail-compact-grid" data-testid="job-overview-grid">
-                    <div
-                      v-for="field in compactFields"
-                      :key="field.id"
-                      :id="field.id"
-                      :class="[
-                        displayTags[field.id].highlight ? 'ring-2 ring-[rgba(182,232,44,0.4)]' : '',
-                        'ui-detail-compact-card'
-                      ]"
-                      @mouseenter="displayTags[field.id].show = true"
-                      @mouseleave="displayTags[field.id].show = false"
-                    >
-                      <dt class="ui-detail-compact-label">
-                        <a :href="`#${field.id}`" class="inline-flex max-w-full" @click="highlightField(field.id)">
-                          <span class="group inline-flex max-w-full items-center gap-2 rounded-full px-1.5 py-1 transition-colors hover:bg-[rgba(182,232,44,0.12)]">
-                            <span
-                              :class="[
-                                displayTags[field.id].show
-                                  ? 'border-[rgba(182,232,44,0.38)] bg-[rgba(182,232,44,0.18)] text-[var(--color-brand-blue)] shadow-[0_8px_16px_rgba(182,232,44,0.14)]'
-                                  : 'border-transparent bg-transparent text-[var(--color-brand-muted)]/70',
-                                'inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border transition-all duration-200'
-                              ]"
-                            >
-                              <HashtagIcon class="h-3.5 w-3.5" aria-hidden="true" />
-                            </span>
-                            <span class="truncate">{{ field.label }}</span>
-                          </span>
-                        </a>
-                      </dt>
-                      <dd
-                        :class="[field.monospace ? 'font-mono text-sm break-all' : '', 'ui-detail-compact-value']"
-                      >
-                        <RouterLink
-                          v-if="field.to && field.value !== '-'"
-                          :to="field.to"
-                          class="font-semibold text-[var(--color-brand-blue)] transition hover:text-[var(--color-brand-deep)]"
-                        >
-                          {{ field.value }}
-                        </RouterLink>
-                        <template v-else>
-                          {{ field.value }}
-                        </template>
-                      </dd>
-                    </div>
-                  </dl>
-                </div>
-
-                <div>
-                  <div class="mb-4">
                     <h3 class="ui-panel-title">Detailed Resources & Commands</h3>
                     <p class="ui-panel-description mt-1">
                       Longer fields stay expanded for readability and copy-friendly access.
@@ -379,7 +368,7 @@ watch(
                         @mouseleave="displayTags[field.id].show = false"
                       >
                         <dt class="text-sm leading-6 font-semibold text-[var(--color-brand-ink-strong)]">
-                          <a :href="`#${field.id}`" @click="highlightField(field.id)">
+                        <a :href="`#${field.id}`" @click.prevent="highlightField(field.id)">
                             <span class="group inline-flex items-center gap-2 rounded-full px-1.5 py-1 transition-colors hover:bg-[rgba(182,232,44,0.12)]">
                               <span
                                 :class="[

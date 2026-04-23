@@ -188,7 +188,7 @@ watch(totalPages, (newLastPage) => {
         <JobsHistoryFiltersBar :filters="filters" @search="applyFilters" />
       </section>
 
-      <div class="mt-5 flow-root">
+      <div class="ui-section-stack">
         <ErrorAlert v-if="error">{{ error }}</ErrorAlert>
         <InfoAlert v-else-if="!initialLoading && jobs.length === 0">
           No job history records found on cluster <span class="font-medium">{{ cluster }}</span>

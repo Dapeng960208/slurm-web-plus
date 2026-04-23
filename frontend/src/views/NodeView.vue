@@ -268,7 +268,7 @@ onUnmounted(() => {
     <div class="ui-page ui-page-readable">
       <BackToResourcesButton :cluster="cluster" />
 
-      <div class="space-y-4">
+      <div class="ui-section-stack">
         <PageHeader
           kicker="Node Detail"
           :title="`Node ${nodeName}`"
@@ -296,7 +296,7 @@ onUnmounted(() => {
 
         <template v-if="node.initialLoading.value && !node.unable.value">
           <StatCardSkeleton :cards="4" />
-          <div class="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(320px,0.9fr)]">
+          <div class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(320px,0.9fr)]">
             <div class="ui-panel ui-section">
               <div class="mb-3">
                 <h2 class="ui-panel-title">Node Overview</h2>
@@ -315,7 +315,7 @@ onUnmounted(() => {
           >Unable to retrieve node {{ nodeName }} from cluster
           <span class="font-medium">{{ cluster }}</span></ErrorAlert
         >
-        <div v-else-if="node.data.value" class="space-y-4">
+        <div v-else-if="node.data.value" class="ui-section-stack">
           <div class="ui-stat-grid">
             <div class="ui-stat-card">
               <div class="ui-stat-label">CPU Capacity</div>
@@ -355,7 +355,7 @@ onUnmounted(() => {
             </div>
           </div>
 
-          <div class="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(320px,0.9fr)]">
+          <div class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(320px,0.9fr)]">
             <div class="ui-panel ui-section" :class="{ 'xl:col-span-2': !nodeMetricsEnabled }">
               <div class="mb-3">
                 <h2 class="ui-panel-title">Node Overview</h2>

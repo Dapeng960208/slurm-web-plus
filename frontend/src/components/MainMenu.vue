@@ -7,7 +7,9 @@
 -->
 
 <script setup lang="ts">
+import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
+import type { RouteLocationRaw } from 'vue-router'
 import { Dialog, DialogPanel, TransitionChild, TransitionRoot } from '@headlessui/vue'
 import {
   CalendarIcon,
@@ -26,8 +28,9 @@ import { useRuntimeStore } from '@/stores/runtime'
 import { useRuntimeConfiguration } from '@/plugins/runtimeConfiguration'
 import BrandLogo from '@/components/BrandLogo.vue'
 
-const { entry } = defineProps<{
+const { entry, clusterContext } = defineProps<{
   entry: string
+  clusterContext?: string
 }>()
 
 const sidebarOpen = defineModel<boolean>()
@@ -58,9 +61,21 @@ const navigation = [
 
 function isFeatureEnabled(feature: string | undefined): boolean {
   if (!feature) return true
-  const cluster = runtimeStore.currentCluster
+  const cluster = navigationCluster.value
   if (!cluster) return false
-  return !!(cluster as Record<string, unknown>)[feature]
+  return !!(cluster as unknown as Record<string, unknown>)[feature]
+}
+
+const navigationCluster = computed(() => {
+  if (clusterContext) {
+    return runtimeStore.getCluster(clusterContext)
+  }
+  return runtimeStore.currentCluster
+})
+
+function navigationTarget(route: string): RouteLocationRaw {
+  const cluster = navigationCluster.value
+  return cluster ? { name: route, params: { cluster: cluster.name } } : { name: route }
 }
 </script>
 
@@ -126,7 +141,7 @@ function isFeatureEnabled(feature: string | undefined): boolean {
                       <li v-for="item in navigation" :key="item.name">
                         <RouterLink
                           v-if="runtimeStore.hasPermission(item.permission) && isFeatureEnabled(item.feature)"
-                          :to="{ name: item.route }"
+                          :to="navigationTarget(item.route)"
                           :class="[
                             item.route == entry
                               ? 'bg-[linear-gradient(135deg,rgba(182,232,44,0.95),rgba(152,201,31,0.95))] text-[var(--color-brand-deep)]'
@@ -188,7 +203,7 @@ function isFeatureEnabled(feature: string | undefined): boolean {
               <li v-for="item in navigation" :key="item.name">
                 <RouterLink
                   v-if="runtimeStore.hasPermission(item.permission) && isFeatureEnabled(item.feature)"
-                  :to="{ name: item.route }"
+                  :to="navigationTarget(item.route)"
                   :class="[
                     item.route == entry
                       ? 'bg-[linear-gradient(135deg,rgba(182,232,44,0.95),rgba(152,201,31,0.95))] text-[var(--color-brand-deep)]'

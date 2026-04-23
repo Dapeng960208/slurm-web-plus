@@ -64,11 +64,37 @@ interface ClusterPingResponse {
   versions: ClusterVersions
 }
 
+interface ClusterStatsResponse {
+  resources: {
+    nodes: number
+    cores: number
+    memory: number
+    real_memory?: number
+    memory_allocated?: number
+    alloc_memory?: number
+    memory_allocated_unused?: number
+    memory_available?: number
+    memory_used?: number
+    memory_free?: number
+    free_mem?: number
+    gpus: number
+  }
+  jobs: {
+    running: number
+    total: number
+  }
+}
+
 export interface ClusterStats {
   resources: {
     nodes: number
     cores: number
     memory: number
+    memory_used: number
+    memory_allocated: number
+    memory_allocated_unused: number
+    memory_available: number
+    memory_free: number
     gpus: number
   }
   jobs: {
@@ -1079,10 +1105,10 @@ export function useGatewayAPI() {
 
   async function clusters(): Promise<Array<ClusterDescription>> {
     const result = await restAPI.get<ClusterDescription[]>(`/clusters`)
-    console.log('[GatewayAPI] 集群列表已加载:')
+    console.log('[GatewayAPI] clusters loaded')
     result.forEach((c) => {
       console.log(
-        `[GatewayAPI]   集群 "${c.name}": persistence=${c.persistence ?? false}, node_metrics=${
+        `[GatewayAPI]   cluster "${c.name}": persistence=${c.persistence ?? false}, node_metrics=${
           c.node_metrics ?? false
         }`
       )
@@ -1099,7 +1125,29 @@ export function useGatewayAPI() {
   }
 
   async function stats(cluster: string): Promise<ClusterStats> {
-    return await restAPI.get<ClusterStats>(`/agents/${cluster}/stats`)
+    const result = await restAPI.get<ClusterStatsResponse>(`/agents/${cluster}/stats`)
+    const memoryAllocated =
+      result.resources.memory_allocated ?? result.resources.alloc_memory ?? result.resources.memory_used ?? 0
+    const memoryUsed = result.resources.memory_used ?? memoryAllocated
+    const memoryAllocatedUnused =
+      result.resources.memory_allocated_unused ?? Math.max(memoryAllocated - memoryUsed, 0)
+    const memoryAvailable =
+      result.resources.memory_available ?? result.resources.memory_free ?? 0
+    const memoryFree = result.resources.memory_free ?? result.resources.free_mem ?? 0
+    return {
+      resources: {
+        nodes: result.resources.nodes,
+        cores: result.resources.cores,
+        memory: result.resources.memory ?? result.resources.real_memory ?? 0,
+        memory_used: memoryUsed,
+        memory_allocated: memoryAllocated,
+        memory_allocated_unused: memoryAllocatedUnused,
+        memory_available: memoryAvailable,
+        memory_free: memoryFree,
+        gpus: result.resources.gpus
+      },
+      jobs: result.jobs
+    }
   }
 
   async function jobs(cluster: string, node?: string): Promise<ClusterJob[]> {
@@ -1247,17 +1295,17 @@ export function useGatewayAPI() {
     if (filters.order) params.append('order', filters.order)
     const query = params.toString()
     const url = `/agents/${cluster}/jobs/history${query ? '?' + query : ''}`
-    console.log('[GatewayAPI] jobs_history 请求 URL:', url)
+    console.log('[GatewayAPI] jobs_history request URL:', url)
     const result = await restAPI.get<JobHistoryResponse>(url)
-    console.log('[GatewayAPI] jobs_history 响应: total=', result.total, 'jobs=', result.jobs.length)
+    console.log('[GatewayAPI] jobs_history response: total=', result.total, 'jobs=', result.jobs.length)
     return result
   }
 
   async function node_metrics(cluster: string, nodeName: string): Promise<NodeInstantMetrics> {
     const url = `/agents/${cluster}/node/${nodeName}/metrics`
-    console.log('[GatewayAPI] node_metrics 请求 URL:', url)
+    console.log('[GatewayAPI] node_metrics request URL:', url)
     const result = await restAPI.get<NodeInstantMetrics>(url)
-    console.log('[GatewayAPI] node_metrics 响应:', result)
+    console.log('[GatewayAPI] node_metrics response:', result)
     return result
   }
 
@@ -1267,9 +1315,9 @@ export function useGatewayAPI() {
     range: MetricRange
   ): Promise<NodeMetricsHistory> {
     const url = `/agents/${cluster}/node/${nodeName}/metrics/history?range=${range}`
-    console.log('[GatewayAPI] node_metrics_history 请求 URL:', url)
+    console.log('[GatewayAPI] node_metrics_history request URL:', url)
     const result = await restAPI.get<NodeMetricsHistory>(url)
-    console.log('[GatewayAPI] node_metrics_history 响应:', result)
+    console.log('[GatewayAPI] node_metrics_history response:', result)
     return result
   }
 

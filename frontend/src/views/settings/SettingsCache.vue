@@ -18,12 +18,12 @@ const runtimeStore = useRuntimeStore()
 </script>
 
 <template>
-  <SettingsTabs entry="Cache" />
-  <div class="ui-panel ui-section">
-    <SettingsHeader title="Cache Service" description="Cache availability, hit ratios and live metrics for each cluster." />
-  </div>
+  <div class="ui-section-stack">
+    <SettingsTabs entry="Cache" />
+    <div class="ui-panel ui-section">
+      <SettingsHeader title="Cache Service" description="Cache availability, hit ratios and live metrics for each cluster." />
+    </div>
 
-  <div class="space-y-6">
     <div
       v-for="cluster in runtimeStore.availableClusters"
       :key="cluster.name"

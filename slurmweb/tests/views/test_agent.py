@@ -651,8 +651,74 @@ class TestAgentViews(TestAgentBase):
             response.json["jobs"]["running"],
             len([job for job in jobs_asset if "RUNNING" in job["job_state"]]),
         )
+        memory_total = sum(max(node.get("real_memory", 0), 0) for node in nodes_asset)
+        memory_allocated = sum(
+            max(
+                min(
+                    max(node.get("real_memory", 0), 0),
+                    self.app.slurmrestd._optional_number_value(
+                        node.get("alloc_memory"),
+                        0,
+                    ),
+                ),
+                0,
+            )
+            for node in nodes_asset
+        )
+        memory_free = sum(
+            min(
+                max(node.get("real_memory", 0), 0),
+                self.app.slurmrestd._optional_number_value(
+                    node.get("free_mem"),
+                    0,
+                ),
+            )
+            for node in nodes_asset
+        )
+        memory_used = sum(
+            min(
+                max(
+                    max(node.get("real_memory", 0), 0)
+                    - min(
+                        max(node.get("real_memory", 0), 0),
+                        self.app.slurmrestd._optional_number_value(
+                            node.get("free_mem"),
+                            0,
+                        ),
+                    ),
+                    0,
+                ),
+                max(
+                    min(
+                        max(node.get("real_memory", 0), 0),
+                        self.app.slurmrestd._optional_number_value(
+                            node.get("alloc_memory"),
+                            0,
+                        ),
+                    ),
+                    0,
+                ),
+            )
+            for node in nodes_asset
+        )
+        memory_available = max(memory_total - memory_allocated, 0)
+        memory_allocated_unused = max(memory_allocated - memory_used, 0)
         self.assertCountEqual(
-            response.json["resources"].keys(), ["nodes", "cores", "memory", "gpus"]
+            response.json["resources"].keys(),
+            [
+                "nodes",
+                "cores",
+                "memory",
+                "real_memory",
+                "memory_allocated",
+                "alloc_memory",
+                "memory_allocated_unused",
+                "memory_available",
+                "memory_used",
+                "memory_free",
+                "free_mem",
+                "gpus",
+            ],
         )
         self.assertEqual(response.json["resources"]["nodes"], len(nodes_asset))
         self.assertEqual(
@@ -661,7 +727,39 @@ class TestAgentViews(TestAgentBase):
         )
         self.assertEqual(
             response.json["resources"]["memory"],
-            sum([node["real_memory"] for node in nodes_asset]),
+            memory_total,
+        )
+        self.assertEqual(
+            response.json["resources"]["real_memory"],
+            memory_total,
+        )
+        self.assertEqual(
+            response.json["resources"]["memory_allocated"],
+            memory_allocated,
+        )
+        self.assertEqual(
+            response.json["resources"]["alloc_memory"],
+            memory_allocated,
+        )
+        self.assertEqual(
+            response.json["resources"]["memory_allocated_unused"],
+            memory_allocated_unused,
+        )
+        self.assertEqual(
+            response.json["resources"]["memory_used"],
+            memory_used,
+        )
+        self.assertEqual(
+            response.json["resources"]["memory_available"],
+            memory_available,
+        )
+        self.assertEqual(
+            response.json["resources"]["memory_free"],
+            memory_free,
+        )
+        self.assertEqual(
+            response.json["resources"]["free_mem"],
+            memory_free,
         )
         self.assertEqual(
             response.json["resources"]["gpus"],
@@ -672,6 +770,40 @@ class TestAgentViews(TestAgentBase):
                 ]
             ),
         )
+
+    def test_request_stats_memory_distinguishes_allocated_and_free_memory(self):
+        self.app.slurmrestd.jobs = mock.Mock(return_value=[{"job_state": ["RUNNING"]}])
+        self.app.slurmrestd.nodes_unfiltered = mock.Mock(
+            return_value=[
+                {
+                    "cpus": 64,
+                    "real_memory": 1024,
+                    "alloc_memory": 256,
+                    "free_mem": {"set": True, "infinite": False, "number": 768},
+                    "gres": "",
+                },
+                {
+                    "cpus": 32,
+                    "real_memory": 2048,
+                    "alloc_memory": 1024,
+                    "free_mem": {"set": True, "infinite": False, "number": 512},
+                    "gres": "",
+                },
+            ]
+        )
+
+        response = self.client.get(f"/v{get_version()}/stats")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json["resources"]["memory"], 3072)
+        self.assertEqual(response.json["resources"]["real_memory"], 3072)
+        self.assertEqual(response.json["resources"]["memory_allocated"], 1280)
+        self.assertEqual(response.json["resources"]["alloc_memory"], 1280)
+        self.assertEqual(response.json["resources"]["memory_used"], 1280)
+        self.assertEqual(response.json["resources"]["memory_allocated_unused"], 0)
+        self.assertEqual(response.json["resources"]["memory_free"], 1280)
+        self.assertEqual(response.json["resources"]["free_mem"], 1280)
+        self.assertEqual(response.json["resources"]["memory_available"], 1792)
 
     @all_slurm_api_versions
     def test_request_partitions(self, slurm_version, api_version):

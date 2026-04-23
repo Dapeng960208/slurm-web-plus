@@ -7,7 +7,7 @@
 -->
 
 <script setup lang="ts">
-import { watch } from 'vue'
+import { computed, watch } from 'vue'
 import { getMBHumanUnit } from '@/composables/GatewayAPI'
 import type { ClusterStats } from '@/composables/GatewayAPI'
 import { useRuntimeStore } from '@/stores/runtime'
@@ -33,6 +33,40 @@ watch(
     setCluster(newCluster)
   }
 )
+
+const statsCards = computed(() => {
+  if (!data.value) return []
+  return [
+    { id: 'nodes', label: 'Nodes', value: String(data.value.resources.nodes) },
+    { id: 'cores', label: 'Cores', value: String(data.value.resources.cores) },
+    {
+      id: 'memory-used',
+      label: 'Used Memory',
+      value: getMBHumanUnit(data.value.resources.memory_used),
+      subtle: `Of ${getMBHumanUnit(data.value.resources.memory)} total`
+    },
+    {
+      id: 'memory-allocated-unused',
+      label: 'Allocated Unused',
+      value: getMBHumanUnit(data.value.resources.memory_allocated_unused),
+      subtle: 'Allocated but not consumed'
+    },
+    {
+      id: 'memory-available',
+      label: 'Unallocated Memory',
+      value: getMBHumanUnit(data.value.resources.memory_available),
+      subtle: 'Total minus allocated'
+    },
+    {
+      id: 'gpus',
+      label: 'GPU',
+      value: String(data.value.resources.gpus),
+      muted: data.value.resources.gpus === 0
+    },
+    { id: 'jobs-running', label: 'Running Jobs', value: String(data.value.jobs.running) },
+    { id: 'jobs-total', label: 'Total Jobs', value: String(data.value.jobs.total) }
+  ]
+})
 </script>
 
 <template>
@@ -55,65 +89,17 @@ watch(
       >
 
       <div v-else class="ui-stat-grid">
-        <div class="ui-stat-card">
-          <p class="ui-stat-label">Nodes</p>
-          <span v-if="loaded && data" id="metric-nodes" class="ui-stat-value">
-            {{ data.resources.nodes }}
-          </span>
-          <div v-else class="flex animate-pulse space-x-4">
-            <div class="h-10 w-10 rounded-full bg-slate-200"></div>
-          </div>
-        </div>
-        <div class="ui-stat-card">
-          <p class="ui-stat-label">Cores</p>
-          <span v-if="loaded && data" id="metric-cores" class="ui-stat-value">
-            {{ data.resources.cores }}
-          </span>
-          <div v-else class="flex animate-pulse space-x-4">
-            <div class="h-10 w-10 rounded-full bg-slate-200"></div>
-          </div>
-        </div>
-        <div class="ui-stat-card">
-          <p class="ui-stat-label">Memory</p>
-          <span v-if="loaded && data" id="metric-memory" class="ui-stat-value">
-            {{ getMBHumanUnit(data.resources.memory) }}
-          </span>
-          <div v-else class="flex animate-pulse space-x-4">
-            <div class="h-10 w-10 rounded-full bg-slate-200"></div>
-          </div>
-        </div>
-        <div class="ui-stat-card">
-          <p class="ui-stat-label">GPU</p>
+        <div v-for="card in statsCards" :key="card.id" class="ui-stat-card">
+          <p class="ui-stat-label">{{ card.label }}</p>
           <span
-            v-if="loaded && data"
-            id="metric-gpus"
+            :id="`metric-${card.id}`"
             :class="[
-              data.resources.gpus ? 'ui-stat-value' : 'ui-stat-value text-[var(--color-brand-muted)]/35'
+              card.muted ? 'ui-stat-value text-[var(--color-brand-muted)]/35' : 'ui-stat-value'
             ]"
           >
-            {{ data.resources.gpus }}
+            {{ card.value }}
           </span>
-          <div v-else class="flex animate-pulse space-x-4">
-            <div class="h-10 w-10 rounded-full bg-slate-200"></div>
-          </div>
-        </div>
-        <div class="ui-stat-card">
-          <p class="ui-stat-label">Running jobs</p>
-          <span v-if="loaded && data" id="metric-jobs-running" class="ui-stat-value">
-            {{ data.jobs.running }}
-          </span>
-          <div v-else class="flex animate-pulse space-x-4">
-            <div class="h-10 w-10 rounded-full bg-slate-200"></div>
-          </div>
-        </div>
-        <div class="ui-stat-card">
-          <p class="ui-stat-label">Total jobs</p>
-          <span v-if="loaded && data" id="metric-jobs-total" class="ui-stat-value">
-            {{ data.jobs.total }}
-          </span>
-          <div v-else class="flex animate-pulse space-x-4">
-            <div class="h-10 w-10 rounded-full bg-slate-200"></div>
-          </div>
+          <p v-if="card.subtle" class="ui-stat-subtle">{{ card.subtle }}</p>
         </div>
       </div>
 

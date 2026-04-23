@@ -158,18 +158,57 @@ def stats():
     nodes = 0
     cores = 0
     memory = 0
+    memory_allocated = 0
+    memory_free = 0
+    memory_used = 0
     gpus = 0
-    for node in slurmrest("nodes"):
+    nodes_getter = getattr(current_app.slurmrestd, "nodes_unfiltered", None)
+    nodes_data = nodes_getter() if callable(nodes_getter) else slurmrest("nodes")
+    for node in nodes_data:
         nodes += 1
         cores += node["cpus"]
-        memory += node["real_memory"]
+        node_memory = max(node.get("real_memory", 0), 0)
+        memory += node_memory
+        node_memory_allocated = max(
+            current_app.slurmrestd._optional_number_value(
+                node.get("alloc_memory"),
+                0,
+            ),
+            0,
+        )
+        node_memory_allocated = min(node_memory, node_memory_allocated)
+        node_memory_free = max(
+            current_app.slurmrestd._optional_number_value(
+                node.get("free_mem"),
+                0,
+            ),
+            0,
+        )
+        node_memory_free = min(node_memory, node_memory_free)
+        node_memory_used = min(
+            max(node_memory - node_memory_free, 0),
+            node_memory_allocated,
+        )
+        memory_allocated += node_memory_allocated
+        memory_free += node_memory_free
+        memory_used += node_memory_used
         gpus += current_app.slurmrestd.node_gres_extract_gpus(node["gres"])
+    memory_available = max(memory - memory_allocated, 0)
+    memory_allocated_unused = max(memory_allocated - memory_used, 0)
     return jsonify(
         {
             "resources": {
                 "nodes": nodes,
                 "cores": cores,
                 "memory": memory,
+                "real_memory": memory,
+                "memory_allocated": memory_allocated,
+                "alloc_memory": memory_allocated,
+                "memory_allocated_unused": memory_allocated_unused,
+                "memory_available": memory_available,
+                "memory_used": memory_used,
+                "memory_free": memory_free,
+                "free_mem": memory_free,
                 "gpus": gpus,
             },
             "jobs": {"running": running, "total": total},

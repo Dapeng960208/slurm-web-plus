@@ -22,6 +22,7 @@ import DetailSkeletonList from '@/components/DetailSkeletonList.vue'
 import PanelSkeleton from '@/components/PanelSkeleton.vue'
 import { HashtagIcon } from '@heroicons/vue/24/outline'
 import { CheckIcon, InformationCircleIcon } from '@heroicons/vue/20/solid'
+import DetailSummaryStrip from '@/components/details/DetailSummaryStrip.vue'
 
 const props = defineProps<{ cluster: string; id: number }>()
 
@@ -312,6 +313,29 @@ const fullFields = computed(() =>
   job.value ? fields(job.value).filter((field) => field.layout === 'full') : []
 )
 
+const summaryItems = computed(() => {
+  if (!job.value) return []
+  return [
+    { id: 'job-id', label: 'Job ID', value: String(job.value.job_id) },
+    { id: 'user', label: 'User', value: fmt(job.value.user_name) },
+    { id: 'account', label: 'Account', value: fmt(job.value.account) },
+    { id: 'partition', label: 'Partition', value: fmt(job.value.partition) },
+    { id: 'nodes', label: 'Nodes', value: fmt(job.value.nodes) },
+    {
+      id: 'max-memory',
+      label: 'Max Memory',
+      value: formatMemoryGB(job.value.used_memory_gb)
+    },
+    {
+      id: 'used-cpu-cores-avg',
+      label: 'Avg CPU Cores',
+      value: fmtCpuCoresAvg(job.value.used_cpu_cores_avg),
+      subtle: 'Average concurrent cores used'
+    },
+    { id: 'exit-code', label: 'Exit Code', value: formatJobExitCode(job.value.exit_code) }
+  ]
+})
+
 async function loadJobHistory() {
   try {
     job.value = await gateway.job_history_detail(props.cluster, props.id)
@@ -351,7 +375,7 @@ watch(
     <div class="ui-page ui-page-readable">
       <JobBackButton :cluster="cluster" route-name="jobs-history" />
 
-      <div class="space-y-6">
+      <div class="ui-section-stack">
         <PageHeader
           kicker="Job History"
           :title="`Job ${job?.job_id ?? id}`"
@@ -369,6 +393,7 @@ watch(
             />
           </template>
         </PageHeader>
+        <DetailSummaryStrip v-if="job" :items="summaryItems" />
 
         <div
           v-if="initialLoading && !error"
@@ -461,110 +486,6 @@ watch(
               </p>
             </div>
             <section class="space-y-6">
-              <div>
-                <div class="mb-4 flex items-center justify-between gap-3">
-                  <div>
-                    <h3 class="ui-panel-title">Overview</h3>
-                    <p class="ui-panel-description mt-1">
-                      Key identifiers, scheduler context and usage summary.
-                    </p>
-                  </div>
-                </div>
-                <dl
-                  class="ui-detail-compact-grid"
-                  data-testid="job-history-overview-grid"
-                >
-                  <div
-                    v-for="field in compactFields"
-                    :key="field.id"
-                    :id="field.id"
-                    :class="[
-                      displayTags[field.id as HistoryField].highlight
-                        ? 'ring-2 ring-[rgba(182,232,44,0.4)]'
-                        : '',
-                      'ui-detail-compact-card'
-                    ]"
-                    @mouseenter="displayTags[field.id as HistoryField].show = true"
-                    @mouseleave="displayTags[field.id as HistoryField].show = false"
-                  >
-                    <dt class="ui-detail-compact-label">
-                      <a
-                        :href="`#${field.id}`"
-                        class="inline-flex max-w-full"
-                        @click.prevent="highlightField(field.id as HistoryField)"
-                      >
-                        <span class="group inline-flex max-w-full items-center gap-2 rounded-full px-1.5 py-1 transition-colors hover:bg-[rgba(182,232,44,0.12)]">
-                          <span
-                            :class="[
-                              displayTags[field.id as HistoryField].show
-                                ? 'border-[rgba(182,232,44,0.38)] bg-[rgba(182,232,44,0.18)] text-[var(--color-brand-blue)] shadow-[0_8px_16px_rgba(182,232,44,0.14)]'
-                                : 'border-transparent bg-transparent text-[var(--color-brand-muted)]/70',
-                              'inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border transition-all duration-200'
-                            ]"
-                          >
-                            <HashtagIcon class="h-3.5 w-3.5" aria-hidden="true" />
-                          </span>
-                          <span class="truncate">{{ field.label }}</span>
-                          <span
-                            v-if="field.help"
-                            class="relative inline-flex items-center shrink-0"
-                          >
-                            <button
-                              type="button"
-                              class="inline-flex h-5 w-5 items-center justify-center rounded-full text-[var(--color-brand-blue)]/80 transition hover:bg-[rgba(116,165,214,0.14)] hover:text-[var(--color-brand-blue)] focus:outline-hidden focus-visible:ring-2 focus-visible:ring-[rgba(116,165,214,0.28)]"
-                              :aria-label="`About ${field.label}`"
-                              :aria-expanded="helpOpenField === field.id"
-                              @mouseenter="helpOpenField = field.id as HistoryField"
-                              @mouseleave="closeHelp(field.id as HistoryField)"
-                              @focus="helpOpenField = field.id as HistoryField"
-                              @blur="closeHelp(field.id as HistoryField)"
-                            >
-                              <InformationCircleIcon class="h-4 w-4" aria-hidden="true" />
-                            </button>
-                            <div
-                              v-if="helpOpenField === field.id"
-                              role="tooltip"
-                              class="absolute top-full left-0 z-20 mt-3 w-72 rounded-[18px] border border-[rgba(80,105,127,0.12)] bg-white/98 p-4 text-left shadow-[var(--shadow-soft)]"
-                            >
-                              <p class="text-sm font-semibold text-[var(--color-brand-ink-strong)]">
-                                {{ field.help.title }}
-                              </p>
-                              <p class="mt-2 text-xs leading-5 text-[var(--color-brand-muted)]">
-                                {{ field.help.body }}
-                              </p>
-                            </div>
-                          </span>
-                        </span>
-                      </a>
-                    </dt>
-                    <dd
-                      v-if="field.kind === 'resource' && field.tres && field.tres.length > 0"
-                      class="ui-detail-compact-value"
-                    >
-                      <JobResources
-                        :tres="field.tres"
-                        :gpu="field.gpu"
-                      />
-                    </dd>
-                    <dd
-                      v-else-if="field.kind === 'resource'"
-                      class="ui-detail-compact-value"
-                    >
-                      -
-                    </dd>
-                    <dd
-                      v-else
-                      :class="[
-                        field.monospace ? 'font-mono text-sm break-all' : '',
-                        'ui-detail-compact-value'
-                      ]"
-                    >
-                      {{ field.value }}
-                    </dd>
-                  </div>
-                </dl>
-              </div>
-
               <div>
                 <div class="mb-4">
                   <h3 class="ui-panel-title">Detailed Resources & Commands</h3>

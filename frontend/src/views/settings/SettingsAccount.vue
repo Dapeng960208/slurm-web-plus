@@ -17,38 +17,39 @@ const authStore = useAuthStore()
 </script>
 
 <template>
-  <SettingsTabs entry="Account" />
-  <div class="ui-panel ui-section">
-    <SettingsHeader title="Account" description="Personal identity, group membership and cluster-level permissions." />
+  <div class="ui-section-stack">
+    <SettingsTabs entry="Account" />
+    <div class="ui-panel ui-section">
+      <SettingsHeader title="Account" description="Personal identity, group membership and cluster-level permissions." />
 
-    <div class="ui-detail-list mt-6">
-      <dl>
-        <div class="ui-detail-row">
-          <dt class="ui-detail-term">Username</dt>
-          <dd class="ui-detail-value">{{ authStore.username }}</dd>
-        </div>
-        <div class="ui-detail-row">
-          <dt class="ui-detail-term">Full name</dt>
-          <dd class="ui-detail-value">{{ authStore.fullname }}</dd>
-        </div>
-        <div class="ui-detail-row">
-          <dt class="ui-detail-term">Groups</dt>
-          <dd class="ui-detail-value">{{ authStore.groups?.join(', ') }}</dd>
-        </div>
-      </dl>
-    </div>
-  </div>
-
-  <div class="ui-table-shell overflow-x-auto">
-    <div class="border-b border-[rgba(80,105,127,0.08)] px-6 py-5">
-      <h2 class="ui-panel-title">Cluster Permissions</h2>
-      <p class="ui-panel-description mt-2">
-        Roles and actions currently granted for each accessible cluster.
-      </p>
+      <div class="ui-detail-list mt-6">
+        <dl>
+          <div class="ui-detail-row">
+            <dt class="ui-detail-term">Username</dt>
+            <dd class="ui-detail-value">{{ authStore.username }}</dd>
+          </div>
+          <div class="ui-detail-row">
+            <dt class="ui-detail-term">Full name</dt>
+            <dd class="ui-detail-value">{{ authStore.fullname }}</dd>
+          </div>
+          <div class="ui-detail-row">
+            <dt class="ui-detail-term">Groups</dt>
+            <dd class="ui-detail-value">{{ authStore.groups?.join(', ') }}</dd>
+          </div>
+        </dl>
+      </div>
     </div>
 
-    <div class="inline-block min-w-full align-middle">
-      <table class="ui-table min-w-full">
+    <div class="ui-table-shell overflow-x-auto">
+      <div class="border-b border-[rgba(80,105,127,0.08)] px-6 py-5">
+        <h2 class="ui-panel-title">Cluster Permissions</h2>
+        <p class="ui-panel-description mt-2">
+          Roles and actions currently granted for each accessible cluster.
+        </p>
+      </div>
+
+      <div class="inline-block min-w-full align-middle">
+        <table class="ui-table min-w-full">
         <thead>
           <tr>
             <th scope="col" class="py-3.5 pr-3 pl-6 text-left">Cluster</th>
@@ -77,7 +78,8 @@ const authStore = useAuthStore()
             </td>
           </tr>
         </tbody>
-      </table>
+        </table>
+      </div>
     </div>
   </div>
 </template>

@@ -101,7 +101,7 @@ function timeLimits(association: ClusterAssociation) {
         Back to accounts
       </button>
 
-      <div class="space-y-6">
+      <div class="ui-section-stack">
         <div id="user-heading">
           <span class="sr-only">User {{ user }}</span>
           <PageHeader

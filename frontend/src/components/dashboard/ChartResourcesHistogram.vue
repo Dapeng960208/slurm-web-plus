@@ -69,17 +69,17 @@ const resourceLabels: Record<string, { group: MetricResourceState[]; color: stri
 }
 
 const memoryLabels: Record<string, { group: MetricMemoryState[]; color: string }> = {
-  used: {
+  'Used Memory': {
     group: ['used'],
-    color: 'rgb(204, 0, 0, 0.7)' // red
+    color: 'rgb(216, 75, 80, 0.78)' // used memory
   },
-  'allocated-idle': {
+  'Allocated Not Used': {
     group: ['allocated_idle'],
-    color: 'rgb(214, 93, 11, 0.7)' // orange
+    color: 'rgb(212, 154, 62, 0.78)' // allocated but not used
   },
-  idle: {
+  'Unallocated Memory': {
     group: ['idle'],
-    color: 'rgb(51, 204, 51, 0.7)' // green
+    color: 'rgb(80, 105, 127, 0.72)' // unallocated
   }
 }
 

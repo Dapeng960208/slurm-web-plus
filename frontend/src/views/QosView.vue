@@ -156,7 +156,7 @@ if (route.query.page_size) {
     <InfoAlert v-else-if="loaded && data?.length == 0"
       >No qos defined on cluster <span class="font-medium">{{ cluster }}</span></InfoAlert
     >
-    <div v-else class="mt-5 flow-root">
+    <div v-else class="ui-section-stack">
       <div class="ui-table-shell -mx-4 overflow-x-auto sm:-mx-6 lg:-mx-8">
         <div class="inline-block min-w-full py-2 align-middle">
           <table class="ui-table min-w-full">

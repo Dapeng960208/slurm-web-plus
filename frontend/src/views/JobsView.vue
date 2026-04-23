@@ -214,7 +214,7 @@ onMounted(async () => {
         <JobsFiltersBar />
       </section>
 
-      <div class="mt-5 flow-root">
+      <div class="ui-section-stack">
         <ErrorAlert v-if="unable"
           >Unable to retrieve jobs from cluster
           <span class="font-medium">{{ cluster }}</span></ErrorAlert

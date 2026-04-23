@@ -321,7 +321,8 @@ class TestSlurmrestd(TestSlurmrestdBase):
 
         self.assertEqual(memory_states["idle"], 4.75)
         self.assertEqual(memory_states["allocated_idle"], 0.5)
-        self.assertEqual(memory_states["used"], 2.25)
+        self.assertEqual(memory_states["used"], 1.75)
+        self.assertEqual(sum(memory_states.values()), memory_total)
         self.assertEqual(memory_total, 7.0)
 
     @all_slurm_api_versions

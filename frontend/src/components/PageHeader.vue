@@ -8,7 +8,7 @@ withDefaults(
     metricLabel?: string
   }>(),
   {
-    kicker: 'Slurm Monitor',
+    kicker: undefined,
     description: undefined,
     metricValue: undefined,
     metricLabel: undefined

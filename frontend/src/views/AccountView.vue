@@ -238,7 +238,7 @@ function hasDifferentQos(userAssociation: ClusterAssociation): boolean {
         Back to accounts
       </button>
 
-      <div class="space-y-6">
+      <div class="ui-section-stack">
         <div id="account-heading">
           <PageHeader
             kicker="Account Detail"
@@ -281,7 +281,7 @@ function hasDifferentQos(userAssociation: ClusterAssociation): boolean {
       <InfoAlert v-else-if="loaded && !accountKnown">
         Account <span class="font-semibold">{{ account }}</span> does not exist on this cluster.
       </InfoAlert>
-      <div v-else-if="accountAssociation">
+      <div v-else-if="accountAssociation" class="ui-section-stack">
         <div class="ui-stat-grid">
           <div class="ui-stat-card">
             <div class="ui-stat-label">Parent Chain</div>

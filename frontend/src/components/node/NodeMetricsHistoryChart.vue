@@ -36,27 +36,27 @@ function updateChart() {
     {
       label: 'CPU',
       data: toPoints(history.cpu_usage),
-      borderColor: 'rgb(80, 105, 127)',
+      borderColor: '#50697f',
       backgroundColor: 'rgba(80, 105, 127, 0.12)',
-      borderWidth: 2,
+      borderWidth: 2.4,
       pointRadius: 0,
       tension: 0.32
     },
     {
       label: 'Memory',
       data: toPoints(history.memory_usage),
-      borderColor: 'rgb(110, 141, 43)',
-      backgroundColor: 'rgba(110, 141, 43, 0.12)',
-      borderWidth: 2,
+      borderColor: '#7bbf1f',
+      backgroundColor: 'rgba(123, 191, 31, 0.14)',
+      borderWidth: 2.4,
       pointRadius: 0,
       tension: 0.32
     },
     {
       label: 'Disk',
       data: toPoints(history.disk_usage),
-      borderColor: 'rgb(239, 155, 40)',
-      backgroundColor: 'rgba(239, 155, 40, 0.12)',
-      borderWidth: 2,
+      borderColor: '#d84b50',
+      backgroundColor: 'rgba(216, 75, 80, 0.12)',
+      borderWidth: 2.4,
       pointRadius: 0,
       tension: 0.32
     }
@@ -81,11 +81,22 @@ onMounted(() => {
         legend: {
           position: 'top',
           labels: {
+            color: '#383b40',
             boxWidth: 12,
-            boxHeight: 12
+            boxHeight: 12,
+            padding: 18,
+            usePointStyle: true,
+            pointStyle: 'line'
           }
         },
         tooltip: {
+          backgroundColor: 'rgba(32, 42, 53, 0.94)',
+          titleColor: '#eef3f4',
+          bodyColor: '#eef3f4',
+          borderColor: 'rgba(182, 232, 44, 0.28)',
+          borderWidth: 1,
+          padding: 12,
+          displayColors: true,
           callbacks: {
             label: (context) => `${context.dataset.label}: ${context.parsed.y.toFixed(2)}%`
           }
@@ -94,6 +105,13 @@ onMounted(() => {
       scales: {
         x: {
           type: 'time',
+          grid: {
+            color: 'rgba(80, 105, 127, 0.08)'
+          },
+          ticks: {
+            color: '#6c7a80',
+            maxRotation: 0
+          },
           time: {
             tooltipFormat: 'yyyy-LL-dd HH:mm'
           }
@@ -101,7 +119,11 @@ onMounted(() => {
         y: {
           beginAtZero: true,
           suggestedMax: 100,
+          grid: {
+            color: 'rgba(80, 105, 127, 0.1)'
+          },
           ticks: {
+            color: '#6c7a80',
             callback: (value) => `${value}%`
           }
         }

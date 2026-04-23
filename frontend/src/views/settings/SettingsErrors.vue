@@ -16,18 +16,19 @@ const runtimeStore = useRuntimeStore()
 </script>
 
 <template>
-  <SettingsTabs entry="Errors" />
-  <div class="ui-panel ui-section">
-    <SettingsHeader title="Errors" description="Application errors captured during the current session." />
-  </div>
+  <div class="ui-section-stack">
+    <SettingsTabs entry="Errors" />
+    <div class="ui-panel ui-section">
+      <SettingsHeader title="Errors" description="Application errors captured during the current session." />
+    </div>
 
-  <InfoAlert v-if="runtimeStore.errors.length === 0">
-    No application errors have been recorded in this session.
-  </InfoAlert>
+    <InfoAlert v-if="runtimeStore.errors.length === 0">
+      No application errors have been recorded in this session.
+    </InfoAlert>
 
-  <div v-else class="ui-table-shell overflow-x-auto">
-    <div class="inline-block min-w-full align-middle">
-      <table class="ui-table min-w-full">
+    <div v-else class="ui-table-shell overflow-x-auto">
+      <div class="inline-block min-w-full align-middle">
+        <table class="ui-table min-w-full">
         <thead>
           <tr>
             <th scope="col" class="py-3.5 pr-3 pl-6 text-left">Timestamp</th>
@@ -44,7 +45,8 @@ const runtimeStore = useRuntimeStore()
             <td class="px-3 py-4">{{ error.message }}</td>
           </tr>
         </tbody>
-      </table>
+        </table>
+      </div>
     </div>
   </div>
 </template>

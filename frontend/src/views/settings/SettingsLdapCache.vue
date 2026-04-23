@@ -125,27 +125,28 @@ onMounted(async () => {
 </script>
 
 <template>
-  <SettingsTabs entry="LDAP Cache" />
-  <div class="ui-panel ui-section">
-    <SettingsHeader
-      title="LDAP Cache"
-      description="Cached LDAP users persisted in the local database for each cluster."
-    />
-  </div>
+  <div class="ui-section-stack">
+    <SettingsTabs entry="LDAP Cache" />
+    <div class="ui-panel ui-section">
+      <SettingsHeader
+        title="LDAP Cache"
+        description="Cached LDAP users persisted in the local database for each cluster."
+      />
+    </div>
 
-  <InfoAlert v-if="!runtimeConfiguration.authentication">
-    LDAP authentication is disabled, so LDAP cache data is unavailable.
-  </InfoAlert>
-  <InfoAlert v-else-if="!pageVisible">
-    No cluster has database support enabled for LDAP user caching.
-  </InfoAlert>
+    <InfoAlert v-if="!runtimeConfiguration.authentication">
+      LDAP authentication is disabled, so LDAP cache data is unavailable.
+    </InfoAlert>
+    <InfoAlert v-else-if="!pageVisible">
+      No cluster has database support enabled for LDAP user caching.
+    </InfoAlert>
 
-  <div v-else class="space-y-6">
-    <div
-      v-for="cluster in clusters"
-      :key="cluster.name"
-      class="ui-panel ui-section"
-    >
+    <div v-else class="ui-section-stack">
+      <div
+        v-for="cluster in clusters"
+        :key="cluster.name"
+        class="ui-panel ui-section"
+      >
       <div class="mb-4">
         <p class="ui-page-kicker">LDAP Cache</p>
         <h3 class="text-xl font-bold text-[var(--color-brand-ink-strong)]">
@@ -235,6 +236,7 @@ onMounted(async () => {
             />
           </div>
         </div>
+      </div>
       </div>
     </div>
   </div>

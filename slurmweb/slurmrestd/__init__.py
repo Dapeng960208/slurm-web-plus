@@ -337,10 +337,10 @@ class Slurmrestd:
             cores = node["cpus"]
             node_gpus = self.node_gres_extract_gpus(node["gres"])
             real_memory = max(0, node.get("real_memory", 0))
-            alloc_memory = max(0, node.get("alloc_memory", 0))
+            alloc_memory = max(0, min(real_memory, node.get("alloc_memory", 0)))
             free_memory = self._optional_number_value(node.get("free_mem"), 0)
             free_memory = max(0, min(real_memory, free_memory))
-            used_memory = max(real_memory - free_memory, 0)
+            used_memory = min(max(real_memory - free_memory, 0), alloc_memory)
             allocated_idle_memory = max(alloc_memory - used_memory, 0)
             idle_memory = max(real_memory - alloc_memory, 0)
 
