@@ -8,7 +8,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import type { LocationQueryRaw } from 'vue-router'
 import type { CachedLdapUser, ClusterDescription } from '@/composables/GatewayAPI'
 import { useGatewayAPI } from '@/composables/GatewayAPI'
@@ -215,6 +215,7 @@ onMounted(async () => {
                 <tr>
                   <th scope="col" class="py-3.5 pr-3 pl-6 text-left">Username</th>
                   <th scope="col" class="px-3 py-3.5 text-left">Full name</th>
+                  <th scope="col" class="px-3 py-3.5 text-left">Shortcuts</th>
                 </tr>
               </thead>
               <tbody class="text-sm text-[var(--color-brand-muted)]">
@@ -223,6 +224,30 @@ onMounted(async () => {
                     {{ user.username }}
                   </td>
                   <td class="px-3 py-3 whitespace-nowrap">{{ user.fullname ?? '-' }}</td>
+                  <td class="px-3 py-3">
+                    <div class="flex flex-wrap gap-2">
+                      <RouterLink
+                        :to="{ name: 'user', params: { cluster: cluster.name, user: user.username } }"
+                        class="ui-button-secondary"
+                      >
+                        View user
+                      </RouterLink>
+                      <RouterLink
+                        v-if="cluster.user_metrics"
+                        :to="{ name: 'user-analysis', params: { cluster: cluster.name, user: user.username } }"
+                        class="ui-button-secondary"
+                      >
+                        View analysis
+                      </RouterLink>
+                      <RouterLink
+                        v-if="runtimeStore.hasClusterPermission(cluster.name, 'view-history-jobs')"
+                        :to="{ name: 'jobs-history', params: { cluster: cluster.name }, query: { user: user.username } }"
+                        class="ui-button-secondary"
+                      >
+                        View history jobs
+                      </RouterLink>
+                    </div>
+                  </td>
                 </tr>
               </tbody>
             </table>

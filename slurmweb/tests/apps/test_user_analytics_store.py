@@ -4,10 +4,11 @@
 #
 # SPDX-License-Identifier: MIT
 
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from types import SimpleNamespace
 import os
 import tempfile
+import types
 import unittest
 from unittest import mock
 
@@ -159,3 +160,69 @@ class TestUserMetricsTimeline(unittest.TestCase):
         self.assertEqual(result["totals"]["submitted_jobs_today"], 3)
         self.assertEqual(result["totals"]["completed_jobs_today"], 1)
         self.assertEqual(result["tool_breakdown"][0]["tool"], "blast")
+
+
+class TestUserMetricsQueries(unittest.TestCase):
+    def setUp(self):
+        self.store = UserAnalyticsStore(settings=SimpleNamespace(tool_mapping_file=None))
+        self.conn = mock.Mock()
+        self.cursor = mock.Mock()
+        self.cursor.fetchall.return_value = []
+        self.cursor_cm = mock.MagicMock()
+        self.cursor_cm.__enter__.return_value = self.cursor
+        self.conn.cursor.return_value = self.cursor_cm
+        self.store._get_conn = mock.Mock(return_value=self.conn)
+        self.store._release_conn = mock.Mock()
+        self.psycopg2_patcher = mock.patch.dict(
+            "sys.modules",
+            {
+                "psycopg2": types.SimpleNamespace(
+                    extras=types.SimpleNamespace(RealDictCursor=object)
+                ),
+                "psycopg2.extras": types.SimpleNamespace(RealDictCursor=object),
+            },
+        )
+        self.psycopg2_patcher.start()
+
+    def tearDown(self):
+        self.psycopg2_patcher.stop()
+
+    def test_completed_jobs_query_does_not_select_submit_line(self):
+        self.store._completed_jobs_rows("alice", date(2026, 4, 24))
+
+        sql = self.cursor.execute.call_args.args[0]
+        self.assertNotIn("js.submit_line", sql)
+        self.assertIn("js.command", sql)
+
+    def test_current_day_query_does_not_select_submit_line(self):
+        self.store._current_day_completed_rows()
+
+        sql = self.cursor.execute.call_args.args[0]
+        self.assertNotIn("js.submit_line", sql)
+        self.assertIn("js.command", sql)
+
+    def test_refresh_current_day_summary_handles_rows_without_submit_line(self):
+        self.store._current_day_completed_rows = mock.Mock(
+            return_value=[
+                {
+                    "activity_date": date(2026, 4, 24),
+                    "user_id": 1,
+                    "job_name": "",
+                    "command": "/opt/app/bin/blastp --db nr",
+                    "used_memory_gb": 4.0,
+                    "used_cpu_cores_avg": 2.0,
+                    "start_time": datetime(2026, 4, 24, 8, 0, tzinfo=timezone.utc),
+                    "end_time": datetime(2026, 4, 24, 8, 15, tzinfo=timezone.utc),
+                    "last_seen": datetime(2026, 4, 24, 8, 15, tzinfo=timezone.utc),
+                    "usage_stats": None,
+                }
+            ]
+        )
+        self.store._upsert_current_day_summary = mock.Mock()
+
+        self.store.refresh_current_day_summary()
+
+        payload = self.store._upsert_current_day_summary.call_args.args[0]
+        self.assertEqual(len(payload), 1)
+        self.assertEqual(payload[0]["tool"], "blastp")
+        self.assertEqual(payload[0]["jobs_count"], 1)

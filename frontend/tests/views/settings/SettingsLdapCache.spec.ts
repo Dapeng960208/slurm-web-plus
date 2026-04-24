@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeEach, vi } from 'vitest'
-import { flushPromises, mount } from '@vue/test-utils'
+import { flushPromises, mount, RouterLinkStub } from '@vue/test-utils'
 import SettingsLdapCacheView from '@/views/settings/SettingsLdapCache.vue'
 import { init_plugins } from '../../lib/common'
 import { useRuntimeStore } from '@/stores/runtime'
@@ -36,12 +36,13 @@ describe('settings/SettingsLdapCache.vue', () => {
     useRuntimeStore().availableClusters = [
       {
         name: 'foo',
-        permissions: { roles: [], actions: ['cache-view'] },
+        permissions: { roles: [], actions: ['cache-view', 'view-history-jobs'] },
         racksdb: true,
         infrastructure: 'foo',
         metrics: true,
         cache: true,
-        database: true
+        database: true,
+        user_metrics: true
       }
     ]
     mockGatewayAPI.ldap_cache_users.mockResolvedValueOnce(
@@ -57,7 +58,8 @@ describe('settings/SettingsLdapCache.vue', () => {
     const wrapper = mount(SettingsLdapCacheView, {
       global: {
         stubs: {
-          SettingsTabs: true
+          SettingsTabs: true,
+          RouterLink: RouterLinkStub
         }
       }
     })
@@ -69,6 +71,10 @@ describe('settings/SettingsLdapCache.vue', () => {
     expect(wrapper.text()).toContain('Alice Doe')
     expect(wrapper.text()).toContain('bob')
     expect(wrapper.text()).toContain('-')
+    const links = wrapper.findAllComponents(RouterLinkStub)
+    expect(links.find((link) => link.props('to')?.name === 'user')).toBeDefined()
+    expect(links.find((link) => link.props('to')?.name === 'user-analysis')).toBeDefined()
+    expect(links.find((link) => link.props('to')?.name === 'jobs-history')).toBeDefined()
     expect(mockGatewayAPI.ldap_cache_users).toHaveBeenCalledWith('foo', {
       username: undefined,
       page: 1,

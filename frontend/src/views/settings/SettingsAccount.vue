@@ -7,6 +7,8 @@
 -->
 
 <script setup lang="ts">
+import { computed } from 'vue'
+import { RouterLink } from 'vue-router'
 import SettingsTabs from '@/components/settings/SettingsTabs.vue'
 import SettingsHeader from '@/components/settings/SettingsHeader.vue'
 import { useRuntimeStore } from '@/stores/runtime'
@@ -14,6 +16,7 @@ import { useAuthStore } from '@/stores/auth'
 
 const runtimeStore = useRuntimeStore()
 const authStore = useAuthStore()
+const clusters = computed(() => runtimeStore.getAllowedClusters())
 </script>
 
 <template>
@@ -55,10 +58,11 @@ const authStore = useAuthStore()
             <th scope="col" class="py-3.5 pr-3 pl-6 text-left">Cluster</th>
             <th scope="col" class="px-3 py-3.5 text-left">Roles</th>
             <th scope="col" class="px-3 py-3.5 text-left">Actions</th>
+            <th scope="col" class="px-3 py-3.5 text-left">Shortcuts</th>
           </tr>
         </thead>
         <tbody class="text-sm text-[var(--color-brand-muted)]">
-          <tr v-for="cluster in runtimeStore.getAllowedClusters()" :key="cluster.name">
+          <tr v-for="cluster in clusters" :key="cluster.name">
             <td class="py-4 pr-3 pl-6 align-top font-semibold text-[var(--color-brand-ink-strong)]">
               {{ cluster.name }}
             </td>
@@ -74,6 +78,30 @@ const authStore = useAuthStore()
                 <span v-for="action in cluster.permissions.actions.sort()" :key="action" class="ui-chip">
                   {{ action }}
                 </span>
+              </div>
+            </td>
+            <td class="px-3 py-4 align-top">
+              <div class="flex flex-wrap gap-2">
+                <RouterLink
+                  :to="{ name: 'user', params: { cluster: cluster.name, user: authStore.username } }"
+                  class="ui-button-secondary"
+                >
+                  View my user
+                </RouterLink>
+                <RouterLink
+                  v-if="cluster.user_metrics"
+                  :to="{ name: 'user-analysis', params: { cluster: cluster.name, user: authStore.username } }"
+                  class="ui-button-secondary"
+                >
+                  View my analysis
+                </RouterLink>
+                <RouterLink
+                  v-if="runtimeStore.hasClusterPermission(cluster.name, 'view-history-jobs')"
+                  :to="{ name: 'jobs-history', params: { cluster: cluster.name }, query: { user: authStore.username } }"
+                  class="ui-button-secondary"
+                >
+                  View my history jobs
+                </RouterLink>
               </div>
             </td>
           </tr>

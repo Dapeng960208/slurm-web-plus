@@ -35,6 +35,7 @@ const ReservationsView = () => import('@/views/ReservationsView.vue')
 const AccountsView = () => import('@/views/AccountsView.vue')
 const AccountView = () => import('@/views/AccountView.vue')
 const UserView = () => import('@/views/UserView.vue')
+const UserAnalysisView = () => import('@/views/UserAnalysisView.vue')
 const JobsStatusBadges = () => import('@/views/tests/JobsStatusBadges.vue')
 const NodesStatusBadges = () => import('@/views/tests/NodesStatusBadges.vue')
 const NotFoundView = () => import('@/views/NotFoundView.vue')
@@ -206,6 +207,12 @@ const router = createRouter({
           name: 'user',
           component: UserView,
           props: true
+        },
+        {
+          path: 'users/:user/analysis',
+          name: 'user-analysis',
+          component: UserAnalysisView,
+          props: true
         }
       ]
     },
@@ -263,7 +270,16 @@ router.beforeEach(async (to, from) => {
       )
     }
     // Guard feature-gated routes
-    if (to.name === 'jobs-history' && !runtime.currentCluster?.persistence) {
+    if (
+      (to.name === 'jobs-history' || to.name === 'job-history') &&
+      !runtime.currentCluster?.persistence
+    ) {
+      return { name: 'jobs', params: { cluster: to.params.cluster } }
+    }
+    if (
+      (to.name === 'jobs-history' || to.name === 'job-history') &&
+      !runtime.hasClusterPermission(to.params.cluster as string, 'view-history-jobs')
+    ) {
       return { name: 'jobs', params: { cluster: to.params.cluster } }
     }
   } else {

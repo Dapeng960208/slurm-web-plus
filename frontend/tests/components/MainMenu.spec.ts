@@ -3,8 +3,10 @@ import { resolve } from 'node:path'
 import { describe, expect, test } from 'vitest'
 import { shallowMount } from '@vue/test-utils'
 import { createTestingPinia } from '@pinia/testing'
+import { nextTick } from 'vue'
 import MainMenu from '@/components/MainMenu.vue'
 import { runtimeConfiguration } from '@/plugins/runtimeConfiguration'
+import { useRuntimeStore } from '@/stores/runtime'
 
 describe('MainMenu.vue', () => {
   test('renders the visible sidebar logo without the white frame', () => {
@@ -65,5 +67,70 @@ describe('MainMenu.vue', () => {
     const matches = source.match(/<BrandLogo size="sm" :framed="false" \/>/g) ?? []
 
     expect(matches).toHaveLength(2)
+  })
+
+  test('shows jobs history only with dedicated permission', async () => {
+    const wrapper = shallowMount(MainMenu, {
+      props: {
+        entry: 'dashboard',
+        clusterContext: 'foo',
+        modelValue: true
+      },
+      global: {
+        plugins: [
+          [
+            runtimeConfiguration,
+            {
+              api_server: 'http://localhost',
+              authentication: true,
+              racksdb_rows_labels: false,
+              racksdb_racks_labels: false,
+              version: 'test-version'
+            }
+          ],
+          createTestingPinia({
+            stubActions: false
+          })
+        ],
+        stubs: {
+          RouterLink: {
+            template: '<a><slot /></a>'
+          },
+          TransitionRoot: {
+            template: '<div><slot /></div>'
+          },
+          TransitionChild: {
+            template: '<div><slot /></div>'
+          },
+          Dialog: {
+            template: '<div><slot /></div>'
+          },
+          DialogPanel: {
+            template: '<div><slot /></div>'
+          },
+          BrandLogo: {
+            props: ['framed', 'size'],
+            template: '<div class="brand-logo-stub" :data-framed="String(framed)" :data-size="size" />'
+          }
+        }
+      }
+    })
+
+    const runtimeStore = useRuntimeStore()
+    runtimeStore.availableClusters = [
+      {
+        name: 'foo',
+        permissions: { roles: [], actions: ['view-history-jobs'] },
+        racksdb: true,
+        infrastructure: 'foo',
+        metrics: true,
+        cache: true,
+        persistence: true
+      }
+    ]
+    runtimeStore.currentCluster = runtimeStore.availableClusters[0]
+    await nextTick()
+
+    expect(wrapper.text()).toContain('Jobs History')
   })
 })

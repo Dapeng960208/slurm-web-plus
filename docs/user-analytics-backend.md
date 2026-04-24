@@ -34,6 +34,81 @@ Notes:
   persistence.
 - The agent still requires `alembic upgrade head` before restart.
 
+## Tool Mapping File
+
+`tool_mapping_file` is optional. When set, it must point to a YAML file
+containing an ordered list of mapping rules.
+
+File format:
+
+- The file root is a YAML list.
+- Each item must contain:
+  - `pattern`: a Python regular expression matched against the detected tool
+    candidate.
+  - `tool`: the canonical tool label to store in
+    `user_tool_daily_stats.tool` and return from the summary API.
+- Rules are evaluated from top to bottom.
+- The first matching rule wins.
+
+```yaml
+- pattern: "^bwa(-mem2)?$"
+  tool: "bwa"
+
+- pattern: "^samtools$"
+  tool: "samtools"
+
+- pattern: "^python[0-9.]*$"
+  tool: "python"
+
+- pattern: ".*"
+  tool: "unknown"
+```
+
+A complete demo file is available at:
+
+- `docs/modules/conf/examples/user-tools.yml`
+
+Tool candidate detection:
+
+1. Try `job_name`.
+2. If `job_name` is empty, try the first token basename from `command`.
+3. If `command` is empty, try the first token basename from `submit_line`.
+4. If nothing can be derived, use `unknown`.
+
+The mapping file is matched against that normalized candidate. This means:
+
+- `job_name` remains the default source when it is present.
+- `command` and `submit_line` are only fallback sources.
+- If no rule matches, the normalized candidate itself is stored.
+- If no candidate exists, `unknown` is stored.
+
+Operational guidance:
+
+- Put the most specific rules first.
+- Use the mapping file to collapse command variants such as `blastn`,
+  `blastp`, and `tblastx` into a single logical tool such as `blast`.
+- Prefer stable canonical labels in `tool` because these values are reused in
+  database aggregates and API responses.
+- Keep a fallback rule only if you explicitly want to override all unmatched
+  tools with one label.
+
+Example deployment:
+
+```ini
+[user_metrics]
+enabled = yes
+aggregation_interval = 3600
+tool_mapping_file = /etc/slurm-web/user-tools.yml
+```
+
+Suggested rollout steps:
+
+1. Copy `docs/modules/conf/examples/user-tools.yml` to your target path.
+2. Adjust patterns for tools and wrappers used in your cluster.
+3. Set `tool_mapping_file` in `agent.ini`.
+4. Restart the agent.
+5. Check user summary and tool analysis output for expected grouping.
+
 ## Data Model
 
 Migration `20260424_0004_user_tool_daily_stats.py` creates

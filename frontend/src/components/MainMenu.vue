@@ -40,7 +40,7 @@ const runtimeConfiguration = useRuntimeConfiguration()
 const navigation = [
   { name: 'Dashboard', route: 'dashboard', icon: HomeIcon, permission: 'view-stats', feature: undefined },
   { name: 'Jobs', route: 'jobs', icon: PlayCircleIcon, permission: 'view-jobs', feature: undefined },
-  { name: 'Jobs History', route: 'jobs-history', icon: ClockIcon, permission: 'view-jobs', feature: 'persistence' },
+  { name: 'Jobs History', route: 'jobs-history', icon: ClockIcon, permission: 'view-history-jobs', feature: 'persistence' },
   { name: 'Resources', route: 'resources', icon: CpuChipIcon, permission: 'view-nodes', feature: undefined },
   { name: 'QOS', route: 'qos', icon: SwatchIcon, permission: 'view-qos', feature: undefined },
   {

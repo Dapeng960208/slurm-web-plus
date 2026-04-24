@@ -1,0 +1,36 @@
+# Ordered tool mapping rules for [user_metrics].tool_mapping_file
+# Rules are evaluated from top to bottom and the first match wins.
+# Matching is applied to the normalized tool candidate:
+# 1. job_name
+# 2. command / submit_line first token basename
+# 3. "unknown" if nothing can be derived
+
+- pattern: '^alphafold($|[-_].*)'
+  tool: alphafold
+
+- pattern: '^(blast|blastn|blastp|tblastn|tblastx)$'
+  tool: blast
+
+- pattern: '^(bwa|bwa-mem|bwa-mem2)$'
+  tool: bwa
+
+- pattern: '^(hisat2|hisat2-align)$'
+  tool: hisat2
+
+- pattern: '^(star|star-align)$'
+  tool: star
+
+- pattern: '^(cellranger|cellranger-count|cellranger-atac)$'
+  tool: cellranger
+
+- pattern: '^(python|python2|python3)$'
+  tool: python
+
+- pattern: '^(r|rscript)$'
+  tool: r
+
+- pattern: '^nextflow$'
+  tool: nextflow
+
+- pattern: '^snakemake$'
+  tool: snakemake

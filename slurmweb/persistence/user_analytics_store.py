@@ -554,7 +554,6 @@ class UserAnalyticsStore:
                     SELECT DISTINCT ON (js.job_id, js.submit_time)
                         js.job_name,
                         js.command,
-                        js.submit_line,
                         js.used_memory_gb,
                         js.used_cpu_cores_avg,
                         js.start_time,
@@ -593,7 +592,6 @@ class UserAnalyticsStore:
                         js.user_id,
                         js.job_name,
                         js.command,
-                        js.submit_line,
                         js.used_memory_gb,
                         js.used_cpu_cores_avg,
                         js.start_time,

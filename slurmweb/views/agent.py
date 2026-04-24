@@ -346,7 +346,7 @@ def metrics(metric):
         abort(500, str(err))
 
 
-@rbac_action("view-jobs")
+@rbac_action("view-history-jobs")
 def jobs_history():
     """Return paginated job history from PostgreSQL."""
     if current_app.jobs_store is None:
@@ -379,7 +379,7 @@ def jobs_history():
         abort(500, str(err))
 
 
-@rbac_action("view-jobs")
+@rbac_action("view-history-jobs")
 def job_history_detail(record_id: int):
     """Return a single job history record by its DB primary key."""
     if current_app.jobs_store is None:

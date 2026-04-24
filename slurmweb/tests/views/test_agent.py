@@ -18,7 +18,7 @@ from slurmweb.slurmrestd.errors import (
 from slurmweb.cache import CachingService
 from slurmweb.views.agent import racksdb_get_version
 
-from ..lib.agent import TestAgentBase
+from ..lib.agent import RemoveActionInPolicy, TestAgentBase
 from ..lib.utils import all_slurm_api_versions, flask_404_description
 
 
@@ -226,6 +226,12 @@ class TestAgentViews(TestAgentBase):
             self.app.jobs_store.query.call_args.args[0]["keyword"],
             "sleep",
         )
+
+    def test_jobs_history_requires_view_history_jobs(self):
+        self.app.jobs_store = mock.Mock()
+        with RemoveActionInPolicy(self.app.policy, "user", "view-history-jobs"):
+            response = self.client.get(f"/v{get_version()}/jobs/history")
+        self.assertEqual(response.status_code, 403)
 
     #
     # General error cases

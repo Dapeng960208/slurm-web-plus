@@ -5,6 +5,9 @@ actions:
   view-jobs: |
     Get _Jobs_ entry in main menu and permission to view all users jobs in
     queue and all jobs details.
+  view-history-jobs: |
+    Get _Jobs History_ entry in main menu and permission to view persisted
+    historical jobs and their details.
   view-nodes: |
     Get _Resources_ entry in main menu and permission to view the list of
     compute nodes in cluster with their status in Slurm.
