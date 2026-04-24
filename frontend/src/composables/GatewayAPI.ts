@@ -8,9 +8,11 @@
 
 import { useRESTAPI } from '@/composables/RESTAPI'
 import type { AxiosResponse } from 'axios'
+import { fetchEventSource } from '@microsoft/fetch-event-source'
 import { useRuntimeConfiguration } from '@/plugins/runtimeConfiguration'
 import { AuthenticationError, APIServerError } from '@/composables/HTTPErrors'
 import type { JobSortCriterion, JobSortOrder } from '@/stores/runtime/jobs'
+import { useAuthStore } from '@/stores/auth'
 
 interface loginIdents {
   user: string
@@ -25,6 +27,7 @@ export interface ClusterDescription {
   cache: boolean
   database?: boolean
   access_control?: boolean
+  ai?: ClusterAICapability
   permissions: ClusterPermissions
   capabilities?: ClusterCapabilities
   versions?: ClusterVersions
@@ -52,6 +55,7 @@ export interface ClusterPermissions extends ClusterPermissionAssignment {
 
 export interface ClusterCapabilities {
   access_control?: boolean
+  ai?: ClusterAICapability
   job_history?: boolean
   ldap_cache?: boolean
   node_metrics?: boolean
@@ -61,6 +65,23 @@ export interface ClusterCapabilities {
 }
 
 export type AccessControlSourceName = keyof ClusterPermissionsSources
+
+export interface AIProviderOption {
+  key: string
+  label: string
+}
+
+export interface ClusterAICapability {
+  enabled?: boolean
+  configurable?: boolean
+  streaming?: boolean
+  persistence?: boolean
+  available_models_count?: number
+  default_model_id?: number | null
+  providers?: AIProviderOption[]
+  tool_mode?: string | null
+  [key: string]: unknown
+}
 
 function normalizeClusterPermissionAssignment(
   assignment?: ClusterPermissionAssignment
@@ -98,6 +119,213 @@ function clusterSupportsAccessControl(cluster?: ClusterDescription): boolean {
 
 export function hasClusterAccessControl(cluster?: ClusterDescription): boolean {
   return clusterSupportsAccessControl(cluster)
+}
+
+function clusterSupportsAIAssistant(cluster?: ClusterDescription): boolean {
+  return cluster?.ai?.enabled === true || cluster?.capabilities?.ai?.enabled === true
+}
+
+export function hasClusterAIAssistant(cluster?: ClusterDescription): boolean {
+  return clusterSupportsAIAssistant(cluster)
+}
+
+function normalizeClusterAICapability(capability?: ClusterAICapability): ClusterAICapability {
+  return {
+    enabled: capability?.enabled ?? false,
+    configurable: capability?.configurable ?? false,
+    streaming: capability?.streaming ?? false,
+    persistence: capability?.persistence ?? false,
+    available_models_count: capability?.available_models_count ?? 0,
+    default_model_id: capability?.default_model_id ?? null,
+    providers: [...(capability?.providers ?? [])],
+    tool_mode: capability?.tool_mode ?? null
+  }
+}
+
+export interface AIModelConfig {
+  id: number
+  cluster?: string
+  name: string
+  provider: string
+  provider_label?: string | null
+  model: string
+  display_name: string
+  enabled: boolean
+  is_default: boolean
+  sort_order: number
+  base_url: string | null
+  deployment: string | null
+  api_version: string | null
+  request_timeout: number | null
+  temperature: number | null
+  system_prompt: string | null
+  extra_options: Record<string, unknown>
+  secret_configured: boolean
+  secret_mask: string | null
+  last_validated_at: string | null
+  last_validation_error: string | null
+  created_at?: string | null
+  updated_at?: string | null
+}
+
+export interface AIModelConfigPayload {
+  name: string
+  provider: string
+  model: string
+  display_name: string
+  enabled: boolean
+  is_default: boolean
+  sort_order: number
+  base_url?: string | null
+  deployment?: string | null
+  api_version?: string | null
+  request_timeout?: number | null
+  temperature?: number | null
+  system_prompt?: string | null
+  extra_options?: Record<string, unknown>
+  api_key?: string
+  clear_secret?: boolean
+}
+
+export interface AIConversationSummary {
+  id: number
+  title: string
+  created_at: string | null
+  updated_at: string | null
+  last_message: string | null
+  model_config_id: number | null
+}
+
+export interface AIConversationMessage {
+  id: number | string
+  role: 'system' | 'user' | 'assistant'
+  content: string
+  created_at: string | null
+  model_config_id?: number | null
+  metadata?: Record<string, unknown>
+}
+
+export interface AIConversation extends AIConversationSummary {
+  messages: AIConversationMessage[]
+}
+
+export interface AIConversationListResponse {
+  items: AIConversationSummary[]
+}
+
+export interface AIModelConfigListResponse {
+  items: AIModelConfig[]
+}
+
+export interface AIChatRequest {
+  message: string
+  conversation_id?: number | null
+  model_config_id?: number | null
+}
+
+export interface AIChatConversationEvent {
+  conversation_id: number
+  message_id?: number
+  model_config_id?: number
+}
+
+export interface AIChatToolEvent {
+  tool_name: string
+  arguments?: Record<string, unknown>
+  duration_ms?: number
+  result_summary?: string
+}
+
+export interface AIChatCompleteEvent {
+  conversation_id: number
+  message_id: number
+  model_config_id?: number
+}
+
+export interface AIChatStreamHandlers {
+  onConversation?: (event: AIChatConversationEvent) => void
+  onContent?: (delta: string) => void
+  onToolStart?: (event: AIChatToolEvent) => void
+  onToolEnd?: (event: AIChatToolEvent) => void
+  onComplete?: (event: AIChatCompleteEvent) => void
+  onError?: (message: string) => void
+  onDone?: (event: AIChatConversationEvent) => void
+}
+
+export interface AIConfigValidationResult {
+  result: string
+  provider: string
+  model: string
+  sample: string
+  last_validated_at: string | null
+}
+
+export interface AIChatStreamSession {
+  controller: AbortController
+  finished: Promise<void>
+}
+
+function normalizeAIModelConfig(config?: Partial<AIModelConfig>): AIModelConfig {
+  return {
+    id: config?.id ?? 0,
+    cluster: config?.cluster,
+    name: config?.name ?? '',
+    provider: config?.provider ?? 'openai-compatible',
+    provider_label: config?.provider_label ?? null,
+    model: config?.model ?? '',
+    display_name: config?.display_name ?? '',
+    enabled: config?.enabled ?? false,
+    is_default: config?.is_default ?? false,
+    sort_order: config?.sort_order ?? 0,
+    base_url: config?.base_url ?? null,
+    deployment: config?.deployment ?? null,
+    api_version: config?.api_version ?? null,
+    request_timeout: config?.request_timeout ?? null,
+    temperature: config?.temperature ?? null,
+    system_prompt: config?.system_prompt ?? null,
+    extra_options: { ...(config?.extra_options ?? {}) },
+    secret_configured: config?.secret_configured ?? false,
+    secret_mask: config?.secret_mask ?? null,
+    last_validated_at: config?.last_validated_at ?? null,
+    last_validation_error: config?.last_validation_error ?? null,
+    created_at: config?.created_at ?? null,
+    updated_at: config?.updated_at ?? null
+  }
+}
+
+function normalizeAIConversationSummary(summary?: Partial<AIConversationSummary>): AIConversationSummary {
+  return {
+    id: summary?.id ?? 0,
+    title: summary?.title ?? 'Untitled conversation',
+    created_at: summary?.created_at ?? null,
+    updated_at: summary?.updated_at ?? null,
+    last_message: summary?.last_message ?? null,
+    model_config_id: summary?.model_config_id ?? null
+  }
+}
+
+function normalizeAIConversationMessage(message?: Partial<AIConversationMessage>): AIConversationMessage {
+  return {
+    id: message?.id ?? '',
+    role: message?.role ?? 'assistant',
+    content: message?.content ?? '',
+    created_at: message?.created_at ?? null,
+    model_config_id: message?.model_config_id ?? null,
+    metadata: { ...(message?.metadata ?? {}) }
+  }
+}
+
+function normalizeAIConversation(conversation?: Partial<AIConversation>): AIConversation {
+  return {
+    ...normalizeAIConversationSummary(conversation),
+    messages: (conversation?.messages ?? []).map((message) => normalizeAIConversationMessage(message))
+  }
+}
+
+function isAIConversationListResponse(
+  response: AIConversationListResponse | AIConversationSummary[]
+): response is AIConversationListResponse {
+  return typeof response === 'object' && response !== null && 'items' in response
 }
 
 export interface CustomRole {
@@ -1191,10 +1419,12 @@ const GatewayClusterAPIKeys = [
   'reservations',
   'accounts',
   'associations',
-  'cache_stats'
+  'cache_stats',
+  'ai_configs',
+  'ai_conversations'
 ] as const
 export type GatewayClusterAPIKey = (typeof GatewayClusterAPIKeys)[number]
-const GatewayClusterWithNumberAPIKeys = ['job'] as const
+const GatewayClusterWithNumberAPIKeys = ['job', 'ai_conversation'] as const
 export type GatewayClusterWithNumberAPIKey = (typeof GatewayClusterWithNumberAPIKeys)[number]
 const GatewayClusterWithStringAPIKeys = [
   'node',
@@ -1216,6 +1446,11 @@ export type GatewayAnyClusterApiKey =
 export function useGatewayAPI() {
   const restAPI = useRESTAPI()
   const runtimeConfiguration = useRuntimeConfiguration()
+  const authStore = useAuthStore()
+
+  function gatewayURL(path: string): string {
+    return `${runtimeConfiguration.api_server}/api${path.startsWith('/') ? path : `/${path}`}`
+  }
 
   async function login(idents: loginIdents): Promise<GatewayLoginResponse> {
     try {
@@ -1250,14 +1485,14 @@ export function useGatewayAPI() {
     console.log('[GatewayAPI] clusters loaded')
     return result.map((cluster) => {
       console.log(
-        `[GatewayAPI]   cluster "${cluster.name}": persistence=${cluster.persistence ?? false}, node_metrics=${
-          cluster.node_metrics ?? false
-        }`
+        `[GatewayAPI]   cluster "${cluster.name}": persistence=${
+          cluster.persistence ?? false
+        }, node_metrics=${cluster.node_metrics ?? false}`
       )
       return {
         ...cluster,
-        access_control:
-          cluster.access_control ?? (cluster.capabilities?.access_control === true),
+        access_control: cluster.access_control ?? cluster.capabilities?.access_control === true,
+        ai: normalizeClusterAICapability(cluster.ai ?? cluster.capabilities?.ai),
         permissions: normalizeClusterPermissions(cluster.permissions)
       }
     })
@@ -1324,9 +1559,9 @@ export function useGatewayAPI() {
   }
 
   async function permissions(cluster: string): Promise<ClusterPermissions> {
-    const result = await restAPI.get<
-      ClusterPermissionsResponse | ClusterPermissionsLegacyResponse
-    >(`/agents/${cluster}/permissions`)
+    const result = await restAPI.get<ClusterPermissionsResponse | ClusterPermissionsLegacyResponse>(
+      `/agents/${cluster}/permissions`
+    )
     return normalizeClusterPermissions(result)
   }
 
@@ -1418,6 +1653,128 @@ export function useGatewayAPI() {
 
   async function cache_reset(cluster: string): Promise<CacheStatistics> {
     return await restAPI.post<CacheStatistics>(`/agents/${cluster}/cache/reset`, {})
+  }
+
+  async function ai_configs(cluster: string): Promise<AIModelConfig[]> {
+    const result = await restAPI.get<AIModelConfigListResponse>(`/agents/${cluster}/ai/configs`)
+    return (result.items ?? []).map((config) => normalizeAIModelConfig(config))
+  }
+
+  async function create_ai_config(
+    cluster: string,
+    payload: AIModelConfigPayload
+  ): Promise<AIModelConfig> {
+    const result = await restAPI.post<Partial<AIModelConfig>>(`/agents/${cluster}/ai/configs`, payload)
+    return normalizeAIModelConfig(result)
+  }
+
+  async function update_ai_config(
+    cluster: string,
+    configId: number,
+    payload: Partial<AIModelConfigPayload>
+  ): Promise<AIModelConfig> {
+    const result = await restAPI.patch<Partial<AIModelConfig>>(
+      `/agents/${cluster}/ai/configs/${configId}`,
+      payload
+    )
+    return normalizeAIModelConfig(result)
+  }
+
+  async function delete_ai_config(cluster: string, configId: number): Promise<{ result: string }> {
+    return await restAPI.delete<{ result: string }>(`/agents/${cluster}/ai/configs/${configId}`)
+  }
+
+  async function validate_ai_config(
+    cluster: string,
+    configId: number
+  ): Promise<AIConfigValidationResult> {
+    return await restAPI.post<AIConfigValidationResult>(
+      `/agents/${cluster}/ai/configs/${configId}/validate`,
+      {}
+    )
+  }
+
+  async function ai_conversations(cluster: string): Promise<AIConversationSummary[]> {
+    const result = await restAPI.get<AIConversationListResponse | AIConversationSummary[]>(
+      `/agents/${cluster}/ai/conversations`
+    )
+    const items = isAIConversationListResponse(result) ? result.items : result
+    return items.map((conversation) => normalizeAIConversationSummary(conversation))
+  }
+
+  async function ai_conversation(cluster: string, conversationId: number): Promise<AIConversation> {
+    const result = await restAPI.get<Partial<AIConversation>>(
+      `/agents/${cluster}/ai/conversations/${conversationId}`
+    )
+    return normalizeAIConversation(result)
+  }
+
+  function stream_ai_chat(
+    cluster: string,
+    payload: AIChatRequest,
+    handlers: AIChatStreamHandlers = {}
+  ): AIChatStreamSession {
+    const controller = new AbortController()
+    const url = gatewayURL(`/agents/${cluster}/ai/chat/stream`)
+
+    const finished = fetchEventSource(url, {
+      method: 'POST',
+      signal: controller.signal,
+      openWhenHidden: true,
+      headers: {
+        Accept: 'text/event-stream',
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${authStore.token ?? ''}`
+      },
+      body: JSON.stringify(payload),
+      async onopen(response) {
+        if (response.ok) {
+          return
+        }
+        let message = `AI chat request failed with status ${response.status}`
+        try {
+          const data = (await response.json()) as { description?: string }
+          if (data?.description) {
+            message = data.description
+          }
+        } catch {
+          /* Keep fallback message */
+        }
+        if (response.status === 401) {
+          throw new AuthenticationError(message)
+        }
+        throw new APIServerError(response.status, message)
+      },
+      onmessage(event) {
+        let data: Record<string, unknown> = {}
+        try {
+          data = event.data ? (JSON.parse(event.data) as Record<string, unknown>) : {}
+        } catch {
+          handlers.onError?.(`Unable to parse AI stream event: ${event.event}`)
+          return
+        }
+        if (event.event === 'conversation') {
+          handlers.onConversation?.(data as unknown as AIChatConversationEvent)
+        } else if (event.event === 'content') {
+          handlers.onContent?.(String(data.delta ?? ''))
+        } else if (event.event === 'tool_start') {
+          handlers.onToolStart?.(data as unknown as AIChatToolEvent)
+        } else if (event.event === 'tool_end') {
+          handlers.onToolEnd?.(data as unknown as AIChatToolEvent)
+        } else if (event.event === 'complete') {
+          handlers.onComplete?.(data as unknown as AIChatCompleteEvent)
+        } else if (event.event === 'error') {
+          handlers.onError?.(String(data.message ?? 'Unknown AI stream error'))
+        } else if (event.event === 'done') {
+          handlers.onDone?.(data as unknown as AIChatConversationEvent)
+        }
+      },
+      onerror(error) {
+        throw error
+      }
+    })
+
+    return { controller, finished }
   }
 
   async function metrics_nodes(
@@ -1653,6 +2010,14 @@ export function useGatewayAPI() {
     cache_stats,
     ldap_cache_users,
     cache_reset,
+    ai_configs,
+    create_ai_config,
+    update_ai_config,
+    delete_ai_config,
+    validate_ai_config,
+    ai_conversations,
+    ai_conversation,
+    stream_ai_chat,
     metrics_nodes,
     metrics_cores,
     metrics_memory,

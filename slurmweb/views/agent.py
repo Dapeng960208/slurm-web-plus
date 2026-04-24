@@ -7,9 +7,10 @@
 from typing import Any, Tuple
 import logging
 
-from flask import Response, current_app, jsonify, abort, request
+from flask import Response, current_app, jsonify, abort, request, stream_with_context
 from rfl.web.tokens import rbac_action, check_jwt
 
+from ..ai.service import AIProviderValidationError, AIRequestError
 from ..version import get_version
 from ..errors import SlurmwebCacheError, SlurmwebMetricsDBError
 from ..persistence.jobs_store import normalize_history_exit_code
@@ -112,6 +113,21 @@ def _role_payload():
     }
 
 
+def _require_ai():
+    if not getattr(current_app, "ai_enabled", False) or current_app.ai_service is None:
+        error = "AI assistant is disabled"
+        logger.warning(error)
+        abort(501, error)
+
+
+def _ai_model_payload():
+    payload = request.get_json(silent=True) or {}
+    try:
+        return payload, current_app.ai_service
+    except Exception:
+        abort(500, "AI service is unavailable")
+
+
 def racksdb_get_version():
     """Get RacksDB version if available, or return 'N/A' if not installed."""
     try:
@@ -148,11 +164,39 @@ def info():
         "persistence": current_app.jobs_store is not None,
         "access_control": bool(getattr(current_app, "access_control_enabled", False)),
         "node_metrics": current_app.settings.node_metrics.enabled,
+        "ai": (
+            current_app.ai_service.capabilities()
+            if getattr(current_app, "ai_enabled", False) and current_app.ai_service is not None
+            else {
+                "enabled": False,
+                "configurable": False,
+                "streaming": False,
+                "persistence": False,
+                "available_models_count": 0,
+                "default_model_id": None,
+                "providers": [],
+                "tool_mode": "mixed",
+            }
+        ),
         "capabilities": {
             "job_history": current_app.jobs_store is not None,
             "ldap_cache": current_app.users_store is not None,
             "access_control": bool(getattr(current_app, "access_control_enabled", False)),
             "node_metrics": current_app.settings.node_metrics.enabled,
+            "ai": (
+                current_app.ai_service.capabilities()
+                if getattr(current_app, "ai_enabled", False) and current_app.ai_service is not None
+                else {
+                    "enabled": False,
+                    "configurable": False,
+                    "streaming": False,
+                    "persistence": False,
+                    "available_models_count": 0,
+                    "default_model_id": None,
+                    "providers": [],
+                    "tool_mode": "mixed",
+                }
+            ),
             "user_metrics": user_metrics_capabilities,
             "user_analytics": {
                 "enabled": user_metrics_enabled,
@@ -635,6 +679,117 @@ def update_access_user_roles(username: str):
     except Exception as err:
         logger.warning("Unable to update access control roles for %s: %s", username, err)
         abort(500, str(err))
+    return jsonify(details)
+
+
+@rbac_action("view-ai")
+def ai_configs():
+    _require_ai()
+    return jsonify({"items": current_app.ai_service.list_configs()})
+
+
+@rbac_action("manage-ai")
+def create_ai_config():
+    _require_ai()
+    payload, _ = _ai_model_payload()
+    try:
+        created = current_app.ai_service.create_model_config(payload)
+        return jsonify(created), 201
+    except AIProviderValidationError as err:
+        abort(400, str(err))
+    except Exception as err:
+        logger.warning("Unable to create AI model config: %s", err)
+        abort(500, str(err))
+
+
+@rbac_action("manage-ai")
+def update_ai_config(config_id: int):
+    _require_ai()
+    payload, _ = _ai_model_payload()
+    try:
+        updated = current_app.ai_service.update_model_config(config_id, payload)
+    except AIProviderValidationError as err:
+        abort(400, str(err))
+    except Exception as err:
+        logger.warning("Unable to update AI model config %s: %s", config_id, err)
+        abort(500, str(err))
+    if updated is None:
+        abort(404, f"AI model config {config_id} not found")
+    return jsonify(updated)
+
+
+@rbac_action("manage-ai")
+def delete_ai_config(config_id: int):
+    _require_ai()
+    try:
+        deleted = current_app.ai_service.delete_model_config(config_id)
+    except Exception as err:
+        logger.warning("Unable to delete AI model config %s: %s", config_id, err)
+        abort(500, str(err))
+    if not deleted:
+        abort(404, f"AI model config {config_id} not found")
+    return jsonify({"result": "AI model config deleted"})
+
+
+@rbac_action("manage-ai")
+def validate_ai_config(config_id: int):
+    _require_ai()
+    try:
+        result = current_app.ai_service.validate_model_config(config_id)
+    except AIProviderValidationError as err:
+        abort(400, str(err))
+    except Exception as err:
+        logger.warning("Unable to validate AI model config %s: %s", config_id, err)
+        abort(500, str(err))
+    if result is None:
+        abort(404, f"AI model config {config_id} not found")
+    return jsonify(result)
+
+
+@rbac_action("view-ai")
+def ai_chat_stream():
+    _require_ai()
+    payload = request.get_json(silent=True) or {}
+    try:
+        generator = current_app.ai_service.stream_chat(request.user, payload)
+    except (AIRequestError, AIProviderValidationError) as err:
+        abort(400, str(err))
+    except Exception as err:
+        logger.warning("Unable to start AI chat stream: %s", err)
+        abort(500, str(err))
+    return Response(
+        stream_with_context(generator()),
+        mimetype="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
+@rbac_action("view-ai")
+def ai_conversations():
+    _require_ai()
+    try:
+        return jsonify(current_app.ai_service.list_conversations(request.user))
+    except Exception as err:
+        logger.warning("Unable to list AI conversations for %s: %s", request.user, err)
+        abort(500, str(err))
+
+
+@rbac_action("view-ai")
+def ai_conversation_detail(conversation_id: int):
+    _require_ai()
+    try:
+        details = current_app.ai_service.get_conversation_detail(
+            request.user,
+            conversation_id,
+        )
+    except Exception as err:
+        logger.warning("Unable to query AI conversation %s: %s", conversation_id, err)
+        abort(500, str(err))
+    if details is None:
+        abort(404, f"AI conversation {conversation_id} not found")
     return jsonify(details)
 
 

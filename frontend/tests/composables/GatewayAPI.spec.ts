@@ -1,6 +1,7 @@
 import { describe, expect, test, beforeEach, afterEach, vi } from 'vitest'
 import {
   compareClusterJobSortOrder,
+  hasClusterAIAssistant,
   jobResourcesTRES,
   jobAllocatedGPU,
   jobRequestedGPU,
@@ -13,6 +14,7 @@ import {
   useGatewayAPI
 } from '@/composables/GatewayAPI'
 import jobs from '../assets/jobs.json'
+import { createPinia, setActivePinia } from 'pinia'
 import jobPending from '../assets/job-pending.json'
 import jobGpuArchived from '../assets/job-gpus-archived.json'
 import jobGpuCompleted from '../assets/job-gpus-completed.json'
@@ -53,15 +55,23 @@ vi.mock('@/composables/RESTAPI', () => ({
 }))
 
 // Provide minimal runtime configuration for GatewayAPI initialization.
-vi.mock('@/plugins/runtimeConfiguration', () => ({
-  useRuntimeConfiguration: () => ({
-    api_server: 'http://localhost',
-    authentication: true,
-    racksdb_rows_labels: true,
-    racksdb_racks_labels: true,
-    version: 'test'
-  })
-}))
+vi.mock('@/plugins/runtimeConfiguration', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/plugins/runtimeConfiguration')>()
+  return {
+    ...actual,
+    useRuntimeConfiguration: () => ({
+      api_server: 'http://localhost',
+      authentication: true,
+      racksdb_rows_labels: true,
+      racksdb_racks_labels: true,
+      version: 'test'
+    })
+  }
+})
+
+beforeEach(() => {
+  setActivePinia(createPinia())
+})
 
 describe('infrastructureImagePng', () => {
   const originalResponse = globalThis.Response
@@ -278,6 +288,211 @@ describe('gateway data APIs', () => {
     vi.clearAllMocks()
   })
 
+  test('detects AI capability from discovery payloads', () => {
+    expect(
+      hasClusterAIAssistant({
+        name: 'cluster-a',
+        permissions: { roles: [], actions: [] },
+        racksdb: true,
+        infrastructure: 'cluster-a',
+        metrics: true,
+        cache: true,
+        capabilities: {
+          ai: {
+            enabled: true,
+            streaming: true
+          }
+        }
+      })
+    ).toBe(true)
+
+    expect(
+      hasClusterAIAssistant({
+        name: 'cluster-b',
+        permissions: { roles: [], actions: [] },
+        racksdb: true,
+        infrastructure: 'cluster-b',
+        metrics: true,
+        cache: true,
+        capabilities: {
+          ai: false
+        }
+      })
+    ).toBe(false)
+  })
+
+  test('requests AI model configs', async () => {
+    mockRestAPI.get.mockResolvedValue({
+      items: [
+        {
+          id: 7,
+          name: 'cluster-qwen',
+          provider: 'qwen',
+          model: 'qwen3-coder',
+          display_name: 'Qwen',
+          enabled: true,
+          is_default: true,
+          sort_order: 10,
+          secret_configured: true,
+          secret_mask: '***1234'
+        }
+      ]
+    })
+
+    const gateway = useGatewayAPI()
+    const result = await gateway.ai_configs('cluster')
+
+    expect(mockRestAPI.get).toHaveBeenCalledWith('/agents/cluster/ai/configs')
+    expect(result[0].provider).toBe('qwen')
+    expect(result[0].secret_mask).toBe('***1234')
+  })
+
+  test('requests AI conversations from wrapped list responses', async () => {
+    mockRestAPI.get.mockResolvedValue({
+      items: [
+        {
+          id: 1,
+          title: 'Queue pressure',
+          created_at: '2026-04-24T09:00:00Z',
+          updated_at: '2026-04-24T09:05:00Z',
+          last_message: 'GPU partition is saturated.',
+          model_config_id: 7
+        }
+      ]
+    })
+
+    const gateway = useGatewayAPI()
+    const result = await gateway.ai_conversations('cluster')
+
+    expect(mockRestAPI.get).toHaveBeenCalledWith('/agents/cluster/ai/conversations')
+    expect(result).toStrictEqual([
+      {
+        id: 1,
+        title: 'Queue pressure',
+        created_at: '2026-04-24T09:00:00Z',
+        updated_at: '2026-04-24T09:05:00Z',
+        last_message: 'GPU partition is saturated.',
+        model_config_id: 7
+      }
+    ])
+  })
+
+  test('creates and updates AI model configs', async () => {
+    mockRestAPI.post.mockResolvedValue({
+      id: 2,
+      name: 'deepseek-prod',
+      provider: 'deepseek',
+      model: 'deepseek-chat',
+      display_name: 'DeepSeek Prod',
+      enabled: true,
+      is_default: false,
+      sort_order: 20,
+      secret_configured: true,
+      secret_mask: '***5678'
+    })
+    mockRestAPI.patch.mockResolvedValue({
+      id: 2,
+      name: 'deepseek-prod',
+      provider: 'deepseek',
+      model: 'deepseek-chat',
+      display_name: 'DeepSeek Prod',
+      enabled: true,
+      is_default: true,
+      sort_order: 20,
+      secret_configured: true,
+      secret_mask: '***5678'
+    })
+
+    const gateway = useGatewayAPI()
+    const created = await gateway.create_ai_config('cluster', {
+      name: 'deepseek-prod',
+      provider: 'deepseek',
+      model: 'deepseek-chat',
+      display_name: 'DeepSeek Prod',
+      enabled: true,
+      is_default: false,
+      sort_order: 20,
+      api_key: 'sk-secret'
+    })
+    const updated = await gateway.update_ai_config('cluster', 2, { is_default: true })
+
+    expect(mockRestAPI.post).toHaveBeenCalledWith('/agents/cluster/ai/configs', {
+      name: 'deepseek-prod',
+      provider: 'deepseek',
+      model: 'deepseek-chat',
+      display_name: 'DeepSeek Prod',
+      enabled: true,
+      is_default: false,
+      sort_order: 20,
+      api_key: 'sk-secret'
+    })
+    expect(mockRestAPI.patch).toHaveBeenCalledWith('/agents/cluster/ai/configs/2', {
+      is_default: true
+    })
+    expect(created.name).toBe('deepseek-prod')
+    expect(updated.is_default).toBe(true)
+  })
+
+  test('validates AI configs', async () => {
+    mockRestAPI.post.mockResolvedValue({
+      result: 'ok',
+      provider: 'qwen',
+      model: 'qwen3-coder',
+      sample: 'PONG',
+      last_validated_at: '2026-04-24T10:15:00Z'
+    })
+
+    const gateway = useGatewayAPI()
+    const result = await gateway.validate_ai_config('cluster', 7)
+
+    expect(mockRestAPI.post).toHaveBeenCalledWith('/agents/cluster/ai/configs/7/validate', {})
+    expect(result.result).toBe('ok')
+  })
+
+  test('requests AI conversation detail', async () => {
+    mockRestAPI.post.mockResolvedValue({
+      id: 2,
+      title: 'New conversation',
+      created_at: '2026-04-24T10:00:00Z',
+      updated_at: '2026-04-24T10:00:05Z',
+      messages: [
+        {
+          id: 10,
+          role: 'user',
+          content: 'Summarize the queue.',
+          created_at: '2026-04-24T10:00:00Z'
+        },
+        {
+          id: 11,
+          role: 'assistant',
+          content: 'Current queue is balanced.',
+          created_at: '2026-04-24T10:00:05Z'
+        }
+      ]
+    })
+    mockRestAPI.get.mockResolvedValue({
+      id: 2,
+      title: 'New conversation',
+      created_at: '2026-04-24T10:00:00Z',
+      updated_at: '2026-04-24T10:00:05Z',
+      messages: [
+        {
+          id: 10,
+          role: 'user',
+          content: 'Summarize the queue.',
+          created_at: '2026-04-24T10:00:00Z'
+        }
+      ]
+    })
+
+    const gateway = useGatewayAPI()
+    const result = await gateway.ai_conversation('cluster', 2)
+
+    expect(mockRestAPI.get).toHaveBeenCalledWith('/agents/cluster/ai/conversations/2')
+    expect(result.id).toBe(2)
+    expect(result.messages).toHaveLength(1)
+  })
+
   test('normalizes permissions sources from merged payload', async () => {
     mockRestAPI.get.mockResolvedValue({
       roles: ['ignored-role'],
@@ -363,7 +578,9 @@ describe('gateway data APIs', () => {
 
   test('lists access control users with filters', async () => {
     mockRestAPI.get.mockResolvedValue({
-      items: [{ username: 'alice', fullname: 'Alice Doe', role_ids: [1], role_names: ['db-admin'] }],
+      items: [
+        { username: 'alice', fullname: 'Alice Doe', role_ids: [1], role_names: ['db-admin'] }
+      ],
       total: 1,
       page: 2,
       page_size: 20
@@ -396,9 +613,7 @@ describe('gateway data APIs', () => {
     const gateway = useGatewayAPI()
     await gateway.access_user_roles('cluster', 'alice doe')
 
-    expect(mockRestAPI.get).toHaveBeenCalledWith(
-      '/agents/cluster/access/users/alice%20doe/roles'
-    )
+    expect(mockRestAPI.get).toHaveBeenCalledWith('/agents/cluster/access/users/alice%20doe/roles')
   })
 
   test('updates access control user roles', async () => {
@@ -415,10 +630,9 @@ describe('gateway data APIs', () => {
     const gateway = useGatewayAPI()
     const result = await gateway.update_access_user_roles('cluster', 'alice', [1])
 
-    expect(mockRestAPI.put).toHaveBeenCalledWith(
-      '/agents/cluster/access/users/alice/roles',
-      { role_ids: [1] }
-    )
+    expect(mockRestAPI.put).toHaveBeenCalledWith('/agents/cluster/access/users/alice/roles', {
+      role_ids: [1]
+    })
     expect(result.custom_roles).toStrictEqual(['db-admin'])
   })
 

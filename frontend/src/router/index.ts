@@ -7,7 +7,7 @@
  */
 
 import { createRouter, createWebHistory, type RouteLocation } from 'vue-router'
-import { hasClusterAccessControl } from '@/composables/GatewayAPI'
+import { hasClusterAIAssistant, hasClusterAccessControl } from '@/composables/GatewayAPI'
 import { useAuthStore } from '@/stores/auth'
 import { useRuntimeStore } from '@/stores/runtime'
 import { useRuntimeConfiguration } from '@/plugins/runtimeConfiguration'
@@ -21,6 +21,7 @@ const SettingsLayout = () => import('@/components/settings/SettingsLayout.vue')
 const SettingsMainView = () => import('@/views/settings/SettingsMain.vue')
 const SettingsErrorsView = () => import('@/views/settings/SettingsErrors.vue')
 const SettingsAccountView = () => import('@/views/settings/SettingsAccount.vue')
+const SettingsAIView = () => import('@/views/settings/SettingsAI.vue')
 const SettingsAccessControlView = () => import('@/views/settings/SettingsAccessControl.vue')
 const SettingsCacheView = () => import('@/views/settings/SettingsCache.vue')
 const SettingsLdapCacheView = () => import('@/views/settings/SettingsLdapCache.vue')
@@ -39,6 +40,7 @@ const AccountsView = () => import('@/views/AccountsView.vue')
 const AccountView = () => import('@/views/AccountView.vue')
 const UserView = () => import('@/views/UserView.vue')
 const UserAnalysisView = () => import('@/views/UserAnalysisView.vue')
+const AssistantView = () => import('@/views/AssistantView.vue')
 const JobsStatusBadges = () => import('@/views/tests/JobsStatusBadges.vue')
 const NodesStatusBadges = () => import('@/views/tests/NodesStatusBadges.vue')
 const NotFoundView = () => import('@/views/NotFoundView.vue')
@@ -101,6 +103,14 @@ const router = createRouter({
           }
         },
         {
+          path: '/settings/ai',
+          name: 'settings-ai',
+          component: SettingsAIView,
+          meta: {
+            settings: true
+          }
+        },
+        {
           path: '/settings/access-control',
           name: 'settings-access-control',
           component: SettingsAccessControlView,
@@ -140,6 +150,19 @@ const router = createRouter({
           name: 'analysis',
           component: ClusterAnalysisView,
           props: true
+        },
+        {
+          path: 'ai',
+          name: 'ai',
+          component: AssistantView,
+          props: true
+        },
+        {
+          path: 'assistant',
+          redirect: (to: RouteLocation) => ({
+            name: 'ai',
+            params: { cluster: to.params.cluster }
+          })
         },
         {
           path: 'jobs',
@@ -314,8 +337,28 @@ router.beforeEach(async (to, from) => {
     runtime.currentCluster = undefined
   }
 
-  if (to.name === 'settings-access-control' && !hasClusterAccessControl(getSettingsCluster(runtime))) {
+  if (
+    to.name === 'settings-access-control' &&
+    !hasClusterAccessControl(getSettingsCluster(runtime))
+  ) {
     return { name: 'settings-account' }
+  }
+  if (to.name === 'settings-ai') {
+    const settingsCluster = getSettingsCluster(runtime)
+    if (
+      !hasClusterAIAssistant(settingsCluster) ||
+      !settingsCluster ||
+      !runtime.hasClusterPermission(settingsCluster.name, 'manage-ai')
+    ) {
+      return { name: 'settings' }
+    }
+  }
+  if (
+    to.name === 'ai' &&
+    (!hasClusterAIAssistant(runtime.currentCluster) ||
+      !runtime.hasClusterPermission(to.params.cluster as string, 'view-ai'))
+  ) {
+    return { name: 'dashboard', params: { cluster: to.params.cluster } }
   }
 
   /* If entering settings page, save previous route to get it back */

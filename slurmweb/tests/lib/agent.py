@@ -93,6 +93,11 @@ access_control_enabled=yes
 enabled=yes
 aggregation_interval=3600
 {% endif %}
+
+{% if ai_enabled %}
+[ai]
+enabled=yes
+{% endif %}
 """
 
 
@@ -120,6 +125,7 @@ class TestAgentConfBase(unittest.TestCase):
         persistence=False,
         access_control_enabled=False,
         user_metrics=False,
+        ai_enabled=False,
     ):
         # Generate JWT signing key
         self.key = tempfile.NamedTemporaryFile(mode="w+", delete=False)
@@ -161,6 +167,7 @@ class TestAgentConfBase(unittest.TestCase):
                 persistence=persistence,
                 access_control_enabled=access_control_enabled,
                 user_metrics=user_metrics,
+                ai_enabled=ai_enabled,
             )
         )
         self.conf.flush()
@@ -196,6 +203,7 @@ class TestAgentBase(TestSlurmrestdClient):
         persistence=False,
         access_control_enabled=False,
         user_metrics=False,
+        ai_enabled=False,
         racksdb_format_error=False,
         racksdb_schema_error=False,
         anonymous_user=False,
@@ -219,6 +227,7 @@ class TestAgentBase(TestSlurmrestdClient):
             persistence=persistence,
             access_control_enabled=access_control_enabled,
             user_metrics=user_metrics,
+            ai_enabled=ai_enabled,
         )
 
         if racksdb:

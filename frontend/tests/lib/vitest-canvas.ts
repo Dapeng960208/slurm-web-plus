@@ -23,3 +23,11 @@ const NodeFile = File as unknown as typeof globalThis.File
 const NodeBlob = Blob as unknown as typeof globalThis.Blob
 globalThis.File = NodeFile
 globalThis.Blob = NodeBlob
+
+class MockResizeObserver {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+}
+
+globalThis.ResizeObserver = MockResizeObserver as typeof globalThis.ResizeObserver

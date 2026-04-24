@@ -31,3 +31,9 @@ actions:
     Access to view access control roles, assignments and permission sources.
   roles-manage: |
     Create, update and delete access control roles and user role assignments.
+  view-ai: |
+    Get _AI_ entry in main menu and permission to use the cluster AI assistant,
+    browse available models and read own AI conversations.
+  manage-ai: |
+    Access AI settings to manage model configurations, default model selection
+    and connectivity diagnostics for the current cluster.

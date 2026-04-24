@@ -8,6 +8,7 @@ import sys
 import urllib
 import logging
 from types import SimpleNamespace
+from datetime import datetime, timezone
 
 from rfl.authentication.user import AuthenticatedUser
 from rfl.web.tokens import RFLTokenizedRBACWebApp
@@ -84,6 +85,40 @@ class SlurmwebAppAgent(SlurmwebWebApp, RFLTokenizedRBACWebApp):
             f"/v{get_version()}/access/users/<username>/roles",
             views.update_access_user_roles,
             methods=["PUT"],
+        ),
+        SlurmwebAppRoute(f"/v{get_version()}/ai/configs", views.ai_configs),
+        SlurmwebAppRoute(
+            f"/v{get_version()}/ai/configs",
+            views.create_ai_config,
+            methods=["POST"],
+        ),
+        SlurmwebAppRoute(
+            f"/v{get_version()}/ai/configs/<int:config_id>",
+            views.update_ai_config,
+            methods=["PATCH"],
+        ),
+        SlurmwebAppRoute(
+            f"/v{get_version()}/ai/configs/<int:config_id>",
+            views.delete_ai_config,
+            methods=["DELETE"],
+        ),
+        SlurmwebAppRoute(
+            f"/v{get_version()}/ai/configs/<int:config_id>/validate",
+            views.validate_ai_config,
+            methods=["POST"],
+        ),
+        SlurmwebAppRoute(
+            f"/v{get_version()}/ai/chat/stream",
+            views.ai_chat_stream,
+            methods=["POST"],
+        ),
+        SlurmwebAppRoute(
+            f"/v{get_version()}/ai/conversations",
+            views.ai_conversations,
+        ),
+        SlurmwebAppRoute(
+            f"/v{get_version()}/ai/conversations/<int:conversation_id>",
+            views.ai_conversation_detail,
         ),
         SlurmwebAppRoute(
             f"/v{get_version()}/user/<username>/metrics/history",
@@ -239,6 +274,10 @@ class SlurmwebAppAgent(SlurmwebWebApp, RFLTokenizedRBACWebApp):
         self.user_metrics_enabled = False
         self.access_control_store = None
         self.access_control_enabled = False
+        self.ai_config_store = None
+        self.ai_conversation_store = None
+        self.ai_service = None
+        self.ai_enabled = False
         database_ready = False
         database_error = None
         if self.settings.database.enabled:
@@ -362,6 +401,38 @@ class SlurmwebAppAgent(SlurmwebWebApp, RFLTokenizedRBACWebApp):
         else:
             logger.debug("Node real-time metrics is disabled")
 
+        if getattr(self.settings, "ai", None) and self.settings.ai.enabled:
+            if database_ready:
+                try:
+                    from ..ai.crypto import AISecretCipher
+                    from ..ai.service import AIService
+                    from ..persistence.ai_conversation_store import AIConversationStore
+                    from ..persistence.ai_model_config_store import AIModelConfigStore
+
+                    secret_cipher = AISecretCipher.from_jwt_key_file(self.settings.jwt.key)
+                    self.ai_config_store = AIModelConfigStore(self.settings.database)
+                    self.ai_conversation_store = AIConversationStore(self.settings.database)
+                    self.ai_config_store.validate_connection()
+                    self.ai_conversation_store.validate_connection()
+                    self.ai_service = AIService(
+                        app=self,
+                        config_store=self.ai_config_store,
+                        conversation_store=self.ai_conversation_store,
+                        secret_cipher=secret_cipher,
+                    )
+                    self.ai_enabled = True
+                    logger.info("AI assistant support enabled")
+                except Exception as err:
+                    logger.warning("Unable to initialize AI assistant support: %s", err)
+            else:
+                reason = str(database_error) if database_error is not None else "unknown reason"
+                logger.warning(
+                    "AI assistant is enabled but database support is unavailable: %s",
+                    reason,
+                )
+        else:
+            logger.debug("AI assistant is disabled")
+
     def _refresh_cached_policy_snapshots_on_startup(self):
         if not getattr(self.settings.persistence, "access_control_enabled", False):
             return
@@ -411,3 +482,7 @@ class SlurmwebAppAgent(SlurmwebWebApp, RFLTokenizedRBACWebApp):
             refreshed,
             failed,
         )
+
+    @staticmethod
+    def now():
+        return datetime.now(timezone.utc)

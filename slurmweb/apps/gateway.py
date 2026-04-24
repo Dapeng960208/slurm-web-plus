@@ -56,6 +56,7 @@ class SlurmwebAgent:
         access_control: bool = False,
         node_metrics: bool = False,
         user_metrics: bool = False,
+        ai: dict = None,
         capabilities: dict = None,
     ):
         self.version = version
@@ -69,6 +70,7 @@ class SlurmwebAgent:
         self.access_control = access_control
         self.node_metrics = node_metrics
         self.user_metrics = user_metrics
+        self.ai = ai or {}
         self.capabilities = capabilities or {}
 
     @classmethod
@@ -86,6 +88,7 @@ class SlurmwebAgent:
                 access_control=data.get("access_control", False),
                 node_metrics=data.get("node_metrics", False),
                 user_metrics=data.get("user_metrics", False),
+                ai=data.get("ai", {}),
                 capabilities=data.get("capabilities", {}),
             )
         except KeyError as err:
@@ -166,6 +169,40 @@ class SlurmwebAppGateway(SlurmwebWebApp, RFLTokenizedWebApp):
             "/api/agents/<cluster>/access/users/<username>/roles",
             views.update_access_user_roles,
             methods=["PUT"],
+        ),
+        SlurmwebAppRoute("/api/agents/<cluster>/ai/configs", views.ai_configs),
+        SlurmwebAppRoute(
+            "/api/agents/<cluster>/ai/configs",
+            views.create_ai_config,
+            methods=["POST"],
+        ),
+        SlurmwebAppRoute(
+            "/api/agents/<cluster>/ai/configs/<int:config_id>",
+            views.update_ai_config,
+            methods=["PATCH"],
+        ),
+        SlurmwebAppRoute(
+            "/api/agents/<cluster>/ai/configs/<int:config_id>",
+            views.delete_ai_config,
+            methods=["DELETE"],
+        ),
+        SlurmwebAppRoute(
+            "/api/agents/<cluster>/ai/configs/<int:config_id>/validate",
+            views.validate_ai_config,
+            methods=["POST"],
+        ),
+        SlurmwebAppRoute(
+            "/api/agents/<cluster>/ai/chat/stream",
+            views.ai_chat_stream,
+            methods=["POST"],
+        ),
+        SlurmwebAppRoute(
+            "/api/agents/<cluster>/ai/conversations",
+            views.ai_conversations,
+        ),
+        SlurmwebAppRoute(
+            "/api/agents/<cluster>/ai/conversations/<int:conversation_id>",
+            views.ai_conversation_detail,
         ),
         SlurmwebAppRoute(
             "/api/agents/<cluster>/user/<username>/metrics/history",

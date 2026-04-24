@@ -14,6 +14,7 @@ import { Dialog, DialogPanel, TransitionChild, TransitionRoot } from '@headlessu
 import {
   CalendarIcon,
   ChartBarSquareIcon,
+  ChatBubbleLeftRightIcon,
   Cog6ToothIcon,
   HomeIcon,
   PlayCircleIcon,
@@ -25,6 +26,7 @@ import {
 } from '@heroicons/vue/24/outline'
 import { TagIcon } from '@heroicons/vue/16/solid'
 
+import { hasClusterAIAssistant } from '@/composables/GatewayAPI'
 import { useRuntimeStore } from '@/stores/runtime'
 import { useRuntimeConfiguration } from '@/plugins/runtimeConfiguration'
 import BrandLogo from '@/components/BrandLogo.vue'
@@ -39,11 +41,48 @@ const sidebarOpen = defineModel<boolean>()
 const runtimeStore = useRuntimeStore()
 const runtimeConfiguration = useRuntimeConfiguration()
 const navigation = [
-  { name: 'Dashboard', route: 'dashboard', icon: HomeIcon, permission: 'view-stats', feature: undefined },
-  { name: 'Analysis', route: 'analysis', icon: ChartBarSquareIcon, permission: 'view-stats', feature: undefined },
-  { name: 'Jobs', route: 'jobs', icon: PlayCircleIcon, permission: 'view-jobs', feature: undefined },
-  { name: 'Jobs History', route: 'jobs-history', icon: ClockIcon, permission: 'view-history-jobs', feature: 'persistence' },
-  { name: 'Resources', route: 'resources', icon: CpuChipIcon, permission: 'view-nodes', feature: undefined },
+  {
+    name: 'Dashboard',
+    route: 'dashboard',
+    icon: HomeIcon,
+    permission: 'view-stats',
+    feature: undefined
+  },
+  {
+    name: 'Analysis',
+    route: 'analysis',
+    icon: ChartBarSquareIcon,
+    permission: 'view-stats',
+    feature: undefined
+  },
+  {
+    name: 'AI',
+    route: 'ai',
+    icon: ChatBubbleLeftRightIcon,
+    permission: 'view-ai',
+    feature: 'ai'
+  },
+  {
+    name: 'Jobs',
+    route: 'jobs',
+    icon: PlayCircleIcon,
+    permission: 'view-jobs',
+    feature: undefined
+  },
+  {
+    name: 'Jobs History',
+    route: 'jobs-history',
+    icon: ClockIcon,
+    permission: 'view-history-jobs',
+    feature: 'persistence'
+  },
+  {
+    name: 'Resources',
+    route: 'resources',
+    icon: CpuChipIcon,
+    permission: 'view-nodes',
+    feature: undefined
+  },
   { name: 'QOS', route: 'qos', icon: SwatchIcon, permission: 'view-qos', feature: undefined },
   {
     name: 'Reservations',
@@ -65,7 +104,19 @@ function isFeatureEnabled(feature: string | undefined): boolean {
   if (!feature) return true
   const cluster = navigationCluster.value
   if (!cluster) return false
+  if (feature === 'ai') {
+    return hasClusterAIAssistant(cluster)
+  }
   return !!(cluster as unknown as Record<string, unknown>)[feature]
+}
+
+function hasNavigationPermission(permission?: string): boolean {
+  if (!permission) return true
+  const cluster = navigationCluster.value
+  if (cluster) {
+    return runtimeStore.hasClusterPermission(cluster.name, permission)
+  }
+  return runtimeStore.hasPermission(permission)
 }
 
 const navigationCluster = computed(() => {
@@ -131,7 +182,9 @@ function navigationTarget(route: string): RouteLocationRaw {
               <div class="flex shrink-0 items-center justify-center pt-7">
                 <BrandLogo size="sm" :framed="false" />
               </div>
-              <div class="mx-2 flex items-center justify-between rounded-full border border-white/10 bg-white/6 px-3 py-2 text-xs text-white/70">
+              <div
+                class="mx-2 flex items-center justify-between rounded-full border border-white/10 bg-white/6 px-3 py-2 text-xs text-white/70"
+              >
                 <span class="font-semibold tracking-[0.18em] uppercase">Cluster Ops</span>
                 <TagIcon class="inline size-3" aria-hidden="true" />
                 <!-- {{ runtimeConfiguration.version }} -->
@@ -142,7 +195,10 @@ function navigationTarget(route: string): RouteLocationRaw {
                     <ul role="list" class="space-y-1.5">
                       <li v-for="item in navigation" :key="item.name">
                         <RouterLink
-                          v-if="runtimeStore.hasPermission(item.permission) && isFeatureEnabled(item.feature)"
+                          v-if="
+                            hasNavigationPermission(item.permission) &&
+                            isFeatureEnabled(item.feature)
+                          "
                           :to="navigationTarget(item.route)"
                           :class="[
                             item.route == entry
@@ -190,13 +246,20 @@ function navigationTarget(route: string): RouteLocationRaw {
 
   <!-- Static sidebar for desktop -->
   <div class="hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-80 lg:flex-col lg:p-4">
-    <div class="flex grow flex-col gap-y-6 overflow-y-auto rounded-[32px] border border-white/10 bg-[linear-gradient(180deg,rgba(32,42,53,0.98),rgba(56,59,64,0.95))] px-6 pb-6 text-white shadow-[var(--shadow-panel)]">
+    <div
+      class="flex grow flex-col gap-y-6 overflow-y-auto rounded-[32px] border border-white/10 bg-[linear-gradient(180deg,rgba(32,42,53,0.98),rgba(56,59,64,0.95))] px-6 pb-6 text-white shadow-[var(--shadow-panel)]"
+    >
       <div class="flex shrink-0 items-center justify-center pt-7">
         <BrandLogo size="sm" :framed="false" />
       </div>
-      <div class="flex items-center justify-between rounded-full border border-white/10 bg-white/6 px-3 py-2 text-xs text-white/70">
+      <div
+        class="flex items-center justify-between rounded-full border border-white/10 bg-white/6 px-3 py-2 text-xs text-white/70"
+      >
         <span class="font-semibold tracking-[0.18em] uppercase">Slurm Monitor</span>
-        <span><TagIcon class="mr-1 inline size-3" aria-hidden="true" /> {{ runtimeConfiguration.version }}</span>
+        <span
+          ><TagIcon class="mr-1 inline size-3" aria-hidden="true" />
+          {{ runtimeConfiguration.version }}</span
+        >
       </div>
       <nav class="flex flex-1 flex-col">
         <ul role="list" class="flex flex-1 flex-col gap-y-7">
@@ -204,7 +267,7 @@ function navigationTarget(route: string): RouteLocationRaw {
             <ul role="list" class="space-y-1.5">
               <li v-for="item in navigation" :key="item.name">
                 <RouterLink
-                  v-if="runtimeStore.hasPermission(item.permission) && isFeatureEnabled(item.feature)"
+                  v-if="hasNavigationPermission(item.permission) && isFeatureEnabled(item.feature)"
                   :to="navigationTarget(item.route)"
                   :class="[
                     item.route == entry
@@ -216,7 +279,9 @@ function navigationTarget(route: string): RouteLocationRaw {
                   <component
                     :is="item.icon"
                     :class="[
-                      item.route == entry ? 'text-[var(--color-brand-deep)]' : 'text-white/60 group-hover:text-white',
+                      item.route == entry
+                        ? 'text-[var(--color-brand-deep)]'
+                        : 'text-white/60 group-hover:text-white',
                       'h-6 w-6 shrink-0 transition'
                     ]"
                     aria-hidden="true"
@@ -231,7 +296,10 @@ function navigationTarget(route: string): RouteLocationRaw {
               :to="{ name: 'settings' }"
               class="group flex items-center gap-x-3 rounded-[18px] border border-white/10 bg-white/6 px-3.5 py-3 text-sm leading-6 font-semibold text-white/80 transition hover:bg-white/12 hover:text-white"
             >
-              <Cog6ToothIcon class="h-6 w-6 shrink-0 text-white/60 group-hover:text-white" aria-hidden="true" />
+              <Cog6ToothIcon
+                class="h-6 w-6 shrink-0 text-white/60 group-hover:text-white"
+                aria-hidden="true"
+              />
               Settings
             </RouterLink>
           </li>

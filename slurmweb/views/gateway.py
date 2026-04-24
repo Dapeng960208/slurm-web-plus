@@ -10,7 +10,8 @@ from functools import wraps
 import asyncio
 
 import jinja2
-from flask import Response, current_app, jsonify, request, abort, render_template
+import requests
+from flask import Response, current_app, jsonify, request, abort, render_template, stream_with_context
 import aiohttp
 from rfl.web.tokens import check_jwt
 from rfl.authentication.user import AnonymousUser
@@ -162,6 +163,7 @@ async def get_cluster(agent):
             "access_control": getattr(agent, "access_control", False),
             "node_metrics": agent.node_metrics,
             "user_metrics": getattr(agent, "user_metrics", False),
+            "ai": getattr(agent, "ai", {}),
             "capabilities": agent.capabilities,
         }
 
@@ -327,6 +329,15 @@ def request_agent(
         abort(500, f"Connection error: {str(err)}")
 
 
+def build_agent_url(cluster: str, query: str, with_version: bool = True):
+    if with_version:
+        return (
+            f"{current_app.agents[cluster].url}/"
+            f"v{current_app.agents[cluster].version}/{query}"
+        )
+    return f"{current_app.agents[cluster].url}/{query}"
+
+
 async def async_proxy_agent(
     cluster: str,
     query: str,
@@ -363,6 +374,55 @@ async def async_proxy_agent(
 def proxy_agent(*args, **kwargs):
     """Launch asynchronous coroutine to request the agent."""
     return asyncio_run(async_proxy_agent(*args, **kwargs))
+
+
+def proxy_stream_agent(cluster: str, query: str, token: str = None, with_version: bool = True):
+    headers = {}
+    if token is not None:
+        headers["Authorization"] = f"Bearer {token}"
+    url = build_agent_url(cluster, query, with_version=with_version)
+    if len(request.query_string):
+        url += f"?{request.query_string.decode()}"
+    verify = True
+    if getattr(current_app.settings.agents, "cacert", None):
+        verify = str(current_app.settings.agents.cacert)
+
+    json_payload = request.get_json(silent=True)
+
+    def generate():
+        try:
+            with requests.request(
+                request.method,
+                url,
+                headers=headers,
+                json=json_payload,
+                stream=True,
+                verify=verify,
+                timeout=300,
+            ) as response:
+                if response.status_code >= 400:
+                    body = response.text
+                    payload = {
+                        "message": body
+                        or f"Agent stream request failed with HTTP {response.status_code}"
+                    }
+                    yield f"event: error\ndata: {json.dumps(payload)}\n\n".encode()
+                    return
+                for chunk in response.iter_content(chunk_size=1024):
+                    if chunk:
+                        yield chunk
+        except requests.RequestException as err:
+            payload = {"message": f"Unable to connect to agent stream: {err}"}
+            yield f"event: error\ndata: {json.dumps(payload)}\n\n".encode()
+
+    return Response(
+        stream_with_context(generate()),
+        mimetype="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 @check_jwt
@@ -441,6 +501,54 @@ def access_user_roles(cluster: str, username: str):
 @validate_cluster
 def update_access_user_roles(cluster: str, username: str):
     return proxy_agent(cluster, f"access/users/{username}/roles", request.token)
+
+
+@check_jwt
+@validate_cluster
+def ai_configs(cluster: str):
+    return proxy_agent(cluster, "ai/configs", request.token)
+
+
+@check_jwt
+@validate_cluster
+def create_ai_config(cluster: str):
+    return proxy_agent(cluster, "ai/configs", request.token)
+
+
+@check_jwt
+@validate_cluster
+def update_ai_config(cluster: str, config_id: int):
+    return proxy_agent(cluster, f"ai/configs/{config_id}", request.token)
+
+
+@check_jwt
+@validate_cluster
+def delete_ai_config(cluster: str, config_id: int):
+    return proxy_agent(cluster, f"ai/configs/{config_id}", request.token)
+
+
+@check_jwt
+@validate_cluster
+def validate_ai_config(cluster: str, config_id: int):
+    return proxy_agent(cluster, f"ai/configs/{config_id}/validate", request.token)
+
+
+@check_jwt
+@validate_cluster
+def ai_chat_stream(cluster: str):
+    return proxy_stream_agent(cluster, "ai/chat/stream", request.token)
+
+
+@check_jwt
+@validate_cluster
+def ai_conversations(cluster: str):
+    return proxy_agent(cluster, "ai/conversations", request.token)
+
+
+@check_jwt
+@validate_cluster
+def ai_conversation_detail(cluster: str, conversation_id: int):
+    return proxy_agent(cluster, f"ai/conversations/{conversation_id}", request.token)
 
 
 @check_jwt

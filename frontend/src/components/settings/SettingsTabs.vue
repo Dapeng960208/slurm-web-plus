@@ -9,7 +9,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
-import { hasClusterAccessControl } from '@/composables/GatewayAPI'
+import { hasClusterAIAssistant, hasClusterAccessControl } from '@/composables/GatewayAPI'
 import { useRuntimeStore } from '@/stores/runtime'
 import { useRuntimeConfiguration } from '@/plugins/runtimeConfiguration'
 
@@ -33,6 +33,13 @@ const tabs = computed(() => {
     { name: 'Errors', href: 'settings-errors' },
     { name: 'Account', href: 'settings-account' }
   ]
+  if (
+    hasClusterAIAssistant(settingsCluster.value) &&
+    settingsCluster.value &&
+    runtimeStore.hasClusterPermission(settingsCluster.value.name, 'manage-ai')
+  ) {
+    result.push({ name: 'AI', href: 'settings-ai' })
+  }
   if (hasClusterAccessControl(settingsCluster.value)) {
     result.push({ name: 'Access Control', href: 'settings-access-control' })
   }
@@ -50,7 +57,9 @@ const tabs = computed(() => {
   <div class="ui-panel ui-section">
     <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
       <div>
-        <h3 class="text-base leading-6 font-semibold text-[var(--color-brand-ink-strong)]">Settings</h3>
+        <h3 class="text-base leading-6 font-semibold text-[var(--color-brand-ink-strong)]">
+          Settings
+        </h3>
         <p class="mt-1 text-sm text-[var(--color-brand-muted)]">
           Preferences, access and cache services in one unified workspace.
         </p>

@@ -49,7 +49,8 @@ describe('MainMenu.vue', () => {
           },
           BrandLogo: {
             props: ['framed', 'size'],
-            template: '<div class="brand-logo-stub" :data-framed="String(framed)" :data-size="size" />'
+            template:
+              '<div class="brand-logo-stub" :data-framed="String(framed)" :data-size="size" />'
           }
         }
       }
@@ -110,7 +111,8 @@ describe('MainMenu.vue', () => {
           },
           BrandLogo: {
             props: ['framed', 'size'],
-            template: '<div class="brand-logo-stub" :data-framed="String(framed)" :data-size="size" />'
+            template:
+              '<div class="brand-logo-stub" :data-framed="String(framed)" :data-size="size" />'
           }
         }
       }
@@ -132,5 +134,93 @@ describe('MainMenu.vue', () => {
     await nextTick()
 
     expect(wrapper.text()).toContain('Jobs History')
+  })
+
+  test('shows AI only when the cluster advertises AI capability and the user has view-ai', async () => {
+    const wrapper = shallowMount(MainMenu, {
+      props: {
+        entry: 'dashboard',
+        clusterContext: 'foo',
+        modelValue: true
+      },
+      global: {
+        plugins: [
+          [
+            runtimeConfiguration,
+            {
+              api_server: 'http://localhost',
+              authentication: true,
+              racksdb_rows_labels: false,
+              racksdb_racks_labels: false,
+              version: 'test-version'
+            }
+          ],
+          createTestingPinia({
+            stubActions: false
+          })
+        ],
+        stubs: {
+          RouterLink: {
+            template: '<a><slot /></a>'
+          },
+          TransitionRoot: {
+            template: '<div><slot /></div>'
+          },
+          TransitionChild: {
+            template: '<div><slot /></div>'
+          },
+          Dialog: {
+            template: '<div><slot /></div>'
+          },
+          DialogPanel: {
+            template: '<div><slot /></div>'
+          },
+          BrandLogo: {
+            props: ['framed', 'size'],
+            template:
+              '<div class="brand-logo-stub" :data-framed="String(framed)" :data-size="size" />'
+          }
+        }
+      }
+    })
+
+    const runtimeStore = useRuntimeStore()
+    runtimeStore.availableClusters = [
+      {
+        name: 'foo',
+        permissions: { roles: [], actions: ['view-stats', 'view-ai'] },
+        racksdb: true,
+        infrastructure: 'foo',
+        metrics: true,
+        cache: true,
+        capabilities: {
+          ai: {
+            enabled: true
+          }
+        }
+      }
+    ]
+    runtimeStore.currentCluster = runtimeStore.availableClusters[0]
+    await nextTick()
+
+    expect(wrapper.text()).toContain('AI')
+
+    runtimeStore.availableClusters = [
+      {
+        name: 'foo',
+        permissions: { roles: [], actions: ['view-stats'] },
+        racksdb: true,
+        infrastructure: 'foo',
+        metrics: true,
+        cache: true,
+        capabilities: {
+          ai: false
+        }
+      }
+    ]
+    runtimeStore.currentCluster = runtimeStore.availableClusters[0]
+    await nextTick()
+
+    expect(wrapper.text()).not.toContain('AI')
   })
 })

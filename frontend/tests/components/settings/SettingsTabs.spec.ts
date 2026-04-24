@@ -113,6 +113,67 @@ describe('SettingsTabs.vue', () => {
     expect(wrapper.text()).toContain('Access Control')
   })
 
+  test('shows AI tab when the current settings cluster supports it and user can manage it', async () => {
+    const wrapper = mountTabs(
+      true,
+      [
+        {
+          name: 'foo',
+          permissions: { roles: [], actions: ['manage-ai'] },
+          capabilities: {
+            ai: {
+              enabled: true
+            }
+          },
+          racksdb: true,
+          infrastructure: 'foo',
+          metrics: true,
+          cache: true
+        }
+      ],
+      'foo'
+    )
+
+    await nextTick()
+    expect(wrapper.text()).toContain('AI')
+  })
+
+  test('hides AI tab when only another cluster supports it', async () => {
+    const wrapper = mountTabs(
+      true,
+      [
+        {
+          name: 'foo',
+          permissions: { roles: [], actions: ['manage-ai'] },
+          capabilities: {
+            ai: false
+          },
+          racksdb: true,
+          infrastructure: 'foo',
+          metrics: true,
+          cache: true
+        },
+        {
+          name: 'bar',
+          permissions: { roles: [], actions: ['manage-ai'] },
+          capabilities: {
+            ai: {
+              enabled: true
+            }
+          },
+          racksdb: true,
+          infrastructure: 'bar',
+          metrics: true,
+          cache: true
+        }
+      ],
+      'foo'
+    )
+
+    await nextTick()
+    expect(wrapper.text()).not.toContain('AI')
+  })
+
   test('hides Access Control tab when only another cluster supports it', async () => {
     const wrapper = mountTabs(
       true,

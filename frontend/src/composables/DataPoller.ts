@@ -59,11 +59,14 @@ export function useClusterDataPoller<Type>(
     try {
       unable.value = false
       if (gateway.isValidGatewayClusterWithStringAPIKey(callback)) {
-        data.value = (await gateway[callback](cluster, otherParam as string)) as Type
+        const method = gateway[callback] as (cluster: string, param: string) => Promise<Type>
+        data.value = await method(cluster, otherParam as string)
       } else if (gateway.isValidGatewayClusterWithNumberAPIKey(callback)) {
-        data.value = (await gateway[callback](cluster, otherParam as number)) as Type
+        const method = gateway[callback] as (cluster: string, param: number) => Promise<Type>
+        data.value = await method(cluster, otherParam as number)
       } else {
-        data.value = (await gateway[callback](cluster)) as Type
+        const method = gateway[callback] as (cluster: string) => Promise<Type>
+        data.value = await method(cluster)
       }
 
       loaded.value = true

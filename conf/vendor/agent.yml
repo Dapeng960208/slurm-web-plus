@@ -586,6 +586,33 @@ node_metrics:
       Prometheus label name that contains the Slurm node hostname.
       Typically "hostname" or "instance".
 
+ai:
+  enabled:
+    type: bool
+    default: false
+    doc: |
+      Determine if AI assistant APIs are enabled for this cluster. This feature
+      depends on database support because both model configurations and
+      conversations are stored in PostgreSQL.
+  max_rounds:
+    type: int
+    default: 4
+    doc: |
+      Maximum number of internal tool-execution rounds allowed before the agent
+      must return a final answer.
+  max_history_messages:
+    type: int
+    default: 24
+    doc: |
+      Maximum number of previously persisted conversation messages loaded as
+      context for a new assistant reply.
+  stream_chunk_size:
+    type: int
+    default: 32
+    doc: |
+      Maximum number of UTF-8 characters emitted in each synthetic SSE content
+      chunk when streaming the final assistant answer to clients.
+
 metrics:
   enabled:
     type: bool
