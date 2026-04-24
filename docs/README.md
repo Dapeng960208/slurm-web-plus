@@ -37,6 +37,7 @@
 
 - [内部文档编写规范](./standards/documentation-standard.md)
 - [内部文档命名规范](./standards/document-naming-convention.md)
+- [AI 开发规范（Git 工作流）](./standards/ai-development-standard.md)
 
 ## 跟踪
 

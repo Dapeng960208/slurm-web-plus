@@ -63,6 +63,17 @@ docs/
 - 错误库入口：`docs/tracking/error-log.md`
 - 标准：`docs/standards/development-error-summary.md`
 
+## 2.5 AI Git 工作流（强制）
+
+AI 在开发与提交时必须遵循 Git 工作流约束，尤其是：
+
+- 所有提交信息必须符合 `type(scope): subject`
+- 每次提交前必须先检查工作区 `git status --porcelain`
+- 对工作区未提交改动，必须先与开发者确认是否提交
+- 网络不可用导致无法 push 时，也必须完成本地 commit，并在 `docs/tracking/` 留下可追溯记录
+
+标准见：`docs/standards/ai-development-standard.md`。
+
 ## 3. 每类文档应包含的最小结构
 
 ### 3.1 功能专题文档

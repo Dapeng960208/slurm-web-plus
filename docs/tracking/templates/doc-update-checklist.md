@@ -13,4 +13,5 @@
 - [ ] `docs/README.md` 是否已补入口
 - [ ] 文件命名与放置是否符合 `docs/standards/document-naming-convention.md`
 - [ ] 开发过程中遇到的可复现错误是否已记录到 `docs/tracking/error-log.md`
+- [ ] 提交前已检查 `git status --porcelain`，并确认未提交改动是否应纳入本次提交
 - [ ] 文档内容是否与当前代码一致

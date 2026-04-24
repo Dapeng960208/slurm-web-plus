@@ -21,3 +21,4 @@
 - 后续 AI 不允许再向 `docs/` 根目录散写新专题文件；根目录仅保留 `docs/README.md` 作为索引入口。
 - 文档命名与放置必须遵循 `docs/standards/document-naming-convention.md`。
 - AI 开发过程中遇到可复现错误时，必须复盘并写入 `docs/tracking/error-log.md`（标准见 `docs/standards/development-error-summary.md`）。
+- AI 进行 Git 提交时必须遵循提交规范，并在每次提交前检查工作区；对未提交改动必须先与开发者确认是否提交（标准见 `docs/standards/ai-development-standard.md`）。
