@@ -12,6 +12,7 @@ import { useRuntimeStore } from '@/stores/runtime'
 import { useRuntimeConfiguration } from '@/plugins/runtimeConfiguration'
 
 const DashboardView = () => import('@/views/DashboardView.vue')
+const ClusterAnalysisView = () => import('@/views/ClusterAnalysisView.vue')
 const LoginView = () => import('@/views/LoginView.vue')
 const AnonymousView = () => import('@/views/AnonymousView.vue')
 const SignoutView = () => import('@/views/SignoutView.vue')
@@ -122,6 +123,12 @@ const router = createRouter({
           path: 'dashboard',
           name: 'dashboard',
           component: DashboardView,
+          props: true
+        },
+        {
+          path: 'analysis',
+          name: 'analysis',
+          component: ClusterAnalysisView,
           props: true
         },
         {

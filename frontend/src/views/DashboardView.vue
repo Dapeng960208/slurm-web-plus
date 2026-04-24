@@ -8,6 +8,7 @@
 
 <script setup lang="ts">
 import { computed, watch } from 'vue'
+import { RouterLink } from 'vue-router'
 import { getMBHumanUnit } from '@/composables/GatewayAPI'
 import type { ClusterStats } from '@/composables/GatewayAPI'
 import { useRuntimeStore } from '@/stores/runtime'
@@ -81,7 +82,13 @@ const statsCards = computed(() => {
         description="Live cluster statistics, workload activity and metric trends in a unified control view."
         :metric-value="loaded && data ? data.jobs.total : undefined"
         metric-label="total jobs"
-      />
+      >
+        <template #actions>
+          <RouterLink :to="{ name: 'analysis', params: { cluster } }" class="ui-button-primary">
+            Open analysis
+          </RouterLink>
+        </template>
+      </PageHeader>
 
       <ErrorAlert v-if="unable"
         >Unable to retrieve statistics from cluster

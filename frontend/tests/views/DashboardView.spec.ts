@@ -44,10 +44,12 @@ describe('DashboardView.vue', () => {
     expect(wrapper.findAll('.ui-stat-label').map((element) => element.text())).toStrictEqual([
       'Nodes',
       'Cores',
-      'Memory',
+      'Total Memory',
+      'Allocated Memory',
+      'Available Memory',
       'GPU',
-      'Running jobs',
-      'Total jobs'
+      'Running Jobs',
+      'Total Jobs'
     ])
     expect(wrapper.get('span#metric-nodes').text()).toBe(stats.resources.nodes.toString())
     expect(wrapper.get('span#metric-cores').text()).toBe(stats.resources.cores.toString())
