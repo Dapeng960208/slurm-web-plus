@@ -34,3 +34,12 @@
 - 根因：Gateway 路由以 `/api/...` 为前缀（例如 `POST /api/login`、`GET /api/clusters`），旧文档残留了不一致路径。
 - 解决：统一修正文档命令为 `/api/login`、`/api/anonymous`、`/api/clusters`，集群接口走 `/api/agents/<cluster>/...`。
 - 预防：写验证命令时优先对照 `slurmweb/apps/gateway.py` 的路由表，避免凭印象写路径。
+
+### 2026-04-24：网络原因导致无法 push 到 GitHub（已本地 commit）
+
+- 场景：提交完成后执行 `git push origin main`。
+- 现象：`Failed to connect to github.com port 443 ... Could not connect to server`。
+- 复现：在网络不可达/被防火墙阻断的环境执行 push。
+- 根因：网络不可用或访问 GitHub 被阻断（非仓库内容问题）。
+- 解决：按规范先完成本地 `git commit`，待网络恢复后再 push。
+- 预防：提交前不以 push 成功为前提；若 push 失败，必须在 `docs/tracking/` 留下“已本地提交、待 push”的记录。
