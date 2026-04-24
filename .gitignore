@@ -4,6 +4,7 @@ __pycache__/
 build/
 dist/
 .venv/
+.vite/
 generated-doc
 node_modules
 /frontend/dist
