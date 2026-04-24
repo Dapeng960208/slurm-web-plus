@@ -41,8 +41,21 @@ const runtimeStore = useRuntimeStore()
       </InfoAlert>
       <InfoAlert v-else-if="!cluster.cache">Cache is disabled on this cluster.</InfoAlert>
       <template v-else>
-        <SettingsCacheStatistics :cluster="cluster" />
-        <SettingsCacheMetrics v-if="cluster.metrics" :cluster="cluster" />
+        <div class="ui-section-stack">
+          <SettingsCacheStatistics :cluster="cluster" />
+          <SettingsCacheMetrics v-if="cluster.metrics" :cluster="cluster" />
+          <div
+            v-else
+            class="rounded-[28px] border border-[rgba(80,105,127,0.12)] bg-[rgba(244,248,251,0.86)] px-6 py-5"
+          >
+            <p class="ui-page-kicker">Metrics Unavailable</p>
+            <h4 class="ui-panel-title">Live cache metrics are unavailable</h4>
+            <p class="ui-panel-description mt-2">
+              This cluster exposes cache statistics, but metrics collection is disabled, so there
+              is no live cache timeline to display.
+            </p>
+          </div>
+        </div>
       </template>
     </div>
   </div>

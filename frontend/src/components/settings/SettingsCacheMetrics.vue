@@ -7,7 +7,7 @@
 -->
 
 <script setup lang="ts">
-import { useTemplateRef, ref } from 'vue'
+import { computed, ref, useTemplateRef } from 'vue'
 import type { ClusterDescription, MetricCacheResult } from '@/composables/GatewayAPI'
 import { useLiveHistogram } from '@/composables/charts/LiveHistogram'
 import ChartSkeleton from '@/components/ChartSkeleton.vue'
@@ -42,6 +42,13 @@ const chart = useLiveHistogram<MetricCacheResult>(
   labels,
   range.value
 )
+
+const hasMetricSamples = computed(() => {
+  if (!chart.metrics.data.value) return false
+  return Object.values(chart.metrics.data.value).some((series) =>
+    series.some(([, value]) => value !== 0)
+  )
+})
 </script>
 
 <template>
@@ -99,7 +106,24 @@ const chart = useLiveHistogram<MetricCacheResult>(
     </ErrorAlert>
     <div v-else class="ui-chart-shell">
       <ChartSkeleton v-show="!chart.metrics.loaded.value" />
-      <canvas v-show="chart.metrics.loaded.value" ref="chartCanvas" class="h-full w-full"></canvas>
+      <div
+        v-show="chart.metrics.loaded.value && !hasMetricSamples"
+        class="flex h-full min-h-64 items-center justify-center rounded-[24px] border border-dashed border-[rgba(80,105,127,0.18)] bg-[rgba(244,248,251,0.86)] px-6 text-center"
+      >
+        <div>
+          <p class="text-sm font-semibold text-[var(--color-brand-ink-strong)]">
+            No live cache metric samples in this range
+          </p>
+          <p class="mt-2 text-sm text-[var(--color-brand-muted)]">
+            Switch the time range or wait for cache traffic to generate hit and miss data points.
+          </p>
+        </div>
+      </div>
+      <canvas
+        v-show="chart.metrics.loaded.value && hasMetricSamples"
+        ref="chartCanvas"
+        class="h-full w-full"
+      ></canvas>
     </div>
   </div>
 </template>

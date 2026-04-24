@@ -25,7 +25,10 @@ vi.mock('@/composables/GatewayAPI', () => ({
 describe('SettingsCacheStatistics.vue', () => {
   beforeEach(() => {
     init_plugins()
-    mockGatewayAPI.cache_reset.mockClear()
+    mockGatewayAPI.cache_reset.mockReset()
+    mockClusterDataPoller.unable.value = false
+    mockClusterDataPoller.loaded.value = true
+    mockClusterDataPoller.data.value = undefined
     useRuntimeStore().availableClusters = [
       {
         name: 'foo',
@@ -37,16 +40,16 @@ describe('SettingsCacheStatistics.vue', () => {
       }
     ]
   })
-  test('should display cluster cache statistics', () => {
-    mockClusterDataPoller.unable.value = false
-    mockClusterDataPoller.loaded.value = true
+
+  test('should display cluster cache statistics with combined hit and miss keys', () => {
     mockClusterDataPoller.data.value = cacheStats
+
     const wrapper = mount(SettingsCacheStatistics, {
       props: {
         cluster: useRuntimeStore().availableClusters[0]
       }
     })
-    // Check columns of statistics table
+
     expect(wrapper.findAll('th').map((element) => element.text())).toStrictEqual([
       'Name',
       'Hit',
@@ -54,11 +57,22 @@ describe('SettingsCacheStatistics.vue', () => {
       'Total',
       'Hit rate'
     ])
-    // Check rows first column
     expect(
       wrapper.findAll('tbody tr td:first-child').map((element) => element.text())
-    ).toStrictEqual(Object.keys(cacheStats.miss.keys).concat(['Total']))
-    // Check total line
+    ).toStrictEqual([
+      'individual-job',
+      'individual-node',
+      'jobs',
+      'nodes',
+      'qos',
+      'reservations',
+      'Total'
+    ])
+    expect(wrapper.text()).toContain('Traffic Snapshot')
+    expect(wrapper.text()).toContain('Hit rate')
+    expect(wrapper.text()).toContain('Requests')
+    expect(wrapper.text()).toContain('Key groups')
+    expect(wrapper.text()).not.toContain('Waiting for cache activity')
     expect(
       wrapper.findAll('tbody tr:last-child td').map((element) => element.text())
     ).toStrictEqual([
@@ -70,33 +84,55 @@ describe('SettingsCacheStatistics.vue', () => {
         '%'
     ])
   })
+
+  test('should render an empty-state overview when there is no cache activity', () => {
+    mockClusterDataPoller.data.value = {
+      hit: { keys: {}, total: 0 },
+      miss: { keys: {}, total: 0 }
+    }
+
+    const wrapper = mount(SettingsCacheStatistics, {
+      props: {
+        cluster: useRuntimeStore().availableClusters[0]
+      }
+    })
+
+    expect(wrapper.text()).toContain('Waiting for cache activity')
+    expect(wrapper.text()).toContain('Once the cluster records cache hits or misses')
+    expect(
+      wrapper.findAll('tbody tr td:first-child').map((element) => element.text())
+    ).toStrictEqual(['Total'])
+  })
+
   test('should report error when unable to retrieve statistics', () => {
     mockClusterDataPoller.unable.value = true
     mockClusterDataPoller.loaded.value = false
+
     const wrapper = mount(SettingsCacheStatistics, {
       props: {
         cluster: useRuntimeStore().availableClusters[0]
       }
     })
+
     expect(wrapper.getComponent(ErrorAlert).text()).toBe('Unable to retrieve cache statistics.')
     expect(wrapper.find('table').exists()).toBeFalsy()
   })
+
   test('should indicate when loading data', () => {
-    mockClusterDataPoller.unable.value = false
     mockClusterDataPoller.loaded.value = false
+
     const wrapper = mount(SettingsCacheStatistics, {
       props: {
         cluster: useRuntimeStore().availableClusters[0]
       }
     })
+
     expect(wrapper.findComponent(LoadingSpinner).exists()).toBeTruthy()
-    expect(wrapper.find('div').text()).toBe('Loading statistics…')
+    expect(wrapper.text()).toContain('Loading statistics...')
     expect(wrapper.find('table').exists()).toBeFalsy()
   })
 
   test('should not show reset button when user lacks cache-reset permission', () => {
-    mockClusterDataPoller.unable.value = false
-    mockClusterDataPoller.loaded.value = true
     mockClusterDataPoller.data.value = cacheStats
 
     const clusterWithoutResetPermission = {
@@ -118,8 +154,6 @@ describe('SettingsCacheStatistics.vue', () => {
   })
 
   test('should show reset button when user has cache-reset permission', () => {
-    mockClusterDataPoller.unable.value = false
-    mockClusterDataPoller.loaded.value = true
     mockClusterDataPoller.data.value = cacheStats
 
     const clusterWithResetPermission = {
@@ -140,12 +174,10 @@ describe('SettingsCacheStatistics.vue', () => {
     const resetButton = wrapper.find('button')
     expect(resetButton.exists()).toBeTruthy()
     expect(resetButton.text()).toBe('Reset statistics')
-    expect(resetButton.find('svg').exists()).toBeTruthy() // ArrowPathIcon
+    expect(resetButton.find('svg').exists()).toBeTruthy()
   })
 
   test('should call cache_reset and update data when reset button is clicked', async () => {
-    mockClusterDataPoller.unable.value = false
-    mockClusterDataPoller.loaded.value = true
     mockClusterDataPoller.data.value = cacheStats
 
     const resetResponse = {
@@ -169,8 +201,7 @@ describe('SettingsCacheStatistics.vue', () => {
       }
     })
 
-    const resetButton = wrapper.find('button')
-    await resetButton.trigger('click')
+    await wrapper.find('button').trigger('click')
 
     expect(mockGatewayAPI.cache_reset).toHaveBeenCalledWith('foo')
     expect(mockClusterDataPoller.data.value).toEqual(resetResponse)
