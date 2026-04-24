@@ -119,6 +119,11 @@ class TestSlurmWebMetricsCollector(unittest.TestCase):
             8,  # total_hits
             3,  # total_misses
         )
+        self.mock_user_analytics_store = mock.MagicMock()
+        self.mock_user_analytics_store.recent_submission_counts.return_value = {
+            "alice": 3,
+            "bob": 1,
+        }
 
     def test_collect_success_with_cache(self):
         """Test successful collection with cache enabled."""
@@ -149,6 +154,53 @@ class TestSlurmWebMetricsCollector(unittest.TestCase):
         # Verify slurmrestd methods were called
         self.mock_slurmrestd.resources_states.assert_called_once()
         self.mock_slurmrestd.jobs_states.assert_called_once()
+
+    def test_collect_success_with_user_submission_metric_enabled(self):
+        with mock.patch("prometheus_client.REGISTRY"):
+            collector = SlurmWebMetricsCollector(
+                slurmrestd=self.mock_slurmrestd,
+                cache=self.mock_cache,
+                user_analytics_store=self.mock_user_analytics_store,
+                user_metrics_store=self.mock_user_analytics_store,
+                user_metrics_enabled=True,
+            )
+
+        metrics = list(collector.collect())
+        metric_names = [metric.name for metric in metrics]
+
+        self.assertIn("slurmweb_user_submissions_last_minute", metric_names)
+        self.mock_user_analytics_store.recent_submission_counts.assert_called_once()
+
+        [user_metric] = [
+            metric
+            for metric in metrics
+            if metric.name == "slurmweb_user_submissions_last_minute"
+        ]
+        self.assertEqual(len(user_metric.samples), 2)
+        samples = {
+            sample.labels["user"]: sample.value
+            for sample in user_metric.samples
+            if sample.name == "slurmweb_user_submissions_last_minute"
+        }
+        self.assertEqual(samples, {"alice": 3, "bob": 1})
+
+    def test_collect_skips_user_submission_metric_when_disabled(self):
+        with mock.patch("prometheus_client.REGISTRY"):
+            collector = SlurmWebMetricsCollector(
+                slurmrestd=self.mock_slurmrestd,
+                cache=self.mock_cache,
+                user_analytics_store=self.mock_user_analytics_store,
+                user_metrics_store=self.mock_user_analytics_store,
+                user_metrics_enabled=False,
+            )
+
+        metrics = list(collector.collect())
+
+        self.assertNotIn(
+            "slurmweb_user_submissions_last_minute",
+            [metric.name for metric in metrics],
+        )
+        self.mock_user_analytics_store.recent_submission_counts.assert_not_called()
 
     def test_collect_slurmrestd_not_found_error(self):
         """Test collection with SlurmrestdNotFoundError."""

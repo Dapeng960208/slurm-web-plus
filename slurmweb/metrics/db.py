@@ -112,6 +112,13 @@ class SlurmwebMetricsDB:
             ],
             RANGE_RESOLUTIONS["1m"],
         ),
+        "users": SlurmwebMetricQuery(
+            "query",
+            [SlurmwebMetricId("slurmweb_user_submissions_last_minute")],
+            RANGE_RESOLUTIONS["1m"],
+            agg="avg_over_time",
+            label_as_key="user",
+        ),
     }
 
     REQUEST_BASE_PATH = "/api/v1/"
@@ -254,6 +261,74 @@ class SlurmwebMetricsDB:
             return results
 
         return asyncio_run(_fetch_all())
+
+    def user_history_metrics(self, username: str, last: str):
+        try:
+            resolution = getattr(self.RANGE_RESOLUTIONS["1m"], last)
+        except AttributeError as err:
+            raise SlurmwebMetricsDBError(f"Unsupported metric range {last}") from err
+
+        end = datetime.now()
+        if last == "hour":
+            start = end - timedelta(hours=1)
+        elif last == "day":
+            start = end - timedelta(days=1)
+        elif last == "week":
+            start = end - timedelta(days=7)
+        else:
+            raise SlurmwebMetricsDBError(f"Unsupported metric range {last}")
+
+        def _rounded_timestamp(timestamp):
+            return int(timestamp - timestamp % resolution.rounding)
+
+        start_ts = _rounded_timestamp(start.timestamp())
+        end_ts = _rounded_timestamp(end.timestamp())
+        promql = (
+            f"slurmweb_user_submissions_last_minute"
+            f"{{job='{self.job}',user='{username}'}}"
+        )
+
+        async def _fetch():
+            async with aiohttp.ClientSession() as session:
+                url = (
+                    f"{self.base_uri.geturl()}{self.REQUEST_BASE_PATH}query_range"
+                    f"?query={promql}&start={start_ts}&end={end_ts}&step={resolution.step}"
+                )
+                logger.debug("User history metrics request: %s", url)
+                try:
+                    async with session.get(url) as response:
+                        if response.status != 200:
+                            raise SlurmwebMetricsDBError(
+                                "Unexpected response status "
+                                f"{response.status} for metrics database request {url}"
+                            )
+                        try:
+                            json_data = await response.json()
+                        except aiohttp.client_exceptions.ContentTypeError as err:
+                            raise SlurmwebMetricsDBError(
+                                "Unsupported Content-Type for metrics database request "
+                                f"{url}"
+                            ) from err
+                except aiohttp.ClientConnectionError as err:
+                    raise SlurmwebMetricsDBError(
+                        f"Metrics database connection error: {str(err)}"
+                    ) from err
+
+                result = json_data.get("data", {}).get("result", [])
+                if not result:
+                    return {"submissions": []}
+                try:
+                    values = [
+                        [int(t_v_pair[0] * 1000), round(float(t_v_pair[1]), 2)]
+                        for t_v_pair in result[0]["values"]
+                    ]
+                except (TypeError, ValueError, IndexError, KeyError) as err:
+                    raise SlurmwebMetricsDBError(
+                        f"Unexpected result on metrics query {promql}"
+                    ) from err
+                return {"submissions": values}
+
+        return asyncio_run(_fetch())
 
     def node_history_metrics(
         self, node_name: str, last: str, hostname_label: str = "hostname"

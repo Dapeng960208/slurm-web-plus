@@ -34,5 +34,9 @@
   "node-history-hour": {
     "content-type": "application/json",
     "status": 200
+  },
+  "users-hour": {
+    "content-type": "application/json",
+    "status": 200
   }
 }

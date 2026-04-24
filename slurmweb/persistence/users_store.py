@@ -127,3 +127,27 @@ class UsersStore:
                 }
         finally:
             self._release_conn(conn)
+
+    def get_ldap_user(self, username):
+        conn = self._get_conn()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT username, fullname, groups, ldap_synced_at
+                    FROM users
+                    WHERE username = %s
+                    """,
+                    (username,),
+                )
+                row = cur.fetchone()
+                if row is None:
+                    return None
+                return {
+                    "username": row[0],
+                    "fullname": row[1],
+                    "groups": row[2] or [],
+                    "ldap_synced_at": row[3],
+                }
+        finally:
+            self._release_conn(conn)

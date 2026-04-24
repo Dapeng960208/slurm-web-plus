@@ -110,6 +110,34 @@ class TestAgentMetricsCollector(TestAgentBase):
             if family.name == "slurmweb_cache_miss_total":
                 self.assertEqual(family.samples[0].value, 11)
 
+    def test_request_metrics_with_user_submission_counts(self):
+        self.app.slurmrestd.resources_states = mock.Mock(
+            return_value=(
+                {"idle": 1},
+                {"idle": 64},
+                {"idle": 0},
+                {"idle": 128},
+                1,
+                64,
+                0,
+                128,
+            )
+        )
+        self.app.slurmrestd.jobs_states = mock.Mock(return_value=({"running": 2}, 2))
+        self.app.metrics_collector.user_metrics_enabled = True
+        self.app.metrics_collector.user_metrics_store = mock.Mock()
+        self.app.metrics_collector.user_metrics_store.recent_submission_counts.return_value = {
+            "alice": 3,
+            "bob": 1,
+        }
+
+        response = self.client.get("/metrics")
+
+        self.assertEqual(response.status_code, 200)
+        families = list(text_string_to_metric_families(response.text))
+        metrics_names = [family.name for family in families]
+        self.assertIn("slurmweb_user_submissions_last_minute", metrics_names)
+
     def test_request_metrics_forbidden(self):
         # Change restricted list of network allowed to request metrics
         self.app.settings.metrics.restrict = [ipaddress.ip_network("192.168.1.0/24")]

@@ -55,11 +55,18 @@ def version():
 
 
 def info():
+    user_metrics_enabled = bool(getattr(current_app, "user_metrics_enabled", False))
+    user_metrics_capabilities = {
+        "enabled": user_metrics_enabled,
+        "history_api": user_metrics_enabled,
+        "summary_api": user_metrics_enabled,
+    }
     data = {
         "cluster": current_app.settings.service.cluster,
         "metrics": current_app.settings.metrics.enabled,
         "cache": current_app.settings.cache.enabled,
         "database": current_app.users_store is not None,
+        "user_metrics": user_metrics_enabled,
         "racksdb": {
             "enabled": current_app.settings.racksdb.enabled,
             "infrastructure": current_app.settings.racksdb.infrastructure,
@@ -68,6 +75,17 @@ def info():
         "version": get_version(),
         "persistence": current_app.jobs_store is not None,
         "node_metrics": current_app.settings.node_metrics.enabled,
+        "capabilities": {
+            "job_history": current_app.jobs_store is not None,
+            "ldap_cache": current_app.users_store is not None,
+            "node_metrics": current_app.settings.node_metrics.enabled,
+            "user_metrics": user_metrics_capabilities,
+            "user_analytics": {
+                "enabled": user_metrics_enabled,
+                "prometheus_user_metrics": user_metrics_enabled,
+                "user_activity_api": user_metrics_enabled,
+            },
+        },
     }
     return jsonify(data)
 
@@ -292,12 +310,19 @@ def metrics(metric):
         "gpus": "view-nodes",
         "memory": "view-nodes",
         "jobs": "view-jobs",
+        "users": "view-jobs",
         "cache": "cache-view",
     }
 
     # Check metric is supported or send HTTP/404
     if metric not in metrics_policy_actions.keys():
         abort(404, f"Metric {metric} not found")
+
+    if metric == "users":
+        if not getattr(current_app, "user_metrics_enabled", False):
+            error = "User metrics is disabled"
+            logger.warning(error)
+            abort(501, error)
 
     # Check permission to request metric or send HTTP/403
     action = metrics_policy_actions[metric]
@@ -384,6 +409,8 @@ def cache_authenticated_user():
     fullname = payload.get("fullname")
     if "fullname" not in payload:
         fullname = getattr(request.user, "fullname", None)
+        if fullname is None and hasattr(request.user, "_details"):
+            fullname = request.user._details.get("fullname")
     groups = payload.get("groups")
     if groups is None:
         groups = getattr(request.user, "groups", [])
@@ -423,6 +450,39 @@ def ldap_cache_users():
         )
     except Exception as err:
         logger.warning("Unable to list cached LDAP users: %s", err)
+        abort(500, str(err))
+
+
+@rbac_action("view-jobs")
+def user_metrics_history(username: str):
+    if not getattr(current_app, "user_metrics_enabled", False) or current_app.user_metrics_store is None:
+        error = "User metrics is disabled"
+        logger.warning(error)
+        abort(501, error)
+    try:
+        return jsonify(
+            current_app.user_metrics_store.user_metrics_history(
+                username, request.args.get("range", "hour")
+            )
+        )
+    except ValueError as err:
+        logger.warning("Unsupported user metrics history range for %s: %s", username, err)
+        abort(400, str(err))
+    except Exception as err:
+        logger.warning("Unable to query user metrics history for %s: %s", username, err)
+        abort(500, str(err))
+
+
+@rbac_action("view-jobs")
+def user_activity_summary(username: str):
+    if not getattr(current_app, "user_metrics_enabled", False) or current_app.user_metrics_store is None:
+        error = "User metrics is disabled"
+        logger.warning(error)
+        abort(501, error)
+    try:
+        return jsonify(current_app.user_metrics_store.user_activity_summary(username))
+    except Exception as err:
+        logger.warning("Unable to query user activity summary for %s: %s", username, err)
         abort(500, str(err))
 
 

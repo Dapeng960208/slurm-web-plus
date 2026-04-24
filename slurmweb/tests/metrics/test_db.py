@@ -34,6 +34,12 @@ class TestSlurmwebMetricsDB(unittest.TestCase):
         self.assertCountEqual(result.keys(), ["allocated", "idle"])
 
     @mock.patch("slurmweb.metrics.db.aiohttp.ClientSession.get")
+    def test_request_users(self, mock_get):
+        _, mock_get.return_value = mock_prometheus_response("users-hour")
+        result = self.db.request("users", "hour")
+        self.assertCountEqual(result.keys(), ["alice", "bob"])
+
+    @mock.patch("slurmweb.metrics.db.aiohttp.ClientSession.get")
     def test_request_node_history_metrics(self, mock_get):
         _, response = mock_prometheus_response("node-history-hour")
         mock_get.side_effect = [response, response, response]

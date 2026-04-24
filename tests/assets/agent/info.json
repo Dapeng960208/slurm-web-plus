@@ -5,6 +5,16 @@
   "metrics": true,
   "node_metrics": false,
   "persistence": false,
+  "capabilities": {
+    "job_history": false,
+    "ldap_cache": true,
+    "node_metrics": false,
+    "user_analytics": {
+      "enabled": false,
+      "prometheus_user_metrics": false,
+      "user_activity_api": false
+    }
+  },
   "racksdb": {
     "enabled": true,
     "infrastructure": "nova",

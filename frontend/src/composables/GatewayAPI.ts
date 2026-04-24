@@ -30,6 +30,7 @@ export interface ClusterDescription {
   error?: boolean
   persistence?: boolean
   node_metrics?: boolean
+  user_metrics?: boolean
 }
 
 interface ClusterPermissions {
@@ -892,6 +893,43 @@ export interface NodeMetricsHistory {
   disk_usage: MetricValue[]
 }
 
+export interface UserMetricsHistory {
+  submissions: MetricValue[]
+}
+
+export interface UserToolActivityRecord {
+  tool: string
+  jobs: number
+  avg_max_memory_mb: number | null
+  avg_cpu_cores: number | null
+  avg_runtime_seconds: number | null
+}
+
+export interface UserActivityProfile {
+  fullname: string | null
+  groups: string[] | null
+  ldap_synced_at: string | null
+  ldap_found: boolean
+}
+
+export interface UserActivitySummary {
+  username: string
+  profile?: UserActivityProfile | null
+  generated_at: string | null
+  totals: {
+    submitted_jobs_today: number
+    completed_jobs_today: number
+    active_tools: number
+    latest_submissions_per_minute: number | null
+    avg_max_memory_mb: number | null
+    avg_cpu_cores: number | null
+    avg_runtime_seconds: number | null
+    busiest_tool: string | null
+    busiest_tool_jobs: number
+  }
+  tool_breakdown: UserToolActivityRecord[]
+}
+
 export interface CacheStatistics {
   hit: {
     keys: Record<string, number>
@@ -1054,7 +1092,8 @@ const GatewayClusterWithStringAPIKeys = [
   'metrics_memory',
   'metrics_gpus',
   'metrics_jobs',
-  'metrics_cache'
+  'metrics_cache',
+  'user_metrics_history'
 ] as const
 export type GatewayClusterWithStringAPIKey = (typeof GatewayClusterWithStringAPIKeys)[number]
 export type GatewayAnyClusterApiKey =
@@ -1277,7 +1316,12 @@ export function useGatewayAPI() {
     const url = `/agents/${cluster}/jobs/history${query ? '?' + query : ''}`
     console.log('[GatewayAPI] jobs_history request URL:', url)
     const result = await restAPI.get<JobHistoryResponse>(url)
-    console.log('[GatewayAPI] jobs_history response: total=', result.total, 'jobs=', result.jobs.length)
+    console.log(
+      '[GatewayAPI] jobs_history response: total=',
+      result.total,
+      'jobs=',
+      result.jobs.length
+    )
     return result
   }
 
@@ -1298,6 +1342,31 @@ export function useGatewayAPI() {
     console.log('[GatewayAPI] node_metrics_history request URL:', url)
     const result = await restAPI.get<NodeMetricsHistory>(url)
     console.log('[GatewayAPI] node_metrics_history response:', result)
+    return result
+  }
+
+  async function user_metrics_history(
+    cluster: string,
+    username: string,
+    range: MetricRange = 'hour'
+  ): Promise<UserMetricsHistory> {
+    const encodedUsername = encodeURIComponent(username)
+    const url = `/agents/${cluster}/user/${encodedUsername}/metrics/history?range=${range}`
+    console.log('[GatewayAPI] user_metrics_history request URL:', url)
+    const result = await restAPI.get<UserMetricsHistory>(url)
+    console.log('[GatewayAPI] user_metrics_history response:', result)
+    return result
+  }
+
+  async function user_activity_summary(
+    cluster: string,
+    username: string
+  ): Promise<UserActivitySummary> {
+    const encodedUsername = encodeURIComponent(username)
+    const url = `/agents/${cluster}/user/${encodedUsername}/activity/summary`
+    console.log('[GatewayAPI] user_activity_summary request URL:', url)
+    const result = await restAPI.get<UserActivitySummary>(url)
+    console.log('[GatewayAPI] user_activity_summary response:', result)
     return result
   }
 
@@ -1402,6 +1471,8 @@ export function useGatewayAPI() {
     job_history_detail,
     node_metrics,
     node_metrics_history,
+    user_metrics_history,
+    user_activity_summary,
     infrastructureImagePng,
     abort,
     isValidGatewayGenericAPIKey,

@@ -38,8 +38,9 @@ import nodeWithGpusModelMixed from '../assets/node-with-gpus-model-mixed.json'
 
 import nodeWithoutGpu from '../assets/node-without-gpu.json'
 
-// Stub REST API for infrastructureImagePng tests; we only care about parsing.
+// Stub REST API for infrastructureImagePng and request builder tests.
 const mockRestAPI = {
+  get: vi.fn(),
   postRaw: vi.fn()
 }
 
@@ -112,6 +113,121 @@ describe('infrastructureImagePng', () => {
     expect(image).toBeInstanceOf(Blob)
     expect((image as Blob).type).toBe('image/png')
     expect(parsedCoordinates).toStrictEqual(coordinates)
+  })
+})
+
+describe('user metrics requests', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  test('requests user metrics history with range query', async () => {
+    mockRestAPI.get.mockResolvedValueOnce({ submissions: [] })
+
+    const gateway = useGatewayAPI()
+    await gateway.user_metrics_history('cluster-a', 'alice', 'day')
+
+    expect(mockRestAPI.get).toHaveBeenCalledWith(
+      '/agents/cluster-a/user/alice/metrics/history?range=day'
+    )
+  })
+
+  test('requests user activity summary', async () => {
+    mockRestAPI.get.mockResolvedValueOnce({
+      username: 'alice',
+      profile: {
+        fullname: 'Alice Doe',
+        groups: ['users'],
+        ldap_synced_at: '2026-04-24T07:55:00Z',
+        ldap_found: true
+      },
+      generated_at: null,
+      totals: {
+        submitted_jobs_today: 0,
+        completed_jobs_today: 0,
+        active_tools: 0,
+        latest_submissions_per_minute: null,
+        avg_max_memory_mb: null,
+        avg_cpu_cores: null,
+        avg_runtime_seconds: null,
+        busiest_tool: null,
+        busiest_tool_jobs: 0
+      },
+      tool_breakdown: []
+    })
+
+    const gateway = useGatewayAPI()
+    await gateway.user_activity_summary('cluster-a', 'alice')
+
+    expect(mockRestAPI.get).toHaveBeenCalledWith('/agents/cluster-a/user/alice/activity/summary')
+  })
+})
+
+describe('user activity gateway methods', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  test('requests user submission history with the provided range', async () => {
+    mockRestAPI.get.mockResolvedValue({
+      submissions: [[1748004750000, 3]]
+    })
+
+    const gateway = useGatewayAPI()
+    const result = await gateway.user_metrics_history('cluster', 'alice', 'day')
+
+    expect(mockRestAPI.get).toHaveBeenCalledWith(
+      '/agents/cluster/user/alice/metrics/history?range=day'
+    )
+    expect(result).toStrictEqual({
+      submissions: [[1748004750000, 3]]
+    })
+  })
+
+  test('defaults user submission history requests to the hour range', async () => {
+    mockRestAPI.get.mockResolvedValue({
+      submissions: [[1748004750000, 1]]
+    })
+
+    const gateway = useGatewayAPI()
+    await gateway.user_metrics_history('cluster', 'alice')
+
+    expect(mockRestAPI.get).toHaveBeenCalledWith(
+      '/agents/cluster/user/alice/metrics/history?range=hour'
+    )
+  })
+
+  test('requests user activity summary', async () => {
+    mockRestAPI.get.mockResolvedValue({
+      username: 'alice',
+      profile: {
+        fullname: 'Alice Doe',
+        groups: ['users', 'bio'],
+        ldap_synced_at: '2026-04-24T07:55:00Z',
+        ldap_found: true
+      },
+      generated_at: '2026-04-24T08:00:00Z',
+      totals: {
+        submitted_jobs_today: 5,
+        completed_jobs_today: 4,
+        active_tools: 2,
+        latest_submissions_per_minute: 1,
+        avg_max_memory_mb: 2048,
+        avg_cpu_cores: 8,
+        avg_runtime_seconds: 600,
+        busiest_tool: 'blastn',
+        busiest_tool_jobs: 3
+      },
+      tool_breakdown: []
+    })
+
+    const gateway = useGatewayAPI()
+    const result = await gateway.user_activity_summary('cluster', 'alice')
+
+    expect(mockRestAPI.get).toHaveBeenCalledWith('/agents/cluster/user/alice/activity/summary')
+    expect(result.username).toBe('alice')
+    expect(result.profile?.fullname).toBe('Alice Doe')
+    expect(result.totals.busiest_tool).toBe('blastn')
   })
 })
 

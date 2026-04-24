@@ -84,6 +84,12 @@ password=secret
 [persistence]
 enabled=yes
 {% endif %}
+
+{% if user_metrics %}
+[user_metrics]
+enabled=yes
+aggregation_interval=3600
+{% endif %}
 """
 
 
@@ -109,6 +115,7 @@ class TestAgentConfBase(unittest.TestCase):
         cache=False,
         database=False,
         persistence=False,
+        user_metrics=False,
     ):
         # Generate JWT signing key
         self.key = tempfile.NamedTemporaryFile(mode="w+", delete=False)
@@ -148,6 +155,7 @@ class TestAgentConfBase(unittest.TestCase):
                 cache=cache,
                 database=database,
                 persistence=persistence,
+                user_metrics=user_metrics,
             )
         )
         self.conf.flush()
@@ -181,6 +189,7 @@ class TestAgentBase(TestSlurmrestdClient):
         cache=False,
         database=False,
         persistence=False,
+        user_metrics=False,
         racksdb_format_error=False,
         racksdb_schema_error=False,
         anonymous_user=False,
@@ -202,6 +211,7 @@ class TestAgentBase(TestSlurmrestdClient):
             cache=cache,
             database=database,
             persistence=persistence,
+            user_metrics=user_metrics,
         )
 
         if racksdb:

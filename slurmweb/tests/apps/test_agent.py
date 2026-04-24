@@ -105,3 +105,28 @@ class TestAgentApp(TestAgentBase):
             "WARNING:slurmweb.apps.agent:Job history persistence is enabled but database support is unavailable: boom",
             cm.output,
         )
+
+    @mock.patch("slurmweb.persistence.user_analytics_store.UserAnalyticsStore")
+    @mock.patch("slurmweb.persistence.jobs_store.JobsStore")
+    @mock.patch("slurmweb.persistence.users_store.UsersStore")
+    def test_app_enables_user_metrics_when_dependencies_ready(
+        self, mock_users_store, mock_jobs_store, mock_user_analytics_store
+    ):
+        self.setup_client(database=True, persistence=True, metrics=True, user_metrics=True)
+        mock_users_store.assert_called_once()
+        mock_jobs_store.assert_called_once()
+        mock_user_analytics_store.assert_called_once()
+        mock_user_analytics_store.return_value.start.assert_called_once()
+        self.assertTrue(self.app.user_metrics_enabled)
+
+    @mock.patch("slurmweb.persistence.jobs_store.JobsStore")
+    @mock.patch("slurmweb.persistence.users_store.UsersStore")
+    def test_app_warns_when_user_metrics_dependencies_missing(
+        self, mock_users_store, mock_jobs_store
+    ):
+        with self.assertLogs("slurmweb", level="WARNING") as cm:
+            self.setup_client(database=True, persistence=False, metrics=True, user_metrics=True)
+        self.assertIn(
+            "WARNING:slurmweb.apps.agent:User metrics is enabled but required metrics/database support is unavailable",
+            cm.output,
+        )

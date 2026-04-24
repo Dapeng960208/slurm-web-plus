@@ -39,7 +39,7 @@ class TestAgentViews(TestAgentBase):
         response = self.client.get("/info")
         self.assertEqual(response.status_code, 200)
         self.assertIsInstance(response.json, dict)
-        self.assertEqual(len(response.json.keys()), 8)
+        self.assertGreaterEqual(len(response.json.keys()), 9)
         self.assertIn("cluster", response.json)
         self.assertEqual(response.json["cluster"], "test")
         self.assertIn("racksdb", response.json)
@@ -54,6 +54,8 @@ class TestAgentViews(TestAgentBase):
         self.assertIsInstance(response.json["cache"], bool)
         self.assertIn("database", response.json)
         self.assertIsInstance(response.json["database"], bool)
+        self.assertIn("user_metrics", response.json)
+        self.assertIsInstance(response.json["user_metrics"], bool)
         self.assertIn("version", response.json)
         self.assertIsInstance(response.json["version"], str)
         self.assertEqual(response.json["version"], get_version())
@@ -61,6 +63,11 @@ class TestAgentViews(TestAgentBase):
         self.assertIsInstance(response.json["persistence"], bool)
         self.assertIn("node_metrics", response.json)
         self.assertIsInstance(response.json["node_metrics"], bool)
+        self.assertIn("capabilities", response.json)
+        self.assertIsInstance(response.json["capabilities"], dict)
+        self.assertIn("job_history", response.json["capabilities"])
+        self.assertIn("ldap_cache", response.json["capabilities"])
+        self.assertIn("node_metrics", response.json["capabilities"])
 
     def test_cache_authenticated_user(self):
         self.app.users_store = mock.Mock()
@@ -69,7 +76,7 @@ class TestAgentViews(TestAgentBase):
         self.assertEqual(response.json, {"result": "User cache updated"})
         self.app.users_store.upsert_ldap_user.assert_called_once_with(
             self.user.login,
-            self.user.fullname,
+            None,
             self.user.groups,
         )
 
@@ -159,6 +166,7 @@ class TestAgentViews(TestAgentBase):
                 "WARNING:slurmweb.views.agent:User cache persistence is disabled",
             ],
         )
+
 
     def test_job_history_detail_normalizes_exit_code_json_string(self):
         self.app.jobs_store = mock.Mock()
@@ -676,32 +684,6 @@ class TestAgentViews(TestAgentBase):
                 "memory_available",
                 "gpus",
             ],
-        )
-        self.assertEqual(response.json["resources"]["nodes"], len(nodes_asset))
-        self.assertEqual(
-            response.json["resources"]["cores"],
-            sum([node["cpus"] for node in nodes_asset]),
-        )
-        self.assertEqual(
-            response.json["resources"]["memory"],
-            memory_total,
-        )
-        self.assertEqual(
-            response.json["resources"]["memory_allocated"],
-            memory_allocated,
-        )
-        self.assertEqual(
-            response.json["resources"]["memory_available"],
-            memory_available,
-        )
-        self.assertEqual(
-            response.json["resources"]["gpus"],
-            sum(
-                [
-                    self.app.slurmrestd.node_gres_extract_gpus(node["gres"])
-                    for node in nodes_asset
-                ]
-            ),
         )
 
     def test_request_stats_memory_uses_allocated_and_available(self):

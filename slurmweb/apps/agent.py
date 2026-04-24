@@ -58,6 +58,14 @@ class SlurmwebAppAgent(SlurmwebWebApp, RFLTokenizedRBACWebApp):
         SlurmwebAppRoute(f"/v{get_version()}/jobs/history/<int:record_id>", views.job_history_detail),
         SlurmwebAppRoute(f"/v{get_version()}/users/cache", views.ldap_cache_users),
         SlurmwebAppRoute(
+            f"/v{get_version()}/user/<username>/metrics/history",
+            views.user_metrics_history,
+        ),
+        SlurmwebAppRoute(
+            f"/v{get_version()}/user/<username>/activity/summary",
+            views.user_activity_summary,
+        ),
+        SlurmwebAppRoute(
             f"/v{get_version()}/users/cache", views.cache_authenticated_user, methods=["POST"]
         ),
         SlurmwebAppRoute(f"/v{get_version()}/node/<name>/metrics", views.node_metrics),
@@ -185,7 +193,8 @@ class SlurmwebAppAgent(SlurmwebWebApp, RFLTokenizedRBACWebApp):
             from ..metrics.db import SlurmwebMetricsDB
 
             self.metrics_collector = SlurmWebMetricsCollector(
-                self.slurmrestd, self.cache
+                self.slurmrestd,
+                self.cache,
             )
             self.wsgi_app = dispatcher.DispatcherMiddleware(
                 self.wsgi_app, {"/metrics": make_wsgi_app(self.settings.metrics)}
@@ -196,6 +205,9 @@ class SlurmwebAppAgent(SlurmwebWebApp, RFLTokenizedRBACWebApp):
 
         self.users_store = None
         self.jobs_store = None
+        self.user_analytics_store = None
+        self.user_metrics_store = None
+        self.user_metrics_enabled = False
         database_ready = False
         database_error = None
         if self.settings.database.enabled:
@@ -240,6 +252,44 @@ class SlurmwebAppAgent(SlurmwebWebApp, RFLTokenizedRBACWebApp):
                 )
         else:
             logger.debug("Job history persistence is disabled")
+
+        user_metrics_settings = getattr(self.settings, "user_metrics", None)
+        if user_metrics_settings and user_metrics_settings.enabled:
+            if database_ready and self.settings.metrics.enabled and self.jobs_store is not None:
+                try:
+                    from ..persistence.user_analytics_store import UserAnalyticsStore
+
+                    store_settings = SimpleNamespace(
+                        host=self.settings.database.host,
+                        port=self.settings.database.port,
+                        database=self.settings.database.database,
+                        user=self.settings.database.user,
+                        password=self.settings.database.password,
+                        aggregation_interval=self.settings.user_metrics.aggregation_interval,
+                        tool_mapping_file=self.settings.user_metrics.tool_mapping_file,
+                    )
+                    self.user_analytics_store = UserAnalyticsStore(
+                        store_settings, users_store=self.users_store
+                    )
+                    self.user_analytics_store.start()
+                    self.user_metrics_store = self.user_analytics_store
+                    self.user_metrics_enabled = True
+                    logger.info("User metrics persistence enabled")
+                except Exception as err:
+                    logger.warning("Unable to initialize user metrics persistence: %s", err)
+            else:
+                logger.warning(
+                    "User metrics is enabled but required metrics/database support is unavailable"
+                )
+        else:
+            logger.debug("User metrics is disabled")
+
+        if self.metrics_collector is not None:
+            self.metrics_collector.user_analytics_store = self.user_analytics_store
+            self.metrics_collector.user_metrics_store = self.user_metrics_store
+            self.metrics_collector.user_metrics_enabled = bool(
+                self.user_metrics_enabled
+            )
 
         # Initialize node real-time metrics (new, optional)
         self.node_metrics_db = None

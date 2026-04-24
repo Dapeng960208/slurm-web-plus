@@ -160,6 +160,8 @@ async def get_cluster(agent):
             "permissions": permissions,
             "persistence": agent.persistence,
             "node_metrics": agent.node_metrics,
+            "user_metrics": getattr(agent, "user_metrics", False),
+            "capabilities": agent.capabilities,
         }
 
     return cluster
@@ -373,6 +375,18 @@ def cache_reset(cluster: str):
 @validate_cluster
 def ldap_cache_users(cluster: str):
     return proxy_agent(cluster, "users/cache", request.token)
+
+
+@check_jwt
+@validate_cluster
+def user_metrics_history(cluster: str, username: str):
+    return proxy_agent(cluster, f"user/{username}/metrics/history", request.token)
+
+
+@check_jwt
+@validate_cluster
+def user_activity_summary(cluster: str, username: str):
+    return proxy_agent(cluster, f"user/{username}/activity/summary", request.token)
 
 
 @check_jwt

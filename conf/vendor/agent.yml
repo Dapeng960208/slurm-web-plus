@@ -543,6 +543,21 @@ persistence:
     default: 60
     doc: Interval in seconds between active job snapshots
 
+user_metrics:
+  enabled:
+    type: bool
+    default: false
+    doc: |
+      Determine if per-user metrics collection and APIs are enabled.
+      This feature depends on both `[database]` and `[metrics]`.
+  aggregation_interval:
+    type: int
+    default: 3600
+    doc: Interval in seconds between refreshes of current-day user summary rows.
+  tool_mapping_file:
+    type: path
+    doc: Optional YAML file with ordered `pattern` / `tool` rules for tool classification.
+
 node_metrics:
   enabled:
     type: bool

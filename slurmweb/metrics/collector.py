@@ -40,9 +40,15 @@ class SlurmWebMetricsCollector(Collector):
         self,
         slurmrestd: "SlurmrestdFilteredCached",
         cache: t.Optional["CachingService"],
+        user_analytics_store=None,
+        user_metrics_store=None,
+        user_metrics_enabled: bool = False,
     ):
         self.slurmrestd = slurmrestd
         self.cache = cache
+        self.user_analytics_store = user_analytics_store
+        self.user_metrics_store = user_metrics_store or user_analytics_store
+        self.user_metrics_enabled = user_metrics_enabled
         self.register()
 
     def describe(self):
@@ -127,6 +133,17 @@ class SlurmWebMetricsCollector(Collector):
         yield prometheus_client.core.GaugeMetricFamily(
             "slurm_jobs_total", "Slurm total number of jobs", value=jobs_total
         )
+
+        user_store = self.user_metrics_store or self.user_analytics_store
+        if self.user_metrics_enabled and user_store is not None:
+            c = prometheus_client.core.GaugeMetricFamily(
+                "slurmweb_user_submissions_last_minute",
+                "Number of submitted jobs per user in the last minute",
+                labels=["user"],
+            )
+            for username, value in user_store.recent_submission_counts().items():
+                c.add_metric([username], value)
+            yield c
 
         # Skip cache metrics if cache service is disabled
         if not self.cache:

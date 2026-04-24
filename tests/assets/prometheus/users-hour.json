@@ -1,0 +1,32 @@
+{
+  "status": "success",
+  "data": {
+    "resultType": "matrix",
+    "result": [
+      {
+        "metric": {
+          "__name__": "slurm_user_jobs_submitted_last_minute",
+          "job": "slurm",
+          "user": "alice"
+        },
+        "values": [
+          [1710000000, "1"],
+          [1710000060, "2"],
+          [1710000120, "3"]
+        ]
+      },
+      {
+        "metric": {
+          "__name__": "slurm_user_jobs_submitted_last_minute",
+          "job": "slurm",
+          "user": "bob"
+        },
+        "values": [
+          [1710000000, "0"],
+          [1710000060, "1"],
+          [1710000120, "1"]
+        ]
+      }
+    ]
+  }
+}

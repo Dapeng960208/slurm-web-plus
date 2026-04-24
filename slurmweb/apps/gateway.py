@@ -54,6 +54,8 @@ class SlurmwebAgent:
         url: str,
         persistence: bool = False,
         node_metrics: bool = False,
+        user_metrics: bool = False,
+        capabilities: dict = None,
     ):
         self.version = version
         self.cluster = cluster
@@ -64,6 +66,8 @@ class SlurmwebAgent:
         self.database = database
         self.persistence = persistence
         self.node_metrics = node_metrics
+        self.user_metrics = user_metrics
+        self.capabilities = capabilities or {}
 
     @classmethod
     def from_json(cls, url, data):
@@ -78,6 +82,8 @@ class SlurmwebAgent:
                 url,
                 persistence=data.get("persistence", False),
                 node_metrics=data.get("node_metrics", False),
+                user_metrics=data.get("user_metrics", False),
+                capabilities=data.get("capabilities", {}),
             )
         except KeyError as err:
             raise SlurmwebAgentError(
@@ -131,6 +137,14 @@ class SlurmwebAppGateway(SlurmwebWebApp, RFLTokenizedWebApp):
             "/api/agents/<cluster>/cache/reset", views.cache_reset, methods=["POST"]
         ),
         SlurmwebAppRoute("/api/agents/<cluster>/users/cache", views.ldap_cache_users),
+        SlurmwebAppRoute(
+            "/api/agents/<cluster>/user/<username>/metrics/history",
+            views.user_metrics_history,
+        ),
+        SlurmwebAppRoute(
+            "/api/agents/<cluster>/user/<username>/activity/summary",
+            views.user_activity_summary,
+        ),
         SlurmwebAppRoute("/api/agents/<cluster>/jobs", views.jobs),
         SlurmwebAppRoute("/api/agents/<cluster>/job/<int:job>", views.job),
         SlurmwebAppRoute("/api/agents/<cluster>/nodes", views.nodes),
