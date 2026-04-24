@@ -19,9 +19,10 @@ npm install
 # 构建生产版本
 npm run build
 
-# 查找前端部署路径
-FRONTEND_PATH=$(grep -r "ui" /etc/slurm-web/gateway.ini | grep path | awk -F'=' '{print $2}' | tr -d ' ')
-echo "前端路径: $FRONTEND_PATH"
+# 查找前端部署路径（示例：从 gateway.ini 中定位 ui.path）
+# 注意：实际配置路径以你的环境为准
+# FRONTEND_PATH=$(grep -r "ui" /etc/slurm-web/gateway.ini | grep path | awk -F'=' '{print $2}' | tr -d ' ')
+# echo "前端路径: $FRONTEND_PATH"
 
 # 备份旧版本
 cp -r $FRONTEND_PATH ${FRONTEND_PATH}.bak.$(date +%Y%m%d_%H%M%S)

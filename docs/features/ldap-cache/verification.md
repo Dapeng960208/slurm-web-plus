@@ -1,4 +1,4 @@
-# LDAP Cache 验证说明
+# LDAP Cache 验证说明（Settings > LDAP Cache）
 
 本文档补充说明本次 LDAP Cache 改动的验证方式，适用于以下变更：
 
@@ -12,7 +12,7 @@
 先获取登录 token：
 
 ```bash
-TOKEN=$(curl -s -X POST http://localhost:5012/login \
+TOKEN=$(curl -s -X POST http://localhost:5012/api/login \
   -H "Content-Type: application/json" \
   -d '{"user":"your_user","password":"your_password"}' \
   | python3 -c "import sys,json; print(json.load(sys.stdin)['token'])")

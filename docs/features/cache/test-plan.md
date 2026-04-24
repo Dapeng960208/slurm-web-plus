@@ -1,4 +1,4 @@
-# Cache Page 测试说明
+# Cache 测试计划（Settings > Cache）
 
 ## 1. 测试范围
 

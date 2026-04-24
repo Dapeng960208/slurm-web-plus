@@ -1,4 +1,4 @@
-# Cache Page 开发需求说明
+# Cache 功能需求说明（Settings > Cache）
 
 ## 1. 背景
 

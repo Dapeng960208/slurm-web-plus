@@ -1,6 +1,6 @@
-# 功能验证清单
+# 验证清单（能力门控 + 依赖 + 路由/接口一致性）
 
-## 1. 后端验证
+## 1. 后端验证（推荐走 Gateway）
 
 ### 1.1 检查配置文件
 ```bash
@@ -31,20 +31,29 @@ journalctl -u slurm-web-gateway -n 50
 
 ### 1.3 验证 API 端点
 
-#### 获取 token
+#### 获取 token（认证开启）
+
+Gateway 登录接口为 `POST /api/login`：
+
 ```bash
-TOKEN=$(curl -s -X POST http://localhost:5012/login \
+TOKEN=$(curl -s -X POST http://localhost:5012/api/login \
   -H "Content-Type: application/json" \
   -d '{"user":"your_user","password":"your_password"}' \
   | python3 -c "import sys,json; print(json.load(sys.stdin)['token'])")
-
-echo "Token: $TOKEN"
 ```
 
-#### 检查 /clusters 接口返回的功能标志
+认证关闭时使用匿名入口 `GET /api/anonymous`：
+
+```bash
+TOKEN=$(curl -s http://localhost:5012/api/anonymous \
+  | python3 -c "import sys,json; print(json.load(sys.stdin)['token'])")
+```
+
+#### 检查 `/api/clusters` 返回的能力门控字段
+
 ```bash
 curl -s -H "Authorization: Bearer $TOKEN" \
-  http://localhost:5012/clusters | python3 -m json.tool
+  http://localhost:5012/api/clusters | python3 -m json.tool
 ```
 
 **预期输出应包含：**
@@ -59,14 +68,13 @@ curl -s -H "Authorization: Bearer $TOKEN" \
 ]
 ```
 
-#### 测试作业历史 API（如果 persistence=true）
-```bash
-# 获取 API 版本
-VERSION=$(slurm-web --version 2>&1 | head -1 | awk '{print $NF}')
+#### 测试作业历史 API（如果 `persistence=true` 且用户有 `view-history-jobs`）
 
-# 查询历史作业
+通过 Gateway 代理访问：
+
+```bash
 curl -s -H "Authorization: Bearer $TOKEN" \
-  "http://localhost:5012/v${VERSION}/jobs/history?page=1&page_size=10" \
+  "http://localhost:5012/api/agents/your_cluster/jobs/history?page=1&page_size=10" \
   | python3 -m json.tool
 ```
 
@@ -113,11 +121,11 @@ curl -s -H "Authorization: Bearer $TOKEN" \
 
 - 鍘嗗彶鎺ュ彛鐜板湪浼氬皢 `exit_code` 瑙勮寖鍖栦负瀵硅薄锛屽吋瀹规柊鍐欏叆鐨?JSON 瀛楃涓插拰鏃ф暟鎹?`0:0` 杩欑被瀛楃涓层€?
 
-#### 测试节点实时资源 API（如果 node_metrics=true）
+#### 测试节点实时资源 API（如果 `node_metrics=true` 且用户有 `view-nodes`）
+
 ```bash
-# 替换 node01 为实际节点名
 curl -s -H "Authorization: Bearer $TOKEN" \
-  "http://localhost:5012/v${VERSION}/agents/your_cluster/node/node01/metrics" \
+  "http://localhost:5012/api/agents/your_cluster/node/node01/metrics" \
   | python3 -m json.tool
 ```
 
@@ -173,15 +181,17 @@ sudo -u postgres psql -d slurmweb -c "\d job_snapshots"
 http://your-server:5012
 ```
 
-### 2.2 检查菜单显示
+### 2.2 检查菜单显示（能力 + 权限双门控）
 
-#### 场景 1：persistence = true
-- 左侧菜单应显示 "Jobs History" 项（在 "Jobs" 下方，带时钟图标）
-- 点击后进入作业历史页面
+#### 场景：`persistence=true` 且有 `view-history-jobs`
 
-#### 场景 2：persistence = false
-- 左侧菜单不应显示 "Jobs History" 项
-- 直接访问 `/cluster_name/jobs/history` 应重定向到 `/cluster_name/jobs`
+- 左侧菜单显示 `Jobs History`
+- 访问 `/:cluster/jobs/history` 正常加载
+
+#### 场景：`persistence=false` 或无 `view-history-jobs`
+
+- 左侧菜单不显示 `Jobs History`
+- 直接访问 `/:cluster/jobs/history` 会被路由守卫重定向到 `/:cluster/jobs`
 
 ### 2.3 测试作业历史页面（如果 persistence=true）
 
@@ -236,8 +246,8 @@ grep "enabled" /etc/slurm-web/agent.ini | grep -A 1 persistence
 # 2. 确认服务已重启
 systemctl restart slurm-web-agent slurm-web-gateway
 
-# 3. 检查 /clusters API 返回
-curl -s -H "Authorization: Bearer $TOKEN" http://localhost:5012/clusters | grep persistence
+# 3. 检查 /api/clusters API 返回
+curl -s -H "Authorization: Bearer $TOKEN" http://localhost:5012/api/clusters | grep persistence
 
 # 4. 清除浏览器缓存并刷新页面
 ```
@@ -320,7 +330,7 @@ WHERE tablename = 'job_snapshots';"
 ```bash
 # 测试历史查询响应时间
 time curl -s -H "Authorization: Bearer $TOKEN" \
-  "http://localhost:5012/v${VERSION}/jobs/history?page=1&page_size=50" \
+  "http://localhost:5012/api/agents/your_cluster/jobs/history?page=1&page_size=50" \
   > /dev/null
 ```
 
@@ -337,7 +347,7 @@ ps aux | grep slurm-web-agent | grep -v grep
 ## 5. 验证通过标准
 
 ✅ **后端：**
-- [ ] `/clusters` API 返回正确的 `persistence` 和 `node_metrics` 标志
+- [ ] `/api/clusters` API 返回正确的 `persistence` 和 `node_metrics` 标志
 - [ ] `/jobs/history` API 返回数据（如果启用）
 - [ ] `/node/{name}/metrics` API 返回数据（如果启用）
 - [ ] 数据库中有作业快照数据（如果启用）
@@ -362,7 +372,7 @@ ps aux | grep slurm-web-agent | grep -v grep
 
 ```bash
 curl -s -H "Authorization: Bearer $TOKEN" \
-  "http://localhost:5012/v${VERSION}/jobs/history/1" \
+  "http://localhost:5012/api/agents/your_cluster/jobs/history/1" \
   | python3 -m json.tool
 ```
 
