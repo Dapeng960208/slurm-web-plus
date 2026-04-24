@@ -106,6 +106,111 @@ class TestAgentApp(TestAgentBase):
             cm.output,
         )
 
+    @mock.patch("slurmweb.persistence.access_control_store.AccessControlStore")
+    @mock.patch("slurmweb.persistence.users_store.UsersStore")
+    def test_app_enables_access_control_when_dependencies_ready(
+        self, mock_users_store, mock_access_control_store
+    ):
+        self.setup_client(database=True, persistence=True, access_control_enabled=True)
+        mock_users_store.assert_called_once()
+        mock_access_control_store.assert_called_once()
+        mock_access_control_store.return_value.validate_connection.assert_called_once()
+        mock_users_store.return_value.list_cached_users_for_policy_refresh.assert_called_once_with()
+        self.assertTrue(self.app.access_control_enabled)
+
+    @mock.patch("slurmweb.persistence.users_store.UsersStore")
+    def test_app_warns_when_access_control_database_support_missing(self, mock_users_store):
+        mock_users_store.return_value.validate_connection.side_effect = RuntimeError("boom")
+        with self.assertLogs("slurmweb", level="WARNING") as cm:
+            self.setup_client(database=True, persistence=True, access_control_enabled=True)
+        self.assertIn(
+            "WARNING:slurmweb.apps.agent:Access control is enabled but database support is unavailable: boom",
+            cm.output,
+        )
+        mock_users_store.return_value.list_cached_users_for_policy_refresh.assert_not_called()
+
+    @mock.patch("slurmweb.persistence.access_control_store.AccessControlStore")
+    @mock.patch("slurmweb.persistence.users_store.UsersStore")
+    def test_app_refreshes_cached_policy_snapshots_on_startup(
+        self, mock_users_store, mock_access_control_store
+    ):
+        mock_users_store.return_value.list_cached_users_for_policy_refresh.return_value = [
+            {
+                "username": "alice",
+                "fullname": "Alice Doe",
+                "groups": ["group"],
+            }
+        ]
+
+        self.setup_client(database=True, persistence=True, access_control_enabled=True)
+
+        mock_users_store.return_value.list_cached_users_for_policy_refresh.assert_called_once_with()
+        mock_users_store.return_value.update_policy_snapshot.assert_called_once()
+        args = mock_users_store.return_value.update_policy_snapshot.call_args.args
+        self.assertEqual(args[0], "alice")
+        self.assertIsInstance(args[1], list)
+        self.assertIsInstance(args[2], list)
+
+    @mock.patch("slurmweb.persistence.access_control_store.AccessControlStore")
+    @mock.patch("slurmweb.persistence.users_store.UsersStore")
+    def test_app_does_not_refresh_cached_policy_snapshots_when_access_control_disabled(
+        self, mock_users_store, mock_access_control_store
+    ):
+        self.setup_client(database=True, persistence=True, access_control_enabled=False)
+
+        mock_access_control_store.assert_not_called()
+        mock_users_store.return_value.list_cached_users_for_policy_refresh.assert_not_called()
+        mock_users_store.return_value.update_policy_snapshot.assert_not_called()
+
+    @mock.patch("slurmweb.persistence.access_control_store.AccessControlStore")
+    @mock.patch("slurmweb.persistence.users_store.UsersStore")
+    def test_app_continues_when_startup_policy_snapshot_refresh_fails_for_user(
+        self, mock_users_store, mock_access_control_store
+    ):
+        mock_users_store.return_value.list_cached_users_for_policy_refresh.return_value = [
+            {
+                "username": "alice",
+                "fullname": "Alice Doe",
+                "groups": ["group"],
+            },
+            {
+                "username": "bob",
+                "fullname": "Bob Doe",
+                "groups": [],
+            },
+        ]
+        mock_users_store.return_value.update_policy_snapshot.side_effect = [
+            RuntimeError("boom"),
+            True,
+        ]
+
+        with self.assertLogs("slurmweb", level="WARNING") as cm:
+            self.setup_client(database=True, persistence=True, access_control_enabled=True)
+
+        self.assertIn(
+            "WARNING:slurmweb.apps.agent:Unable to refresh startup policy snapshot for cached user alice: boom",
+            cm.output,
+        )
+        self.assertEqual(mock_users_store.return_value.update_policy_snapshot.call_count, 2)
+
+    @mock.patch("slurmweb.persistence.access_control_store.AccessControlStore")
+    @mock.patch("slurmweb.persistence.users_store.UsersStore")
+    def test_app_continues_when_loading_cached_users_for_startup_policy_refresh_fails(
+        self, mock_users_store, mock_access_control_store
+    ):
+        mock_users_store.return_value.list_cached_users_for_policy_refresh.side_effect = RuntimeError(
+            "boom"
+        )
+
+        with self.assertLogs("slurmweb", level="WARNING") as cm:
+            self.setup_client(database=True, persistence=True, access_control_enabled=True)
+
+        self.assertIn(
+            "WARNING:slurmweb.apps.agent:Unable to load cached users for startup policy snapshot refresh: boom",
+            cm.output,
+        )
+        mock_users_store.return_value.update_policy_snapshot.assert_not_called()
+
     @mock.patch("slurmweb.persistence.user_analytics_store.UserAnalyticsStore")
     @mock.patch("slurmweb.persistence.jobs_store.JobsStore")
     @mock.patch("slurmweb.persistence.users_store.UsersStore")

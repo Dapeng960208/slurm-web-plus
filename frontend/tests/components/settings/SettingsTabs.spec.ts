@@ -6,7 +6,11 @@ import SettingsTabs from '@/components/settings/SettingsTabs.vue'
 import { runtimeConfiguration } from '@/plugins/runtimeConfiguration'
 import { useRuntimeStore } from '@/stores/runtime'
 
-function mountTabs(authentication: boolean, clusters: Array<Record<string, unknown>>) {
+function mountTabs(
+  authentication: boolean,
+  clusters: Array<Record<string, unknown>>,
+  settingsCluster?: string
+) {
   const wrapper = mount(SettingsTabs, {
     props: { entry: 'General' },
     global: {
@@ -19,7 +23,11 @@ function mountTabs(authentication: boolean, clusters: Array<Record<string, unkno
       ]
     }
   })
-  useRuntimeStore().availableClusters = clusters as never
+  const runtimeStore = useRuntimeStore()
+  runtimeStore.availableClusters = clusters as never
+  runtimeStore.beforeSettingsRoute = settingsCluster
+    ? ({ params: { cluster: settingsCluster } } as never)
+    : undefined
   return wrapper
 }
 
@@ -73,5 +81,65 @@ describe('SettingsTabs.vue', () => {
 
     await nextTick()
     expect(wrapper.text()).not.toContain('LDAP Cache')
+  })
+
+  test('shows Access Control tab when the current settings cluster supports it', async () => {
+    const wrapper = mountTabs(
+      true,
+      [
+        {
+          name: 'foo',
+          permissions: { roles: [], actions: [] },
+          capabilities: { access_control: true },
+          racksdb: true,
+          infrastructure: 'foo',
+          metrics: true,
+          cache: true
+        },
+        {
+          name: 'bar',
+          permissions: { roles: [], actions: [] },
+          capabilities: { access_control: false },
+          racksdb: true,
+          infrastructure: 'bar',
+          metrics: true,
+          cache: true
+        }
+      ],
+      'foo'
+    )
+
+    await nextTick()
+    expect(wrapper.text()).toContain('Access Control')
+  })
+
+  test('hides Access Control tab when only another cluster supports it', async () => {
+    const wrapper = mountTabs(
+      true,
+      [
+        {
+          name: 'foo',
+          permissions: { roles: [], actions: [] },
+          capabilities: { access_control: false },
+          racksdb: true,
+          infrastructure: 'foo',
+          metrics: true,
+          cache: true
+        },
+        {
+          name: 'bar',
+          permissions: { roles: [], actions: [] },
+          capabilities: { access_control: true },
+          racksdb: true,
+          infrastructure: 'bar',
+          metrics: true,
+          cache: true
+        }
+      ],
+      'foo'
+    )
+
+    await nextTick()
+    expect(wrapper.text()).not.toContain('Access Control')
   })
 })

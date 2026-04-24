@@ -65,6 +65,8 @@ class TestGatewayViews(TestGatewayBase):
             )
 
     def test_message_permission_error(self):
+        if not hasattr(os, "geteuid"):
+            self.skipTest("os.geteuid() is not available on this platform")
         if os.geteuid() == 0:
             self.skipTest("Cannot test permission error as root")
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -222,6 +224,102 @@ class TestGatewayViews(TestGatewayBase):
         self.assertEqual(response.status_code, 200)
         self.assertCountEqual(response.json.keys(), ["hit", "miss"])
 
+    @mock.patch("slurmweb.views.gateway.aiohttp.ClientSession.get")
+    def test_clusters_include_extended_capabilities(self, mock_get):
+        permissions, mock_get.return_value = mock_agent_aio_response(
+            asset="permissions"
+        )
+        foo = fake_slurmweb_agent("foo")
+        foo.access_control = True
+        foo.persistence = True
+        foo.node_metrics = True
+        foo.user_metrics = True
+        foo.capabilities = {
+            "job_history": True,
+            "ldap_cache": True,
+            "node_metrics": True,
+            "user_metrics": {
+                "enabled": True,
+                "history_api": True,
+                "summary_api": True,
+            },
+            "user_analytics": {
+                "enabled": True,
+                "prometheus_user_metrics": True,
+                "user_activity_api": True,
+            },
+        }
+        self.app_set_agents({"foo": foo})
+
+        response = self.client.get("/api/clusters")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.json,
+            [
+                {
+                    "capabilities": foo.capabilities,
+                    "access_control": True,
+                    "database": True,
+                    "infrastructure": "foo",
+                    "metrics": True,
+                    "cache": True,
+                    "name": "foo",
+                    "node_metrics": True,
+                    "user_metrics": True,
+                    "persistence": True,
+                    "permissions": permissions,
+                    "racksdb": True,
+                }
+            ],
+        )
+        mock_get.assert_called_once_with(
+            f"http://foo/v{foo.version}/permissions",
+            headers=mock.ANY,
+        )
+
+    @mock.patch("slurmweb.views.gateway.proxy_agent")
+    def test_access_roles(self, mock_proxy_agent):
+        self.app_set_agents({"foo": fake_slurmweb_agent("foo")})
+        mock_proxy_agent.return_value = (
+            self.app.response_class(
+                response='{"items":[{"id":1,"name":"db-admin","actions":["roles-manage"]}]}',
+                status=200,
+                mimetype="application/json",
+            ),
+            200,
+        )
+
+        response = self.client.get("/api/agents/foo/access/roles")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json["items"][0]["name"], "db-admin")
+        self.assertEqual(mock_proxy_agent.call_args.args[:2], ("foo", "access/roles"))
+
+    @mock.patch("slurmweb.views.gateway.proxy_agent")
+    def test_update_access_user_roles(self, mock_proxy_agent):
+        self.app_set_agents({"foo": fake_slurmweb_agent("foo")})
+        mock_proxy_agent.return_value = (
+            self.app.response_class(
+                response='{"username":"alice","role_ids":[1,2]}',
+                status=200,
+                mimetype="application/json",
+            ),
+            200,
+        )
+
+        response = self.client.put(
+            "/api/agents/foo/access/users/alice/roles",
+            json={"role_ids": [1, 2]},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json["role_ids"], [1, 2])
+        self.assertEqual(
+            mock_proxy_agent.call_args.args[:2],
+            ("foo", "access/users/alice/roles"),
+        )
+
     @mock.patch("slurmweb.views.gateway.proxy_agent")
     def test_job_history_detail(self, mock_proxy_agent):
         self.app_set_agents({"foo": fake_slurmweb_agent("foo")})
@@ -264,6 +362,30 @@ class TestGatewayViews(TestGatewayBase):
         self.assertEqual(mock_proxy_agent.call_args.args[:2], ("foo", "users/cache"))
         self.assertTrue(mock_proxy_agent.call_args.args[2])
 
+    @mock.patch("slurmweb.views.gateway.aiohttp.ClientSession.get")
+    def test_ldap_cache_users_forwards_filters_to_agent(self, mock_get):
+        foo = fake_slurmweb_agent("foo")
+        self.app_set_agents({"foo": foo})
+        _, mock_get.return_value = mock_agent_aio_response(
+            content={
+                "items": [{"username": "alice", "fullname": "Alice Doe"}],
+                "total": 1,
+                "page": 2,
+                "page_size": 20,
+            }
+        )
+
+        response = self.client.get(
+            "/api/agents/foo/users/cache?username=ali&page=2&page_size=20"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json["page"], 2)
+        mock_get.assert_called_once_with(
+            f"http://foo/v{foo.version}/users/cache?username=ali&page=2&page_size=20",
+            headers=mock.ANY,
+        )
+
     @mock.patch("slurmweb.views.gateway.proxy_agent")
     def test_user_metrics_history(self, mock_proxy_agent):
         self.app_set_agents({"foo": fake_slurmweb_agent("foo")})
@@ -282,6 +404,24 @@ class TestGatewayViews(TestGatewayBase):
             mock_proxy_agent.call_args.args[:2], ("foo", "user/alice/metrics/history")
         )
 
+    @mock.patch("slurmweb.views.gateway.aiohttp.ClientSession.get")
+    def test_user_metrics_history_forwards_range_to_agent(self, mock_get):
+        foo = fake_slurmweb_agent("foo")
+        self.app_set_agents({"foo": foo})
+        _, mock_get.return_value = mock_agent_aio_response(
+            content={"submissions": [[1713956400000, 2]]}
+        )
+
+        response = self.client.get(
+            "/api/agents/foo/user/alice/metrics/history?range=day"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        mock_get.assert_called_once_with(
+            f"http://foo/v{foo.version}/user/alice/metrics/history?range=day",
+            headers=mock.ANY,
+        )
+
     @mock.patch("slurmweb.views.gateway.proxy_agent")
     def test_user_activity_summary(self, mock_proxy_agent):
         self.app_set_agents({"foo": fake_slurmweb_agent("foo")})
@@ -298,6 +438,56 @@ class TestGatewayViews(TestGatewayBase):
         self.assertEqual(response.json["totals"]["submitted_jobs_today"], 3)
         self.assertEqual(
             mock_proxy_agent.call_args.args[:2], ("foo", "user/alice/activity/summary")
+        )
+
+    @mock.patch("slurmweb.views.gateway.aiohttp.ClientSession.get")
+    def test_user_activity_summary_requests_agent_url(self, mock_get):
+        foo = fake_slurmweb_agent("foo")
+        self.app_set_agents({"foo": foo})
+        _, mock_get.return_value = mock_agent_aio_response(
+            content={
+                "username": "alice",
+                "profile": None,
+                "generated_at": None,
+                "totals": {"submitted_jobs_today": 0},
+                "tool_breakdown": [],
+            }
+        )
+
+        response = self.client.get("/api/agents/foo/user/alice/activity/summary")
+
+        self.assertEqual(response.status_code, 200)
+        mock_get.assert_called_once_with(
+            f"http://foo/v{foo.version}/user/alice/activity/summary",
+            headers=mock.ANY,
+        )
+
+    @mock.patch("slurmweb.views.gateway.aiohttp.ClientSession.get")
+    def test_node_metrics(self, mock_get):
+        foo = fake_slurmweb_agent("foo")
+        self.app_set_agents({"foo": foo})
+        _, mock_get.return_value = mock_agent_aio_response(
+            content={
+                "cpu_usage": 0.25,
+                "memory_usage": 0.5,
+                "disk_usage": 0.75,
+            }
+        )
+
+        response = self.client.get("/api/agents/foo/node/cn1/metrics")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.json,
+            {
+                "cpu_usage": 0.25,
+                "memory_usage": 0.5,
+                "disk_usage": 0.75,
+            },
+        )
+        mock_get.assert_called_once_with(
+            f"http://foo/v{foo.version}/node/cn1/metrics",
+            headers=mock.ANY,
         )
 
     @mock.patch("slurmweb.views.gateway.proxy_agent")
@@ -322,6 +512,24 @@ class TestGatewayViews(TestGatewayBase):
             mock_proxy_agent.call_args.args[:2], ("foo", "node/cn1/metrics/history")
         )
         self.assertTrue(mock_proxy_agent.call_args.args[2])
+
+    @mock.patch("slurmweb.views.gateway.aiohttp.ClientSession.get")
+    def test_node_metrics_history_forwards_range_to_agent(self, mock_get):
+        foo = fake_slurmweb_agent("foo")
+        self.app_set_agents({"foo": foo})
+        _, mock_get.return_value = mock_agent_aio_response(
+            content={"cpu_usage": [], "memory_usage": [], "disk_usage": []}
+        )
+
+        response = self.client.get(
+            "/api/agents/foo/node/cn1/metrics/history?range=week"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        mock_get.assert_called_once_with(
+            f"http://foo/v{foo.version}/node/cn1/metrics/history?range=week",
+            headers=mock.ANY,
+        )
 
     @mock.patch("slurmweb.views.gateway.aiohttp.ClientSession.post")
     def test_cache_reset(self, mock_post):

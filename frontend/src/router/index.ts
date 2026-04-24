@@ -7,6 +7,7 @@
  */
 
 import { createRouter, createWebHistory, type RouteLocation } from 'vue-router'
+import { hasClusterAccessControl } from '@/composables/GatewayAPI'
 import { useAuthStore } from '@/stores/auth'
 import { useRuntimeStore } from '@/stores/runtime'
 import { useRuntimeConfiguration } from '@/plugins/runtimeConfiguration'
@@ -20,6 +21,7 @@ const SettingsLayout = () => import('@/components/settings/SettingsLayout.vue')
 const SettingsMainView = () => import('@/views/settings/SettingsMain.vue')
 const SettingsErrorsView = () => import('@/views/settings/SettingsErrors.vue')
 const SettingsAccountView = () => import('@/views/settings/SettingsAccount.vue')
+const SettingsAccessControlView = () => import('@/views/settings/SettingsAccessControl.vue')
 const SettingsCacheView = () => import('@/views/settings/SettingsCache.vue')
 const SettingsLdapCacheView = () => import('@/views/settings/SettingsLdapCache.vue')
 const ClustersView = () => import('@/views/ClustersView.vue')
@@ -94,6 +96,14 @@ const router = createRouter({
           path: '/settings/account',
           name: 'settings-account',
           component: SettingsAccountView,
+          meta: {
+            settings: true
+          }
+        },
+        {
+          path: '/settings/access-control',
+          name: 'settings-access-control',
+          component: SettingsAccessControlView,
           meta: {
             settings: true
           }
@@ -241,6 +251,16 @@ const router = createRouter({
   ]
 })
 
+function getSettingsCluster(runtime: ReturnType<typeof useRuntimeStore>) {
+  if (runtime.currentCluster) return runtime.currentCluster
+  const routeCluster = runtime.beforeSettingsRoute?.params?.cluster
+  if (typeof routeCluster === 'string') {
+    const cluster = runtime.getCluster(routeCluster)
+    if (cluster) return cluster
+  }
+  return runtime.getAllowedClusters()[0]
+}
+
 router.beforeEach(async (to, from) => {
   /* redirect to login page if not logged in and trying to access a restricted page */
   const publicPages = [
@@ -292,6 +312,10 @@ router.beforeEach(async (to, from) => {
   } else {
     console.log(`Unsetting current cluster`)
     runtime.currentCluster = undefined
+  }
+
+  if (to.name === 'settings-access-control' && !hasClusterAccessControl(getSettingsCluster(runtime))) {
+    return { name: 'settings-account' }
   }
 
   /* If entering settings page, save previous route to get it back */

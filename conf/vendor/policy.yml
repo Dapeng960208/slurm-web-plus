@@ -27,3 +27,7 @@ actions:
     Access to cache information and metrics in settings panel.
   cache-reset: |
     Reset cache statistics in settings panel.
+  roles-view: |
+    Access to view access control roles, assignments and permission sources.
+  roles-manage: |
+    Create, update and delete access control roles and user role assignments.

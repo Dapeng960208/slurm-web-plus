@@ -534,6 +534,12 @@ persistence:
     default: false
     doc: |
       Determine if job history persistence to PostgreSQL is enabled.
+  access_control_enabled:
+    type: bool
+    default: false
+    doc: |
+      Determine if database-backed custom access control roles and user role
+      bindings are enabled.
   retention_days:
     type: int
     default: 180

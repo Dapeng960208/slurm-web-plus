@@ -40,6 +40,78 @@ def _normalize_job_history_record(record: dict) -> dict:
     return data
 
 
+def _sorted_strings(values) -> list:
+    return sorted(str(value) for value in values if value not in (None, ""))
+
+
+def _permission_payload(user) -> dict:
+    if hasattr(current_app.policy, "roles_actions_sources"):
+        merged = current_app.policy.roles_actions_sources(user)
+    else:
+        roles, actions = current_app.policy.roles_actions(user)
+        merged = {
+            "roles": set(roles),
+            "actions": set(actions),
+            "sources": {
+                "policy": {
+                    "roles": set(roles),
+                    "actions": set(actions),
+                },
+                "custom": {
+                    "roles": set(),
+                    "actions": set(),
+                },
+            },
+        }
+    return {
+        "roles": _sorted_strings(merged["roles"]),
+        "actions": _sorted_strings(merged["actions"]),
+        "sources": {
+            "policy": {
+                "roles": _sorted_strings(merged["sources"]["policy"]["roles"]),
+                "actions": _sorted_strings(merged["sources"]["policy"]["actions"]),
+            },
+            "custom": {
+                "roles": _sorted_strings(merged["sources"]["custom"]["roles"]),
+                "actions": _sorted_strings(merged["sources"]["custom"]["actions"]),
+            },
+        },
+    }
+
+
+def _require_access_control():
+    if not getattr(current_app, "access_control_enabled", False) or current_app.access_control_store is None:
+        error = "Access control is disabled"
+        logger.warning(error)
+        abort(501, error)
+
+
+def _access_page_args():
+    page = _positive_int_query_arg("page", 1)
+    page_size = min(_positive_int_query_arg("page_size", 50), 200)
+    username = request.args.get("username")
+    return username, page, page_size
+
+
+def _role_payload():
+    payload = request.get_json(silent=True) or {}
+    name = str(payload.get("name", "")).strip()
+    if not name:
+        abort(400, "Role name is required")
+    actions = payload.get("actions")
+    if not isinstance(actions, list):
+        abort(400, "Role actions must be a list")
+    actions = _sorted_strings(actions)
+    invalid_actions = sorted(set(actions) - current_app.policy.definition_actions)
+    if invalid_actions:
+        abort(400, f"Unknown role actions: {', '.join(invalid_actions)}")
+    return {
+        "name": name,
+        "description": payload.get("description"),
+        "actions": actions,
+    }
+
+
 def racksdb_get_version():
     """Get RacksDB version if available, or return 'N/A' if not installed."""
     try:
@@ -74,10 +146,12 @@ def info():
         },
         "version": get_version(),
         "persistence": current_app.jobs_store is not None,
+        "access_control": bool(getattr(current_app, "access_control_enabled", False)),
         "node_metrics": current_app.settings.node_metrics.enabled,
         "capabilities": {
             "job_history": current_app.jobs_store is not None,
             "ldap_cache": current_app.users_store is not None,
+            "access_control": bool(getattr(current_app, "access_control_enabled", False)),
             "node_metrics": current_app.settings.node_metrics.enabled,
             "user_metrics": user_metrics_capabilities,
             "user_analytics": {
@@ -92,13 +166,7 @@ def info():
 
 @check_jwt
 def permissions():
-    roles, actions = current_app.policy.roles_actions(request.user)
-    return jsonify(
-        {
-            "roles": list(roles),
-            "actions": list(actions),
-        }
-    )
+    return jsonify(_permission_payload(request.user))
 
 
 def handle_slurmrestd_errors(func):
@@ -416,10 +484,13 @@ def cache_authenticated_user():
         groups = getattr(request.user, "groups", [])
 
     try:
+        policy_roles, policy_actions = current_app.policy.file_roles_actions(request.user)
         current_app.users_store.upsert_ldap_user(
             username,
             fullname,
             groups,
+            policy_roles=_sorted_strings(policy_roles),
+            policy_actions=_sorted_strings(policy_actions),
         )
     except Exception as err:
         logger.warning("Unable to cache authenticated user %s: %s", request.user, err)
@@ -451,6 +522,120 @@ def ldap_cache_users():
     except Exception as err:
         logger.warning("Unable to list cached LDAP users: %s", err)
         abort(500, str(err))
+
+
+@rbac_action("roles-view")
+def access_roles():
+    _require_access_control()
+    try:
+        return jsonify({"items": current_app.access_control_store.list_roles()})
+    except Exception as err:
+        logger.warning("Unable to list access control roles: %s", err)
+        abort(500, str(err))
+
+
+@rbac_action("roles-manage")
+def create_access_role():
+    _require_access_control()
+    role = _role_payload()
+    try:
+        created = current_app.access_control_store.create_role(
+            role["name"],
+            role["description"],
+            role["actions"],
+        )
+        return jsonify(created), 201
+    except ValueError as err:
+        abort(400, str(err))
+    except Exception as err:
+        logger.warning("Unable to create access control role: %s", err)
+        abort(500, str(err))
+
+
+@rbac_action("roles-manage")
+def update_access_role(role_id: int):
+    _require_access_control()
+    role = _role_payload()
+    try:
+        updated = current_app.access_control_store.update_role(
+            role_id,
+            role["name"],
+            role["description"],
+            role["actions"],
+        )
+    except ValueError as err:
+        abort(400, str(err))
+    except Exception as err:
+        logger.warning("Unable to update access control role %s: %s", role_id, err)
+        abort(500, str(err))
+
+    if updated is None:
+        abort(404, f"Access control role {role_id} not found")
+    return jsonify(updated)
+
+
+@rbac_action("roles-manage")
+def delete_access_role(role_id: int):
+    _require_access_control()
+    try:
+        deleted = current_app.access_control_store.delete_role(role_id)
+    except Exception as err:
+        logger.warning("Unable to delete access control role %s: %s", role_id, err)
+        abort(500, str(err))
+    if not deleted:
+        abort(404, f"Access control role {role_id} not found")
+    return jsonify({"result": "Role deleted"})
+
+
+@rbac_action("roles-view")
+def access_users():
+    _require_access_control()
+    username, page, page_size = _access_page_args()
+    try:
+        return jsonify(
+            current_app.access_control_store.list_users(
+                username=username,
+                page=page,
+                page_size=page_size,
+            )
+        )
+    except Exception as err:
+        logger.warning("Unable to list access control users: %s", err)
+        abort(500, str(err))
+
+
+@rbac_action("roles-view")
+def access_user_roles(username: str):
+    _require_access_control()
+    try:
+        details = current_app.access_control_store.get_user_roles(username)
+    except Exception as err:
+        logger.warning("Unable to query access control roles for %s: %s", username, err)
+        abort(500, str(err))
+    if details is None:
+        abort(404, f"User {username} not found")
+    return jsonify(details)
+
+
+@rbac_action("roles-manage")
+def update_access_user_roles(username: str):
+    _require_access_control()
+    payload = request.get_json(silent=True) or {}
+    role_ids = payload.get("role_ids")
+    if not isinstance(role_ids, list):
+        abort(400, "role_ids must be a list")
+    try:
+        role_ids = [int(role_id) for role_id in role_ids]
+    except (TypeError, ValueError):
+        abort(400, "role_ids must contain integers")
+    try:
+        details = current_app.access_control_store.set_user_roles(username, role_ids)
+    except ValueError as err:
+        abort(400, str(err))
+    except Exception as err:
+        logger.warning("Unable to update access control roles for %s: %s", username, err)
+        abort(500, str(err))
+    return jsonify(details)
 
 
 @rbac_action("view-jobs")

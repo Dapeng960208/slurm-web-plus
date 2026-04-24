@@ -41,6 +41,10 @@ import nodeWithoutGpu from '../assets/node-without-gpu.json'
 // Stub REST API for infrastructureImagePng and request builder tests.
 const mockRestAPI = {
   get: vi.fn(),
+  post: vi.fn(),
+  patch: vi.fn(),
+  put: vi.fn(),
+  delete: vi.fn(),
   postRaw: vi.fn()
 }
 
@@ -161,6 +165,44 @@ describe('user metrics requests', () => {
 
     expect(mockRestAPI.get).toHaveBeenCalledWith('/agents/cluster-a/user/alice/activity/summary')
   })
+
+  test('encodes usernames in user metrics requests', async () => {
+    mockRestAPI.get.mockResolvedValueOnce({ submissions: [] })
+
+    const gateway = useGatewayAPI()
+    await gateway.user_metrics_history('cluster-a', 'alice doe', 'week')
+
+    expect(mockRestAPI.get).toHaveBeenCalledWith(
+      '/agents/cluster-a/user/alice%20doe/metrics/history?range=week'
+    )
+  })
+
+  test('encodes usernames in user activity summary requests', async () => {
+    mockRestAPI.get.mockResolvedValueOnce({
+      username: 'alice doe',
+      profile: null,
+      generated_at: null,
+      totals: {
+        submitted_jobs_today: 0,
+        completed_jobs_today: 0,
+        active_tools: 0,
+        latest_submissions_per_minute: null,
+        avg_max_memory_mb: null,
+        avg_cpu_cores: null,
+        avg_runtime_seconds: null,
+        busiest_tool: null,
+        busiest_tool_jobs: 0
+      },
+      tool_breakdown: []
+    })
+
+    const gateway = useGatewayAPI()
+    await gateway.user_activity_summary('cluster-a', 'alice doe')
+
+    expect(mockRestAPI.get).toHaveBeenCalledWith(
+      '/agents/cluster-a/user/alice%20doe/activity/summary'
+    )
+  })
 })
 
 describe('user activity gateway methods', () => {
@@ -228,6 +270,284 @@ describe('user activity gateway methods', () => {
     expect(result.username).toBe('alice')
     expect(result.profile?.fullname).toBe('Alice Doe')
     expect(result.totals.busiest_tool).toBe('blastn')
+  })
+})
+
+describe('gateway data APIs', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  test('normalizes permissions sources from merged payload', async () => {
+    mockRestAPI.get.mockResolvedValue({
+      roles: ['ignored-role'],
+      actions: ['ignored-action'],
+      sources: {
+        policy: { roles: ['user'], actions: ['view-jobs'] },
+        custom: { roles: ['db-admin'], actions: ['roles-manage'] },
+        merged: { roles: ['user', 'db-admin'], actions: ['view-jobs', 'roles-manage'] }
+      }
+    })
+
+    const gateway = useGatewayAPI()
+    const result = await gateway.permissions('cluster')
+
+    expect(mockRestAPI.get).toHaveBeenCalledWith('/agents/cluster/permissions')
+    expect(result).toStrictEqual({
+      roles: ['user', 'db-admin'],
+      actions: ['view-jobs', 'roles-manage'],
+      sources: {
+        policy: { roles: ['user'], actions: ['view-jobs'] },
+        custom: { roles: ['db-admin'], actions: ['roles-manage'] },
+        merged: { roles: ['user', 'db-admin'], actions: ['view-jobs', 'roles-manage'] }
+      }
+    })
+  })
+
+  test('normalizes legacy permissions payloads without sources', async () => {
+    mockRestAPI.get.mockResolvedValue({
+      roles: ['user'],
+      actions: ['view-jobs']
+    })
+
+    const gateway = useGatewayAPI()
+    const result = await gateway.permissions('cluster')
+
+    expect(result).toStrictEqual({
+      roles: ['user'],
+      actions: ['view-jobs'],
+      sources: {
+        policy: { roles: [], actions: [] },
+        custom: { roles: [], actions: [] },
+        merged: { roles: ['user'], actions: ['view-jobs'] }
+      }
+    })
+  })
+
+  test('requests access control roles list', async () => {
+    mockRestAPI.get.mockResolvedValue({
+      items: [{ id: 1, name: 'db-admin', description: null, actions: ['roles-manage'] }]
+    })
+
+    const gateway = useGatewayAPI()
+    const result = await gateway.access_roles('cluster')
+
+    expect(mockRestAPI.get).toHaveBeenCalledWith('/agents/cluster/access/roles')
+    expect(result).toStrictEqual([
+      { id: 1, name: 'db-admin', description: null, actions: ['roles-manage'] }
+    ])
+  })
+
+  test('creates access control roles', async () => {
+    mockRestAPI.post.mockResolvedValue({
+      id: 2,
+      name: 'ops-viewer',
+      description: 'Operations read-only',
+      actions: ['roles-view', 'view-jobs']
+    })
+
+    const gateway = useGatewayAPI()
+    const result = await gateway.create_access_role('cluster', {
+      name: 'ops-viewer',
+      description: 'Operations read-only',
+      actions: ['roles-view', 'view-jobs']
+    })
+
+    expect(mockRestAPI.post).toHaveBeenCalledWith('/agents/cluster/access/roles', {
+      name: 'ops-viewer',
+      description: 'Operations read-only',
+      actions: ['roles-view', 'view-jobs']
+    })
+    expect(result.id).toBe(2)
+  })
+
+  test('lists access control users with filters', async () => {
+    mockRestAPI.get.mockResolvedValue({
+      items: [{ username: 'alice', fullname: 'Alice Doe', role_ids: [1], role_names: ['db-admin'] }],
+      total: 1,
+      page: 2,
+      page_size: 20
+    })
+
+    const gateway = useGatewayAPI()
+    const result = await gateway.access_users('cluster', {
+      username: 'ali',
+      page: 2,
+      page_size: 20
+    })
+
+    expect(mockRestAPI.get).toHaveBeenCalledWith(
+      '/agents/cluster/access/users?username=ali&page=2&page_size=20'
+    )
+    expect(result.total).toBe(1)
+  })
+
+  test('encodes usernames for access control user role queries', async () => {
+    mockRestAPI.get.mockResolvedValue({
+      username: 'alice doe',
+      fullname: 'Alice Doe',
+      policy_roles: ['user'],
+      policy_actions: ['view-jobs'],
+      custom_roles: [],
+      custom_actions: [],
+      role_ids: []
+    })
+
+    const gateway = useGatewayAPI()
+    await gateway.access_user_roles('cluster', 'alice doe')
+
+    expect(mockRestAPI.get).toHaveBeenCalledWith(
+      '/agents/cluster/access/users/alice%20doe/roles'
+    )
+  })
+
+  test('updates access control user roles', async () => {
+    mockRestAPI.put.mockResolvedValue({
+      username: 'alice',
+      fullname: 'Alice Doe',
+      policy_roles: ['user'],
+      policy_actions: ['view-jobs'],
+      custom_roles: ['db-admin'],
+      custom_actions: ['roles-manage'],
+      role_ids: [1]
+    })
+
+    const gateway = useGatewayAPI()
+    const result = await gateway.update_access_user_roles('cluster', 'alice', [1])
+
+    expect(mockRestAPI.put).toHaveBeenCalledWith(
+      '/agents/cluster/access/users/alice/roles',
+      { role_ids: [1] }
+    )
+    expect(result.custom_roles).toStrictEqual(['db-admin'])
+  })
+
+  test('requests LDAP cache users with filters', async () => {
+    mockRestAPI.get.mockResolvedValue({
+      items: [{ username: 'alice', fullname: 'Alice Doe' }],
+      total: 1,
+      page: 2,
+      page_size: 20
+    })
+
+    const gateway = useGatewayAPI()
+    const result = await gateway.ldap_cache_users('cluster', {
+      username: 'ali',
+      page: 2,
+      page_size: 20
+    })
+
+    expect(mockRestAPI.get).toHaveBeenCalledWith(
+      '/agents/cluster/users/cache?username=ali&page=2&page_size=20'
+    )
+    expect(result).toStrictEqual({
+      items: [{ username: 'alice', fullname: 'Alice Doe' }],
+      total: 1,
+      page: 2,
+      page_size: 20
+    })
+  })
+
+  test('normalizes legacy LDAP cache array responses', async () => {
+    mockRestAPI.get.mockResolvedValue([
+      { username: 'alice', fullname: 'Alice Doe' },
+      { username: 'bob', fullname: null }
+    ])
+
+    const gateway = useGatewayAPI()
+    const result = await gateway.ldap_cache_users('cluster', {
+      page: 3,
+      page_size: 10
+    })
+
+    expect(mockRestAPI.get).toHaveBeenCalledWith('/agents/cluster/users/cache?page=3&page_size=10')
+    expect(result).toStrictEqual({
+      items: [
+        { username: 'alice', fullname: 'Alice Doe' },
+        { username: 'bob', fullname: null }
+      ],
+      total: 2,
+      page: 3,
+      page_size: 10
+    })
+  })
+
+  test('requests jobs history with all supported filters', async () => {
+    mockRestAPI.get.mockResolvedValue({
+      total: 1,
+      page: 2,
+      page_size: 50,
+      jobs: []
+    })
+
+    const gateway = useGatewayAPI()
+    await gateway.jobs_history('cluster', {
+      keyword: 'blast',
+      start: '2026-04-01',
+      end: '2026-04-24',
+      user: 'alice',
+      account: 'bio',
+      partition: 'gpu',
+      qos: 'normal',
+      state: 'COMPLETED',
+      job_id: 42,
+      page: 2,
+      page_size: 50,
+      sort: 'resources',
+      order: 'desc'
+    })
+
+    expect(mockRestAPI.get).toHaveBeenCalledWith(
+      '/agents/cluster/jobs/history?keyword=blast&start=2026-04-01&end=2026-04-24&user=alice&account=bio&partition=gpu&qos=normal&state=COMPLETED&job_id=42&page=2&page_size=50&sort=resources&order=desc'
+    )
+  })
+
+  test('requests job history detail by record id', async () => {
+    mockRestAPI.get.mockResolvedValue({
+      id: 12,
+      job_id: 1234,
+      exit_code: null
+    })
+
+    const gateway = useGatewayAPI()
+    const result = await gateway.job_history_detail('cluster', 12)
+
+    expect(mockRestAPI.get).toHaveBeenCalledWith('/agents/cluster/jobs/history/12')
+    expect(result.id).toBe(12)
+  })
+
+  test('requests node instant metrics', async () => {
+    mockRestAPI.get.mockResolvedValue({
+      cpu_usage: 0.2,
+      memory_usage: 0.3,
+      disk_usage: 0.4
+    })
+
+    const gateway = useGatewayAPI()
+    const result = await gateway.node_metrics('cluster', 'cn1')
+
+    expect(mockRestAPI.get).toHaveBeenCalledWith('/agents/cluster/node/cn1/metrics')
+    expect(result).toStrictEqual({
+      cpu_usage: 0.2,
+      memory_usage: 0.3,
+      disk_usage: 0.4
+    })
+  })
+
+  test('requests node metrics history with range', async () => {
+    mockRestAPI.get.mockResolvedValue({
+      cpu_usage: [[1748004750000, 0.2]],
+      memory_usage: [],
+      disk_usage: []
+    })
+
+    const gateway = useGatewayAPI()
+    const result = await gateway.node_metrics_history('cluster', 'cn1', 'day')
+
+    expect(mockRestAPI.get).toHaveBeenCalledWith(
+      '/agents/cluster/node/cn1/metrics/history?range=day'
+    )
+    expect(result.cpu_usage).toStrictEqual([[1748004750000, 0.2]])
   })
 })
 

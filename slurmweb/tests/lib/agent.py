@@ -83,6 +83,9 @@ password=secret
 {% if persistence %}
 [persistence]
 enabled=yes
+{% if access_control_enabled %}
+access_control_enabled=yes
+{% endif %}
 {% endif %}
 
 {% if user_metrics %}
@@ -115,6 +118,7 @@ class TestAgentConfBase(unittest.TestCase):
         cache=False,
         database=False,
         persistence=False,
+        access_control_enabled=False,
         user_metrics=False,
     ):
         # Generate JWT signing key
@@ -155,6 +159,7 @@ class TestAgentConfBase(unittest.TestCase):
                 cache=cache,
                 database=database,
                 persistence=persistence,
+                access_control_enabled=access_control_enabled,
                 user_metrics=user_metrics,
             )
         )
@@ -189,6 +194,7 @@ class TestAgentBase(TestSlurmrestdClient):
         cache=False,
         database=False,
         persistence=False,
+        access_control_enabled=False,
         user_metrics=False,
         racksdb_format_error=False,
         racksdb_schema_error=False,
@@ -211,6 +217,7 @@ class TestAgentBase(TestSlurmrestdClient):
             cache=cache,
             database=database,
             persistence=persistence,
+            access_control_enabled=access_control_enabled,
             user_metrics=user_metrics,
         )
 

@@ -10,6 +10,28 @@
     "view-nodes",
     "cache-reset"
   ],
+  "sources": {
+    "policy": {
+      "roles": [
+        "admin"
+      ],
+      "actions": [
+        "view-jobs",
+        "cache-view",
+        "view-reservations",
+        "view-stats",
+        "view-qos",
+        "view-partitions",
+        "view-accounts",
+        "view-nodes",
+        "cache-reset"
+      ]
+    },
+    "custom": {
+      "roles": [],
+      "actions": []
+    }
+  },
   "roles": [
     "admin"
   ]

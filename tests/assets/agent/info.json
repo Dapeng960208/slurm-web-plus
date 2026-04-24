@@ -5,9 +5,11 @@
   "metrics": true,
   "node_metrics": false,
   "persistence": false,
+  "access_control": false,
   "capabilities": {
     "job_history": false,
     "ldap_cache": true,
+    "access_control": false,
     "node_metrics": false,
     "user_analytics": {
       "enabled": false,

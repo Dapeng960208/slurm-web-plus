@@ -4,6 +4,8 @@
 #
 # SPDX-License-Identifier: MIT
 
+from unittest import mock
+
 from slurmweb.version import get_version
 
 from ..lib.agent import TestAgentBase
@@ -11,17 +13,71 @@ from ..lib.utils import all_slurm_api_versions
 
 
 class TestAgentPermissions(TestAgentBase):
+    def _enable_access_control(self, custom_roles=None, custom_actions=None):
+        self.app.access_control_enabled = True
+        self.app.access_control_store = mock.Mock()
+        self.app.access_control_store.user_permissions.return_value = (
+            custom_roles or [],
+            custom_actions or [],
+        )
+        self.app.policy._access_control_enabled = True
+        self.app.policy.set_access_control_store(self.app.access_control_store)
+
     def test_permissions_user(self):
         self.setup_client()
         response = self.client.get(f"/v{get_version()}/permissions")
         self.assertEqual(response.status_code, 200)
         self.assertIsInstance(response.json, dict)
-        self.assertEqual(len(response.json.keys()), 2)
+        self.assertEqual(len(response.json.keys()), 3)
         self.assertIn("actions", response.json)
         self.assertIn("roles", response.json)
+        self.assertIn("sources", response.json)
         self.assertCountEqual(response.json["roles"], ["user"])
         self.assertCountEqual(
             response.json["actions"], self.app.policy.roles_actions(self.user)[1]
+        )
+        self.assertEqual(
+            response.json["sources"]["custom"],
+            {"roles": [], "actions": []},
+        )
+        self.assertCountEqual(
+            response.json["sources"]["policy"]["roles"],
+            ["user"],
+        )
+        self.assertCountEqual(
+            response.json["sources"]["policy"]["actions"],
+            self.app.policy.file_roles_actions(self.user)[1],
+        )
+
+    def test_permissions_custom_roles_union_from_access_control_store(self):
+        self.setup_client()
+        self._enable_access_control(
+            custom_roles=["db-admin", "db-auditor"],
+            custom_actions=["roles-view", "roles-manage"],
+        )
+
+        response = self.client.get(f"/v{get_version()}/permissions")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertCountEqual(
+            response.json["roles"],
+            ["user", "db-admin", "db-auditor"],
+        )
+        self.assertCountEqual(
+            response.json["actions"],
+            list(self.app.policy.file_roles_actions(self.user)[1]) + ["roles-view", "roles-manage"],
+        )
+        self.assertCountEqual(
+            response.json["sources"]["policy"]["roles"],
+            ["user"],
+        )
+        self.assertCountEqual(
+            response.json["sources"]["custom"]["roles"],
+            ["db-admin", "db-auditor"],
+        )
+        self.assertCountEqual(
+            response.json["sources"]["custom"]["actions"],
+            ["roles-view", "roles-manage"],
         )
 
     def test_permissions_anonymous(self):
@@ -30,9 +86,10 @@ class TestAgentPermissions(TestAgentBase):
         response = self.client.get(f"/v{get_version()}/permissions")
         self.assertEqual(response.status_code, 200)
         self.assertIsInstance(response.json, dict)
-        self.assertEqual(len(response.json.keys()), 2)
+        self.assertEqual(len(response.json.keys()), 3)
         self.assertIn("actions", response.json)
         self.assertIn("roles", response.json)
+        self.assertIn("sources", response.json)
         # anonymous user should get the anonymous role and corresponding set of actions
         # when anonymous mode is enabled in policy.
         self.assertCountEqual(response.json["roles"], ["anonymous"])
@@ -46,9 +103,10 @@ class TestAgentPermissions(TestAgentBase):
         response = self.client.get(f"/v{get_version()}/permissions")
         self.assertEqual(response.status_code, 200)
         self.assertIsInstance(response.json, dict)
-        self.assertEqual(len(response.json.keys()), 2)
+        self.assertEqual(len(response.json.keys()), 3)
         self.assertIn("actions", response.json)
         self.assertIn("roles", response.json)
+        self.assertIn("sources", response.json)
         # anonymous user should get no role or action when anonymous mode is disabled in
         # policy.
         self.assertCountEqual(response.json["roles"], [])

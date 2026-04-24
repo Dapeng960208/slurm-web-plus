@@ -9,6 +9,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
+import { hasClusterAccessControl } from '@/composables/GatewayAPI'
 import { useRuntimeStore } from '@/stores/runtime'
 import { useRuntimeConfiguration } from '@/plugins/runtimeConfiguration'
 
@@ -16,13 +17,26 @@ const { entry } = defineProps<{ entry: string }>()
 const runtimeStore = useRuntimeStore()
 const runtimeConfiguration = useRuntimeConfiguration()
 
+const settingsCluster = computed(() => {
+  if (runtimeStore.currentCluster) return runtimeStore.currentCluster
+  const routeCluster = runtimeStore.beforeSettingsRoute?.params?.cluster
+  if (typeof routeCluster === 'string') {
+    const cluster = runtimeStore.getCluster(routeCluster)
+    if (cluster) return cluster
+  }
+  return runtimeStore.getAllowedClusters()[0]
+})
+
 const tabs = computed(() => {
   const result = [
     { name: 'General', href: 'settings' },
     { name: 'Errors', href: 'settings-errors' },
-    { name: 'Account', href: 'settings-account' },
-    { name: 'Cache', href: 'settings-cache' }
+    { name: 'Account', href: 'settings-account' }
   ]
+  if (hasClusterAccessControl(settingsCluster.value)) {
+    result.push({ name: 'Access Control', href: 'settings-access-control' })
+  }
+  result.push({ name: 'Cache', href: 'settings-cache' })
   if (
     runtimeConfiguration.authentication &&
     runtimeStore.availableClusters.some((cluster) => cluster.database)

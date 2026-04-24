@@ -23,13 +23,74 @@ class User(Base):
         nullable=False,
         server_default=sa.text("'[]'::jsonb"),
     )
+    policy_roles = sa.Column(
+        postgresql.JSONB(astext_type=sa.Text()),
+        nullable=False,
+        server_default=sa.text("'[]'::jsonb"),
+    )
+    policy_actions = sa.Column(
+        postgresql.JSONB(astext_type=sa.Text()),
+        nullable=False,
+        server_default=sa.text("'[]'::jsonb"),
+    )
     ldap_synced_at = sa.Column(sa.TIMESTAMP(timezone=True), nullable=True)
+    permission_synced_at = sa.Column(sa.TIMESTAMP(timezone=True), nullable=True)
     created_at = sa.Column(
         sa.TIMESTAMP(timezone=True),
         nullable=False,
         server_default=sa.text("NOW()"),
     )
     updated_at = sa.Column(
+        sa.TIMESTAMP(timezone=True),
+        nullable=False,
+        server_default=sa.text("NOW()"),
+    )
+
+
+class Role(Base):
+    __tablename__ = "roles"
+    __table_args__ = (
+        sa.UniqueConstraint("name", name="uq_roles_name"),
+    )
+
+    id = sa.Column(sa.BigInteger(), primary_key=True, autoincrement=True)
+    name = sa.Column(sa.Text(), nullable=False)
+    description = sa.Column(sa.Text(), nullable=True)
+    actions = sa.Column(
+        postgresql.JSONB(astext_type=sa.Text()),
+        nullable=False,
+        server_default=sa.text("'[]'::jsonb"),
+    )
+    created_at = sa.Column(
+        sa.TIMESTAMP(timezone=True),
+        nullable=False,
+        server_default=sa.text("NOW()"),
+    )
+    updated_at = sa.Column(
+        sa.TIMESTAMP(timezone=True),
+        nullable=False,
+        server_default=sa.text("NOW()"),
+    )
+
+
+class UserRole(Base):
+    __tablename__ = "user_roles"
+    __table_args__ = (
+        sa.PrimaryKeyConstraint("user_id", "role_id", name="pk_user_roles"),
+        sa.Index("idx_user_roles_role_id", "role_id"),
+    )
+
+    user_id = sa.Column(
+        sa.BigInteger(),
+        sa.ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    role_id = sa.Column(
+        sa.BigInteger(),
+        sa.ForeignKey("roles.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    created_at = sa.Column(
         sa.TIMESTAMP(timezone=True),
         nullable=False,
         server_default=sa.text("NOW()"),

@@ -97,9 +97,11 @@ def fake_slurmweb_agent(cluster: str):
         capabilities={
             "job_history": True,
             "ldap_cache": True,
+            "access_control": False,
             "node_metrics": False,
         },
         persistence=False,
+        access_control=False,
         node_metrics=False,
     )
 

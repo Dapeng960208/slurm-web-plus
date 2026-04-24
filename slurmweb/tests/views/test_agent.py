@@ -61,23 +61,84 @@ class TestAgentViews(TestAgentBase):
         self.assertEqual(response.json["version"], get_version())
         self.assertIn("persistence", response.json)
         self.assertIsInstance(response.json["persistence"], bool)
+        self.assertIn("access_control", response.json)
+        self.assertIsInstance(response.json["access_control"], bool)
         self.assertIn("node_metrics", response.json)
         self.assertIsInstance(response.json["node_metrics"], bool)
         self.assertIn("capabilities", response.json)
         self.assertIsInstance(response.json["capabilities"], dict)
         self.assertIn("job_history", response.json["capabilities"])
         self.assertIn("ldap_cache", response.json["capabilities"])
+        self.assertIn("access_control", response.json["capabilities"])
         self.assertIn("node_metrics", response.json["capabilities"])
+        self.assertIn("user_metrics", response.json["capabilities"])
+        self.assertFalse(response.json["access_control"])
+        self.assertFalse(response.json["capabilities"]["access_control"])
+        self.assertEqual(
+            response.json["capabilities"]["user_metrics"],
+            {
+                "enabled": False,
+                "history_api": False,
+                "summary_api": False,
+            },
+        )
+        self.assertIn("user_analytics", response.json["capabilities"])
+        self.assertEqual(
+            response.json["capabilities"]["user_analytics"],
+            {
+                "enabled": False,
+                "prometheus_user_metrics": False,
+                "user_activity_api": False,
+            },
+        )
+
+    def test_info_with_database_and_user_capabilities_enabled(self):
+        self.app.users_store = mock.Mock()
+        self.app.jobs_store = mock.Mock()
+        self.app.user_metrics_enabled = True
+        self.app.access_control_enabled = True
+        self.app.settings.node_metrics.enabled = True
+
+        response = self.client.get("/info")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json["database"])
+        self.assertTrue(response.json["persistence"])
+        self.assertTrue(response.json["access_control"])
+        self.assertTrue(response.json["node_metrics"])
+        self.assertTrue(response.json["user_metrics"])
+        self.assertEqual(
+            response.json["capabilities"],
+            {
+                "job_history": True,
+                "ldap_cache": True,
+                "access_control": True,
+                "node_metrics": True,
+                "user_metrics": {
+                    "enabled": True,
+                    "history_api": True,
+                    "summary_api": True,
+                },
+                "user_analytics": {
+                    "enabled": True,
+                    "prometheus_user_metrics": True,
+                    "user_activity_api": True,
+                },
+            },
+        )
 
     def test_cache_authenticated_user(self):
         self.app.users_store = mock.Mock()
         response = self.client.post(f"/v{get_version()}/users/cache")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json, {"result": "User cache updated"})
+        policy_roles, policy_actions = self.app.policy.file_roles_actions(self.user)
         self.app.users_store.upsert_ldap_user.assert_called_once_with(
             self.user.login,
             None,
             self.user.groups,
+            policy_roles=sorted(policy_roles),
+            policy_actions=sorted(policy_actions),
         )
 
     def test_cache_authenticated_user_with_payload(self):
@@ -89,10 +150,104 @@ class TestAgentViews(TestAgentBase):
         )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json, {"result": "User cache updated"})
+        policy_roles, policy_actions = self.app.policy.file_roles_actions(self.user)
         self.app.users_store.upsert_ldap_user.assert_called_once_with(
             "alice",
             "Alice Doe",
             ["users"],
+            policy_roles=sorted(policy_roles),
+            policy_actions=sorted(policy_actions),
+        )
+
+    def test_access_roles(self):
+        self.app.access_control_enabled = True
+        self.app.access_control_store = mock.Mock()
+        self.app.access_control_store.list_roles.return_value = [
+            {"id": 1, "name": "db-admin", "actions": ["roles-manage"]},
+        ]
+
+        with mock.patch.object(self.app.policy, "allowed_user_action", return_value=True):
+            response = self.client.get(f"/v{get_version()}/access/roles")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.json,
+            {
+                "items": [
+                    {"id": 1, "name": "db-admin", "actions": ["roles-manage"]},
+                ]
+            },
+        )
+        self.app.access_control_store.list_roles.assert_called_once_with()
+
+    def test_create_access_role(self):
+        self.app.access_control_enabled = True
+        self.app.access_control_store = mock.Mock()
+        self.app.access_control_store.create_role.return_value = {
+            "id": 2,
+            "name": "ops-viewer",
+            "description": "Operations read-only role",
+            "actions": ["roles-view", "view-jobs"],
+        }
+
+        with mock.patch.object(self.app.policy, "allowed_user_action", return_value=True):
+            response = self.client.post(
+                f"/v{get_version()}/access/roles",
+                json={
+                    "name": "ops-viewer",
+                    "description": "Operations read-only role",
+                    "actions": ["view-jobs", "roles-view"],
+                },
+            )
+
+        self.assertEqual(response.status_code, 201)
+        self.app.access_control_store.create_role.assert_called_once_with(
+            "ops-viewer",
+            "Operations read-only role",
+            ["roles-view", "view-jobs"],
+        )
+
+    def test_access_users_with_filters(self):
+        self.app.access_control_enabled = True
+        self.app.access_control_store = mock.Mock()
+        self.app.access_control_store.list_users.return_value = {
+            "items": [{"username": "alice"}],
+            "total": 1,
+            "page": 2,
+            "page_size": 200,
+        }
+
+        with mock.patch.object(self.app.policy, "allowed_user_action", return_value=True):
+            response = self.client.get(
+                f"/v{get_version()}/access/users?username=ali&page=2&page_size=250"
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.app.access_control_store.list_users.assert_called_once_with(
+            username="ali",
+            page=2,
+            page_size=200,
+        )
+
+    def test_update_access_user_roles(self):
+        self.app.access_control_enabled = True
+        self.app.access_control_store = mock.Mock()
+        self.app.access_control_store.set_user_roles.return_value = {
+            "username": "alice",
+            "role_ids": [1, 2],
+        }
+
+        with mock.patch.object(self.app.policy, "allowed_user_action", return_value=True):
+            response = self.client.put(
+                f"/v{get_version()}/access/users/alice/roles",
+                json={"role_ids": [1, 2]},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json["role_ids"], [1, 2])
+        self.app.access_control_store.set_user_roles.assert_called_once_with(
+            "alice",
+            [1, 2],
         )
 
     def test_ldap_cache_users(self):

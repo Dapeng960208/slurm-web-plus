@@ -48,7 +48,14 @@ class UsersStore:
         finally:
             self._release_conn(conn)
 
-    def upsert_ldap_user(self, username, fullname, groups):
+    def upsert_ldap_user(
+        self,
+        username,
+        fullname,
+        groups,
+        policy_roles=None,
+        policy_actions=None,
+    ):
         if not username:
             return
 
@@ -59,15 +66,26 @@ class UsersStore:
                     """
                     INSERT INTO users (
                         username, fullname, groups,
-                        ldap_synced_at, created_at, updated_at
-                    ) VALUES (%s, %s, %s::jsonb, NOW(), NOW(), NOW())
+                        policy_roles, policy_actions,
+                        ldap_synced_at, permission_synced_at,
+                        created_at, updated_at
+                    ) VALUES (%s, %s, %s::jsonb, %s::jsonb, %s::jsonb, NOW(), NOW(), NOW(), NOW())
                     ON CONFLICT (username) DO UPDATE SET
-                        fullname       = EXCLUDED.fullname,
-                        groups         = EXCLUDED.groups,
-                        ldap_synced_at = EXCLUDED.ldap_synced_at,
-                        updated_at     = NOW()
+                        fullname            = EXCLUDED.fullname,
+                        groups              = EXCLUDED.groups,
+                        policy_roles        = EXCLUDED.policy_roles,
+                        policy_actions      = EXCLUDED.policy_actions,
+                        ldap_synced_at      = EXCLUDED.ldap_synced_at,
+                        permission_synced_at = EXCLUDED.permission_synced_at,
+                        updated_at          = NOW()
                     """,
-                    (username, fullname, json.dumps(groups or [])),
+                    (
+                        username,
+                        fullname,
+                        json.dumps(groups or []),
+                        json.dumps(policy_roles or []),
+                        json.dumps(policy_actions or []),
+                    ),
                 )
             conn.commit()
         except Exception:
@@ -135,6 +153,7 @@ class UsersStore:
                 cur.execute(
                     """
                     SELECT username, fullname, groups, ldap_synced_at
+                         , policy_roles, policy_actions, permission_synced_at
                     FROM users
                     WHERE username = %s
                     """,
@@ -148,6 +167,65 @@ class UsersStore:
                     "fullname": row[1],
                     "groups": row[2] or [],
                     "ldap_synced_at": row[3],
+                    "policy_roles": row[4] or [],
+                    "policy_actions": row[5] or [],
+                    "permission_synced_at": row[6],
                 }
         finally:
             self._release_conn(conn)
+
+    def list_cached_users_for_policy_refresh(self):
+        conn = self._get_conn()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT username, fullname, groups
+                    FROM users
+                    ORDER BY username ASC
+                    """
+                )
+                return [
+                    {
+                        "username": username,
+                        "fullname": fullname,
+                        "groups": groups or [],
+                    }
+                    for username, fullname, groups in cur.fetchall()
+                ]
+        finally:
+            self._release_conn(conn)
+
+    def update_policy_snapshot(self, username, policy_roles, policy_actions):
+        if not username:
+            return False
+
+        conn = self._get_conn()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    UPDATE users
+                    SET policy_roles = %s::jsonb,
+                        policy_actions = %s::jsonb,
+                        permission_synced_at = NOW(),
+                        updated_at = NOW()
+                    WHERE username = %s
+                    """,
+                    (
+                        json.dumps(policy_roles or []),
+                        json.dumps(policy_actions or []),
+                        username,
+                    ),
+                )
+                updated = cur.rowcount
+            conn.commit()
+        except Exception:
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+            raise
+        finally:
+            self._release_conn(conn)
+        return bool(updated)

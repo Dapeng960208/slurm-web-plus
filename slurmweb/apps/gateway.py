@@ -53,6 +53,7 @@ class SlurmwebAgent:
         database: bool,
         url: str,
         persistence: bool = False,
+        access_control: bool = False,
         node_metrics: bool = False,
         user_metrics: bool = False,
         capabilities: dict = None,
@@ -65,6 +66,7 @@ class SlurmwebAgent:
         self.url = url
         self.database = database
         self.persistence = persistence
+        self.access_control = access_control
         self.node_metrics = node_metrics
         self.user_metrics = user_metrics
         self.capabilities = capabilities or {}
@@ -81,6 +83,7 @@ class SlurmwebAgent:
                 data["database"],
                 url,
                 persistence=data.get("persistence", False),
+                access_control=data.get("access_control", False),
                 node_metrics=data.get("node_metrics", False),
                 user_metrics=data.get("user_metrics", False),
                 capabilities=data.get("capabilities", {}),
@@ -131,12 +134,39 @@ class SlurmwebAppGateway(SlurmwebWebApp, RFLTokenizedWebApp):
         SlurmwebAppRoute("/api/users", views.users),
         SlurmwebAppRoute("/api/agents/<cluster>/ping", views.ping),
         SlurmwebAppRoute("/api/agents/<cluster>/stats", views.stats),
+        SlurmwebAppRoute("/api/agents/<cluster>/permissions", views.permissions),
         SlurmwebAppRoute("/api/agents/<cluster>/metrics/<metric>", views.metrics),
         SlurmwebAppRoute("/api/agents/<cluster>/cache/stats", views.cache_stats),
         SlurmwebAppRoute(
             "/api/agents/<cluster>/cache/reset", views.cache_reset, methods=["POST"]
         ),
         SlurmwebAppRoute("/api/agents/<cluster>/users/cache", views.ldap_cache_users),
+        SlurmwebAppRoute("/api/agents/<cluster>/access/roles", views.access_roles),
+        SlurmwebAppRoute(
+            "/api/agents/<cluster>/access/roles",
+            views.create_access_role,
+            methods=["POST"],
+        ),
+        SlurmwebAppRoute(
+            "/api/agents/<cluster>/access/roles/<int:role_id>",
+            views.update_access_role,
+            methods=["PATCH"],
+        ),
+        SlurmwebAppRoute(
+            "/api/agents/<cluster>/access/roles/<int:role_id>",
+            views.delete_access_role,
+            methods=["DELETE"],
+        ),
+        SlurmwebAppRoute("/api/agents/<cluster>/access/users", views.access_users),
+        SlurmwebAppRoute(
+            "/api/agents/<cluster>/access/users/<username>/roles",
+            views.access_user_roles,
+        ),
+        SlurmwebAppRoute(
+            "/api/agents/<cluster>/access/users/<username>/roles",
+            views.update_access_user_roles,
+            methods=["PUT"],
+        ),
         SlurmwebAppRoute(
             "/api/agents/<cluster>/user/<username>/metrics/history",
             views.user_metrics_history,

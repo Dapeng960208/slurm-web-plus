@@ -107,10 +107,54 @@ export function useRESTAPI() {
       return http.post(resource, data, requestConfig(withToken, responseType))
     })) as CType
   }
+
+  async function put<CType>(
+    resource: string,
+    data: unknown,
+    withToken: boolean = true,
+    responseType: ResponseType = 'json'
+  ): Promise<CType> {
+    console.log(`Slurm-web gateway API put ${resource}`)
+    return (
+      await requestServer(() => {
+        return http.put(resource, data, requestConfig(withToken, responseType))
+      })
+    ).data as CType
+  }
+
+  async function patch<CType>(
+    resource: string,
+    data: unknown,
+    withToken: boolean = true,
+    responseType: ResponseType = 'json'
+  ): Promise<CType> {
+    console.log(`Slurm-web gateway API patch ${resource}`)
+    return (
+      await requestServer(() => {
+        return http.patch(resource, data, requestConfig(withToken, responseType))
+      })
+    ).data as CType
+  }
+
+  async function deleteRequest<CType>(
+    resource: string,
+    withToken: boolean = true,
+    responseType: ResponseType = 'json'
+  ): Promise<CType> {
+    console.log(`Slurm-web gateway API delete ${resource}`)
+    return (
+      await requestServer(() => {
+        return http.delete(resource, requestConfig(withToken, responseType))
+      })
+    ).data as CType
+  }
   return {
     abortController,
     get,
     post,
-    postRaw
+    postRaw,
+    put,
+    patch,
+    delete: deleteRequest
   }
 }

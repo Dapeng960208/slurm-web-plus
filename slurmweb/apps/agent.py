@@ -9,6 +9,7 @@ import urllib
 import logging
 from types import SimpleNamespace
 
+from rfl.authentication.user import AuthenticatedUser
 from rfl.web.tokens import RFLTokenizedRBACWebApp
 
 try:
@@ -21,6 +22,7 @@ except ModuleNotFoundError:
     from werkzeug import wsgi as dispatcher
 
 from . import SlurmwebWebApp
+from ..access_control import AccessControlPolicyManager
 from ..version import get_version
 from ..views import SlurmwebAppRoute
 from ..views import agent as views
@@ -57,6 +59,32 @@ class SlurmwebAppAgent(SlurmwebWebApp, RFLTokenizedRBACWebApp):
         SlurmwebAppRoute(f"/v{get_version()}/jobs/history", views.jobs_history),
         SlurmwebAppRoute(f"/v{get_version()}/jobs/history/<int:record_id>", views.job_history_detail),
         SlurmwebAppRoute(f"/v{get_version()}/users/cache", views.ldap_cache_users),
+        SlurmwebAppRoute(f"/v{get_version()}/access/roles", views.access_roles),
+        SlurmwebAppRoute(
+            f"/v{get_version()}/access/roles",
+            views.create_access_role,
+            methods=["POST"],
+        ),
+        SlurmwebAppRoute(
+            f"/v{get_version()}/access/roles/<int:role_id>",
+            views.update_access_role,
+            methods=["PATCH"],
+        ),
+        SlurmwebAppRoute(
+            f"/v{get_version()}/access/roles/<int:role_id>",
+            views.delete_access_role,
+            methods=["DELETE"],
+        ),
+        SlurmwebAppRoute(f"/v{get_version()}/access/users", views.access_users),
+        SlurmwebAppRoute(
+            f"/v{get_version()}/access/users/<username>/roles",
+            views.access_user_roles,
+        ),
+        SlurmwebAppRoute(
+            f"/v{get_version()}/access/users/<username>/roles",
+            views.update_access_user_roles,
+            methods=["PUT"],
+        ),
         SlurmwebAppRoute(
             f"/v{get_version()}/user/<username>/metrics/history",
             views.user_metrics_history,
@@ -122,6 +150,7 @@ class SlurmwebAppAgent(SlurmwebWebApp, RFLTokenizedRBACWebApp):
             policy=self.settings.policy.definition,
             roles=selected_roles_policy_path,
         )
+        self.policy = AccessControlPolicyManager(self.policy)
         if self.settings.cache.enabled:
             self.cache = CachingService(
                 host=self.settings.cache.host,
@@ -208,6 +237,8 @@ class SlurmwebAppAgent(SlurmwebWebApp, RFLTokenizedRBACWebApp):
         self.user_analytics_store = None
         self.user_metrics_store = None
         self.user_metrics_enabled = False
+        self.access_control_store = None
+        self.access_control_enabled = False
         database_ready = False
         database_error = None
         if self.settings.database.enabled:
@@ -219,11 +250,38 @@ class SlurmwebAppAgent(SlurmwebWebApp, RFLTokenizedRBACWebApp):
                 database_ready = True
                 logger.info("Database support enabled")
             except Exception as err:
+                self.users_store = None
                 database_error = err
                 logger.warning("Unable to initialize database support: %s", err)
         else:
             database_error = RuntimeError("[database] enabled = no")
             logger.debug("Database support is disabled")
+
+        if getattr(self.settings.persistence, "access_control_enabled", False):
+            if database_ready:
+                try:
+                    from ..persistence.access_control_store import AccessControlStore
+
+                    self.access_control_store = AccessControlStore(self.settings.database)
+                    self.access_control_store.validate_connection()
+                    self.access_control_enabled = True
+                    logger.info("Access control support enabled")
+                except Exception as err:
+                    logger.warning("Unable to initialize access control support: %s", err)
+            else:
+                reason = (
+                    str(database_error) if database_error is not None else "unknown reason"
+                )
+                logger.warning(
+                    "Access control is enabled but database support is unavailable: %s",
+                    reason,
+                )
+        else:
+            logger.debug("Access control is disabled")
+
+        self.policy._access_control_enabled = self.access_control_enabled
+        self.policy.set_access_control_store(self.access_control_store)
+        self._refresh_cached_policy_snapshots_on_startup()
 
         if self.settings.persistence.enabled:
             if database_ready:
@@ -303,3 +361,53 @@ class SlurmwebAppAgent(SlurmwebWebApp, RFLTokenizedRBACWebApp):
             logger.info("Node real-time metrics enabled")
         else:
             logger.debug("Node real-time metrics is disabled")
+
+    def _refresh_cached_policy_snapshots_on_startup(self):
+        if not getattr(self.settings.persistence, "access_control_enabled", False):
+            return
+        if self.users_store is None:
+            return
+
+        try:
+            cached_users = self.users_store.list_cached_users_for_policy_refresh()
+        except Exception as err:
+            logger.warning(
+                "Unable to load cached users for startup policy snapshot refresh: %s",
+                err,
+            )
+            return
+
+        logger.info(
+            "Refreshing policy snapshots for %d cached users on startup",
+            len(cached_users),
+        )
+        refreshed = 0
+        failed = 0
+        for cached_user in cached_users:
+            try:
+                user = AuthenticatedUser(
+                    login=cached_user["username"],
+                    fullname=cached_user.get("fullname"),
+                    groups=cached_user.get("groups") or [],
+                )
+                policy_roles, policy_actions = self.policy.file_roles_actions(user)
+                self.users_store.update_policy_snapshot(
+                    cached_user["username"],
+                    sorted(policy_roles),
+                    sorted(policy_actions),
+                )
+                refreshed += 1
+            except Exception as err:
+                failed += 1
+                logger.warning(
+                    "Unable to refresh startup policy snapshot for cached user %s: %s",
+                    cached_user.get("username"),
+                    err,
+                )
+
+        logger.info(
+            "Startup policy snapshot refresh completed: scanned=%d refreshed=%d failed=%d",
+            len(cached_users),
+            refreshed,
+            failed,
+        )

@@ -159,6 +159,7 @@ async def get_cluster(agent):
             "database": agent.database,
             "permissions": permissions,
             "persistence": agent.persistence,
+            "access_control": getattr(agent, "access_control", False),
             "node_metrics": agent.node_metrics,
             "user_metrics": getattr(agent, "user_metrics", False),
             "capabilities": agent.capabilities,
@@ -302,6 +303,23 @@ def request_agent(
                 headers=headers,
                 json=request.json,
             )
+        elif request.method == "PUT":
+            return session.put(
+                url,
+                headers=headers,
+                json=request.json,
+            )
+        elif request.method == "PATCH":
+            return session.patch(
+                url,
+                headers=headers,
+                json=request.json,
+            )
+        elif request.method == "DELETE":
+            return session.delete(
+                url,
+                headers=headers,
+            )
         else:
             abort(500, f"Unsupported request method {request.method}")
     except aiohttp.ClientConnectionError as err:
@@ -361,6 +379,12 @@ def stats(cluster: str):
 
 @check_jwt
 @validate_cluster
+def permissions(cluster: str):
+    return proxy_agent(cluster, "permissions", request.token)
+
+
+@check_jwt
+@validate_cluster
 def cache_stats(cluster: str):
     return proxy_agent(cluster, "cache/stats", request.token)
 
@@ -375,6 +399,48 @@ def cache_reset(cluster: str):
 @validate_cluster
 def ldap_cache_users(cluster: str):
     return proxy_agent(cluster, "users/cache", request.token)
+
+
+@check_jwt
+@validate_cluster
+def access_roles(cluster: str):
+    return proxy_agent(cluster, "access/roles", request.token)
+
+
+@check_jwt
+@validate_cluster
+def create_access_role(cluster: str):
+    return proxy_agent(cluster, "access/roles", request.token)
+
+
+@check_jwt
+@validate_cluster
+def update_access_role(cluster: str, role_id: int):
+    return proxy_agent(cluster, f"access/roles/{role_id}", request.token)
+
+
+@check_jwt
+@validate_cluster
+def delete_access_role(cluster: str, role_id: int):
+    return proxy_agent(cluster, f"access/roles/{role_id}", request.token)
+
+
+@check_jwt
+@validate_cluster
+def access_users(cluster: str):
+    return proxy_agent(cluster, "access/users", request.token)
+
+
+@check_jwt
+@validate_cluster
+def access_user_roles(cluster: str, username: str):
+    return proxy_agent(cluster, f"access/users/{username}/roles", request.token)
+
+
+@check_jwt
+@validate_cluster
+def update_access_user_roles(cluster: str, username: str):
+    return proxy_agent(cluster, f"access/users/{username}/roles", request.token)
 
 
 @check_jwt

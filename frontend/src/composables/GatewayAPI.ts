@@ -24,7 +24,9 @@ export interface ClusterDescription {
   metrics: boolean
   cache: boolean
   database?: boolean
+  access_control?: boolean
   permissions: ClusterPermissions
+  capabilities?: ClusterCapabilities
   versions?: ClusterVersions
   stats?: ClusterStats
   error?: boolean
@@ -33,9 +35,119 @@ export interface ClusterDescription {
   user_metrics?: boolean
 }
 
-interface ClusterPermissions {
+export interface ClusterPermissionAssignment {
   roles: string[]
   actions: string[]
+}
+
+export interface ClusterPermissionsSources {
+  policy?: ClusterPermissionAssignment
+  custom?: ClusterPermissionAssignment
+  merged?: ClusterPermissionAssignment
+}
+
+export interface ClusterPermissions extends ClusterPermissionAssignment {
+  sources?: ClusterPermissionsSources
+}
+
+export interface ClusterCapabilities {
+  access_control?: boolean
+  job_history?: boolean
+  ldap_cache?: boolean
+  node_metrics?: boolean
+  user_metrics?: boolean | Record<string, unknown>
+  user_analytics?: Record<string, unknown>
+  [key: string]: unknown
+}
+
+export type AccessControlSourceName = keyof ClusterPermissionsSources
+
+function normalizeClusterPermissionAssignment(
+  assignment?: ClusterPermissionAssignment
+): ClusterPermissionAssignment {
+  return {
+    roles: [...(assignment?.roles ?? [])],
+    actions: [...(assignment?.actions ?? [])]
+  }
+}
+
+export function normalizeClusterPermissions(permissions?: ClusterPermissions): ClusterPermissions {
+  const merged = normalizeClusterPermissionAssignment({
+    roles: permissions?.sources?.merged?.roles ?? permissions?.roles ?? [],
+    actions: permissions?.sources?.merged?.actions ?? permissions?.actions ?? []
+  })
+
+  return {
+    roles: merged.roles,
+    actions: merged.actions,
+    sources: {
+      policy: normalizeClusterPermissionAssignment(permissions?.sources?.policy),
+      custom: normalizeClusterPermissionAssignment(permissions?.sources?.custom),
+      merged
+    }
+  }
+}
+
+interface ClusterPermissionsResponse extends ClusterPermissions {}
+
+interface ClusterPermissionsLegacyResponse extends ClusterPermissionAssignment {}
+
+function clusterSupportsAccessControl(cluster?: ClusterDescription): boolean {
+  return cluster?.access_control === true || cluster?.capabilities?.access_control === true
+}
+
+export function hasClusterAccessControl(cluster?: ClusterDescription): boolean {
+  return clusterSupportsAccessControl(cluster)
+}
+
+export interface CustomRole {
+  id: number
+  name: string
+  description: string | null
+  actions: string[]
+  created_at?: string | null
+  updated_at?: string | null
+}
+
+export interface CustomRolePayload {
+  name: string
+  description?: string | null
+  actions: string[]
+}
+
+export interface AccessControlRolesResponse {
+  items: CustomRole[]
+}
+
+export interface AccessControlUserRole {
+  id: number
+  name: string
+  description?: string | null
+  actions?: string[]
+}
+
+export interface AccessControlUserRow {
+  username: string
+  fullname: string | null
+  policy_roles: string[]
+  policy_actions: string[]
+  custom_roles: AccessControlUserRole[]
+  custom_actions: string[]
+}
+
+export interface AccessControlUsersResponse {
+  items: AccessControlUserRow[]
+  total: number
+  page: number
+  page_size: number
+}
+
+export interface AccessControlUserAssignment extends AccessControlUserRow {}
+
+export interface AccessControlUsersFilters {
+  username?: string
+  page?: number
+  page_size?: number
 }
 
 export interface UserDescription {
@@ -1136,14 +1248,19 @@ export function useGatewayAPI() {
   async function clusters(): Promise<Array<ClusterDescription>> {
     const result = await restAPI.get<ClusterDescription[]>(`/clusters`)
     console.log('[GatewayAPI] clusters loaded')
-    result.forEach((c) => {
+    return result.map((cluster) => {
       console.log(
-        `[GatewayAPI]   cluster "${c.name}": persistence=${c.persistence ?? false}, node_metrics=${
-          c.node_metrics ?? false
+        `[GatewayAPI]   cluster "${cluster.name}": persistence=${cluster.persistence ?? false}, node_metrics=${
+          cluster.node_metrics ?? false
         }`
       )
+      return {
+        ...cluster,
+        access_control:
+          cluster.access_control ?? (cluster.capabilities?.access_control === true),
+        permissions: normalizeClusterPermissions(cluster.permissions)
+      }
     })
-    return result
   }
 
   async function users(): Promise<Array<UserDescription>> {
@@ -1204,6 +1321,73 @@ export function useGatewayAPI() {
 
   async function associations(cluster: string): Promise<Array<ClusterAssociation>> {
     return await restAPI.get<ClusterAssociation[]>(`/agents/${cluster}/associations`)
+  }
+
+  async function permissions(cluster: string): Promise<ClusterPermissions> {
+    const result = await restAPI.get<
+      ClusterPermissionsResponse | ClusterPermissionsLegacyResponse
+    >(`/agents/${cluster}/permissions`)
+    return normalizeClusterPermissions(result)
+  }
+
+  async function access_roles(cluster: string): Promise<CustomRole[]> {
+    const result = await restAPI.get<AccessControlRolesResponse>(`/agents/${cluster}/access/roles`)
+    return result.items
+  }
+
+  async function create_access_role(
+    cluster: string,
+    payload: CustomRolePayload
+  ): Promise<CustomRole> {
+    return await restAPI.post<CustomRole>(`/agents/${cluster}/access/roles`, payload)
+  }
+
+  async function update_access_role(
+    cluster: string,
+    roleId: number,
+    payload: CustomRolePayload
+  ): Promise<CustomRole> {
+    return await restAPI.patch<CustomRole>(`/agents/${cluster}/access/roles/${roleId}`, payload)
+  }
+
+  async function delete_access_role(cluster: string, roleId: number): Promise<{ result: string }> {
+    return await restAPI.delete<{ result: string }>(`/agents/${cluster}/access/roles/${roleId}`)
+  }
+
+  async function access_users(
+    cluster: string,
+    filters: AccessControlUsersFilters = {}
+  ): Promise<AccessControlUsersResponse> {
+    const params = new URLSearchParams()
+    if (filters.username) params.append('username', filters.username)
+    if (filters.page) params.append('page', filters.page.toString())
+    if (filters.page_size) params.append('page_size', filters.page_size.toString())
+    const query = params.toString()
+    return await restAPI.get<AccessControlUsersResponse>(
+      `/agents/${cluster}/access/users${query ? '?' + query : ''}`
+    )
+  }
+
+  async function access_user_roles(
+    cluster: string,
+    username: string
+  ): Promise<AccessControlUserAssignment> {
+    const encodedUsername = encodeURIComponent(username)
+    return await restAPI.get<AccessControlUserAssignment>(
+      `/agents/${cluster}/access/users/${encodedUsername}/roles`
+    )
+  }
+
+  async function update_access_user_roles(
+    cluster: string,
+    username: string,
+    roleIds: number[]
+  ): Promise<AccessControlUserAssignment> {
+    const encodedUsername = encodeURIComponent(username)
+    return await restAPI.put<AccessControlUserAssignment>(
+      `/agents/${cluster}/access/users/${encodedUsername}/roles`,
+      { role_ids: roleIds }
+    )
   }
 
   async function cache_stats(cluster: string): Promise<CacheStatistics> {
@@ -1458,6 +1642,14 @@ export function useGatewayAPI() {
     reservations,
     accounts,
     associations,
+    permissions,
+    access_roles,
+    create_access_role,
+    update_access_role,
+    delete_access_role,
+    access_users,
+    access_user_roles,
+    update_access_user_roles,
     cache_stats,
     ldap_cache_users,
     cache_reset,
