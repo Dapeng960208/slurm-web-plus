@@ -34,8 +34,8 @@ const activeFiltersGroups: Array<{
     icon: BoltIcon,
     removeCallback: runtimeStore.jobs.removeStateFilter,
     colors: {
-      badge: 'border-gray-200 dark:border-gray-400 bg-gray-600 dark:bg-gray-500',
-      button: 'text-gray-400 hover:bg-gray-700 hover:text-gray-500'
+      badge: 'border-[rgba(80,105,127,0.16)] bg-[rgba(80,105,127,0.92)]',
+      button: 'text-white/70 hover:bg-white/14 hover:text-white'
     }
   },
   {
@@ -44,8 +44,8 @@ const activeFiltersGroups: Array<{
     icon: UserIcon,
     removeCallback: runtimeStore.jobs.removeUserFilter,
     colors: {
-      badge: 'border-gray-200 dark:border-gray-400 bg-emerald-500',
-      button: 'text-emerald-600 hover:bg-emerald-600 hover:text-emerald-700'
+      badge: 'border-[rgba(123,191,31,0.18)] bg-[rgba(123,191,31,0.94)]',
+      button: 'text-white/70 hover:bg-white/14 hover:text-white'
     }
   },
   {
@@ -54,8 +54,8 @@ const activeFiltersGroups: Array<{
     icon: UsersIcon,
     removeCallback: runtimeStore.jobs.removeAccountFilter,
     colors: {
-      badge: 'border-gray-200 dark:border-gray-400 bg-yellow-500',
-      button: 'text-yellow-600 hover:bg-yellow-600 hover:text-yellow-700'
+      badge: 'border-[rgba(239,155,40,0.18)] bg-[rgba(239,155,40,0.92)]',
+      button: 'text-white/70 hover:bg-white/14 hover:text-white'
     }
   },
   {
@@ -64,8 +64,8 @@ const activeFiltersGroups: Array<{
     icon: SwatchIcon,
     removeCallback: runtimeStore.jobs.removeQosFilter,
     colors: {
-      badge: 'border-gray-200 dark:border-gray-400 bg-purple-500',
-      button: 'text-purple-600 hover:bg-purple-600 hover:text-purple-700'
+      badge: 'border-[rgba(80,105,127,0.16)] bg-[linear-gradient(135deg,rgba(80,105,127,0.96),rgba(108,122,128,0.96))]',
+      button: 'text-white/70 hover:bg-white/14 hover:text-white'
     }
   },
   {
@@ -74,8 +74,8 @@ const activeFiltersGroups: Array<{
     icon: RectangleGroupIcon,
     removeCallback: runtimeStore.jobs.removePartitionFilter,
     colors: {
-      badge: 'border-gray-200 dark:border-gray-400 bg-amber-700',
-      button: 'text-amber-800 hover:bg-amber-800 hover:text-amber-900'
+      badge: 'border-[rgba(32,42,53,0.18)] bg-[rgba(32,42,53,0.94)]',
+      button: 'text-white/70 hover:bg-white/14 hover:text-white'
     }
   }
 ]
@@ -83,14 +83,20 @@ const activeFiltersGroups: Array<{
 
 <template>
   <!-- Active filters -->
-  <div v-show="!runtimeStore.jobs.emptyFilters()" class="bg-gray-100 dark:bg-gray-800">
-    <div class="mx-auto px-4 py-3 sm:flex sm:items-center sm:px-6 lg:px-8">
-      <h3 class="text-sm font-medium text-gray-500">
+  <div
+    v-show="!runtimeStore.jobs.emptyFilters()"
+    class="ui-panel-soft rounded-[24px] px-4 py-4 sm:px-6"
+  >
+    <div class="mx-auto sm:flex sm:items-center">
+      <h3 class="text-sm font-semibold text-[var(--color-brand-ink-strong)]">
         <FunnelIcon class="mr-1 h-4 w-4" />
         <span class="sr-only">Filters active</span>
       </h3>
 
-      <div aria-hidden="true" class="hidden h-5 w-px bg-gray-300 sm:ml-4 sm:block" />
+      <div
+        aria-hidden="true"
+        class="hidden h-5 w-px bg-[rgba(80,105,127,0.16)] sm:ml-4 sm:block"
+      />
 
       <div class="mt-2 sm:mt-0 sm:ml-4">
         <div class="-m-1 flex flex-wrap items-center">
@@ -100,7 +106,7 @@ const activeFiltersGroups: Array<{
               :key="activeFilter"
               :class="[
                 activeFilterGroup.colors.badge,
-                'm-1 inline-flex items-center rounded-full border py-1.5 pr-2 pl-3 text-xs font-medium text-white'
+                'm-1 inline-flex items-center rounded-full border px-3 py-1.5 text-xs font-medium text-white shadow-[var(--shadow-soft)]'
               ]"
             >
               <component :is="activeFilterGroup.icon" class="mr-1 h-4 w-4"></component>

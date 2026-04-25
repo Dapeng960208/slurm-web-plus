@@ -53,8 +53,14 @@ describe('views/settings/SettingsAccount.vue', () => {
     })
 
     const links = wrapper.findAllComponents(RouterLinkStub)
-    expect(links.find((link) => link.props('to')?.name === 'user')).toBeDefined()
-    expect(links.find((link) => link.props('to')?.name === 'user-analysis')).toBeDefined()
+    expect(links.find((link) => link.props('to')?.name === 'my-profile')).toBeDefined()
+    expect(
+      links.find(
+        (link) =>
+          link.props('to')?.name === 'my-profile' &&
+          link.props('to')?.query?.section === 'analysis'
+      )
+    ).toBeDefined()
     expect(links.find((link) => link.props('to')?.name === 'jobs-history')).toBeDefined()
   })
 

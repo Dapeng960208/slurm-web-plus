@@ -475,6 +475,33 @@
     line-height: 1;
   }
 
+  .ui-inline-link,
+  .ui-user-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    color: var(--color-brand-blue);
+    font-weight: 600;
+    transition:
+      color 180ms ease,
+      transform 180ms ease;
+  }
+
+  .ui-inline-link:hover,
+  .ui-user-link:hover {
+    color: var(--color-brand-ink-strong);
+    transform: translateX(1px);
+  }
+
+  .ui-user-link::before {
+    content: '';
+    width: 0.42rem;
+    height: 0.42rem;
+    border-radius: 999px;
+    background: linear-gradient(135deg, rgba(182, 232, 44, 0.95), rgba(80, 105, 127, 0.88));
+    box-shadow: 0 0 0 4px rgba(182, 232, 44, 0.08);
+  }
+
   .ui-panel-title {
     color: var(--color-brand-ink-strong);
     font-size: 1.05rem;
@@ -491,6 +518,86 @@
     position: relative;
     height: 20rem;
     width: 100%;
+  }
+
+  .ui-percent-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    min-width: 0;
+    border-radius: 999px;
+    border: 1px solid rgba(80, 105, 127, 0.14);
+    background: rgba(255, 255, 255, 0.92);
+    box-shadow: var(--shadow-soft);
+    color: var(--color-brand-ink-strong);
+  }
+
+  .ui-percent-badge-sm {
+    padding: 0.28rem 0.55rem 0.28rem 0.38rem;
+    font-size: 0.78rem;
+    font-weight: 700;
+  }
+
+  .ui-percent-badge-md {
+    padding: 0.36rem 0.72rem 0.36rem 0.42rem;
+    font-size: 0.96rem;
+    font-weight: 700;
+  }
+
+  .ui-percent-badge-lg {
+    padding: 0.48rem 0.88rem 0.48rem 0.5rem;
+    font-size: 1.3rem;
+    font-weight: 800;
+  }
+
+  .ui-percent-badge-icon-shell {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    background: rgba(182, 232, 44, 0.16);
+    color: var(--color-brand-blue);
+    width: 1.5rem;
+    height: 1.5rem;
+    flex: 0 0 auto;
+  }
+
+  .ui-percent-badge-lg .ui-percent-badge-icon-shell {
+    width: 1.8rem;
+    height: 1.8rem;
+  }
+
+  .ui-percent-badge-icon {
+    width: 0.9rem;
+    height: 0.9rem;
+  }
+
+  .ui-percent-badge-value {
+    white-space: nowrap;
+    line-height: 1;
+  }
+
+  .ui-percent-badge-label {
+    color: var(--color-brand-muted);
+    font-size: 0.76em;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .ui-percent-badge-default {
+    color: var(--color-brand-ink-strong);
+  }
+
+  .ui-percent-badge-success {
+    border-color: rgba(123, 191, 31, 0.22);
+  }
+
+  .ui-percent-badge-warning {
+    border-color: rgba(239, 155, 40, 0.22);
+  }
+
+  .ui-percent-badge-danger {
+    border-color: rgba(216, 75, 80, 0.22);
   }
 
   .ui-chart-skeleton {
@@ -635,6 +742,116 @@
 
   .ui-panel-divider {
     border-top: 1px solid rgba(80, 105, 127, 0.12);
+  }
+
+  .ui-empty-state {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+    border-radius: var(--radius-panel);
+    border: 1px dashed rgba(80, 105, 127, 0.2);
+    background: rgba(244, 248, 251, 0.86);
+    padding: 1.2rem 1.25rem;
+  }
+
+  .ui-empty-state-icon,
+  .ui-user-workspace-icon,
+  .ui-forbidden-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    border-radius: 999px;
+    background: rgba(182, 232, 44, 0.16);
+    color: var(--color-brand-blue);
+  }
+
+  .ui-empty-state-icon,
+  .ui-user-workspace-icon {
+    width: 2.25rem;
+    height: 2.25rem;
+  }
+
+  .ui-forbidden-panel {
+    display: flex;
+    width: 100%;
+    max-width: 36rem;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.5rem;
+    text-align: center;
+  }
+
+  .ui-forbidden-icon {
+    width: 4rem;
+    height: 4rem;
+  }
+
+  .ui-user-menu-button {
+    display: inline-flex;
+    min-width: 0;
+    align-items: center;
+    gap: 0.75rem;
+    border-radius: 999px;
+    border: 1px solid rgba(80, 105, 127, 0.12);
+    background: rgba(255, 255, 255, 0.92);
+    padding: 0.42rem 0.72rem 0.42rem 0.45rem;
+    box-shadow: var(--shadow-soft);
+  }
+
+  .ui-user-menu-avatar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 999px;
+    background: linear-gradient(135deg, rgba(182, 232, 44, 0.95), rgba(80, 105, 127, 0.78));
+    color: var(--color-brand-deep);
+    flex: 0 0 auto;
+  }
+
+  .ui-user-menu-panel {
+    position: absolute;
+    right: 0;
+    z-index: 60;
+    margin-top: 0.65rem;
+    min-width: 16rem;
+    overflow: hidden;
+    border-radius: 24px;
+    border: 1px solid rgba(255, 255, 255, 0.78);
+    background: rgba(255, 255, 255, 0.94);
+    box-shadow: var(--shadow-panel);
+    backdrop-filter: blur(14px);
+  }
+
+  .ui-user-menu-header {
+    border-bottom: 1px solid rgba(80, 105, 127, 0.1);
+    padding: 1rem 1rem 0.85rem;
+  }
+
+  .ui-user-menu-list {
+    padding: 0.6rem;
+  }
+
+  .ui-user-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    border-radius: 18px;
+    padding: 0.78rem 0.85rem;
+    color: var(--color-brand-ink-strong);
+    font-size: 0.92rem;
+    font-weight: 600;
+    transition:
+      background-color 180ms ease,
+      color 180ms ease,
+      transform 180ms ease;
+  }
+
+  .ui-user-menu-item-active {
+    background: rgba(182, 232, 44, 0.14);
+    color: var(--color-brand-deep);
   }
 
   .ui-table-shell {
@@ -908,5 +1125,42 @@
     background:
       linear-gradient(180deg, rgba(255, 255, 255, 0.97), rgba(239, 244, 246, 0.86)),
       radial-gradient(circle at top left, rgba(182, 232, 44, 0.1), transparent 38%);
+  }
+
+  .ui-tool-chart {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .ui-tool-chart-row {
+    border-radius: calc(var(--radius-panel) - 8px);
+    border: 1px solid rgba(80, 105, 127, 0.12);
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(239, 244, 246, 0.88)),
+      radial-gradient(circle at top left, rgba(182, 232, 44, 0.1), transparent 42%);
+    padding: 1rem;
+    box-shadow: var(--shadow-soft);
+  }
+
+  .ui-tool-chart-track {
+    height: 0.85rem;
+    overflow: hidden;
+    border-radius: 999px;
+    background: rgba(80, 105, 127, 0.12);
+  }
+
+  .ui-tool-chart-fill {
+    height: 100%;
+    border-radius: inherit;
+    box-shadow: 0 10px 18px rgba(80, 105, 127, 0.14);
+  }
+
+  .ui-tool-chart-fill-memory {
+    background: linear-gradient(135deg, rgba(182, 232, 44, 0.96), rgba(123, 191, 31, 0.92));
+  }
+
+  .ui-tool-chart-fill-jobs {
+    background: linear-gradient(135deg, rgba(80, 105, 127, 0.92), rgba(32, 42, 53, 0.92));
   }
 }

@@ -1,286 +1,99 @@
-# Slurm Web Plus 近期增强能力（面向交付与维护）
+# 最新功能
 
-本文聚焦最近一批已经落地的增强能力，目标是让开发、测试、交付和后续 AI 能快速理解“功能为什么加、怎么开、怎么用、依赖什么、文档应该改哪里”。
+## 1. 用户工作台合并
 
-## 1. 功能概览
+本轮前端把“用户信息页”“用户分析页”“右上角我的入口”合并成一个统一的用户工作台。
 
-最近新增或显著增强的能力包括：
+涉及路由：
 
-- 数据库持久化的 AI 集群助手
-- 数据库驱动的访问控制自定义角色
-- 用户分析与集群分析工作台
-- 历史作业访问控制与 LDAP Cache 协同
-- Cache 页面空态和可观测性改进
+- `/:cluster/users/:user`
+- `/:cluster/me`
+- `/:cluster/users/:user/analysis`
+  - 保留旧入口
+  - 自动重定向到 `user` 路由并附带 `query.section=analysis`
 
-这些能力都不是孤立补丁，而是在已有 Gateway / Agent 架构上形成的一组“可选增强模块”。
+页面结构固定为三类区块：
 
-## 2. AI 集群助手
+- 我的身份与权限摘要
+- 用户资料区
+- 用户分析区
 
-### 2.1 目标
+权限矩阵：
 
-为单个集群提供受权限约束的多轮对话助手，让用户能够用自然语言查询：
+| 场景 | `associations-view` | `view-jobs` + `user_metrics` | 结果 |
+|---|---|---|---|
+| 查看自己 | 否 | 否 | 可进入，只显示身份与权限摘要 |
+| 查看自己 | 是 | 否 | 显示摘要和资料区 |
+| 查看自己 | 否 | 是 | 显示摘要和分析区 |
+| 查看别人 | 是 | 否 | 仅显示资料区 |
+| 查看别人 | 否 | 是 | 仅显示分析区 |
+| 查看别人 | 否 | 否 | 跳 `/forbidden` |
 
-- 集群状态
-- 作业详情
-- 节点资源
-- 分区、QOS、账户、预约
-- 节点和集群指标
-- 历史作业数据
+## 2. 统一 403 无权限拦截页
 
-### 2.2 启用条件
+新增 `/forbidden` 整页拦截页，用于所有整页级权限不足的场景。
 
-需要同时满足：
+页面固定包含：
 
-- `[ai] enabled = yes`
-- `[database] enabled = yes`
-- 数据库已完成最新迁移
-- 当前用户拥有 `view-ai` 或 `manage-ai` 权限
+- 当前页面无访问权限
+- 缺少的 permission 说明
+- 请联系管理员申请权限
+- 返回上一路由
+- 回 dashboard / clusters 的快捷入口
 
-### 2.3 数据模型
+当前已经接入统一 403 的页面：
 
-AI 相关数据存储在数据库中，主要包括：
-
-- `ai_model_configs`：模型配置
-- `ai_conversations`：会话头信息
-- `ai_messages`：会话消息
-- `ai_tool_calls`：工具调用审计记录
-
-关键约束：
-
-- 每个集群可配置多个模型
-- 每个集群只能有一个默认模型
-- 密钥密文存储，返回前端时只暴露掩码
-
-### 2.4 前端行为
-
-入口与页面：
-
-- 设置页：`/settings/ai`
-- 会话页：`/:cluster/ai`
-- 兼容重定向：`/:cluster/assistant -> /:cluster/ai`
-
-用户可见能力：
-
-- 模型配置增删改查
-- 启用/禁用
-- 设置默认模型
-- 连接校验
-- 多轮会话
-- 会话历史恢复
-- SSE 流式输出
-- 工具调用执行轨迹展示
-
-### 2.5 后端行为
-
-Agent 暴露以下核心接口：
-
-- `GET /v{version}/ai/configs`
-- `POST /v{version}/ai/configs`
-- `PATCH /v{version}/ai/configs/<id>`
-- `DELETE /v{version}/ai/configs/<id>`
-- `POST /v{version}/ai/configs/<id>/validate`
-- `POST /v{version}/ai/chat/stream`
-- `GET /v{version}/ai/conversations`
-- `GET /v{version}/ai/conversations/<id>`
-
-Gateway 在 `/api/agents/<cluster>/ai/...` 下做镜像代理。
-
-### 2.6 安全边界
-
-- AI 只能使用只读工具
-- 工具执行受用户 RBAC 限制
-- AI 不能透传原始 slurmrestd URL
-- AI 不能透传原始 PromQL
-- AI 不允许执行写操作、删除、提交、取消等变更行为
-
-相关专项文档：
-
-- [AI 需求说明](../features/ai/requirements.md)
-- [AI 测试计划](../features/ai/test-plan.md)
-
-## 3. 访问控制增强
-
-### 3.1 目标
-
-在原有文件策略 RBAC 的基础上，引入数据库持久化的“自定义角色 + 用户绑定”能力，满足更灵活的集群授权需求。
-
-### 3.2 启用条件
-
-- `[database] enabled = yes`
-- `[persistence] access_control_enabled = yes`
-
-### 3.3 权限合并模型
-
-有效权限来源分三部分：
-
-- `policy`：文件策略角色与动作
-- `custom`：数据库自定义角色与动作
-- `merged`：两者合并后的最终结果
-
-前端在 `Settings > Account` 和 `Settings > Access Control` 中展示这些来源，便于排查“用户为什么有/没有某个权限”。
-
-### 3.4 页面与交互
-
-入口：
-
-- 设置页标签：`Access Control`
-
-页面能力：
-
-- 自定义角色列表
-- 角色创建、编辑、删除
-- 基于缓存用户的搜索和分页
-- 用户角色绑定编辑
-- 只读模式与可编辑模式区分
-
-### 3.5 后端行为
-
-Agent 接口：
-
-- `GET /v{version}/access/roles`
-- `POST /v{version}/access/roles`
-- `PATCH /v{version}/access/roles/<id>`
-- `DELETE /v{version}/access/roles/<id>`
-- `GET /v{version}/access/users`
-- `GET /v{version}/access/users/<username>/roles`
-- `PUT /v{version}/access/users/<username>/roles`
-
-新权限动作：
-
-- `roles-view`
-- `roles-manage`
-
-### 3.6 启动刷新机制
-
-Agent 启动时，如果访问控制启用且数据库可用，会根据缓存用户刷新策略快照：
-
-- 更新 `policy_roles`
-- 更新 `policy_actions`
-- 更新 `permission_synced_at`
-
-这一步不会查询 LDAP，也不会阻塞其他核心功能启动。
-
-相关专项文档：
-
-- [访问控制需求说明](../features/access-control/requirements.md)
-- [访问控制测试计划](../features/access-control/test-plan.md)
-
-## 4. 用户分析与集群分析
-
-### 4.1 用户分析
-
-目标：
-
-- 展示某个用户的提交趋势
-- 统计工具链使用情况
-- 给出日级执行汇总
-- 从用户详情页直接跳转历史作业和分析页
-
-入口：
-
-- 用户详情：`/:cluster/users/:user`
-- 用户分析：`/:cluster/users/:user/analysis`
-
-启用条件：
-
-- `user_metrics.enabled = yes`
-- 数据库、Prometheus、作业历史均可用
-
-数据来源：
-
-- `job_snapshots`
-- `user_tool_daily_stats`
-- Prometheus 用户指标
-
-相关专项文档：
-
-- [用户分析后端说明](../features/user-analytics/backend.md)
-
-### 4.2 集群分析工作台
-
-目标：
-
-- 把“集群现在忙不忙”和“为什么忙”聚合成一个分析视图
-- 辅助判断是容量不足、排队阻塞、策略限制还是资源碎片化
-
-入口：
-
-- `/:cluster/analysis`
-
-页面当前聚合：
-
-- 容量利用率
-- 队列阻塞原因
-- 分区热点
-- 历史压力
-- 等待时间样本
-- 推荐动作
-
-它同时消费三类数据：
-
-- 实时 `stats/jobs/nodes`
-- Prometheus 历史指标
-- 历史作业样本
-
-这是当前仓库从“可视化看板”向“分析工作台”演进的关键页面。
-
-## 5. 历史作业、LDAP Cache 与权限联动
-
-### 5.1 历史作业
-
-历史作业页已经不是简单的“数据库列表”，而是一个受 capability 和 permission 同时约束的能力：
-
-- 集群必须启用 `persistence`
-- 用户必须拥有 `view-history-jobs`
-
-入口：
-
+- `/:cluster/ai`
 - `/:cluster/jobs/history`
 - `/:cluster/jobs/history/:id`
+- `/settings/access-control`
+- `/settings/ai`
+- 用户工作台相关页面
 
-### 5.2 LDAP Cache
+## 3. 全站百分比统一样式
 
-登录成功后，Gateway 会把认证成功用户推送给支持数据库的 Agent，用于：
+新增共享百分比展示组件，统一约束为：
 
-- 缓存用户基础信息
-- 存储策略快照
-- 支撑访问控制页面
-- 支撑历史作业和分析页的用户展示
+- 主值始终显示数字
+- 搭配百分比图标
+- 不能只靠颜色表达状态
+- 空值和 `0` 值有稳定渲染
 
-这让系统在历史查询路径上不必每次实时访问 LDAP。
+已替换的高频页面：
 
-## 6. Cache 页面改进
+- `NodeView.vue`
+- `ClusterAnalysisView.vue`
+- `NodeMetricsHistoryChart.vue`
+- `SettingsCacheStatistics.vue`
 
-本轮对 `Settings > Cache` 做了明确的运维体验修正：
+## 4. 用户分析工具图升级
 
-- 无流量时不再保留无意义空白区域
-- metrics 开启但无样本时显示空态说明
-- metrics 关闭时显示原因解释
-- 统计区改为更稳定的信息布局
+用户分析里的工具模块已经改为双指标横向条，不再使用单一 canvas 柱状图。
 
-这类修改虽然不涉及后端模型，但直接改善了页面可读性和故障判断效率。
+新行为：
 
-相关专项文档：
+- 按平均最大内存降序
+- 同时展示平均最大内存和作业数
+- 每行附带 CPU、Runtime、jobs 标签
+- 配色沿用现有绿灰风格变量，不引入新的主色体系
 
-- [Cache 需求说明](../features/cache/requirements.md)
-- [Cache 测试计划](../features/cache/test-plan.md)
+## 5. 高频 UI 补强
 
-## 7. 这些功能之间的关系
+为了保持站点整体风格一致，本轮只做共享层增强，不做大面积重排：
 
-最近功能并不是并列孤岛，而是相互支撑：
+- 顶栏用户名改为带图标的用户菜单
+- Jobs / History / Account / LDAP Cache 中的用户名改为统一链接样式
+- filter chips 改为更贴近现有绿灰玻璃风格
+- 空状态、无权限态、统计卡片和分区标题补充轻量图标与统一微样式
 
-- LDAP Cache 为访问控制和历史分析提供稳定用户维度
-- 历史作业持久化为用户分析和集群分析提供样本
-- 访问控制为 AI 和历史能力提供更细粒度边界
-- AI 助手复用已有只读接口和权限模型，而不是自建旁路
+## 6. 本轮验证
 
-因此后续新增能力时，优先复用现有的权限、持久化和 capability 体系，不要重复造新的入口或数据通路。
+已完成：
 
-## 8. 后续文档维护要求
+- `npm --prefix frontend run type-check`
+- 关键改动相关的 Vitest 定向用例
+- `npm --prefix frontend run build`
 
-如果继续扩展以上任一能力，必须同步更新：
+说明：
 
-- [项目说明](./project-overview.md)
-- [架构总览](./architecture-overview.md)
-- 对应专项设计/测试文档
-- `docs/tracking/` 中的当前发布跟踪记录
+- `npm --prefix frontend run test:unit -- --run` 在当前环境中运行超过 300 秒后超时中断，尚未得到完整结果。

@@ -15,7 +15,9 @@ import ErrorAlert from '@/components/ErrorAlert.vue'
 import InfoAlert from '@/components/InfoAlert.vue'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
 import PageHeader from '@/components/PageHeader.vue'
+import PercentMetric from '@/components/PercentMetric.vue'
 import { analyzeCluster } from '@/composables/ClusterAnalysis'
+import { formatPercentValue } from '@/composables/percentages'
 import {
   isMetricRange,
   type ClusterJob,
@@ -91,7 +93,7 @@ const updatedAtLabel = computed(() => {
 const historicalCards = computed(() => {
   const busyCoresDetail =
     analysis.value.history.averageBusyCores != null && stats.value?.resources.cores
-      ? `${Math.round(percent(analysis.value.history.averageBusyCores, stats.value.resources.cores))}% average of declared CPU capacity`
+      ? `${formatPercentValue(percent(analysis.value.history.averageBusyCores, stats.value.resources.cores), 0)}% average of declared CPU capacity`
       : 'CPU history unavailable'
 
   return [
@@ -438,9 +440,7 @@ onUnmounted(() => {
                     </div>
                   </div>
                   <div class="text-right">
-                    <div class="text-2xl font-bold text-[var(--color-brand-ink-strong)]">
-                      {{ metric.value == null ? '--' : `${Math.round(metric.value)}%` }}
-                    </div>
+                    <PercentMetric :value="metric.value" :maximum-fraction-digits="0" />
                   </div>
                 </div>
                 <div class="ui-analysis-meter-track">
@@ -484,9 +484,11 @@ onUnmounted(() => {
                       {{ reason.count }} pending job(s)
                     </div>
                   </div>
-                  <div class="text-sm font-semibold text-[var(--color-brand-blue)]">
-                    {{ Math.round(reason.share * 100) }}%
-                  </div>
+                  <PercentMetric
+                    :value="Math.round(reason.share * 100)"
+                    size="sm"
+                    :maximum-fraction-digits="0"
+                  />
                 </div>
                 <div class="ui-analysis-meter-track mt-3">
                   <div

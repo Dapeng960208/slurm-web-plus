@@ -11,6 +11,9 @@ import AccountBreadcrumb from '@/components/accounts/AccountBreadcrumb.vue'
 import PanelSkeleton from '@/components/PanelSkeleton.vue'
 
 const mockClusterDataPoller = getMockClusterDataPoller<ClusterAssociation[]>()
+const analyticsPanelsStub = {
+  template: '<div>Tool Analysis</div>'
+}
 
 vi.mock('@/composables/DataPoller', () => ({
   useClusterDataPoller: () => mockClusterDataPoller
@@ -22,7 +25,7 @@ describe('UserView.vue', () => {
     useRuntimeStore().availableClusters = [
       {
         name: 'foo',
-        permissions: { roles: [], actions: [] },
+        permissions: { roles: [], actions: ['associations-view'] },
         racksdb: true,
         infrastructure: 'foo',
         metrics: true,
@@ -45,6 +48,11 @@ describe('UserView.vue', () => {
       props: {
         cluster: 'foo',
         user: 'root'
+      },
+      global: {
+        stubs: {
+          UserAnalyticsPanels: analyticsPanelsStub
+        }
       }
     })
     await flushPromises()
@@ -76,6 +84,7 @@ describe('UserView.vue', () => {
     useRuntimeStore().availableClusters = [
       {
         ...useRuntimeStore().availableClusters[0],
+        permissions: { roles: [], actions: ['associations-view', 'view-jobs'] },
         user_metrics: true
       }
     ]
@@ -86,19 +95,24 @@ describe('UserView.vue', () => {
       props: {
         cluster: 'foo',
         user: 'root'
+      },
+      global: {
+        stubs: {
+          UserAnalyticsPanels: analyticsPanelsStub
+        }
       }
     })
     await flushPromises()
 
-    expect(wrapper.get('#user-heading').findAll('router-link-stub').length).toBe(2)
-    expect(wrapper.text()).toContain('Analysis enabled')
+    expect(wrapper.text()).toContain('Submission and tool analytics')
+    expect(wrapper.text()).toContain('Tool Analysis')
   })
 
   test('shows history jobs shortcut when permission is granted', async () => {
     useRuntimeStore().availableClusters = [
       {
         ...useRuntimeStore().availableClusters[0],
-        permissions: { roles: [], actions: ['view-history-jobs'] }
+        permissions: { roles: [], actions: ['associations-view', 'view-history-jobs'] }
       }
     ]
     mockClusterDataPoller.loaded.value = true
@@ -108,11 +122,15 @@ describe('UserView.vue', () => {
       props: {
         cluster: 'foo',
         user: 'root'
+      },
+      global: {
+        stubs: {
+          UserAnalyticsPanels: analyticsPanelsStub
+        }
       }
     })
     await flushPromises()
 
-    expect(wrapper.get('#user-heading').findAll('router-link-stub').length).toBe(2)
     expect(wrapper.text()).toContain('History access granted')
   })
 
@@ -124,6 +142,11 @@ describe('UserView.vue', () => {
       props: {
         cluster: 'foo',
         user: 'root'
+      },
+      global: {
+        stubs: {
+          UserAnalyticsPanels: analyticsPanelsStub
+        }
       }
     })
 
@@ -139,6 +162,11 @@ describe('UserView.vue', () => {
       props: {
         cluster: 'foo',
         user: 'root'
+      },
+      global: {
+        stubs: {
+          UserAnalyticsPanels: analyticsPanelsStub
+        }
       }
     })
 
@@ -156,6 +184,11 @@ describe('UserView.vue', () => {
       props: {
         cluster: 'foo',
         user: 'nonexistent'
+      },
+      global: {
+        stubs: {
+          UserAnalyticsPanels: analyticsPanelsStub
+        }
       }
     })
 

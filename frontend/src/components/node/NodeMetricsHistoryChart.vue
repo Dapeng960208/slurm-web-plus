@@ -12,6 +12,7 @@ import { Chart } from 'chart.js/auto'
 import type { Point } from 'chart.js'
 import 'chartjs-adapter-luxon'
 import type { NodeMetricsHistory } from '@/composables/GatewayAPI'
+import { formatPercentValue } from '@/composables/percentages'
 
 const { history } = defineProps<{
   history: NodeMetricsHistory | null
@@ -98,7 +99,7 @@ onMounted(() => {
           padding: 12,
           displayColors: true,
           callbacks: {
-            label: (context) => `${context.dataset.label}: ${context.parsed.y.toFixed(2)}%`
+            label: (context) => `${context.dataset.label}: ${formatPercentValue(context.parsed.y, 2)}%`
           }
         }
       },
@@ -124,7 +125,7 @@ onMounted(() => {
           },
           ticks: {
             color: '#6c7a80',
-            callback: (value) => `${value}%`
+            callback: (value) => `${formatPercentValue(Number(value), 0)}%`
           }
         }
       }

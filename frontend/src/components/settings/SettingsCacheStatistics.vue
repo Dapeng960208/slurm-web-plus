@@ -13,6 +13,7 @@ import { useClusterDataPoller } from '@/composables/DataPoller'
 import useDoughnutChart from '@/composables/charts/Doughnut'
 import ErrorAlert from '@/components/ErrorAlert.vue'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
+import PercentMetric from '@/components/PercentMetric.vue'
 import { ArrowPathIcon } from '@heroicons/vue/20/solid'
 import { useGatewayAPI } from '@/composables/GatewayAPI'
 
@@ -71,17 +72,15 @@ async function resetCache(clusterName: string) {
   data.value = await gatewayAPI.cache_reset(clusterName)
 }
 
-function hitRateTotal(): string {
-  if (!data.value) return '-'
-  if (!(data.value.miss.total + data.value.hit.total)) return '-'
-  return (
-    ((data.value.hit.total / (data.value.miss.total + data.value.hit.total)) * 100).toFixed(2) + '%'
-  )
+function hitRateTotal(): number | null {
+  if (!data.value) return null
+  if (!(data.value.miss.total + data.value.hit.total)) return null
+  return (data.value.hit.total / (data.value.miss.total + data.value.hit.total)) * 100
 }
 
-function hitRateKey(key: string, value: number): string {
-  if (!(hitValue(key) + value)) return '-'
-  return ((hitValue(key) / (hitValue(key) + value)) * 100).toFixed(2) + '%'
+function hitRateKey(key: string, value: number): number | null {
+  if (!(hitValue(key) + value)) return null
+  return (hitValue(key) / (hitValue(key) + value)) * 100
 }
 </script>
 
@@ -126,7 +125,7 @@ function hitRateKey(key: string, value: number): string {
               <td class="px-4 py-4 whitespace-nowrap">{{ missValue(key) }}</td>
               <td class="px-4 py-4 whitespace-nowrap">{{ missValue(key) + hitValue(key) }}</td>
               <td class="py-4 pr-4 pl-4 whitespace-nowrap">
-                {{ hitRateKey(key, missValue(key)) }}
+                <PercentMetric :value="hitRateKey(key, missValue(key))" size="sm" :maximum-fraction-digits="2" />
               </td>
             </tr>
             <tr>
@@ -136,7 +135,9 @@ function hitRateKey(key: string, value: number): string {
               <td class="px-4 py-4 whitespace-nowrap">{{ data.hit.total }}</td>
               <td class="px-4 py-4 whitespace-nowrap">{{ data.miss.total }}</td>
               <td class="px-4 py-4 whitespace-nowrap">{{ data.hit.total + data.miss.total }}</td>
-              <td class="py-4 pr-4 pl-4 whitespace-nowrap">{{ hitRateTotal() }}</td>
+              <td class="py-4 pr-4 pl-4 whitespace-nowrap">
+                <PercentMetric :value="hitRateTotal()" size="sm" :maximum-fraction-digits="2" />
+              </td>
             </tr>
           </tbody>
         </table>
@@ -171,8 +172,8 @@ function hitRateKey(key: string, value: number): string {
           <dt class="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--color-brand-muted)]">
             Hit rate
           </dt>
-          <dd class="mt-2 text-2xl font-semibold text-[var(--color-brand-ink-strong)]">
-            {{ hitRateTotal() }}
+          <dd class="mt-2">
+            <PercentMetric :value="hitRateTotal()" :maximum-fraction-digits="2" />
           </dd>
         </div>
         <div class="rounded-2xl border border-[rgba(80,105,127,0.12)] bg-white/75 px-4 py-3">

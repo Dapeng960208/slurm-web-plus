@@ -73,7 +73,13 @@ describe('settings/SettingsLdapCache.vue', () => {
     expect(wrapper.text()).toContain('-')
     const links = wrapper.findAllComponents(RouterLinkStub)
     expect(links.find((link) => link.props('to')?.name === 'user')).toBeDefined()
-    expect(links.find((link) => link.props('to')?.name === 'user-analysis')).toBeDefined()
+    expect(
+      links.find(
+        (link) =>
+          link.props('to')?.name === 'user' &&
+          link.props('to')?.query?.section === 'analysis'
+      )
+    ).toBeDefined()
     expect(links.find((link) => link.props('to')?.name === 'jobs-history')).toBeDefined()
     expect(mockGatewayAPI.ldap_cache_users).toHaveBeenCalledWith('foo', {
       username: undefined,

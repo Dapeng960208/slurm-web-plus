@@ -1,126 +1,129 @@
-# 用户分析后端说明（User Metrics / User Analytics）
+# 用户分析后端与页面契约
 
-本文说明“用户分析”相关后端能力：它建立在 PostgreSQL 的历史作业持久化之上，提供可选的用户维度聚合（提交趋势、工具分析、日级汇总等）。
+本文说明用户分析能力的启用条件、后端数据来源，以及当前前端用户工作台如何消费这些数据。
 
-## 1. 启用条件（实现事实）
+## 1. 启用条件
 
-要启用用户分析能力，需要同时满足：
+用户分析能力要求以下条件同时满足：
 
-- `[database] enabled = yes` 且数据库可连接（Agent `database=true`）
-- `[persistence] enabled = yes` 且作业历史持久化已启动（Agent `persistence=true`）
-- `[metrics] enabled = yes`（用户指标聚合依赖 Prometheus 路径）
+- `[database] enabled = yes`
+- `[persistence] enabled = yes`
+- `[metrics] enabled = yes`
 - `[user_metrics] enabled = yes`
 
-注意：
+同时还需要 Agent 实际完成相关依赖装配：
 
-- 仅开启 `[user_metrics] enabled = yes` 不等于能力一定可用；Agent 会根据依赖是否满足决定是否真正启用，并在日志中说明降级原因。
-- 启用前必须完成 `alembic upgrade head`。
+- 历史作业持久化可用
+- Prometheus 查询可用
+- 用户分析聚合 store 可用
 
-## 2. 配置示例（agent.ini）
+仅打开 `[user_metrics] enabled = yes` 不代表功能一定可用。Agent 会根据依赖状态决定是否真正对外暴露 `user_metrics=true`。
 
-```ini
-[database]
-enabled = yes
-host = 127.0.0.1
-port = 5432
-database = slurmweb
-user = slurmweb
-password = REPLACE_ME
+## 2. 数据来源
 
-[persistence]
-enabled = yes
-snapshot_interval = 60
-retention_days = 180
+当前实现不新增后端用户详情聚合接口，仍复用现有能力：
 
-[metrics]
-enabled = yes
+- 用户资料区
+  - `associations`
+- 用户分析区摘要
+  - `GET /api/agents/<cluster>/user/<username>/activity/summary`
+- 用户分析区趋势图
+  - `GET /api/agents/<cluster>/user/<username>/metrics/history?range=hour|day|week`
+- 我的身份与权限摘要
+  - 前端本地 `authStore`
+  - 当前 cluster merged permissions
 
-[user_metrics]
-enabled = yes
-aggregation_interval = 3600
-# tool_mapping_file = /etc/slurm-web/user-tools.yml
+后端聚合表和依赖仍保持不变：
+
+- `job_snapshots`
+- `user_tool_daily_stats`
+- Prometheus 用户指标
+
+## 3. 路由契约
+
+前端用户分析现已并入统一用户工作台，相关路由如下：
+
+- `/:cluster/users/:user`
+  - 统一用户工作台主路由
+- `/:cluster/me`
+  - 当前登录用户自助入口
+- `/:cluster/users/:user/analysis`
+  - 兼容旧链接
+  - 会重定向到 `user` 并附带 `query.section=analysis`
+
+因此，后端仍只需要保证原有 `associations`、`user_activity_summary`、`user_metrics_history` 三类数据源稳定可用。
+
+## 4. 权限矩阵
+
+用户工作台按区块做权限控制：
+
+| 页面区块 | 依赖 permission | 依赖 capability |
+|---|---|---|
+| 我的身份与权限摘要 | 无 | 无 |
+| 用户资料区 | `associations-view` | 无 |
+| 用户分析区 | `view-jobs` | `cluster.user_metrics=true` |
+
+整页进入规则：
+
+- 查看自己时始终允许进入 `/:cluster/me`
+- 查看别人时，只要资料区或分析区至少有一个可见，就允许进入
+- 查看别人时两个区块都不可见，前端统一跳 `/forbidden`
+
+## 5. 用户分析区页面行为
+
+用户分析区由 `UserAnalyticsPanels.vue` 负责渲染，关键行为如下：
+
+- 提交趋势支持 `hour`、`day`、`week` 切换
+- 工具分析默认取内存最高的前若干工具
+- 工具图改为双指标横向条
+  - 左侧：平均最大内存
+  - 右侧：作业数
+- 每一行同时展示工具名、CPU、Runtime、jobs
+
+排序规则：
+
+1. 按 `avg_max_memory_mb` 降序
+2. 内存相同按 `jobs` 降序
+
+## 6. 降级行为
+
+前端区分 capability 缺失与 permission 缺失：
+
+- `user_metrics` 未启用
+  - 不当作权限错误
+  - 用户工作台只隐藏分析区
+- 缺少 `view-jobs`
+  - 分析区不渲染
+  - 若查看别人且同时也没有资料区权限，则跳 `/forbidden`
+- `associations` 请求失败
+  - 仅资料区显示错误提示
+- `user_activity_summary` 或 `user_metrics_history` 请求失败
+  - 仅分析区显示错误或降级提示
+
+## 7. 百分比与图表输出约束
+
+用户分析本轮没有新增百分比 API，但页面层面的信息表达有统一要求：
+
+- 百分比场景统一用数字值和图标组件表达
+- 工具分析不再依赖单一 canvas 文本绘制
+- 图表可访问文本优先，保证列表信息和视觉图能同时独立理解
+
+## 8. 验证建议
+
+最小验证步骤：
+
+1. 确认 Agent `/info` 返回 `user_metrics=true`
+2. 访问 `/:cluster/users/:user`
+3. 访问 `/:cluster/me`
+4. 访问旧链接 `/:cluster/users/:user/analysis`
+5. 校验旧链接已重定向到 `user?section=analysis`
+6. 校验无权限用户进入用户工作台时是否跳 `/forbidden`
+7. 校验分析区工具图是否同时展示内存和作业数
+
+前端验证命令：
+
+```powershell
+npm --prefix frontend run type-check
+npm --prefix frontend run test:unit -- --run
+npm --prefix frontend run build
 ```
-
-## 3. 工具映射文件（tool_mapping_file）
-
-`tool_mapping_file` 可选，用于把“检测到的工具候选值”归一化为稳定的 tool 标签，写入 `user_tool_daily_stats.tool` 并在 API 汇总中返回。
-
-文件格式：
-
-- YAML 根节点为 list
-- 每项包含：
-  - `pattern`：Python 正则表达式（匹配工具候选值）
-  - `tool`：归一化后的标签
-- 自上而下匹配，首个命中规则生效
-
-示例：
-
-```yaml
-- pattern: "^bwa(-mem2)?$"
-  tool: "bwa"
-
-- pattern: "^samtools$"
-  tool: "samtools"
-
-- pattern: "^python[0-9.]*$"
-  tool: "python"
-
-- pattern: ".*"
-  tool: "unknown"
-```
-
-示例文件位置：
-
-- `docs/modules/conf/examples/user-tools.yml`
-
-工具候选值检测顺序（实现事实）：
-
-1. 优先使用 `job_name`
-2. `job_name` 为空时，使用 `command` 的第一个 token 的 basename
-3. `command` 为空时，使用 `submit_line` 的第一个 token 的 basename
-4. 无法推导则使用 `unknown`
-
-## 4. 数据模型
-
-迁移 `20260424_0004_user_tool_daily_stats.py` 引入：
-
-- `user_tool_daily_stats`：日级、用户级、工具级 rollup
-
-历史作业快照表：
-
-- `job_snapshots`：用于提交趋势、运行时与资源使用统计的样本来源
-
-## 5. 接口
-
-### 5.1 Agent 接口
-
-- `GET /v<version>/user/<username>/metrics/history?range=hour|day|week`
-- `GET /v<version>/user/<username>/activity/summary`
-- `GET /v<version>/metrics/users`
-  - 仅当 `[metrics]` + `[user_metrics]` + 数据库持久化均可用时才可用
-
-### 5.2 Gateway 代理接口
-
-- `GET /api/agents/<cluster>/user/<username>/metrics/history?range=hour|day|week`
-- `GET /api/agents/<cluster>/user/<username>/activity/summary`
-
-### 5.3 能力门控
-
-- Agent `/info` 返回顶层 `user_metrics` 布尔值
-- Gateway `/api/clusters` 会透传同名字段用于前端门控
-
-禁用时行为（实现事实）：
-
-- 用户分析相关接口返回 HTTP `501`，错误信息为 `User metrics is disabled`
-
-## 6. 验证步骤（最小集）
-
-1. `alembic current`
-2. `alembic upgrade head`
-3. 确认表存在：`user_tool_daily_stats`
-4. 重启 Agent
-5. 访问 Agent `/info`，确认 `user_metrics=true`
-6. 通过 Gateway 查询：
-   - `/api/agents/<cluster>/user/<username>/activity/summary`
-   - `/api/agents/<cluster>/user/<username>/metrics/history?range=day`
-7. 若启用 Prometheus user metrics，确认 Agent `/metrics` 包含 `slurmweb_user_submissions_last_minute`

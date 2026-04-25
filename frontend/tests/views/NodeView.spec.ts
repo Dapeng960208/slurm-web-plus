@@ -182,7 +182,7 @@ describe('NodeView.vue', () => {
 
     // CPU: 32/64 = 50%
     const cpuPercentage = wrapper.get('dl div#allocation dd ul li:first-child span').text()
-    expect(cpuPercentage).toBe('(50%)')
+    expect(cpuPercentage).toBe('50%')
   })
 
   test('rounds Memory percentage correctly', async () => {
@@ -208,7 +208,7 @@ describe('NodeView.vue', () => {
 
     // Memory: 8000/16000 = 50%
     const memoryPercentage = wrapper.get('dl div#allocation dd ul li:nth-child(2) span').text()
-    expect(memoryPercentage).toBe('(50%)')
+    expect(memoryPercentage).toBe('50%')
   })
 
   test('rounds GPU percentage correctly when available', async () => {
@@ -234,7 +234,7 @@ describe('NodeView.vue', () => {
 
     // GPU: 2/4 = 50%
     const gpuPercentage = wrapper.get('dl div#allocation dd ul li:nth-child(3) span').text()
-    expect(gpuPercentage).toBe('(50%)')
+    expect(gpuPercentage).toBe('50%')
   })
 
   test('rounds to 1 decimal place for non-integer percentages', async () => {
@@ -262,11 +262,11 @@ describe('NodeView.vue', () => {
 
     // CPU: 15/64 = 23.4375% -> 23.4%
     const cpuPercentage = wrapper.get('dl div#allocation dd ul li:first-child span').text()
-    expect(cpuPercentage).toBe('(23.4%)')
+    expect(cpuPercentage).toBe('23.4%')
 
     // Memory: 5000/16000 = 31.25% -> 31.3%
     const memoryPercentage = wrapper.get('dl div#allocation dd ul li:nth-child(2) span').text()
-    expect(memoryPercentage).toBe('(31.3%)')
+    expect(memoryPercentage).toBe('31.3%')
   })
 
   test('renders node skeleton before node data arrives', () => {

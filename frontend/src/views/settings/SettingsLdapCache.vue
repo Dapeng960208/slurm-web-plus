@@ -234,10 +234,14 @@ onMounted(async () => {
                       </RouterLink>
                       <RouterLink
                         v-if="cluster.user_metrics"
-                        :to="{ name: 'user-analysis', params: { cluster: cluster.name, user: user.username } }"
+                        :to="{
+                          name: 'user',
+                          params: { cluster: cluster.name, user: user.username },
+                          query: { section: 'analysis' }
+                        }"
                         class="ui-button-secondary"
                       >
-                        View analysis
+                        Open analysis
                       </RouterLink>
                       <RouterLink
                         v-if="runtimeStore.hasClusterPermission(cluster.name, 'view-history-jobs')"

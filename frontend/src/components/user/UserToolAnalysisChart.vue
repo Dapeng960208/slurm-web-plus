@@ -7,17 +7,13 @@
 -->
 
 <script setup lang="ts">
-import { onMounted, onUnmounted, useTemplateRef, watch } from 'vue'
-import { Chart } from 'chart.js/auto'
-import type { TooltipItem } from 'chart.js'
+import { computed } from 'vue'
 import type { UserToolActivityRecord } from '@/composables/GatewayAPI'
+import { getMBHumanUnit } from '@/composables/GatewayAPI'
 
 const { tools } = defineProps<{
   tools: UserToolActivityRecord[]
 }>()
-
-const chartCanvas = useTemplateRef<HTMLCanvasElement>('chartCanvas')
-let chart: Chart<'bar'> | null = null
 
 function formatDuration(seconds: number | null): string {
   if (seconds == null || Number.isNaN(seconds)) return 'N/A'
@@ -28,104 +24,91 @@ function formatDuration(seconds: number | null): string {
   return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`
 }
 
-function updateChart() {
-  if (!chart) return
-
-  chart.data.labels = tools.map((tool) => tool.tool)
-  chart.data.datasets = [
-    {
-      label: 'Jobs',
-      data: tools.map((tool) => tool.jobs),
-      backgroundColor: 'rgba(80, 105, 127, 0.82)',
-      borderRadius: 10,
-      borderSkipped: false,
-      maxBarThickness: 18
-    }
-  ]
-  chart.update()
-}
-
-onMounted(() => {
-  if (!chartCanvas.value) return
-  chart = new Chart(chartCanvas.value, {
-    type: 'bar',
-    data: { labels: [], datasets: [] },
-    options: {
-      indexAxis: 'y',
-      responsive: true,
-      maintainAspectRatio: false,
-      animation: false,
-      plugins: {
-        legend: {
-          display: false
-        },
-        tooltip: {
-          backgroundColor: 'rgba(32, 42, 53, 0.94)',
-          titleColor: '#eef3f4',
-          bodyColor: '#eef3f4',
-          borderColor: 'rgba(182, 232, 44, 0.28)',
-          borderWidth: 1,
-          padding: 12,
-          callbacks: {
-            label: (context: TooltipItem<'bar'>) => {
-              const tool = tools[context.dataIndex]
-              return `${tool.jobs} jobs`
-            },
-            afterBody: (items: TooltipItem<'bar'>[]) => {
-              const tool = tools[items[0].dataIndex]
-              return [
-                `Avg memory: ${
-                  tool.avg_max_memory_mb != null
-                    ? `${Math.round(tool.avg_max_memory_mb)} MB`
-                    : 'N/A'
-                }`,
-                `Avg CPU: ${
-                  tool.avg_cpu_cores != null ? `${tool.avg_cpu_cores.toFixed(1)} cores` : 'N/A'
-                }`,
-                `Avg runtime: ${formatDuration(tool.avg_runtime_seconds)}`
-              ]
-            }
-          }
-        }
-      },
-      scales: {
-        x: {
-          beginAtZero: true,
-          grid: {
-            color: 'rgba(80, 105, 127, 0.08)'
-          },
-          ticks: {
-            color: '#6c7a80',
-            precision: 0
-          }
-        },
-        y: {
-          grid: {
-            display: false
-          },
-          ticks: {
-            color: '#383b40'
-          }
-        }
-      }
-    }
-  })
-  updateChart()
-})
-
-watch(
-  () => tools,
-  () => updateChart(),
-  { deep: true }
+const maxMemory = computed(() =>
+  Math.max(...tools.map((tool) => tool.avg_max_memory_mb ?? 0), 0)
 )
 
-onUnmounted(() => {
-  chart?.destroy()
-})
+const maxJobs = computed(() => Math.max(...tools.map((tool) => tool.jobs), 0))
+
+function memoryWidth(tool: UserToolActivityRecord): string {
+  if (!maxMemory.value) return '0%'
+  return `${((tool.avg_max_memory_mb ?? 0) / maxMemory.value) * 100}%`
+}
+
+function jobsWidth(tool: UserToolActivityRecord): string {
+  if (!maxJobs.value) return '0%'
+  return `${(tool.jobs / maxJobs.value) * 100}%`
+}
 </script>
 
 <template>
-  <div class="ui-chart-shell h-[18rem]">
-    <canvas ref="chartCanvas" class="h-full w-full" />
+  <div class="ui-tool-chart">
+    <article
+      v-for="tool in tools"
+      :key="tool.tool"
+      class="ui-tool-chart-row"
+      :data-testid="`tool-chart-${tool.tool}`"
+    >
+      <div class="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <div class="font-semibold text-[var(--color-brand-ink-strong)]">
+            {{ tool.tool }}
+          </div>
+          <div class="mt-1 text-sm text-[var(--color-brand-muted)]">
+            {{ tool.jobs }} completed job(s)
+          </div>
+        </div>
+        <div class="flex flex-wrap gap-2">
+          <span class="ui-chip">
+            {{ tool.avg_max_memory_mb != null ? getMBHumanUnit(tool.avg_max_memory_mb) : 'N/A' }}
+          </span>
+          <span class="ui-chip">{{ tool.jobs }} jobs</span>
+        </div>
+      </div>
+
+      <div class="mt-4 grid gap-4 xl:grid-cols-2">
+        <div>
+          <div class="mb-2 flex items-center justify-between gap-3">
+            <span class="ui-stat-label">Average Max Memory</span>
+            <span class="text-sm font-semibold text-[var(--color-brand-ink-strong)]">
+              {{ tool.avg_max_memory_mb != null ? getMBHumanUnit(tool.avg_max_memory_mb) : 'N/A' }}
+            </span>
+          </div>
+          <div class="ui-tool-chart-track">
+            <div
+              class="ui-tool-chart-fill ui-tool-chart-fill-memory"
+              :style="{ width: memoryWidth(tool) }"
+            />
+          </div>
+        </div>
+
+        <div>
+          <div class="mb-2 flex items-center justify-between gap-3">
+            <span class="ui-stat-label">Completed Jobs</span>
+            <span class="text-sm font-semibold text-[var(--color-brand-ink-strong)]">
+              {{ tool.jobs }}
+            </span>
+          </div>
+          <div class="ui-tool-chart-track">
+            <div
+              class="ui-tool-chart-fill ui-tool-chart-fill-jobs"
+              :style="{ width: jobsWidth(tool) }"
+            />
+          </div>
+        </div>
+      </div>
+
+      <div class="mt-4 grid gap-2 text-sm text-[var(--color-brand-muted)] sm:grid-cols-3">
+        <div>
+          CPU:
+          {{ tool.avg_cpu_cores != null ? `${tool.avg_cpu_cores.toFixed(1)} cores` : 'N/A' }}
+        </div>
+        <div>Runtime: {{ formatDuration(tool.avg_runtime_seconds) }}</div>
+        <div>
+          Peak reference:
+          {{ maxMemory > 0 ? getMBHumanUnit(maxMemory) : 'N/A' }}
+        </div>
+      </div>
+    </article>
   </div>
 </template>

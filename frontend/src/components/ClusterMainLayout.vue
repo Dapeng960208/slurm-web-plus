@@ -12,11 +12,11 @@ import { onMounted, ref } from 'vue'
 import type { Ref } from 'vue'
 import { useRuntimeStore } from '@/stores/runtime'
 import { useRuntimeConfiguration } from '@/plugins/runtimeConfiguration'
-import { useAuthStore } from '@/stores/auth'
-import { Bars3Icon, ArrowRightOnRectangleIcon, ServerStackIcon } from '@heroicons/vue/24/outline'
+import { Bars3Icon, ServerStackIcon } from '@heroicons/vue/24/outline'
 import { ChevronRightIcon } from '@heroicons/vue/20/solid'
 import MainMenu from '@/components/MainMenu.vue'
 import ClustersPopOver from '@/components/ClustersPopOver.vue'
+import UserMenu from '@/components/UserMenu.vue'
 
 type BreadcrumbPart = {
   title: string
@@ -33,7 +33,6 @@ const clusterNotFound: Ref<boolean> = ref(false)
 const sidebarOpen = ref(false)
 const runtimeStore = useRuntimeStore()
 const runtimeConfiguration = useRuntimeConfiguration()
-const authStore = useAuthStore()
 
 onMounted(() => {
   if (!runtimeStore.checkClusterAvailable(cluster)) {
@@ -74,7 +73,7 @@ onMounted(() => {
             />
             <router-link
               v-if="breadcrumbPart.routeName"
-              :to="{ name: breadcrumbPart.routeName }"
+              :to="{ name: breadcrumbPart.routeName, params: { cluster } }"
               class="truncate text-sm font-medium text-[var(--color-brand-blue)] transition hover:text-[var(--color-brand-ink-strong)]"
               >{{ breadcrumbPart.title }}</router-link
             >
@@ -104,31 +103,7 @@ onMounted(() => {
             aria-hidden="true"
           />
 
-          <!-- Profile -->
-          <span v-if="runtimeConfiguration.authentication" class="hidden lg:flex lg:items-center">
-            <span
-              class="m-2 rounded-full bg-[rgba(239,244,246,0.92)] px-3 py-1.5 text-sm leading-6 font-semibold text-[var(--color-brand-ink-strong)]"
-              aria-hidden="true"
-            >
-              {{ authStore.fullname }}
-            </span>
-          </span>
-
-          <!-- Signout button -->
-          <RouterLink
-            v-if="runtimeConfiguration.authentication"
-            :to="{ name: 'signout' }"
-            custom
-            v-slot="{ navigate }"
-          >
-            <button
-              @click="navigate"
-              role="link"
-              class="rounded-full p-2.5 text-[var(--color-brand-muted)] transition hover:bg-[rgba(182,232,44,0.14)] hover:text-[var(--color-brand-ink-strong)] lg:-m-2.5"
-            >
-              <ArrowRightOnRectangleIcon class="h-6 w-6" />
-            </button>
-          </RouterLink>
+          <UserMenu v-if="runtimeConfiguration.authentication" :cluster="cluster" />
         </div>
       </div>
     </div>

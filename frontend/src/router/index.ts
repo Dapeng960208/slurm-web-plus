@@ -8,6 +8,7 @@
 
 import { createRouter, createWebHistory, type RouteLocation } from 'vue-router'
 import { hasClusterAIAssistant, hasClusterAccessControl } from '@/composables/GatewayAPI'
+import { resolveUserWorkspaceSections } from '@/composables/userWorkspace'
 import { useAuthStore } from '@/stores/auth'
 import { useRuntimeStore } from '@/stores/runtime'
 import { useRuntimeConfiguration } from '@/plugins/runtimeConfiguration'
@@ -39,8 +40,8 @@ const ReservationsView = () => import('@/views/ReservationsView.vue')
 const AccountsView = () => import('@/views/AccountsView.vue')
 const AccountView = () => import('@/views/AccountView.vue')
 const UserView = () => import('@/views/UserView.vue')
-const UserAnalysisView = () => import('@/views/UserAnalysisView.vue')
 const AssistantView = () => import('@/views/AssistantView.vue')
+const ForbiddenView = () => import('@/views/ForbiddenView.vue')
 const JobsStatusBadges = () => import('@/views/tests/JobsStatusBadges.vue')
 const NodesStatusBadges = () => import('@/views/tests/NodesStatusBadges.vue')
 const NotFoundView = () => import('@/views/NotFoundView.vue')
@@ -73,6 +74,11 @@ const router = createRouter({
       path: '/signout',
       name: 'signout',
       component: SignoutView
+    },
+    {
+      path: '/forbidden',
+      name: 'forbidden',
+      component: ForbiddenView
     },
     {
       path: '/settings',
@@ -249,10 +255,25 @@ const router = createRouter({
           props: true
         },
         {
+          path: 'me',
+          name: 'my-profile',
+          component: UserView,
+          props: (route: RouteLocation) => ({
+            cluster: route.params.cluster,
+            selfView: true
+          })
+        },
+        {
           path: 'users/:user/analysis',
           name: 'user-analysis',
-          component: UserAnalysisView,
-          props: true
+          redirect: (to: RouteLocation) => ({
+            name: 'user',
+            params: { cluster: to.params.cluster, user: to.params.user },
+            query: {
+              ...to.query,
+              section: 'analysis'
+            }
+          })
         }
       ]
     },
@@ -284,12 +305,26 @@ function getSettingsCluster(runtime: ReturnType<typeof useRuntimeStore>) {
   return runtime.getAllowedClusters()[0]
 }
 
+function forbiddenRoute(
+  cluster: string | null | undefined,
+  permission: string
+): { name: string; query: Record<string, string> } {
+  return {
+    name: 'forbidden',
+    query: {
+      ...(cluster ? { cluster } : {}),
+      permission
+    }
+  }
+}
+
 router.beforeEach(async (to, from) => {
   /* redirect to login page if not logged in and trying to access a restricted page */
   const publicPages = [
     '/login',
     '/signout',
     '/anonymous',
+    '/forbidden',
     '/tests/jobs-status-badges',
     '/tests/nodes-status-badges'
   ]
@@ -330,7 +365,7 @@ router.beforeEach(async (to, from) => {
       (to.name === 'jobs-history' || to.name === 'job-history') &&
       !runtime.hasClusterPermission(to.params.cluster as string, 'view-history-jobs')
     ) {
-      return { name: 'jobs', params: { cluster: to.params.cluster } }
+      return forbiddenRoute(to.params.cluster as string, 'view-history-jobs')
     }
   } else {
     console.log(`Unsetting current cluster`)
@@ -343,22 +378,49 @@ router.beforeEach(async (to, from) => {
   ) {
     return { name: 'settings-account' }
   }
+  if (
+    to.name === 'settings-access-control' &&
+    !runtime.hasClusterPermission(getSettingsCluster(runtime)?.name ?? '', 'roles-view')
+  ) {
+    return forbiddenRoute(getSettingsCluster(runtime)?.name, 'roles-view')
+  }
   if (to.name === 'settings-ai') {
     const settingsCluster = getSettingsCluster(runtime)
     if (
       !hasClusterAIAssistant(settingsCluster) ||
-      !settingsCluster ||
-      !runtime.hasClusterPermission(settingsCluster.name, 'manage-ai')
+      !settingsCluster
     ) {
       return { name: 'settings' }
     }
+    if (!runtime.hasClusterPermission(settingsCluster.name, 'manage-ai')) {
+      return forbiddenRoute(settingsCluster.name, 'manage-ai')
+    }
+  }
+  if (to.name === 'ai' && !hasClusterAIAssistant(runtime.currentCluster)) {
+    return { name: 'dashboard', params: { cluster: to.params.cluster } }
   }
   if (
     to.name === 'ai' &&
-    (!hasClusterAIAssistant(runtime.currentCluster) ||
-      !runtime.hasClusterPermission(to.params.cluster as string, 'view-ai'))
+    !runtime.hasClusterPermission(to.params.cluster as string, 'view-ai')
   ) {
-    return { name: 'dashboard', params: { cluster: to.params.cluster } }
+    return forbiddenRoute(to.params.cluster as string, 'view-ai')
+  }
+
+  if (to.name === 'user' || to.name === 'my-profile') {
+    const clusterName = to.params.cluster as string
+    const cluster = runtime.getCluster(clusterName)
+    const viewedUser =
+      to.name === 'my-profile' ? auth.username : (to.params.user as string | undefined)
+    const sections = resolveUserWorkspaceSections(
+      runtime,
+      cluster,
+      clusterName,
+      viewedUser,
+      auth.username
+    )
+    if (!sections.any) {
+      return forbiddenRoute(clusterName, 'associations-view or view-jobs')
+    }
   }
 
   /* If entering settings page, save previous route to get it back */

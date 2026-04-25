@@ -254,7 +254,13 @@ onMounted(async () => {
                     <JobStatusBadge :status="job.job_state" />
                   </td>
                   <td class="px-3 py-3 whitespace-nowrap">
-                    {{ job.user_name }} ({{ job.account }})
+                    <RouterLink
+                      :to="{ name: 'user', params: { cluster, user: job.user_name } }"
+                      class="ui-user-link"
+                    >
+                      {{ job.user_name }}
+                    </RouterLink>
+                    <span class="text-[var(--color-brand-muted)]">({{ job.account }})</span>
                   </td>
                   <td class="hidden px-3 py-3 whitespace-nowrap sm:table-cell">
                     <JobResources :job="job" />

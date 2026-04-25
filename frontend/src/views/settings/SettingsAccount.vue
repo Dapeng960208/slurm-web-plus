@@ -94,17 +94,21 @@ function sortedValues(values: string[]) {
 
           <div class="flex flex-wrap gap-2">
             <RouterLink
-              :to="{ name: 'user', params: { cluster: cluster.name, user: authStore.username } }"
+              :to="{ name: 'my-profile', params: { cluster: cluster.name } }"
               class="ui-button-secondary"
             >
-              View my user
+              Open my workspace
             </RouterLink>
             <RouterLink
               v-if="cluster.user_metrics"
-              :to="{ name: 'user-analysis', params: { cluster: cluster.name, user: authStore.username } }"
+              :to="{
+                name: 'my-profile',
+                params: { cluster: cluster.name },
+                query: { section: 'analysis' }
+              }"
               class="ui-button-secondary"
             >
-              View my analysis
+              Open my analysis
             </RouterLink>
             <RouterLink
               v-if="runtimeStore.hasClusterPermission(cluster.name, 'view-history-jobs')"

@@ -25,7 +25,11 @@ const runtimeStore = useRuntimeStore()
 const clusterDetails = computed(() =>
   runtimeStore.availableClusters.find((value) => value.name === cluster)
 )
-const userMetricsEnabled = computed(() => Boolean(clusterDetails.value?.user_metrics))
+const userMetricsEnabled = computed(
+  () =>
+    Boolean(clusterDetails.value?.user_metrics) &&
+    runtimeStore.hasClusterPermission(cluster, 'view-jobs')
+)
 </script>
 
 <template>

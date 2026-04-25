@@ -59,7 +59,7 @@ const userMetricsHistoryHasData = computed(() => {
 const topTools = computed<UserToolActivityRecord[]>(() => {
   return (userMetricsSummary.value?.tool_breakdown ?? [])
     .slice()
-    .sort((a, b) => b.jobs - a.jobs)
+    .sort((a, b) => (b.avg_max_memory_mb ?? 0) - (a.avg_max_memory_mb ?? 0) || b.jobs - a.jobs)
     .slice(0, 6)
 })
 
@@ -392,8 +392,8 @@ onUnmounted(() => {
         <div class="mb-3">
           <h2 class="ui-panel-title">Tool Analysis</h2>
           <p class="ui-panel-description mt-2">
-            Tool-level completed job volume for today, with memory, CPU and runtime details on
-            hover.
+            Dual horizontal bars compare average memory footprint and completed job volume for the
+            most active tools recorded today.
           </p>
         </div>
 
@@ -410,7 +410,7 @@ onUnmounted(() => {
         <div class="mb-3">
           <h2 class="ui-panel-title">Top Tools</h2>
           <p class="ui-panel-description mt-2">
-            Daily roll-up for the most active tools associated with this user.
+            Daily roll-up for memory, CPU, runtime and completed jobs associated with this user.
           </p>
         </div>
 

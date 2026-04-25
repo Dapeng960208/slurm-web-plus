@@ -20,7 +20,7 @@ describe('UserAnalysisView.vue', () => {
     useRuntimeStore().availableClusters = [
       {
         name: 'foo',
-        permissions: { roles: [], actions: [] },
+        permissions: { roles: [], actions: ['view-jobs'] },
         racksdb: true,
         infrastructure: 'foo',
         metrics: true,
@@ -90,6 +90,7 @@ describe('UserAnalysisView.vue', () => {
     useRuntimeStore().availableClusters = [
       {
         ...useRuntimeStore().availableClusters[0],
+        permissions: { roles: [], actions: ['view-jobs'] },
         user_metrics: false
       }
     ]

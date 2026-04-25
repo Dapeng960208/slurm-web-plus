@@ -8,6 +8,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { RouterLink } from 'vue-router'
 import { useRoute } from 'vue-router'
 import { useGatewayAPI } from '@/composables/GatewayAPI'
 import type { ClusterTRES, JobHistoryRecord } from '@/composables/GatewayAPI'
@@ -538,6 +539,17 @@ watch(
                         class="mt-1 text-sm leading-6 text-[var(--color-brand-muted)] sm:col-span-2 sm:mt-0"
                       >
                         -
+                      </dd>
+                      <dd
+                        v-else-if="field.id === 'user' && field.value !== '-'"
+                        class="mt-1 text-sm leading-6 sm:col-span-2 sm:mt-0"
+                      >
+                        <RouterLink
+                          :to="{ name: 'user', params: { cluster, user: field.value } }"
+                          class="ui-user-link"
+                        >
+                          {{ field.value }}
+                        </RouterLink>
                       </dd>
                       <dd
                         v-else

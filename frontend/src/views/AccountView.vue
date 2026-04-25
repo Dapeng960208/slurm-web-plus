@@ -420,7 +420,7 @@ function hasDifferentQos(userAssociation: ClusterAssociation): boolean {
                     <RouterLink
                       v-if="association.user"
                       :to="{ name: 'user', params: { cluster, user: association.user } }"
-                      class="text-[var(--color-brand-blue)] transition hover:text-[var(--color-brand-ink-strong)]"
+                      class="ui-user-link"
                     >
                       {{ association.user }}
                     </RouterLink>

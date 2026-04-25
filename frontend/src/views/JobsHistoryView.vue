@@ -8,7 +8,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import type { LocationQueryRaw } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { useGatewayAPI } from '@/composables/GatewayAPI'
@@ -224,7 +224,15 @@ watch(totalPages, (newLastPage) => {
                     <JobStatusBadge :status="splitJobHistoryState(job.job_state)" />
                   </td>
                   <td class="px-3 py-3 whitespace-nowrap">
-                    {{ job.user_name ?? '-' }} ({{ job.account ?? '-' }})
+                    <RouterLink
+                      v-if="job.user_name"
+                      :to="{ name: 'user', params: { cluster, user: job.user_name } }"
+                      class="ui-user-link"
+                    >
+                      {{ job.user_name }}
+                    </RouterLink>
+                    <span v-else>-</span>
+                    <span class="text-[var(--color-brand-muted)]">({{ job.account ?? '-' }})</span>
                   </td>
                   <td class="hidden px-3 py-3 whitespace-nowrap sm:table-cell">
                     <JobHistoryResources :job="job" />

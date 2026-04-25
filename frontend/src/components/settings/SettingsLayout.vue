@@ -10,17 +10,16 @@
 import { computed, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { RouterView } from 'vue-router'
-import { useAuthStore } from '@/stores/auth'
 import { useRuntimeStore } from '@/stores/runtime'
 import { useRuntimeConfiguration } from '@/plugins/runtimeConfiguration'
 import LeaveSettingsButton from '@/components/settings/LeaveSettingsButton.vue'
 import MainMenu from '@/components/MainMenu.vue'
-import { Bars3Icon, ArrowRightOnRectangleIcon, ServerStackIcon } from '@heroicons/vue/24/outline'
+import { Bars3Icon, ServerStackIcon } from '@heroicons/vue/24/outline'
+import UserMenu from '@/components/UserMenu.vue'
 
 const sidebarOpen = ref(false)
 const runtimeStore = useRuntimeStore()
 const runtimeConfiguration = useRuntimeConfiguration()
-const authStore = useAuthStore()
 
 const navigationCluster = computed(() => {
   if (runtimeStore.currentCluster) return runtimeStore.currentCluster
@@ -77,29 +76,7 @@ const navigationCluster = computed(() => {
             aria-hidden="true"
           />
 
-          <span v-if="runtimeConfiguration.authentication" class="hidden lg:flex lg:items-center">
-            <span
-              class="m-2 rounded-full bg-[rgba(239,244,246,0.92)] px-3 py-1.5 text-sm leading-6 font-semibold text-[var(--color-brand-ink-strong)]"
-              aria-hidden="true"
-            >
-              {{ authStore.fullname }}
-            </span>
-          </span>
-
-          <RouterLink
-            v-if="runtimeConfiguration.authentication"
-            :to="{ name: 'signout' }"
-            custom
-            v-slot="{ navigate }"
-          >
-            <button
-              @click="navigate"
-              role="link"
-              class="rounded-full p-2.5 text-[var(--color-brand-muted)] transition hover:bg-[rgba(182,232,44,0.14)] hover:text-[var(--color-brand-ink-strong)] lg:-m-2.5"
-            >
-              <ArrowRightOnRectangleIcon class="h-6 w-6" />
-            </button>
-          </RouterLink>
+          <UserMenu v-if="runtimeConfiguration.authentication" :cluster="navigationCluster?.name" />
         </div>
       </div>
     </div>

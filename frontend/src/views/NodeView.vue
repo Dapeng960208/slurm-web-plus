@@ -37,6 +37,7 @@ import PanelSkeleton from '@/components/PanelSkeleton.vue'
 import StatCardSkeleton from '@/components/StatCardSkeleton.vue'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
 import NodeMetricsHistoryChart from '@/components/node/NodeMetricsHistoryChart.vue'
+import PercentMetric from '@/components/PercentMetric.vue'
 import { XCircleIcon } from '@heroicons/vue/20/solid'
 
 const { cluster, nodeName } = defineProps<{ cluster: string; nodeName: string }>()
@@ -338,12 +339,8 @@ onUnmounted(() => {
             </div>
             <div v-if="nodeMetricsEnabled" class="ui-stat-card">
               <div class="ui-stat-label">Realtime CPU</div>
-              <div class="ui-stat-value">
-                {{
-                  nodeMetrics?.cpu_usage !== null && nodeMetrics?.cpu_usage !== undefined
-                    ? `${nodeMetrics.cpu_usage}%`
-                    : '--'
-                }}
+              <div class="mt-3">
+                <PercentMetric :value="nodeMetrics?.cpu_usage" size="lg" />
               </div>
               <div class="ui-stat-subtle">
                 <template v-if="nodeMetricsError">Metrics unavailable</template>
@@ -392,9 +389,9 @@ onUnmounted(() => {
                           <strong class="font-semibold text-[var(--color-brand-ink-strong)]">
                             {{ detail.label }}:
                           </strong>
-                          <span class="order-3 text-[var(--color-brand-muted)]"
-                            >({{ detail.pct }}%)</span
-                          >
+                          <span class="order-3">
+                            <PercentMetric :value="detail.pct" size="sm" />
+                          </span>
                           <span class="order-2">{{ detail.text }}</span>
                         </li>
                       </ul>
@@ -542,8 +539,8 @@ onUnmounted(() => {
                   <div class="flex items-center justify-between gap-4">
                     <div>
                       <div class="ui-stat-label">CPU Usage</div>
-                      <div class="mt-2 text-2xl font-bold text-[var(--color-brand-ink-strong)]">
-                        {{ nodeMetrics.cpu_usage !== null ? `${nodeMetrics.cpu_usage}%` : 'N/A' }}
+                      <div class="mt-2">
+                        <PercentMetric :value="nodeMetrics.cpu_usage" />
                       </div>
                       <div class="mt-1.5 text-sm text-[var(--color-brand-muted)]">
                         Actual: {{ actualCpuUsage !== null ? `${actualCpuUsage} cores` : 'N/A' }}
@@ -570,10 +567,8 @@ onUnmounted(() => {
                   <div class="flex items-center justify-between gap-4">
                     <div>
                       <div class="ui-stat-label">Memory Usage</div>
-                      <div class="mt-2 text-2xl font-bold text-[var(--color-brand-ink-strong)]">
-                        {{
-                          nodeMetrics.memory_usage !== null ? `${nodeMetrics.memory_usage}%` : 'N/A'
-                        }}
+                      <div class="mt-2">
+                        <PercentMetric :value="nodeMetrics.memory_usage" />
                       </div>
                       <div class="mt-1.5 text-sm text-[var(--color-brand-muted)]">
                         Actual:
@@ -601,8 +596,8 @@ onUnmounted(() => {
                   <div class="flex items-center justify-between gap-4">
                     <div>
                       <div class="ui-stat-label">Disk Usage</div>
-                      <div class="mt-2 text-2xl font-bold text-[var(--color-brand-ink-strong)]">
-                        {{ nodeMetrics.disk_usage !== null ? `${nodeMetrics.disk_usage}%` : 'N/A' }}
+                      <div class="mt-2">
+                        <PercentMetric :value="nodeMetrics.disk_usage" />
                       </div>
                     </div>
                     <span
