@@ -7,7 +7,7 @@
 -->
 
 <script setup lang="ts">
-import { computed, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { ChevronLeftIcon } from '@heroicons/vue/20/solid'
 import {
@@ -23,6 +23,7 @@ import PageHeader from '@/components/PageHeader.vue'
 import AccountBreadcrumb from '@/components/accounts/AccountBreadcrumb.vue'
 import PanelSkeleton from '@/components/PanelSkeleton.vue'
 import { useClusterDataPoller } from '@/composables/DataPoller'
+import { useGatewayAPI } from '@/composables/GatewayAPI'
 import type { ClusterAssociation } from '@/composables/GatewayAPI'
 import {
   normalizeClusterPermissions,
@@ -35,6 +36,7 @@ import { resolveUserWorkspaceSections } from '@/composables/userWorkspace'
 import { useRuntimeStore } from '@/stores/runtime'
 import { useAuthStore } from '@/stores/auth'
 import UserAnalyticsPanels from '@/components/user/UserAnalyticsPanels.vue'
+import ActionDialog from '@/components/operations/ActionDialog.vue'
 
 const props = withDefaults(
   defineProps<{
@@ -52,6 +54,11 @@ const route = useRoute()
 const router = useRouter()
 const runtimeStore = useRuntimeStore()
 const authStore = useAuthStore()
+const gateway = useGatewayAPI()
+const editOpen = ref(false)
+const deleteOpen = ref(false)
+const operationBusy = ref(false)
+const operationError = ref<string | null>(null)
 const viewedUser = computed(() => props.selfView ? authStore.username ?? props.user ?? '' : props.user ?? '')
 const clusterDetails = computed(() => runtimeStore.getCluster(props.cluster))
 const sections = computed(() =>
@@ -100,6 +107,12 @@ const associatedAccounts = computed(() => {
 
 const canViewHistoryJobs = computed(() =>
   runtimeStore.hasRoutePermission(props.cluster, 'jobs-history', 'view')
+)
+const canManageUser = computed(() =>
+  runtimeStore.hasRoutePermission(props.cluster, 'users-admin', 'edit')
+)
+const canDeleteUser = computed(() =>
+  runtimeStore.hasRoutePermission(props.cluster, 'users-admin', 'delete')
 )
 
 const breadcrumb = computed(() => {
@@ -156,6 +169,42 @@ function goBack() {
   }
   router.push({ name: 'accounts', params: { cluster: props.cluster } })
 }
+
+async function saveUser(payload: Record<string, string>) {
+  if (!viewedUser.value) return
+  operationBusy.value = true
+  operationError.value = null
+  try {
+    await gateway.save_user(props.cluster, {
+      name: viewedUser.value,
+      description: payload.description || null,
+      default_account: payload.default_account || undefined,
+      default_wckey: payload.default_wckey || undefined,
+      admin_level: payload.admin_level || undefined
+    })
+    runtimeStore.reportInfo(`User ${viewedUser.value} update requested.`)
+    editOpen.value = false
+  } catch (error: unknown) {
+    operationError.value = error instanceof Error ? error.message : String(error)
+  } finally {
+    operationBusy.value = false
+  }
+}
+
+async function removeUser() {
+  if (!viewedUser.value) return
+  operationBusy.value = true
+  operationError.value = null
+  try {
+    await gateway.delete_user(props.cluster, viewedUser.value)
+    runtimeStore.reportInfo(`User ${viewedUser.value} deletion requested.`)
+    deleteOpen.value = false
+  } catch (error: unknown) {
+    operationError.value = error instanceof Error ? error.message : String(error)
+  } finally {
+    operationBusy.value = false
+  }
+}
 </script>
 
 <template>
@@ -205,6 +254,22 @@ function goBack() {
                 >
                   Account permissions
                 </RouterLink>
+                <button
+                  v-if="canManageUser"
+                  type="button"
+                  class="ui-button-secondary"
+                  @click="editOpen = true"
+                >
+                  Edit user
+                </button>
+                <button
+                  v-if="canDeleteUser"
+                  type="button"
+                  class="ui-button-secondary"
+                  @click="deleteOpen = true"
+                >
+                  Delete user
+                </button>
               </div>
             </template>
           </PageHeader>
@@ -485,5 +550,34 @@ function goBack() {
         </section>
       </div>
     </div>
+
+    <ActionDialog
+      :open="editOpen"
+      :title="knownUser ? 'Edit User' : 'Create User'"
+      :description="viewedUser ? `${knownUser ? 'Update' : 'Create'} SlurmDB user ${viewedUser}.` : ''"
+      :submit-label="knownUser ? 'Save changes' : 'Create user'"
+      :loading="operationBusy"
+      :error="operationError"
+      :fields="[
+        { key: 'description', label: 'Description', type: 'textarea' },
+        { key: 'default_account', label: 'Default account' },
+        { key: 'default_wckey', label: 'Default WCKEY' },
+        { key: 'admin_level', label: 'Admin level' }
+      ]"
+      @close="editOpen = false"
+      @submit="saveUser"
+    />
+
+    <ActionDialog
+      :open="deleteOpen"
+      title="Delete User"
+      :description="viewedUser ? `Delete SlurmDB user ${viewedUser}. This action is destructive.` : ''"
+      submit-label="Delete user"
+      :loading="operationBusy"
+      :error="operationError"
+      :fields="[]"
+      @close="deleteOpen = false"
+      @submit="removeUser"
+    />
   </ClusterMainLayout>
 </template>

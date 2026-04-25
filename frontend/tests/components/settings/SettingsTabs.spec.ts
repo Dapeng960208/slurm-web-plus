@@ -32,28 +32,11 @@ function mountTabs(
 }
 
 describe('SettingsTabs.vue', () => {
-  test('shows LDAP Cache tab only when authentication and database support are enabled', async () => {
+  test('does not show LDAP Cache tab after admin-page migration', async () => {
     const wrapper = mountTabs(true, [
       {
         name: 'foo',
-        permissions: { roles: [], actions: ['cache-view'] },
-        racksdb: true,
-        infrastructure: 'foo',
-        metrics: true,
-        cache: true,
-        database: true
-      }
-    ])
-
-    await nextTick()
-    expect(wrapper.text()).toContain('LDAP Cache')
-  })
-
-  test('hides LDAP Cache tab when authentication is disabled', async () => {
-    const wrapper = mountTabs(false, [
-      {
-        name: 'foo',
-        permissions: { roles: [], actions: [] },
+        permissions: { roles: [], actions: [], rules: ['admin/ldap-cache:view:*'] },
         racksdb: true,
         infrastructure: 'foo',
         metrics: true,
@@ -66,60 +49,34 @@ describe('SettingsTabs.vue', () => {
     expect(wrapper.text()).not.toContain('LDAP Cache')
   })
 
-  test('hides LDAP Cache tab when no cluster has database support', async () => {
-    const wrapper = mountTabs(true, [
-      {
-        name: 'foo',
-        permissions: { roles: [], actions: [] },
-        racksdb: true,
-        infrastructure: 'foo',
-        metrics: true,
-        cache: true,
-        database: false
-      }
-    ])
-
-    await nextTick()
-    expect(wrapper.text()).not.toContain('LDAP Cache')
-  })
-
-  test('shows Access Control tab when the current settings cluster supports it', async () => {
+  test('does not show Access Control tab after admin-page migration', async () => {
     const wrapper = mountTabs(
       true,
       [
         {
           name: 'foo',
-          permissions: { roles: [], actions: ['roles-view'] },
+          permissions: { roles: [], actions: [], rules: ['admin/access-control:view:*'] },
           capabilities: { access_control: true },
           racksdb: true,
           infrastructure: 'foo',
           metrics: true,
           cache: true
-        },
-        {
-          name: 'bar',
-          permissions: { roles: [], actions: [] },
-          capabilities: { access_control: false },
-          racksdb: true,
-          infrastructure: 'bar',
-          metrics: true,
-          cache: true
         }
       ],
       'foo'
     )
 
     await nextTick()
-    expect(wrapper.text()).toContain('Access Control')
+    expect(wrapper.text()).not.toContain('Access Control')
   })
 
-  test('shows AI tab when the current settings cluster supports it and user can manage it', async () => {
+  test('does not show AI tab after admin-page migration', async () => {
     const wrapper = mountTabs(
       true,
       [
         {
           name: 'foo',
-          permissions: { roles: [], actions: ['manage-ai'] },
+          permissions: { roles: [], actions: [], rules: ['admin/ai:view:*'] },
           capabilities: {
             ai: {
               enabled: true
@@ -127,42 +84,6 @@ describe('SettingsTabs.vue', () => {
           },
           racksdb: true,
           infrastructure: 'foo',
-          metrics: true,
-          cache: true
-        }
-      ],
-      'foo'
-    )
-
-    await nextTick()
-    expect(wrapper.text()).toContain('AI')
-  })
-
-  test('hides AI tab when only another cluster supports it', async () => {
-    const wrapper = mountTabs(
-      true,
-      [
-        {
-          name: 'foo',
-          permissions: { roles: [], actions: ['manage-ai'] },
-          capabilities: {
-            ai: false
-          },
-          racksdb: true,
-          infrastructure: 'foo',
-          metrics: true,
-          cache: true
-        },
-        {
-          name: 'bar',
-          permissions: { roles: [], actions: ['manage-ai'] },
-          capabilities: {
-            ai: {
-              enabled: true
-            }
-          },
-          racksdb: true,
-          infrastructure: 'bar',
           metrics: true,
           cache: true
         }
@@ -174,33 +95,45 @@ describe('SettingsTabs.vue', () => {
     expect(wrapper.text()).not.toContain('AI')
   })
 
-  test('hides Access Control tab when only another cluster supports it', async () => {
+  test('keeps only base settings tabs visible', async () => {
     const wrapper = mountTabs(
       true,
       [
         {
           name: 'foo',
-          permissions: { roles: [], actions: [] },
-          capabilities: { access_control: false },
+          permissions: {
+            roles: [],
+            actions: [],
+            rules: [
+              'admin/ai:view:*',
+              'admin/access-control:view:*',
+              'admin/cache:view:*',
+              'admin/ldap-cache:view:*'
+            ]
+          },
+          capabilities: {
+            ai: {
+              enabled: true
+            },
+            access_control: true
+          },
           racksdb: true,
           infrastructure: 'foo',
           metrics: true,
-          cache: true
-        },
-        {
-          name: 'bar',
-          permissions: { roles: [], actions: [] },
-          capabilities: { access_control: true },
-          racksdb: true,
-          infrastructure: 'bar',
-          metrics: true,
-          cache: true
+          cache: true,
+          database: true
         }
       ],
       'foo'
     )
 
     await nextTick()
+    expect(wrapper.text()).toContain('General')
+    expect(wrapper.text()).toContain('Errors')
+    expect(wrapper.text()).toContain('Account')
+    expect(wrapper.text()).not.toContain('AI')
     expect(wrapper.text()).not.toContain('Access Control')
+    expect(wrapper.text()).not.toContain('Cache')
+    expect(wrapper.text()).not.toContain('LDAP Cache')
   })
 })

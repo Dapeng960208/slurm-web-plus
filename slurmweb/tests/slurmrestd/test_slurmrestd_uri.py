@@ -6,8 +6,8 @@
 
 import unittest
 import urllib
-import tempfile
 from pathlib import Path
+import tempfile
 
 from rfl.authentication.jwt import jwt_gen_key
 
@@ -37,8 +37,8 @@ class TestSlurmrestdUri(unittest.TestCase):
         )
 
     def test_http(self):
-        with tempfile.NamedTemporaryFile() as fh:
-            key_path = Path(fh.name)
+        with tempfile.TemporaryDirectory() as tmpdir:
+            key_path = Path(tmpdir) / "slurmrestd.key"
             jwt_gen_key(key_path)
             slurmrestd = Slurmrestd(
                 urllib.parse.urlparse("http://localhost:6820"),

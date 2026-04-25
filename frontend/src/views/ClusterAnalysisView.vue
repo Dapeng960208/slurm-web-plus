@@ -54,11 +54,15 @@ const coreMetrics = ref<Partial<Record<MetricResourceState, MetricValue[]>> | nu
 const memoryMetrics = ref<Partial<Record<MetricMemoryState, MetricValue[]>> | null>(null)
 const gpuMetrics = ref<Partial<Record<MetricResourceState, MetricValue[]>> | null>(null)
 const historyJobs = ref<JobHistoryRecord[]>([])
+const pingDetails = ref<unknown>(null)
+const diagDetails = ref<unknown>(null)
 
 const jobsUnavailable = ref(false)
 const nodesUnavailable = ref(false)
 const metricsUnavailable = ref(false)
 const waitSamplesUnavailable = ref(false)
+const pingUnavailable = ref(false)
+const diagUnavailable = ref(false)
 
 let refreshTimer: ReturnType<typeof setInterval> | null = null
 
@@ -161,6 +165,8 @@ async function loadAnalysis() {
   nodesUnavailable.value = false
   metricsUnavailable.value = false
   waitSamplesUnavailable.value = false
+  pingUnavailable.value = false
+  diagUnavailable.value = false
 
   try {
     const statsResult = await gateway.stats(cluster)
@@ -269,6 +275,30 @@ async function loadAnalysis() {
   } else {
     historyJobs.value = []
   }
+
+  tasks.push(
+    gateway
+      .analysis_ping(cluster)
+      .then((payload) => {
+        pingDetails.value = payload
+      })
+      .catch(() => {
+        pingDetails.value = null
+        pingUnavailable.value = true
+      })
+  )
+
+  tasks.push(
+    gateway
+      .analysis_diag(cluster)
+      .then((payload) => {
+        diagDetails.value = payload
+      })
+      .catch(() => {
+        diagDetails.value = null
+        diagUnavailable.value = true
+      })
+  )
 
   await Promise.all(tasks)
   updatedAt.value = new Date().toISOString()
@@ -641,6 +671,39 @@ onUnmounted(() => {
               <p class="mt-4 border-t border-[rgba(80,105,127,0.12)] pt-4 text-sm leading-6 text-[var(--color-brand-blue)]">
                 {{ recommendation.evidence }}
               </p>
+            </article>
+          </div>
+        </section>
+
+        <section class="ui-panel ui-section">
+          <div class="mb-4">
+            <h2 class="ui-panel-title">Controller Health</h2>
+            <p class="ui-panel-description mt-2">
+              Lightweight controller status checks from the Slurm `ping` and `diag` endpoints.
+            </p>
+          </div>
+
+          <div class="grid gap-4 xl:grid-cols-2">
+            <article class="ui-panel-soft px-4 py-4">
+              <div class="flex items-center justify-between gap-3">
+                <div class="ui-stat-label">Ping</div>
+                <span class="ui-chip">{{ pingUnavailable ? 'Unavailable' : 'Ready' }}</span>
+              </div>
+              <InfoAlert v-if="pingUnavailable" class="mt-4">
+                Ping data is currently unavailable for this cluster.
+              </InfoAlert>
+              <pre v-else class="mt-4 overflow-x-auto text-xs text-[var(--color-brand-ink-strong)]">{{ JSON.stringify(pingDetails, null, 2) }}</pre>
+            </article>
+
+            <article class="ui-panel-soft px-4 py-4">
+              <div class="flex items-center justify-between gap-3">
+                <div class="ui-stat-label">Diag</div>
+                <span class="ui-chip">{{ diagUnavailable ? 'Unavailable' : 'Ready' }}</span>
+              </div>
+              <InfoAlert v-if="diagUnavailable" class="mt-4">
+                Diagnostic data is currently unavailable for this cluster.
+              </InfoAlert>
+              <pre v-else class="mt-4 overflow-x-auto text-xs text-[var(--color-brand-ink-strong)]">{{ JSON.stringify(diagDetails, null, 2) }}</pre>
             </article>
           </div>
         </section>

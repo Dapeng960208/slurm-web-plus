@@ -82,6 +82,8 @@ class TestGatewayViews(TestGatewayBase):
             with open(self.app.settings.ui.message_login, "w+") as fh:
                 fh.write("Hello, *world*!")
             os.chmod(self.app.settings.ui.message_login, 0o200)
+            if os.access(self.app.settings.ui.message_login, os.R_OK):
+                self.skipTest("Platform does not enforce unreadable chmod semantics")
 
             response = self.client.get("/api/messages/login")
             self.assertEqual(response.status_code, 500)
@@ -254,25 +256,20 @@ class TestGatewayViews(TestGatewayBase):
         response = self.client.get("/api/clusters")
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(
-            response.json,
-            [
-                {
-                    "capabilities": foo.capabilities,
-                    "access_control": True,
-                    "database": True,
-                    "infrastructure": "foo",
-                    "metrics": True,
-                    "cache": True,
-                    "name": "foo",
-                    "node_metrics": True,
-                    "user_metrics": True,
-                    "persistence": True,
-                    "permissions": permissions,
-                    "racksdb": True,
-                }
-            ],
-        )
+        self.assertEqual(len(response.json), 1)
+        cluster = response.json[0]
+        self.assertEqual(cluster["name"], "foo")
+        self.assertEqual(cluster["capabilities"], foo.capabilities)
+        self.assertEqual(cluster["permissions"], permissions)
+        self.assertEqual(cluster["access_control"], True)
+        self.assertEqual(cluster["database"], True)
+        self.assertEqual(cluster["metrics"], True)
+        self.assertEqual(cluster["cache"], True)
+        self.assertEqual(cluster["node_metrics"], True)
+        self.assertEqual(cluster["user_metrics"], True)
+        self.assertEqual(cluster["persistence"], True)
+        self.assertEqual(cluster["racksdb"], True)
+        self.assertIn("ai", cluster)
         mock_get.assert_called_once_with(
             f"http://foo/v{foo.version}/permissions",
             headers=mock.ANY,
@@ -512,6 +509,147 @@ class TestGatewayViews(TestGatewayBase):
             mock_proxy_agent.call_args.args[:2], ("foo", "node/cn1/metrics/history")
         )
         self.assertTrue(mock_proxy_agent.call_args.args[2])
+
+    @mock.patch("slurmweb.views.gateway.proxy_agent")
+    def test_analysis_diag(self, mock_proxy_agent):
+        self.app_set_agents({"foo": fake_slurmweb_agent("foo")})
+        mock_proxy_agent.return_value = (
+            self.app.response_class(
+                response='{"mode":"primary"}',
+                status=200,
+                mimetype="application/json",
+            ),
+            200,
+        )
+
+        response = self.client.get("/api/agents/foo/analysis/diag")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json, {"mode": "primary"})
+        self.assertEqual(mock_proxy_agent.call_args.args[:2], ("foo", "analysis/diag"))
+
+    @mock.patch("slurmweb.views.gateway.proxy_agent")
+    def test_analysis_ping(self, mock_proxy_agent):
+        self.app_set_agents({"foo": fake_slurmweb_agent("foo")})
+        mock_proxy_agent.return_value = (
+            self.app.response_class(
+                response='{"ok":true}',
+                status=200,
+                mimetype="application/json",
+            ),
+            200,
+        )
+
+        response = self.client.get("/api/agents/foo/analysis/ping")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json, {"ok": True})
+        self.assertEqual(mock_proxy_agent.call_args.args[:2], ("foo", "analysis/ping"))
+
+    @mock.patch("slurmweb.views.gateway.proxy_agent")
+    def test_admin_system_query(self, mock_proxy_agent):
+        self.app_set_agents({"foo": fake_slurmweb_agent("foo")})
+        mock_proxy_agent.return_value = (
+            self.app.response_class(
+                response='{"licenses":[]}',
+                status=200,
+                mimetype="application/json",
+            ),
+            200,
+        )
+
+        response = self.client.get("/api/agents/foo/admin/system/licenses")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json, {"licenses": []})
+        self.assertEqual(
+            mock_proxy_agent.call_args.args[:2],
+            ("foo", "admin/system/licenses"),
+        )
+
+    @mock.patch("slurmweb.views.gateway.proxy_agent")
+    def test_update_job(self, mock_proxy_agent):
+        self.app_set_agents({"foo": fake_slurmweb_agent("foo")})
+        mock_proxy_agent.return_value = (
+            self.app.response_class(
+                response='{"result":"job updated"}',
+                status=200,
+                mimetype="application/json",
+            ),
+            200,
+        )
+
+        response = self.client.post(
+            "/api/agents/foo/job/123/update",
+            data='{"priority": 1000}',
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json["result"], "job updated")
+        self.assertEqual(mock_proxy_agent.call_args.args[:2], ("foo", "job/123/update"))
+
+    @mock.patch("slurmweb.views.gateway.proxy_agent")
+    def test_delete_job(self, mock_proxy_agent):
+        self.app_set_agents({"foo": fake_slurmweb_agent("foo")})
+        mock_proxy_agent.return_value = (
+            self.app.response_class(
+                response='{"result":"job cancelled"}',
+                status=200,
+                mimetype="application/json",
+            ),
+            200,
+        )
+
+        response = self.client.delete(
+            "/api/agents/foo/job/123/cancel",
+            data='{"signal":"TERM"}',
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json["result"], "job cancelled")
+        self.assertEqual(mock_proxy_agent.call_args.args[:2], ("foo", "job/123/cancel"))
+
+    @mock.patch("slurmweb.views.gateway.proxy_agent")
+    def test_update_node(self, mock_proxy_agent):
+        self.app_set_agents({"foo": fake_slurmweb_agent("foo")})
+        mock_proxy_agent.return_value = (
+            self.app.response_class(
+                response='{"result":"node updated"}',
+                status=200,
+                mimetype="application/json",
+            ),
+            200,
+        )
+
+        response = self.client.post(
+            "/api/agents/foo/node/cn01/update",
+            data='{"state":"DRAIN","reason":"maintenance"}',
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json["result"], "node updated")
+        self.assertEqual(mock_proxy_agent.call_args.args[:2], ("foo", "node/cn01/update"))
+
+    @mock.patch("slurmweb.views.gateway.proxy_agent")
+    def test_delete_node(self, mock_proxy_agent):
+        self.app_set_agents({"foo": fake_slurmweb_agent("foo")})
+        mock_proxy_agent.return_value = (
+            self.app.response_class(
+                response='{"result":"node deleted"}',
+                status=200,
+                mimetype="application/json",
+            ),
+            200,
+        )
+
+        response = self.client.delete("/api/agents/foo/node/cn01/delete")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json["result"], "node deleted")
+        self.assertEqual(mock_proxy_agent.call_args.args[:2], ("foo", "node/cn01/delete"))
 
     @mock.patch("slurmweb.views.gateway.aiohttp.ClientSession.get")
     def test_node_metrics_history_forwards_range_to_agent(self, mock_get):

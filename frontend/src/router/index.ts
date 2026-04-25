@@ -26,6 +26,8 @@ const SettingsAIView = () => import('@/views/settings/SettingsAI.vue')
 const SettingsAccessControlView = () => import('@/views/settings/SettingsAccessControl.vue')
 const SettingsCacheView = () => import('@/views/settings/SettingsCache.vue')
 const SettingsLdapCacheView = () => import('@/views/settings/SettingsLdapCache.vue')
+const AdminLayoutView = () => import('@/views/AdminLayoutView.vue')
+const AdminSystemView = () => import('@/views/AdminSystemView.vue')
 const ClustersView = () => import('@/views/ClustersView.vue')
 const JobsView = () => import('@/views/JobsView.vue')
 const JobView = () => import('@/views/JobView.vue')
@@ -156,6 +158,44 @@ const router = createRouter({
           name: 'analysis',
           component: ClusterAnalysisView,
           props: true
+        },
+        {
+          path: 'admin',
+          name: 'admin',
+          component: AdminLayoutView,
+          props: true,
+          children: [
+            {
+              path: '',
+              name: 'admin-system',
+              component: AdminSystemView,
+              props: true
+            },
+            {
+              path: 'ai',
+              name: 'admin-ai',
+              component: SettingsAIView,
+              props: true
+            },
+            {
+              path: 'access-control',
+              name: 'admin-access-control',
+              component: SettingsAccessControlView,
+              props: true
+            },
+            {
+              path: 'cache',
+              name: 'admin-cache',
+              component: SettingsCacheView,
+              props: true
+            },
+            {
+              path: 'ldap-cache',
+              name: 'admin-ldap-cache',
+              component: SettingsLdapCacheView,
+              props: true
+            }
+          ]
         },
         {
           path: 'ai',
@@ -330,7 +370,7 @@ function clusterRoutePermission(
       return { resource: 'ai', operation: 'view' }
     case 'jobs':
     case 'job':
-      return { resource: 'jobs', operation: 'view' }
+      return null
     case 'jobs-history':
     case 'job-history':
       return { resource: 'jobs-history', operation: 'view' }
@@ -346,9 +386,32 @@ function clusterRoutePermission(
     case 'accounts':
     case 'account':
       return { resource: 'accounts', operation: 'view' }
+    case 'admin-system':
+      return { resource: 'admin/system', operation: 'view' }
+    case 'admin-ai':
+      return { resource: 'admin/ai', operation: 'view' }
+    case 'admin-access-control':
+      return { resource: 'admin/access-control', operation: 'view' }
+    case 'admin-cache':
+      return { resource: 'admin/cache', operation: 'view' }
+    case 'admin-ldap-cache':
+      return { resource: 'admin/ldap-cache', operation: 'view' }
     default:
       return null
   }
+}
+
+function clusterHasAdminAccess(
+  runtime: ReturnType<typeof useRuntimeStore>,
+  clusterName: string
+): boolean {
+  return [
+    'admin/system',
+    'admin/ai',
+    'admin/access-control',
+    'admin/cache',
+    'admin/ldap-cache'
+  ].some((resource) => runtime.hasRoutePermission(clusterName, resource, 'view'))
 }
 
 router.beforeEach(async (to, from) => {
@@ -401,6 +464,12 @@ router.beforeEach(async (to, from) => {
         `${requiredPermission.resource}:${requiredPermission.operation}:*`
       )
     }
+    if (
+      (to.name === 'jobs' || to.name === 'job') &&
+      !runtime.hasRoutePermissionAnyScope(to.params.cluster as string, 'jobs', 'view')
+    ) {
+      return forbiddenRoute(to.params.cluster as string, 'jobs:view:* or jobs:view:self')
+    }
     // Guard feature-gated routes
     if (
       (to.name === 'jobs-history' || to.name === 'job-history') &&
@@ -417,6 +486,28 @@ router.beforeEach(async (to, from) => {
   } else {
     console.log(`Unsetting current cluster`)
     runtime.currentCluster = undefined
+  }
+
+  if (
+    to.name === 'settings-ai' ||
+    to.name === 'settings-access-control' ||
+    to.name === 'settings-cache' ||
+    to.name === 'settings-ldap-cache'
+  ) {
+    const settingsCluster = getSettingsCluster(runtime)
+    if (!settingsCluster) {
+      return { name: 'settings' }
+    }
+    if (to.name === 'settings-ai') {
+      return { name: 'admin-ai', params: { cluster: settingsCluster.name } }
+    }
+    if (to.name === 'settings-access-control') {
+      return { name: 'admin-access-control', params: { cluster: settingsCluster.name } }
+    }
+    if (to.name === 'settings-cache') {
+      return { name: 'admin-cache', params: { cluster: settingsCluster.name } }
+    }
+    return { name: 'admin-ldap-cache', params: { cluster: settingsCluster.name } }
   }
 
   if (
@@ -471,6 +562,13 @@ router.beforeEach(async (to, from) => {
     )
     if (!sections.any) {
       return forbiddenRoute(clusterName, 'user/profile:view:* or user/analysis:view:*')
+    }
+  }
+
+  if (to.params.cluster && String(to.name).startsWith('admin-')) {
+    const clusterName = to.params.cluster as string
+    if (!clusterHasAdminAccess(runtime, clusterName)) {
+      return forbiddenRoute(clusterName, 'admin/*:view:*')
     }
   }
 

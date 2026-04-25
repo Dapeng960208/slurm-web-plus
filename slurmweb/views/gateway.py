@@ -284,6 +284,7 @@ def request_agent(
 ):
     """Return the aiohttp request context manager on the given session for the given
     query."""
+    json_payload = request.get_json(silent=True)
     headers = {}
     if token is not None:
         headers = {"Authorization": f"Bearer {token}"}
@@ -303,24 +304,25 @@ def request_agent(
             return session.post(
                 url,
                 headers=headers,
-                json=request.json,
+                json=json_payload,
             )
         elif request.method == "PUT":
             return session.put(
                 url,
                 headers=headers,
-                json=request.json,
+                json=json_payload,
             )
         elif request.method == "PATCH":
             return session.patch(
                 url,
                 headers=headers,
-                json=request.json,
+                json=json_payload,
             )
         elif request.method == "DELETE":
             return session.delete(
                 url,
                 headers=headers,
+                json=json_payload,
             )
         else:
             abort(500, f"Unsupported request method {request.method}")
@@ -583,6 +585,42 @@ def job(cluster: str, job: int):
 
 @check_jwt
 @validate_cluster
+def analysis_ping(cluster: str):
+    return proxy_agent(cluster, "analysis/ping", request.token)
+
+
+@check_jwt
+@validate_cluster
+def analysis_diag(cluster: str):
+    return proxy_agent(cluster, "analysis/diag", request.token)
+
+
+@check_jwt
+@validate_cluster
+def admin_system_query(cluster: str, query: str):
+    return proxy_agent(cluster, f"admin/system/{query}", request.token)
+
+
+@check_jwt
+@validate_cluster
+def job_submit(cluster: str):
+    return proxy_agent(cluster, "jobs/submit", request.token)
+
+
+@check_jwt
+@validate_cluster
+def job_update(cluster: str, job: int):
+    return proxy_agent(cluster, f"job/{job}/update", request.token)
+
+
+@check_jwt
+@validate_cluster
+def job_cancel(cluster: str, job: int):
+    return proxy_agent(cluster, f"job/{job}/cancel", request.token)
+
+
+@check_jwt
+@validate_cluster
 def nodes(cluster: str):
     return proxy_agent(cluster, "nodes", request.token)
 
@@ -591,6 +629,18 @@ def nodes(cluster: str):
 @validate_cluster
 def node(cluster: str, name: str):
     return proxy_agent(cluster, f"node/{name}", request.token)
+
+
+@check_jwt
+@validate_cluster
+def node_update(cluster: str, name: str):
+    return proxy_agent(cluster, f"node/{name}/update", request.token)
+
+
+@check_jwt
+@validate_cluster
+def node_delete(cluster: str, name: str):
+    return proxy_agent(cluster, f"node/{name}/delete", request.token)
 
 
 @check_jwt
@@ -607,8 +657,38 @@ def qos(cluster: str):
 
 @check_jwt
 @validate_cluster
+def qos_update(cluster: str):
+    return proxy_agent(cluster, "qos", request.token)
+
+
+@check_jwt
+@validate_cluster
+def qos_delete(cluster: str, name: str):
+    return proxy_agent(cluster, f"qos/{name}/delete", request.token)
+
+
+@check_jwt
+@validate_cluster
 def reservations(cluster: str):
     return proxy_agent(cluster, "reservations", request.token)
+
+
+@check_jwt
+@validate_cluster
+def reservation_create(cluster: str):
+    return proxy_agent(cluster, "reservation", request.token)
+
+
+@check_jwt
+@validate_cluster
+def reservation_update(cluster: str, name: str):
+    return proxy_agent(cluster, f"reservation/{name}/update", request.token)
+
+
+@check_jwt
+@validate_cluster
+def reservation_delete(cluster: str, name: str):
+    return proxy_agent(cluster, f"reservation/{name}/delete", request.token)
 
 
 @check_jwt
@@ -619,8 +699,98 @@ def accounts(cluster: str):
 
 @check_jwt
 @validate_cluster
+def account(cluster: str, name: str):
+    return proxy_agent(cluster, f"account/{name}", request.token)
+
+
+@check_jwt
+@validate_cluster
+def accounts_update(cluster: str):
+    return proxy_agent(cluster, "accounts", request.token)
+
+
+@check_jwt
+@validate_cluster
+def account_delete(cluster: str, name: str):
+    return proxy_agent(cluster, f"account/{name}/delete", request.token)
+
+
+@check_jwt
+@validate_cluster
 def associations(cluster: str):
     return proxy_agent(cluster, "associations", request.token)
+
+
+@check_jwt
+@validate_cluster
+def associations_update(cluster: str):
+    return proxy_agent(cluster, "associations", request.token)
+
+
+@check_jwt
+@validate_cluster
+def associations_delete(cluster: str):
+    return proxy_agent(cluster, "associations", request.token)
+
+
+@check_jwt
+@validate_cluster
+def users_admin(cluster: str):
+    return proxy_agent(cluster, "users", request.token)
+
+
+@check_jwt
+@validate_cluster
+def user_admin(cluster: str, name: str):
+    return proxy_agent(cluster, f"user/{name}", request.token)
+
+
+@check_jwt
+@validate_cluster
+def users_update(cluster: str):
+    return proxy_agent(cluster, "users", request.token)
+
+
+@check_jwt
+@validate_cluster
+def user_delete(cluster: str, name: str):
+    return proxy_agent(cluster, f"user/{name}/delete", request.token)
+
+
+@check_jwt
+@validate_cluster
+def wckeys(cluster: str):
+    return proxy_agent(cluster, "wckeys", request.token)
+
+
+@check_jwt
+@validate_cluster
+def wckeys_update(cluster: str):
+    return proxy_agent(cluster, "wckeys", request.token)
+
+
+@check_jwt
+@validate_cluster
+def wckey_delete(cluster: str, wckey_id: str):
+    return proxy_agent(cluster, f"wckey/{wckey_id}/delete", request.token)
+
+
+@check_jwt
+@validate_cluster
+def clusters_admin(cluster: str):
+    return proxy_agent(cluster, "clusters", request.token)
+
+
+@check_jwt
+@validate_cluster
+def clusters_update(cluster: str):
+    return proxy_agent(cluster, "clusters", request.token)
+
+
+@check_jwt
+@validate_cluster
+def cluster_delete(cluster: str, name: str):
+    return proxy_agent(cluster, f"cluster/{name}/delete", request.token)
 
 
 @check_jwt

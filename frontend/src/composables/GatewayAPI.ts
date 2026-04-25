@@ -42,7 +42,7 @@ export type PermissionRule = string
 
 const LEGACY_PERMISSION_RULES: Record<string, PermissionRule[]> = {
   'view-stats': ['dashboard:view:*', 'analysis:view:*'],
-  'view-jobs': ['jobs:view:*', 'user/analysis:view:self'],
+  'view-jobs': ['jobs:view:*', 'jobs:view:self', 'user/analysis:view:self'],
   'view-history-jobs': ['jobs-history:view:*'],
   'view-nodes': ['resources:view:*'],
   'view-qos': ['qos:view:*', 'jobs/filter-qos:view:*'],
@@ -50,12 +50,17 @@ const LEGACY_PERMISSION_RULES: Record<string, PermissionRule[]> = {
   'associations-view': ['accounts:view:*', 'user/profile:view:*'],
   'view-accounts': ['jobs/filter-accounts:view:*'],
   'view-partitions': ['jobs/filter-partitions:view:*', 'resources/filter-partitions:view:*'],
-  'cache-view': ['settings/cache:view:*'],
-  'cache-reset': ['settings/cache:edit:*'],
-  'roles-view': ['settings/access-control:view:*'],
-  'roles-manage': ['settings/access-control:edit:*', 'settings/access-control:delete:*'],
-  'view-ai': ['ai:view:*'],
-  'manage-ai': ['settings/ai:edit:*']
+  'cache-view': ['settings/cache:view:*', 'admin/cache:view:*', 'admin/ldap-cache:view:*'],
+  'cache-reset': ['settings/cache:edit:*', 'admin/cache:edit:*'],
+  'roles-view': ['settings/access-control:view:*', 'admin/access-control:view:*'],
+  'roles-manage': [
+    'settings/access-control:edit:*',
+    'settings/access-control:delete:*',
+    'admin/access-control:edit:*',
+    'admin/access-control:delete:*'
+  ],
+  'view-ai': ['ai:view:*', 'admin/ai:view:*'],
+  'manage-ai': ['settings/ai:edit:*', 'admin/ai:edit:*']
 }
 
 export interface ClusterPermissionAssignment {
@@ -1159,6 +1164,51 @@ export interface CachedLdapUsersFilters {
   page_size?: number
 }
 
+export interface ClusterOperationResult {
+  supported?: boolean
+  operation: string
+  target?: string | null
+  api_version?: string | null
+  warnings?: unknown[]
+  errors?: unknown[]
+  result?: unknown
+}
+
+export interface JobSubmitPayload extends Record<string, unknown> {
+  name?: string
+  script?: string
+  partition?: string
+  account?: string
+  qos?: string
+}
+
+export interface JobUpdatePayload extends Record<string, unknown> {
+  partition?: string
+  qos?: string
+  priority?: number | null
+  time_limit?: string | null
+  comment?: string | null
+}
+
+export interface NodeUpdatePayload extends Record<string, unknown> {
+  state?: string
+  reason?: string
+  features?: string[]
+  active_features?: string[]
+}
+
+export interface ReservationPayload extends Record<string, unknown> {
+  name?: string
+  partition?: string
+  users?: string[]
+  accounts?: string[]
+}
+
+export interface SlurmdbObjectPayload extends Record<string, unknown> {
+  name?: string
+  description?: string | null
+}
+
 type CachedLdapUsersAPIResponse = CachedLdapUser[] | CachedLdapUsersResponse
 
 function isCachedLdapUsersResponse(
@@ -1560,6 +1610,14 @@ export function useGatewayAPI() {
     return await restAPI.get<ClusterPingResponse>(`/agents/${cluster}/ping`)
   }
 
+  async function analysis_ping(cluster: string): Promise<unknown> {
+    return await restAPI.get<unknown>(`/agents/${cluster}/analysis/ping`)
+  }
+
+  async function analysis_diag(cluster: string): Promise<unknown> {
+    return await restAPI.get<unknown>(`/agents/${cluster}/analysis/diag`)
+  }
+
   async function stats(cluster: string): Promise<ClusterStats> {
     const result = await restAPI.get<ClusterStatsResponse>(`/agents/${cluster}/stats`)
     return {
@@ -1602,6 +1660,132 @@ export function useGatewayAPI() {
 
   async function reservations(cluster: string): Promise<ClusterQos[]> {
     return await restAPI.get<ClusterQos[]>(`/agents/${cluster}/reservations`)
+  }
+
+  async function submit_job(
+    cluster: string,
+    payload: JobSubmitPayload
+  ): Promise<ClusterOperationResult> {
+    return await restAPI.post<ClusterOperationResult>(`/agents/${cluster}/jobs/submit`, payload)
+  }
+
+  async function update_job(
+    cluster: string,
+    jobId: number,
+    payload: JobUpdatePayload
+  ): Promise<ClusterOperationResult> {
+    return await restAPI.post<ClusterOperationResult>(
+      `/agents/${cluster}/job/${jobId}/update`,
+      payload
+    )
+  }
+
+  async function cancel_job(
+    cluster: string,
+    jobId: number,
+    payload: Record<string, unknown> = {}
+  ): Promise<ClusterOperationResult> {
+    return await restAPI.delete<ClusterOperationResult>(
+      `/agents/${cluster}/job/${jobId}/cancel`,
+      payload
+    )
+  }
+
+  async function update_node(
+    cluster: string,
+    nodeName: string,
+    payload: NodeUpdatePayload
+  ): Promise<ClusterOperationResult> {
+    const encodedNodeName = encodeURIComponent(nodeName)
+    return await restAPI.post<ClusterOperationResult>(
+      `/agents/${cluster}/node/${encodedNodeName}/update`,
+      payload
+    )
+  }
+
+  async function delete_node(cluster: string, nodeName: string): Promise<ClusterOperationResult> {
+    const encodedNodeName = encodeURIComponent(nodeName)
+    return await restAPI.delete<ClusterOperationResult>(
+      `/agents/${cluster}/node/${encodedNodeName}/delete`
+    )
+  }
+
+  async function save_reservation(
+    cluster: string,
+    payload: ReservationPayload
+  ): Promise<ClusterOperationResult> {
+    return await restAPI.post<ClusterOperationResult>(`/agents/${cluster}/reservation`, payload)
+  }
+
+  async function update_reservation(
+    cluster: string,
+    reservationName: string,
+    payload: ReservationPayload
+  ): Promise<ClusterOperationResult> {
+    const encodedReservation = encodeURIComponent(reservationName)
+    return await restAPI.post<ClusterOperationResult>(
+      `/agents/${cluster}/reservation/${encodedReservation}/update`,
+      payload
+    )
+  }
+
+  async function delete_reservation(
+    cluster: string,
+    reservationName: string
+  ): Promise<ClusterOperationResult> {
+    const encodedReservation = encodeURIComponent(reservationName)
+    return await restAPI.delete<ClusterOperationResult>(
+      `/agents/${cluster}/reservation/${encodedReservation}/delete`
+    )
+  }
+
+  async function save_account(
+    cluster: string,
+    payload: SlurmdbObjectPayload
+  ): Promise<ClusterOperationResult> {
+    return await restAPI.post<ClusterOperationResult>(`/agents/${cluster}/accounts`, payload)
+  }
+
+  async function delete_account(
+    cluster: string,
+    accountName: string
+  ): Promise<ClusterOperationResult> {
+    return await restAPI.delete<ClusterOperationResult>(
+      `/agents/${cluster}/account/${encodeURIComponent(accountName)}/delete`
+    )
+  }
+
+  async function save_user(
+    cluster: string,
+    payload: SlurmdbObjectPayload
+  ): Promise<ClusterOperationResult> {
+    return await restAPI.post<ClusterOperationResult>(`/agents/${cluster}/users`, payload)
+  }
+
+  async function delete_user(cluster: string, username: string): Promise<ClusterOperationResult> {
+    return await restAPI.delete<ClusterOperationResult>(
+      `/agents/${cluster}/user/${encodeURIComponent(username)}/delete`
+    )
+  }
+
+  async function save_association(
+    cluster: string,
+    payload: Record<string, unknown>
+  ): Promise<ClusterOperationResult> {
+    return await restAPI.post<ClusterOperationResult>(`/agents/${cluster}/associations`, payload)
+  }
+
+  async function save_qos(
+    cluster: string,
+    payload: SlurmdbObjectPayload
+  ): Promise<ClusterOperationResult> {
+    return await restAPI.post<ClusterOperationResult>(`/agents/${cluster}/qos`, payload)
+  }
+
+  async function delete_qos(cluster: string, qosName: string): Promise<ClusterOperationResult> {
+    return await restAPI.delete<ClusterOperationResult>(
+      `/agents/${cluster}/qos/${encodeURIComponent(qosName)}/delete`
+    )
   }
 
   async function accounts(cluster: string): Promise<Array<AccountDescription>> {
@@ -1721,6 +1905,34 @@ export function useGatewayAPI() {
 
   async function cache_reset(cluster: string): Promise<CacheStatistics> {
     return await restAPI.post<CacheStatistics>(`/agents/${cluster}/cache/reset`, {})
+  }
+
+  async function admin_licenses(cluster: string): Promise<unknown> {
+    return await restAPI.get<unknown>(`/agents/${cluster}/admin/system/licenses`)
+  }
+
+  async function admin_shares(cluster: string): Promise<unknown> {
+    return await restAPI.get<unknown>(`/agents/${cluster}/admin/system/shares`)
+  }
+
+  async function admin_reconfigure(cluster: string): Promise<ClusterOperationResult> {
+    return await restAPI.post<ClusterOperationResult>(`/agents/${cluster}/admin/system/reconfigure`, {})
+  }
+
+  async function admin_slurmdb_diag(cluster: string): Promise<unknown> {
+    return await restAPI.get<unknown>(`/agents/${cluster}/admin/system/slurmdb/diag`)
+  }
+
+  async function admin_slurmdb_config(cluster: string): Promise<unknown> {
+    return await restAPI.get<unknown>(`/agents/${cluster}/admin/system/slurmdb/config`)
+  }
+
+  async function admin_slurmdb_instances(cluster: string): Promise<unknown> {
+    return await restAPI.get<unknown>(`/agents/${cluster}/admin/system/slurmdb/instances`)
+  }
+
+  async function admin_slurmdb_tres(cluster: string): Promise<unknown> {
+    return await restAPI.get<unknown>(`/agents/${cluster}/admin/system/slurmdb/tres`)
   }
 
   async function ai_configs(cluster: string): Promise<AIModelConfig[]> {
@@ -2057,6 +2269,8 @@ export function useGatewayAPI() {
     clusters,
     users,
     ping,
+    analysis_ping,
+    analysis_diag,
     stats,
     jobs,
     job,
@@ -2065,8 +2279,23 @@ export function useGatewayAPI() {
     partitions,
     qos,
     reservations,
+    submit_job,
+    update_job,
+    cancel_job,
+    update_node,
+    delete_node,
+    save_reservation,
+    update_reservation,
+    delete_reservation,
     accounts,
+    save_account,
+    delete_account,
     associations,
+    save_association,
+    save_user,
+    delete_user,
+    save_qos,
+    delete_qos,
     permissions,
     access_roles,
     access_catalog,
@@ -2079,6 +2308,13 @@ export function useGatewayAPI() {
     cache_stats,
     ldap_cache_users,
     cache_reset,
+    admin_licenses,
+    admin_shares,
+    admin_reconfigure,
+    admin_slurmdb_diag,
+    admin_slurmdb_config,
+    admin_slurmdb_instances,
+    admin_slurmdb_tres,
     ai_configs,
     create_ai_config,
     update_ai_config,

@@ -138,8 +138,10 @@ def mock_slurmrestd_responses(slurmrestd, slurm_version, api_version, assets):
 
     if len(responses) > 1:
         slurmrestd.session.get = mock.Mock(side_effect=responses)
+        slurmrestd.session.request = mock.Mock(side_effect=responses)
     else:
         slurmrestd.session.get = mock.Mock(return_value=responses[0])
+        slurmrestd.session.request = mock.Mock(return_value=responses[0])
 
     return results
 

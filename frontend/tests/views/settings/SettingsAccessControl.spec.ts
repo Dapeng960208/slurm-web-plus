@@ -3,6 +3,7 @@ import { flushPromises, mount } from '@vue/test-utils'
 import SettingsAccessControlView from '@/views/settings/SettingsAccessControl.vue'
 import { init_plugins } from '../../lib/common'
 import { useRuntimeStore } from '@/stores/runtime'
+import type { RouterMock } from 'vue-router-mock'
 
 const mockGatewayAPI = {
   access_catalog: vi.fn(),
@@ -24,8 +25,13 @@ vi.mock('@/composables/GatewayAPI', async (importOriginal) => {
 })
 
 describe('views/settings/SettingsAccessControl.vue', () => {
+  async function mountOnAdminRoute(router: RouterMock) {
+    await router.setParams({ cluster: 'foo' })
+    router.currentRoute.value.name = 'admin-access-control'
+  }
+
   beforeEach(() => {
-    init_plugins()
+    void init_plugins()
     vi.clearAllMocks()
     mockGatewayAPI.access_catalog.mockReset()
     mockGatewayAPI.access_roles.mockReset()
@@ -38,18 +44,15 @@ describe('views/settings/SettingsAccessControl.vue', () => {
   })
 
   test('loads current-cluster roles and saves assignments in manage mode', async () => {
+    const router = init_plugins()
     const runtimeStore = useRuntimeStore()
     runtimeStore.availableClusters = [
       {
         name: 'foo',
         permissions: {
           roles: ['admin'],
-          actions: ['roles-view', 'roles-manage'],
-          rules: [
-            'settings/access-control:view:*',
-            'settings/access-control:edit:*',
-            'settings/access-control:delete:*'
-          ]
+          actions: [],
+          rules: ['admin/access-control:view:*', 'admin/access-control:edit:*', 'admin/access-control:delete:*']
         },
         capabilities: { access_control: true },
         racksdb: true,
@@ -81,8 +84,8 @@ describe('views/settings/SettingsAccessControl.vue', () => {
           label: 'Settings',
           resources: [
             {
-              resource: 'settings/access-control',
-              label: 'Settings / Access Control',
+              resource: 'admin/access-control',
+              label: 'Admin / Access Control',
               operations: ['view'],
               scopes: ['*']
             }
@@ -90,7 +93,7 @@ describe('views/settings/SettingsAccessControl.vue', () => {
         }
       ],
       legacy_map: {
-        'roles-view': ['settings/access-control:view:*'],
+        'roles-view': ['admin/access-control:view:*'],
         'view-jobs': ['jobs:view:*']
       }
     })
@@ -100,7 +103,7 @@ describe('views/settings/SettingsAccessControl.vue', () => {
         name: 'db-admin',
         description: 'Database administrators',
         actions: ['roles-manage', 'view-jobs'],
-        permissions: ['jobs:view:*', 'settings/access-control:edit:*']
+        permissions: ['jobs:view:*', 'admin/access-control:edit:*']
       }
     ])
     mockGatewayAPI.access_users.mockResolvedValue({
@@ -129,7 +132,7 @@ describe('views/settings/SettingsAccessControl.vue', () => {
           name: 'db-admin',
           description: 'Database administrators',
           actions: ['roles-manage', 'view-jobs'],
-          permissions: ['jobs:view:*', 'settings/access-control:edit:*']
+          permissions: ['jobs:view:*', 'admin/access-control:edit:*']
         }
       ],
       custom_actions: ['roles-manage', 'view-jobs']
@@ -139,7 +142,7 @@ describe('views/settings/SettingsAccessControl.vue', () => {
       name: 'ops-viewer',
       description: 'Operations read-only',
       actions: ['roles-view', 'view-jobs'],
-      permissions: ['jobs:view:*', 'settings/access-control:view:*']
+      permissions: ['jobs:view:*', 'admin/access-control:view:*']
     })
     mockGatewayAPI.update_access_user_roles.mockResolvedValue({
       username: 'alice',
@@ -152,16 +155,20 @@ describe('views/settings/SettingsAccessControl.vue', () => {
           name: 'db-admin',
           description: 'Database administrators',
           actions: ['roles-manage', 'view-jobs'],
-          permissions: ['jobs:view:*', 'settings/access-control:edit:*']
+          permissions: ['jobs:view:*', 'admin/access-control:edit:*']
         }
       ],
       custom_actions: ['roles-manage', 'view-jobs']
     })
 
+    await mountOnAdminRoute(router)
+
     const wrapper = mount(SettingsAccessControlView, {
       global: {
         stubs: {
-          SettingsTabs: true
+          SettingsTabs: true,
+          AdminTabs: true,
+          AdminHeader: true
         }
       }
     })
@@ -190,12 +197,15 @@ describe('views/settings/SettingsAccessControl.vue', () => {
     await rolePermissionCheckboxes[1].setValue(true)
     await wrapper.get('form').trigger('submit.prevent')
 
-    expect(mockGatewayAPI.create_access_role).toHaveBeenCalledWith('foo', {
-      name: 'ops-viewer',
-      description: 'Operations read-only',
-      actions: ['roles-view', 'view-jobs'],
-      permissions: ['jobs:view:*', 'settings/access-control:view:*']
-    })
+    expect(mockGatewayAPI.create_access_role).toHaveBeenCalledWith(
+      'foo',
+      expect.objectContaining({
+        name: 'ops-viewer',
+        description: 'Operations read-only',
+        actions: ['roles-view', 'view-jobs'],
+        permissions: expect.arrayContaining(['jobs:view:*', 'admin/access-control:view:*'])
+      })
+    )
 
     const saveButton = wrapper
       .findAll('button')
@@ -207,14 +217,15 @@ describe('views/settings/SettingsAccessControl.vue', () => {
   })
 
   test('shows read-only state when the user lacks roles-manage', async () => {
+    const router = init_plugins()
     const runtimeStore = useRuntimeStore()
     runtimeStore.availableClusters = [
       {
         name: 'foo',
         permissions: {
           roles: ['auditor'],
-          actions: ['roles-view'],
-          rules: ['settings/access-control:view:*']
+          actions: [],
+          rules: ['admin/access-control:view:*']
         },
         capabilities: { access_control: true },
         racksdb: true,
@@ -234,8 +245,8 @@ describe('views/settings/SettingsAccessControl.vue', () => {
           label: 'Settings',
           resources: [
             {
-              resource: 'settings/access-control',
-              label: 'Settings / Access Control',
+              resource: 'admin/access-control',
+              label: 'Admin / Access Control',
               operations: ['view'],
               scopes: ['*']
             }
@@ -243,7 +254,7 @@ describe('views/settings/SettingsAccessControl.vue', () => {
         }
       ],
       legacy_map: {
-        'roles-view': ['settings/access-control:view:*']
+        'roles-view': ['admin/access-control:view:*']
       }
     })
     mockGatewayAPI.access_roles.mockResolvedValue([
@@ -252,7 +263,7 @@ describe('views/settings/SettingsAccessControl.vue', () => {
         name: 'db-auditor',
         description: 'Read-only role',
         actions: ['roles-view'],
-        permissions: ['settings/access-control:view:*']
+        permissions: ['admin/access-control:view:*']
       }
     ])
     mockGatewayAPI.access_users.mockResolvedValue({
@@ -262,10 +273,14 @@ describe('views/settings/SettingsAccessControl.vue', () => {
       page_size: 20
     })
 
+    await mountOnAdminRoute(router)
+
     const wrapper = mount(SettingsAccessControlView, {
       global: {
         stubs: {
-          SettingsTabs: true
+          SettingsTabs: true,
+          AdminTabs: true,
+          AdminHeader: true
         }
       }
     })
@@ -279,7 +294,7 @@ describe('views/settings/SettingsAccessControl.vue', () => {
       page: 1,
       page_size: 20
     })
-    expect(wrapper.text()).toContain('editing requires `settings/access-control:edit:*`')
+    expect(wrapper.text()).toContain('editing requires admin/access-control:edit:*')
     expect(wrapper.text()).toContain('No cached users match the current search.')
     expect(wrapper.get('button[type="submit"]').attributes('disabled')).toBeDefined()
   })

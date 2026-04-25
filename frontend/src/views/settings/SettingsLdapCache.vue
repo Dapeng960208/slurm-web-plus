@@ -16,6 +16,8 @@ import { useRuntimeConfiguration } from '@/plugins/runtimeConfiguration'
 import { useRuntimeStore } from '@/stores/runtime'
 import SettingsTabs from '@/components/settings/SettingsTabs.vue'
 import SettingsHeader from '@/components/settings/SettingsHeader.vue'
+import AdminTabs from '@/components/admin/AdminTabs.vue'
+import AdminHeader from '@/components/admin/AdminHeader.vue'
 import InfoAlert from '@/components/InfoAlert.vue'
 import ErrorAlert from '@/components/ErrorAlert.vue'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
@@ -28,6 +30,9 @@ const runtimeConfiguration = useRuntimeConfiguration()
 const route = useRoute()
 const router = useRouter()
 const pageSize = ref(DEFAULT_PAGE_SIZE)
+const isAdminRoute = computed(() => String(route.name ?? '').startsWith('admin-'))
+const tabsComponent = computed(() => (isAdminRoute.value ? AdminTabs : SettingsTabs))
+const headerComponent = computed(() => (isAdminRoute.value ? AdminHeader : SettingsHeader))
 
 const clusterUsers = reactive<Record<string, CachedLdapUser[]>>({})
 const clusterTotals = reactive<Record<string, number>>({})
@@ -43,7 +48,15 @@ const pageVisible = computed(
 )
 
 async function fetchClusterUsers(cluster: ClusterDescription) {
-  if (!cluster.database || !runtimeStore.hasRoutePermission(cluster.name, 'settings/ldap-cache', 'view')) return
+  if (
+    !cluster.database ||
+    !runtimeStore.hasRoutePermission(
+      cluster.name,
+      isAdminRoute.value ? 'admin/ldap-cache' : 'settings/ldap-cache',
+      'view'
+    )
+  )
+    return
 
   if (clusterPages[cluster.name] === undefined) clusterPages[cluster.name] = 1
   if (clusterQueries[cluster.name] === undefined) clusterQueries[cluster.name] = ''
@@ -98,7 +111,11 @@ function updateQueryParameters() {
   if (pageSize.value !== DEFAULT_PAGE_SIZE) {
     query.page_size = pageSize.value
   }
-  router.push({ name: 'settings-ldap-cache', query })
+  router.push({
+    name: isAdminRoute.value ? 'admin-ldap-cache' : 'settings-ldap-cache',
+    params: isAdminRoute.value ? { cluster: runtimeStore.currentCluster?.name } : undefined,
+    query
+  })
 }
 
 function updateClusterPage(cluster: ClusterDescription, page: number) {
@@ -126,9 +143,14 @@ onMounted(async () => {
 
 <template>
   <div class="ui-section-stack">
-    <SettingsTabs entry="LDAP Cache" />
+    <component
+      :is="tabsComponent"
+      entry="LDAP Cache"
+      :cluster="runtimeStore.currentCluster?.name ?? runtimeStore.availableClusters[0]?.name ?? ''"
+    />
     <div class="ui-panel ui-section">
-      <SettingsHeader
+      <component
+        :is="headerComponent"
         title="LDAP Cache"
         description="Cached LDAP users persisted in the local database for each cluster."
       />
@@ -154,7 +176,15 @@ onMounted(async () => {
         </h3>
       </div>
 
-      <InfoAlert v-if="!runtimeStore.hasRoutePermission(cluster.name, 'settings/ldap-cache', 'view')">
+      <InfoAlert
+        v-if="
+          !runtimeStore.hasRoutePermission(
+            cluster.name,
+            isAdminRoute ? 'admin/ldap-cache' : 'settings/ldap-cache',
+            'view'
+          )
+        "
+      >
         No permission to get LDAP cache information on this cluster.
       </InfoAlert>
       <InfoAlert v-else-if="!cluster.database">

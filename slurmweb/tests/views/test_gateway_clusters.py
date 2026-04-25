@@ -14,6 +14,24 @@ class TestGatewayViews(TestGatewayBase):
     def setUp(self):
         self.setup_app()
 
+    def _expected_cluster(self, name, permissions):
+        agent = fake_slurmweb_agent(name)
+        return {
+            "capabilities": agent.capabilities,
+            "database": True,
+            "infrastructure": name,
+            "metrics": True,
+            "cache": True,
+            "name": name,
+            "node_metrics": False,
+            "user_metrics": False,
+            "persistence": False,
+            "permissions": permissions,
+            "racksdb": True,
+            "access_control": False,
+            "ai": agent.ai,
+        }
+
     @mock.patch("slurmweb.views.gateway.aiohttp.ClientSession.get")
     def test_clusters_one_agent(self, mock_get):
         permissions, mock_get.return_value = mock_agent_aio_response(
@@ -25,26 +43,7 @@ class TestGatewayViews(TestGatewayBase):
         self.assertEqual(response.status_code, 200)
         self.assertIsInstance(response.json, list)
         self.assertEqual(len(response.json), 1)
-        self.assertEqual(
-            response.json[0],
-            {
-                "capabilities": {
-                    "job_history": True,
-                    "ldap_cache": True,
-                    "node_metrics": False,
-                },
-                "database": True,
-                "infrastructure": "foo",
-                "metrics": True,
-                "cache": True,
-                "name": "foo",
-                "node_metrics": False,
-                "user_metrics": False,
-                "persistence": False,
-                "permissions": permissions,
-                "racksdb": True,
-            },
-        )
+        self.assertEqual(response.json[0], self._expected_cluster("foo", permissions))
 
     @mock.patch("slurmweb.views.gateway.aiohttp.ClientSession.get")
     def test_clusters_multiple_agents(self, mock_get):
@@ -65,57 +64,9 @@ class TestGatewayViews(TestGatewayBase):
         self.assertCountEqual(
             response.json,
             [
-                {
-                    "capabilities": {
-                        "job_history": True,
-                        "ldap_cache": True,
-                        "node_metrics": False,
-                    },
-                    "database": True,
-                    "infrastructure": "foo",
-                    "metrics": True,
-                    "cache": True,
-                    "name": "foo",
-                    "node_metrics": False,
-                    "user_metrics": False,
-                    "persistence": False,
-                    "permissions": permissions,
-                    "racksdb": True,
-                },
-                {
-                    "capabilities": {
-                        "job_history": True,
-                        "ldap_cache": True,
-                        "node_metrics": False,
-                    },
-                    "database": True,
-                    "infrastructure": "bar",
-                    "metrics": True,
-                    "cache": True,
-                    "name": "bar",
-                    "node_metrics": False,
-                    "user_metrics": False,
-                    "persistence": False,
-                    "permissions": permissions,
-                    "racksdb": True,
-                },
-                {
-                    "capabilities": {
-                        "job_history": True,
-                        "ldap_cache": True,
-                        "node_metrics": False,
-                    },
-                    "database": True,
-                    "infrastructure": "baz",
-                    "metrics": True,
-                    "cache": True,
-                    "name": "baz",
-                    "node_metrics": False,
-                    "user_metrics": False,
-                    "persistence": False,
-                    "permissions": permissions,
-                    "racksdb": True,
-                },
+                self._expected_cluster("foo", permissions),
+                self._expected_cluster("bar", permissions),
+                self._expected_cluster("baz", permissions),
             ],
         )
 
@@ -156,40 +107,8 @@ class TestGatewayViews(TestGatewayBase):
         self.assertCountEqual(
             response.json,
             [
-                {
-                    "capabilities": {
-                        "job_history": True,
-                        "ldap_cache": True,
-                        "node_metrics": False,
-                    },
-                    "database": True,
-                    "infrastructure": "foo",
-                    "metrics": True,
-                    "cache": True,
-                    "name": "foo",
-                    "node_metrics": False,
-                    "user_metrics": False,
-                    "persistence": False,
-                    "permissions": permissions,
-                    "racksdb": True,
-                },
-                {
-                    "capabilities": {
-                        "job_history": True,
-                        "ldap_cache": True,
-                        "node_metrics": False,
-                    },
-                    "database": True,
-                    "infrastructure": "bar",
-                    "metrics": True,
-                    "cache": True,
-                    "name": "bar",
-                    "node_metrics": False,
-                    "user_metrics": False,
-                    "persistence": False,
-                    "permissions": permissions,
-                    "racksdb": True,
-                },
+                self._expected_cluster("foo", permissions),
+                self._expected_cluster("bar", permissions),
             ],
         )
 

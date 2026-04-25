@@ -8,13 +8,15 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue'
-import { RouterLink } from 'vue-router'
+import { RouterLink, useRoute } from 'vue-router'
 import { Dialog, DialogPanel, DialogTitle, TransitionChild, TransitionRoot } from '@headlessui/vue'
 import type { AIModelConfig, AIModelConfigPayload, AIProviderOption } from '@/composables/GatewayAPI'
 import { hasClusterAIAssistant, useGatewayAPI } from '@/composables/GatewayAPI'
 import { useRuntimeStore } from '@/stores/runtime'
 import SettingsTabs from '@/components/settings/SettingsTabs.vue'
 import SettingsHeader from '@/components/settings/SettingsHeader.vue'
+import AdminTabs from '@/components/admin/AdminTabs.vue'
+import AdminHeader from '@/components/admin/AdminHeader.vue'
 import InfoAlert from '@/components/InfoAlert.vue'
 import ErrorAlert from '@/components/ErrorAlert.vue'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
@@ -35,7 +37,11 @@ const FALLBACK_PROVIDERS: AIProviderOption[] = [
 
 const gateway = useGatewayAPI()
 const runtimeStore = useRuntimeStore()
+const route = useRoute()
 
+const isAdminRoute = computed(() => String(route.name ?? '').startsWith('admin-'))
+const tabsComponent = computed(() => (isAdminRoute.value ? AdminTabs : SettingsTabs))
+const headerComponent = computed(() => (isAdminRoute.value ? AdminHeader : SettingsHeader))
 const loading = ref(false)
 const error = ref<string | null>(null)
 const submitError = ref<string | null>(null)
@@ -80,12 +86,20 @@ const aiAvailable = computed(() => hasClusterAIAssistant(settingsCluster.value))
 const canManage = computed(
   () =>
     !!currentClusterName.value &&
-    runtimeStore.hasRoutePermission(currentClusterName.value, 'settings/ai', 'edit')
+    runtimeStore.hasRoutePermission(
+      currentClusterName.value,
+      isAdminRoute.value ? 'admin/ai' : 'settings/ai',
+      'edit'
+    )
 )
 const canView = computed(
   () =>
     !!currentClusterName.value &&
-    runtimeStore.hasRoutePermission(currentClusterName.value, 'settings/ai', 'view')
+    runtimeStore.hasRoutePermission(
+      currentClusterName.value,
+      isAdminRoute.value ? 'admin/ai' : 'settings/ai',
+      'view'
+    )
 )
 const canViewChat = computed(
   () => !!currentClusterName.value && runtimeStore.hasRoutePermission(currentClusterName.value, 'ai', 'view')
@@ -373,11 +387,12 @@ onMounted(async () => {
 
 <template>
   <div class="ui-section-stack">
-    <SettingsTabs entry="AI" />
+    <component :is="tabsComponent" entry="AI" :cluster="currentClusterName" />
 
     <div class="ui-panel ui-section">
       <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <SettingsHeader
+        <component
+          :is="headerComponent"
           title="AI"
           description="Manage cluster-scoped model configs, default model selection, connectivity checks and masked secrets."
         />

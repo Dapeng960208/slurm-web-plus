@@ -55,7 +55,7 @@ type PermissionScope = '*' | 'self'
 
 const LEGACY_PERMISSION_RULES: Record<string, string[]> = {
   'view-stats': ['dashboard:view:*', 'analysis:view:*'],
-  'view-jobs': ['jobs:view:*', 'user/analysis:view:self'],
+  'view-jobs': ['jobs:view:*', 'jobs:view:self', 'user/analysis:view:self'],
   'view-history-jobs': ['jobs-history:view:*'],
   'view-nodes': ['resources:view:*'],
   'view-qos': ['qos:view:*', 'jobs/filter-qos:view:*'],
@@ -63,12 +63,22 @@ const LEGACY_PERMISSION_RULES: Record<string, string[]> = {
   'associations-view': ['accounts:view:*', 'user/profile:view:*'],
   'view-accounts': ['jobs/filter-accounts:view:*'],
   'view-partitions': ['jobs/filter-partitions:view:*', 'resources/filter-partitions:view:*'],
-  'cache-view': ['settings/cache:view:*', 'settings/ldap-cache:view:*'],
-  'cache-reset': ['settings/cache:edit:*'],
-  'roles-view': ['settings/access-control:view:*'],
-  'roles-manage': ['settings/access-control:edit:*', 'settings/access-control:delete:*'],
-  'view-ai': ['ai:view:*', 'settings/ai:view:*'],
-  'manage-ai': ['settings/ai:edit:*']
+  'cache-view': [
+    'settings/cache:view:*',
+    'settings/ldap-cache:view:*',
+    'admin/cache:view:*',
+    'admin/ldap-cache:view:*'
+  ],
+  'cache-reset': ['settings/cache:edit:*', 'admin/cache:edit:*'],
+  'roles-view': ['settings/access-control:view:*', 'admin/access-control:view:*'],
+  'roles-manage': [
+    'settings/access-control:edit:*',
+    'settings/access-control:delete:*',
+    'admin/access-control:edit:*',
+    'admin/access-control:delete:*'
+  ],
+  'view-ai': ['ai:view:*', 'settings/ai:view:*', 'admin/ai:view:*'],
+  'manage-ai': ['settings/ai:edit:*', 'admin/ai:edit:*']
 }
 
 function operationAllows(granted: PermissionOperation, requested: PermissionOperation): boolean {
@@ -168,6 +178,15 @@ export const useRuntimeStore = defineStore('runtime', () => {
     return [...rules].some((rule) => ruleAllows(rule, resource, operation, scope))
   }
 
+  function hasRoutePermissionAnyScope(
+    clusterName: string,
+    resource: string,
+    operation: PermissionOperation = 'view',
+    scopes: PermissionScope[] = ['*', 'self']
+  ): boolean {
+    return scopes.some((scope) => hasRoutePermission(clusterName, resource, operation, scope))
+  }
+
   function addNotification(notification: Notification) {
     notifications.value.push(notification)
     setTimeout(removeNotification, notification.timeout * 1000, notification)
@@ -209,6 +228,7 @@ export const useRuntimeStore = defineStore('runtime', () => {
     hasPermission,
     hasClusterPermission,
     hasRoutePermission,
+    hasRoutePermissionAnyScope,
     addNotification,
     removeNotification,
     reportError,

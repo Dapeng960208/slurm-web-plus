@@ -26,6 +26,16 @@ class TestAgentViews(TestAgentBase):
     def setUp(self):
         self.setup_client()
 
+    def _enable_rules(self, *rules):
+        self.app.access_control_enabled = True
+        self.app.access_control_store = mock.Mock()
+        self.app.access_control_store.user_permissions.return_value = ([], [], list(rules))
+        self.app.policy._access_control_enabled = True
+        self.app.policy.set_access_control_store(self.app.access_control_store)
+
+    def _enable_job_view_all_rules(self):
+        self._enable_rules("jobs:view:*")
+
     #
     # Generic routes (without slurmrestd requests)
     #
@@ -95,6 +105,7 @@ class TestAgentViews(TestAgentBase):
     def test_info_with_database_and_user_capabilities_enabled(self):
         self.app.users_store = mock.Mock()
         self.app.jobs_store = mock.Mock()
+        self.app.node_metrics_db = mock.Mock()
         self.app.user_metrics_enabled = True
         self.app.access_control_enabled = True
         self.app.settings.node_metrics.enabled = True
@@ -114,6 +125,16 @@ class TestAgentViews(TestAgentBase):
                 "ldap_cache": True,
                 "access_control": True,
                 "node_metrics": True,
+                "ai": {
+                    "enabled": False,
+                    "configurable": False,
+                    "streaming": False,
+                    "persistence": False,
+                    "available_models_count": 0,
+                    "default_model_id": None,
+                    "providers": [],
+                    "tool_mode": "mixed",
+                },
                 "user_metrics": {
                     "enabled": True,
                     "history_api": True,
@@ -205,6 +226,7 @@ class TestAgentViews(TestAgentBase):
             "ops-viewer",
             "Operations read-only role",
             ["roles-view", "view-jobs"],
+            ["admin/access-control:view:*", "jobs:view:*"],
         )
 
     def test_access_users_with_filters(self):
@@ -251,6 +273,7 @@ class TestAgentViews(TestAgentBase):
         )
 
     def test_ldap_cache_users(self):
+        self._enable_rules("admin/ldap-cache:view:*")
         self.app.users_store = mock.Mock()
         self.app.users_store.list_ldap_users.return_value = {
             "items": [
@@ -277,6 +300,7 @@ class TestAgentViews(TestAgentBase):
         )
 
     def test_ldap_cache_users_with_filters(self):
+        self._enable_rules("admin/ldap-cache:view:*")
         self.app.users_store = mock.Mock()
         self.app.users_store.list_ldap_users.return_value = {
             "items": [{"username": "alice", "fullname": "Alice Doe"}],
@@ -304,6 +328,7 @@ class TestAgentViews(TestAgentBase):
         )
 
     def test_ldap_cache_users_disabled(self):
+        self._enable_rules("admin/ldap-cache:view:*")
         with self.assertLogs("slurmweb", level="WARNING") as cm:
             response = self.client.get(f"/v{get_version()}/users/cache")
         self.assertEqual(response.status_code, 501)
@@ -493,6 +518,7 @@ class TestAgentViews(TestAgentBase):
     @all_slurm_api_versions
     def test_request_jobs(self, slurm_version, api_version):
         self.setup_slurmrestd(slurm_version, api_version)
+        self._enable_job_view_all_rules()
         self.app.jobs_store = mock.Mock()
         [jobs_asset] = self.mock_slurmrestd_responses(
             slurm_version,
@@ -511,6 +537,7 @@ class TestAgentViews(TestAgentBase):
     @all_slurm_api_versions
     def test_request_jobs_node(self, slurm_version, api_version):
         self.setup_slurmrestd(slurm_version, api_version)
+        self._enable_job_view_all_rules()
         [jobs_asset] = self.mock_slurmrestd_responses(
             slurm_version,
             api_version,
@@ -549,6 +576,7 @@ class TestAgentViews(TestAgentBase):
     @all_slurm_api_versions
     def test_request_job_running(self, slurm_version, api_version):
         self.setup_slurmrestd(slurm_version, api_version)
+        self._enable_job_view_all_rules()
         [slurmdb_job_asset, slurm_job_asset] = self.mock_slurmrestd_responses(
             slurm_version,
             api_version,
@@ -568,6 +596,7 @@ class TestAgentViews(TestAgentBase):
     @all_slurm_api_versions
     def test_request_job_pending(self, slurm_version, api_version):
         self.setup_slurmrestd(slurm_version, api_version)
+        self._enable_job_view_all_rules()
         [slurmdb_job_asset, slurm_job_asset] = self.mock_slurmrestd_responses(
             slurm_version,
             api_version,
@@ -587,6 +616,7 @@ class TestAgentViews(TestAgentBase):
     @all_slurm_api_versions
     def test_request_job_completed(self, slurm_version, api_version):
         self.setup_slurmrestd(slurm_version, api_version)
+        self._enable_job_view_all_rules()
         [slurmdb_job_asset, slurm_job_asset] = self.mock_slurmrestd_responses(
             slurm_version,
             api_version,
@@ -606,6 +636,7 @@ class TestAgentViews(TestAgentBase):
     @all_slurm_api_versions
     def test_request_job_failed(self, slurm_version, api_version):
         self.setup_slurmrestd(slurm_version, api_version)
+        self._enable_job_view_all_rules()
         [slurmdb_job_asset, slurm_job_asset] = self.mock_slurmrestd_responses(
             slurm_version,
             api_version,
@@ -625,6 +656,7 @@ class TestAgentViews(TestAgentBase):
     @all_slurm_api_versions
     def test_request_job_timeout(self, slurm_version, api_version):
         self.setup_slurmrestd(slurm_version, api_version)
+        self._enable_job_view_all_rules()
         [slurmdb_job_asset, slurm_job_asset] = self.mock_slurmrestd_responses(
             slurm_version,
             api_version,
@@ -644,6 +676,7 @@ class TestAgentViews(TestAgentBase):
     @all_slurm_api_versions
     def test_request_job_archived(self, slurm_version, api_version):
         self.setup_slurmrestd(slurm_version, api_version)
+        self._enable_job_view_all_rules()
         [slurmdb_job_asset, slurm_job_asset] = self.mock_slurmrestd_responses(
             slurm_version,
             api_version,
@@ -662,6 +695,7 @@ class TestAgentViews(TestAgentBase):
     @all_slurm_api_versions
     def test_request_job_not_found(self, slurm_version, api_version):
         self.setup_slurmrestd(slurm_version, api_version)
+        self._enable_job_view_all_rules()
         [slurmdb_job_asset, slurm_job_asset] = self.mock_slurmrestd_responses(
             slurm_version,
             api_version,
@@ -956,6 +990,7 @@ class TestAgentViews(TestAgentBase):
             )
 
     def test_cache_stats_disabled(self):
+        self._enable_rules("admin/cache:view:*")
         with self.assertLogs("slurmweb", level="WARNING") as cm:
             response = self.client.get(f"/v{get_version()}/cache/stats")
         self.assertEqual(response.status_code, 501)
@@ -978,6 +1013,7 @@ class TestAgentViews(TestAgentBase):
         )
 
     def test_cache_stats(self):
+        self._enable_rules("admin/cache:view:*")
         self.app.cache = mock.Mock(spec=CachingService)
         self.app.cache.metrics.return_value = (
             {"jobs": 10, "nodes": 5},
@@ -996,6 +1032,7 @@ class TestAgentViews(TestAgentBase):
         )
 
     def test_cache_reset_disabled(self):
+        self._enable_rules("admin/cache:edit:*")
         with self.assertLogs("slurmweb", level="WARNING") as cm:
             response = self.client.post(f"/v{get_version()}/cache/reset")
         self.assertEqual(response.status_code, 501)
@@ -1016,6 +1053,7 @@ class TestAgentViews(TestAgentBase):
         )
 
     def test_cache_reset(self):
+        self._enable_rules("admin/cache:edit:*")
         self.app.cache = mock.Mock(spec=CachingService)
         self.app.cache.metrics.return_value = (
             {"jobs": 0},

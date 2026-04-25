@@ -3,6 +3,7 @@ import { flushPromises, mount, RouterLinkStub } from '@vue/test-utils'
 import SettingsLdapCacheView from '@/views/settings/SettingsLdapCache.vue'
 import { init_plugins } from '../../lib/common'
 import { useRuntimeStore } from '@/stores/runtime'
+import type { RouterMock } from 'vue-router-mock'
 
 const mockGatewayAPI = {
   ldap_cache_users: vi.fn()
@@ -27,16 +28,26 @@ function paginatedUsersResponse(items: Array<{ username: string; fullname: strin
 
 describe('settings/SettingsLdapCache.vue', () => {
   beforeEach(() => {
-    init_plugins()
+    void init_plugins()
     vi.clearAllMocks()
     mockGatewayAPI.ldap_cache_users.mockReset()
   })
 
+  async function primeAdminRoute(router: RouterMock, cluster = 'foo') {
+    await router.setParams({ cluster })
+    router.currentRoute.value.name = 'admin-ldap-cache'
+  }
+
   test('renders cached LDAP users by cluster', async () => {
+    const router = init_plugins()
     useRuntimeStore().availableClusters = [
       {
         name: 'foo',
-        permissions: { roles: [], actions: ['cache-view', 'view-history-jobs'] },
+        permissions: {
+          roles: [],
+          actions: ['view-history-jobs'],
+          rules: ['admin/ldap-cache:view:*', 'jobs-history:view:*']
+        },
         racksdb: true,
         infrastructure: 'foo',
         metrics: true,
@@ -55,10 +66,14 @@ describe('settings/SettingsLdapCache.vue', () => {
       )
     )
 
+    await primeAdminRoute(router)
+
     const wrapper = mount(SettingsLdapCacheView, {
       global: {
         stubs: {
           SettingsTabs: true,
+          AdminTabs: true,
+          AdminHeader: true,
           RouterLink: RouterLinkStub
         }
       }
@@ -89,10 +104,11 @@ describe('settings/SettingsLdapCache.vue', () => {
   })
 
   test('renders cached LDAP users when backend still returns a legacy array', async () => {
+    const router = init_plugins()
     useRuntimeStore().availableClusters = [
       {
         name: 'foo',
-        permissions: { roles: [], actions: ['cache-view'] },
+        permissions: { roles: [], actions: [], rules: ['admin/ldap-cache:view:*'] },
         racksdb: true,
         infrastructure: 'foo',
         metrics: true,
@@ -105,10 +121,14 @@ describe('settings/SettingsLdapCache.vue', () => {
       { username: 'bob', fullname: null }
     ])
 
+    await primeAdminRoute(router)
+
     const wrapper = mount(SettingsLdapCacheView, {
       global: {
         stubs: {
-          SettingsTabs: true
+          SettingsTabs: true,
+          AdminTabs: true,
+          AdminHeader: true
         }
       }
     })
@@ -122,10 +142,11 @@ describe('settings/SettingsLdapCache.vue', () => {
   })
 
   test('searches by username and resets to first page', async () => {
+    const router = init_plugins()
     useRuntimeStore().availableClusters = [
       {
         name: 'foo',
-        permissions: { roles: [], actions: ['cache-view'] },
+        permissions: { roles: [], actions: [], rules: ['admin/ldap-cache:view:*'] },
         racksdb: true,
         infrastructure: 'foo',
         metrics: true,
@@ -137,10 +158,14 @@ describe('settings/SettingsLdapCache.vue', () => {
       .mockResolvedValueOnce(paginatedUsersResponse([{ username: 'alice', fullname: 'Alice Doe' }], 1))
       .mockResolvedValueOnce(paginatedUsersResponse([{ username: 'alice', fullname: 'Alice Doe' }], 1))
 
+    await primeAdminRoute(router)
+
     const wrapper = mount(SettingsLdapCacheView, {
       global: {
         stubs: {
-          SettingsTabs: true
+          SettingsTabs: true,
+          AdminTabs: true,
+          AdminHeader: true
         }
       }
     })
@@ -158,10 +183,11 @@ describe('settings/SettingsLdapCache.vue', () => {
   })
 
   test('supports pagination and reset', async () => {
+    const router = init_plugins()
     useRuntimeStore().availableClusters = [
       {
         name: 'foo',
-        permissions: { roles: [], actions: ['cache-view'] },
+        permissions: { roles: [], actions: [], rules: ['admin/ldap-cache:view:*'] },
         racksdb: true,
         infrastructure: 'foo',
         metrics: true,
@@ -174,10 +200,14 @@ describe('settings/SettingsLdapCache.vue', () => {
       .mockResolvedValueOnce(paginatedUsersResponse([{ username: 'bob', fullname: 'Bob Doe' }], 60, 2))
       .mockResolvedValueOnce(paginatedUsersResponse([{ username: 'alice', fullname: 'Alice Doe' }], 60, 1))
 
+    await primeAdminRoute(router)
+
     const wrapper = mount(SettingsLdapCacheView, {
       global: {
         stubs: {
-          SettingsTabs: true
+          SettingsTabs: true,
+          AdminTabs: true,
+          AdminHeader: true
         }
       }
     })
@@ -209,10 +239,11 @@ describe('settings/SettingsLdapCache.vue', () => {
   })
 
   test('keeps cluster state isolated', async () => {
+    const router = init_plugins()
     useRuntimeStore().availableClusters = [
       {
         name: 'foo',
-        permissions: { roles: [], actions: ['cache-view'] },
+        permissions: { roles: [], actions: [], rules: ['admin/ldap-cache:view:*'] },
         racksdb: true,
         infrastructure: 'foo',
         metrics: true,
@@ -221,7 +252,7 @@ describe('settings/SettingsLdapCache.vue', () => {
       },
       {
         name: 'bar',
-        permissions: { roles: [], actions: ['cache-view'] },
+        permissions: { roles: [], actions: [], rules: ['admin/ldap-cache:view:*'] },
         racksdb: true,
         infrastructure: 'bar',
         metrics: true,
@@ -234,10 +265,14 @@ describe('settings/SettingsLdapCache.vue', () => {
       .mockResolvedValueOnce(paginatedUsersResponse([{ username: 'bob', fullname: 'Bob Doe' }], 1))
       .mockResolvedValueOnce(paginatedUsersResponse([{ username: 'alice', fullname: 'Alice Doe' }], 1))
 
+    await primeAdminRoute(router)
+
     const wrapper = mount(SettingsLdapCacheView, {
       global: {
         stubs: {
-          SettingsTabs: true
+          SettingsTabs: true,
+          AdminTabs: true,
+          AdminHeader: true
         }
       }
     })
@@ -268,10 +303,11 @@ describe('settings/SettingsLdapCache.vue', () => {
   })
 
   test('shows disabled message when cluster database support is unavailable', async () => {
+    const router = init_plugins()
     useRuntimeStore().availableClusters = [
       {
         name: 'foo',
-        permissions: { roles: [], actions: ['cache-view'] },
+        permissions: { roles: [], actions: [], rules: ['admin/ldap-cache:view:*'] },
         racksdb: true,
         infrastructure: 'foo',
         metrics: true,
@@ -280,10 +316,14 @@ describe('settings/SettingsLdapCache.vue', () => {
       }
     ]
 
+    await primeAdminRoute(router)
+
     const wrapper = mount(SettingsLdapCacheView, {
       global: {
         stubs: {
-          SettingsTabs: true
+          SettingsTabs: true,
+          AdminTabs: true,
+          AdminHeader: true
         }
       }
     })
@@ -295,6 +335,7 @@ describe('settings/SettingsLdapCache.vue', () => {
   })
 
   test('shows permission error for denied clusters', async () => {
+    const router = init_plugins()
     useRuntimeStore().availableClusters = [
       {
         name: 'foo',
@@ -307,10 +348,14 @@ describe('settings/SettingsLdapCache.vue', () => {
       }
     ]
 
+    await primeAdminRoute(router)
+
     const wrapper = mount(SettingsLdapCacheView, {
       global: {
         stubs: {
-          SettingsTabs: true
+          SettingsTabs: true,
+          AdminTabs: true,
+          AdminHeader: true
         }
       }
     })
@@ -322,10 +367,11 @@ describe('settings/SettingsLdapCache.vue', () => {
   })
 
   test('shows empty state when no cached LDAP users are present', async () => {
+    const router = init_plugins()
     useRuntimeStore().availableClusters = [
       {
         name: 'foo',
-        permissions: { roles: [], actions: ['cache-view'] },
+        permissions: { roles: [], actions: [], rules: ['admin/ldap-cache:view:*'] },
         racksdb: true,
         infrastructure: 'foo',
         metrics: true,
@@ -335,10 +381,14 @@ describe('settings/SettingsLdapCache.vue', () => {
     ]
     mockGatewayAPI.ldap_cache_users.mockResolvedValueOnce(paginatedUsersResponse([], 0))
 
+    await primeAdminRoute(router)
+
     const wrapper = mount(SettingsLdapCacheView, {
       global: {
         stubs: {
-          SettingsTabs: true
+          SettingsTabs: true,
+          AdminTabs: true,
+          AdminHeader: true
         }
       }
     })

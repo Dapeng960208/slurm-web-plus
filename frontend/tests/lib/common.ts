@@ -5,11 +5,18 @@ import { runtimeConfiguration } from '@/plugins/runtimeConfiguration'
 import type { GatewayAnyClusterApiKey } from '@/composables/GatewayAPI'
 import { httpPlugin } from '@/plugins/http'
 import { createTestingPinia } from '@pinia/testing'
+import { setActivePinia } from 'pinia'
 import { config, RouterLinkStub } from '@vue/test-utils'
 import { createRouterMock, injectRouterMock } from 'vue-router-mock'
 import type { RouterMock } from 'vue-router-mock'
 
 export function init_plugins(): RouterMock {
+  const pinia = createTestingPinia({
+    createSpy: vi.fn,
+    stubActions: false
+  })
+  setActivePinia(pinia)
+
   config.global.plugins = [
     [
       runtimeConfiguration,
@@ -19,10 +26,7 @@ export function init_plugins(): RouterMock {
       }
     ],
     httpPlugin,
-    createTestingPinia({
-      createSpy: vi.fn,
-      stubActions: false
-    })
+    pinia
   ]
   config.global.stubs = {
     RouterLink: RouterLinkStub

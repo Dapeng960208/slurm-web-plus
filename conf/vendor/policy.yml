@@ -5,6 +5,11 @@ actions:
   view-jobs: |
     Get _Jobs_ entry in main menu and permission to view all users jobs in
     queue and all jobs details.
+  view-own-jobs: |
+    Get _Jobs_ entry in main menu and permission to view only the current
+    authenticated user's jobs and self-scoped job analytics.
+  cancel-own-jobs: |
+    Permission to cancel only the current authenticated user's jobs.
   view-nodes: |
     Get _Resources_ entry in main menu and permission to view the list of
     compute nodes in cluster with their status in Slurm.
@@ -35,5 +40,5 @@ actions:
     Get _AI_ entry in main menu and permission to use the cluster AI assistant,
     browse available models and read own AI conversations.
   manage-ai: |
-    Access AI settings to manage model configurations, default model selection
-    and connectivity diagnostics for the current cluster.
+    Access cluster admin AI settings to view, manage and delete model
+    configurations for the current cluster.

@@ -32,6 +32,8 @@ if t.TYPE_CHECKING:
 
 
 class Slurmrestd:
+    WRITE_SUPPORTED_VERSIONS = {"0.0.41", "0.0.42", "0.0.43", "0.0.44"}
+
     def __init__(
         self,
         uri: urllib.parse.ParseResult,
@@ -96,7 +98,14 @@ class Slurmrestd:
             )
 
     def _execute_request(
-        self, component: str, api_version: str, endpoint: str, ignore_notfound=False
+        self,
+        component: str,
+        api_version: str,
+        endpoint: str,
+        ignore_notfound=False,
+        method: str = "GET",
+        payload: t.Optional[t.Dict[str, t.Any]] = None,
+        query: t.Optional[t.Dict[str, t.Any]] = None,
     ) -> dict:
         """Execute HTTP request to slurmrestd API with provided API version and return
         parsed JSON result.
@@ -111,12 +120,24 @@ class Slurmrestd:
             Parsed JSON response as a dictionary
         """
         # Compose query path with provided API version
-        query = f"/{component}/v{api_version}/{endpoint}"
+        request_path = f"/{component}/v{api_version}/{endpoint}"
 
         try:
-            response = self.session.get(
-                f"{self.prefix}{query}", headers=self.auth.headers()
-            )
+            request_url = f"{self.prefix}{request_path}"
+            if method.upper() == "GET":
+                response = self.session.get(
+                    request_url,
+                    headers=self.auth.headers(),
+                    params=query,
+                )
+            else:
+                response = self.session.request(
+                    method,
+                    request_url,
+                    headers=self.auth.headers(),
+                    json=payload,
+                    params=query,
+                )
         except requests.exceptions.ConnectionError as err:
             raise SlurmrestConnectionError(str(err))
 
@@ -135,15 +156,24 @@ class Slurmrestd:
             logger.error(
                 "Unable to extract warnings from slurmrestd response to %s, "
                 "unsupported Slurm version?",
-                query,
+                request_path,
             )
         elif len(result["warnings"]):
             logger.warning(
-                "slurmrestd query %s warnings: %s", query, result["warnings"]
+                "slurmrestd query %s warnings: %s", request_path, result["warnings"]
             )
         return result
 
-    def _request(self, component: str, endpoint: str, key: str, ignore_notfound=False):
+    def _request(
+        self,
+        component: str,
+        endpoint: str,
+        key: t.Optional[str],
+        ignore_notfound=False,
+        method: str = "GET",
+        payload: t.Optional[t.Dict[str, t.Any]] = None,
+        query: t.Optional[t.Dict[str, t.Any]] = None,
+    ):
         """Make a request to slurmrestd API with detected API version.
 
         Args:
@@ -157,9 +187,43 @@ class Slurmrestd:
             self.discover()
 
         result = self._execute_request(
-            component, self.api_version, endpoint, ignore_notfound
+            component,
+            self.api_version,
+            endpoint,
+            ignore_notfound,
+            method=method,
+            payload=payload,
+            query=query,
         )
+        if key is None:
+            return result
         return result[key]
+
+    def request_json(
+        self,
+        method: str,
+        component: str,
+        endpoint: str,
+        *,
+        payload: t.Optional[t.Dict[str, t.Any]] = None,
+        query: t.Optional[t.Dict[str, t.Any]] = None,
+        key: t.Optional[str] = None,
+        ignore_notfound: bool = False,
+    ):
+        return self._request(
+            component,
+            endpoint,
+            key,
+            ignore_notfound=ignore_notfound,
+            method=method,
+            payload=payload,
+            query=query,
+        )
+
+    def supports_write_operations(self) -> bool:
+        if self.api_version is None:
+            self.discover()
+        return self.api_version in self.WRITE_SUPPORTED_VERSIONS
 
     def discover(self) -> t.Tuple[str, str, str]:
         """Discover the actual slurmrestd API version and Slurm version by trying
@@ -221,6 +285,26 @@ class Slurmrestd:
 
     def jobs(self, **kwargs):
         return self._request("slurm", "jobs", "jobs", **kwargs)
+
+    def ping_data(self):
+        return self._request("slurm", "ping", "pings")
+
+    def diag(self):
+        return self._request("slurm", "diag", "statistics")
+
+    def job_submit(self, payload: t.Dict[str, t.Any]):
+        return self.request_json("POST", "slurm", "job/submit", payload=payload)
+
+    def job_update(self, job_id: int, payload: t.Dict[str, t.Any]):
+        return self.request_json("POST", "slurm", f"job/{job_id}", payload=payload)
+
+    def job_cancel(self, job_id: int, payload: t.Optional[t.Dict[str, t.Any]] = None):
+        return self.request_json(
+            "DELETE",
+            "slurm",
+            f"job/{job_id}",
+            payload=payload,
+        )
 
     def jobs_by_node(self, node: str):
         """Select jobs not completed which are allocated the given node."""
@@ -403,6 +487,12 @@ class Slurmrestd:
                 raise SlurmrestdNotFoundError(f"Node {node_name} not found")
             raise err
 
+    def node_update(self, node_name: str, payload: t.Dict[str, t.Any]):
+        return self.request_json("POST", "slurm", f"node/{node_name}", payload=payload)
+
+    def node_delete(self, node_name: str):
+        return self.request_json("DELETE", "slurm", f"node/{node_name}")
+
     def partitions(self, **kwargs):
         return self._request("slurm", "partitions", "partitions", **kwargs)
 
@@ -415,8 +505,99 @@ class Slurmrestd:
     def reservations(self: str, **kwargs):
         return self._request("slurm", "reservations", "reservations", **kwargs)
 
+    def reservation_create(self, payload: t.Dict[str, t.Any]):
+        return self.request_json("POST", "slurm", "reservation", payload=payload)
+
+    def reservation_update(
+        self, reservation_name: str, payload: t.Dict[str, t.Any]
+    ):
+        return self.request_json(
+            "POST",
+            "slurm",
+            f"reservation/{reservation_name}",
+            payload=payload,
+        )
+
+    def reservation_delete(self, reservation_name: str):
+        return self.request_json("DELETE", "slurm", f"reservation/{reservation_name}")
+
     def qos(self: str, **kwargs):
         return self._request("slurmdb", "qos", "qos", **kwargs)
+
+    def account(self, account_name: str):
+        return self._request("slurmdb", f"account/{account_name}", "accounts")[0]
+
+    def accounts_update(self, payload: t.Dict[str, t.Any]):
+        return self.request_json("POST", "slurmdb", "accounts", payload=payload)
+
+    def account_delete(self, account_name: str):
+        return self.request_json("DELETE", "slurmdb", f"account/{account_name}")
+
+    def user(self, username: str):
+        return self._request("slurmdb", f"user/{username}", "users")[0]
+
+    def users(self):
+        return self._request("slurmdb", "users", "users")
+
+    def users_update(self, payload: t.Dict[str, t.Any]):
+        return self.request_json("POST", "slurmdb", "users", payload=payload)
+
+    def user_delete(self, username: str):
+        return self.request_json("DELETE", "slurmdb", f"user/{username}")
+
+    def associations_update(self, payload: t.Dict[str, t.Any]):
+        return self.request_json("POST", "slurmdb", "associations", payload=payload)
+
+    def associations_delete(self, payload: t.Dict[str, t.Any]):
+        return self.request_json("DELETE", "slurmdb", "association", payload=payload)
+
+    def qos_update(self, payload: t.Dict[str, t.Any]):
+        return self.request_json("POST", "slurmdb", "qos", payload=payload)
+
+    def qos_delete(self, qos_name: str):
+        return self.request_json("DELETE", "slurmdb", f"qos/{qos_name}")
+
+    def wckeys(self):
+        return self._request("slurmdb", "wckeys", "wckeys")
+
+    def wckeys_update(self, payload: t.Dict[str, t.Any]):
+        return self.request_json("POST", "slurmdb", "wckeys", payload=payload)
+
+    def wckey_delete(self, wckey_id: str):
+        return self.request_json("DELETE", "slurmdb", f"wckey/{wckey_id}")
+
+    def clusters(self):
+        return self._request("slurmdb", "clusters", "clusters")
+
+    def clusters_update(self, payload: t.Dict[str, t.Any]):
+        return self.request_json("POST", "slurmdb", "clusters", payload=payload)
+
+    def cluster_delete(self, cluster_name: str):
+        return self.request_json("DELETE", "slurmdb", f"cluster/{cluster_name}")
+
+    def licenses(self):
+        return self._request("slurm", "licenses", "licenses")
+
+    def shares(self):
+        return self._request("slurm", "shares", "shares")
+
+    def reconfigure(self):
+        return self.request_json("GET", "slurm", "reconfigure")
+
+    def slurmdb_diag(self):
+        return self._request("slurmdb", "diag", "statistics")
+
+    def slurmdb_config(self):
+        return self.request_json("GET", "slurmdb", "config")
+
+    def instances(self):
+        return self._request("slurmdb", "instances", "instances")
+
+    def tres(self):
+        try:
+            return self._request("slurmdb", "tres", "TRES")
+        except KeyError:
+            return self._request("slurmdb", "tres", "tres")
 
     @staticmethod
     def node_gres_extract_gpus(gres_full: str) -> int:
@@ -468,9 +649,26 @@ class SlurmrestdAdapter(Slurmrestd):
 
         return result
 
-    def _request(self, component: str, endpoint: str, key: str, ignore_notfound=False):
+    def _request(
+        self,
+        component: str,
+        endpoint: str,
+        key: t.Optional[str],
+        ignore_notfound=False,
+        method: str = "GET",
+        payload: t.Optional[t.Dict[str, t.Any]] = None,
+        query: t.Optional[t.Dict[str, t.Any]] = None,
+    ):
         """Make request and adapt response data under the key if needed."""
-        result = super()._request(component, endpoint, key, ignore_notfound)
+        result = super()._request(
+            component,
+            endpoint,
+            key,
+            ignore_notfound,
+            method=method,
+            payload=payload,
+            query=query,
+        )
 
         # Apply adaptation chain to data under the key, passing component
         # for differentiation between slurmctld and slurmdbd jobs
@@ -512,13 +710,13 @@ class SlurmrestdFiltered(SlurmrestdAdapter):
                 SlurmrestdFiltered.filter_item_fields(items, selection)
         return items
 
-    def jobs(self):
-        return SlurmrestdFiltered.filter_fields(super().jobs(), self.filters.jobs)
+    def jobs(self, **kwargs):
+        return SlurmrestdFiltered.filter_fields(super().jobs(**kwargs), self.filters.jobs)
 
-    def jobs_unfiltered(self):
+    def jobs_unfiltered(self, **kwargs):
         """Return full job fields from slurmrestd, bypassing field filtering.
         Used by the persistence layer to capture all fields needed for storage."""
-        return super().jobs()
+        return super().jobs(**kwargs)
 
     def _ctldjob(self, job_id: int, **kwargs):
         return SlurmrestdFiltered.filter_fields(
@@ -544,11 +742,11 @@ class SlurmrestdFiltered(SlurmrestdAdapter):
             # pass the error, the job is just not available in ctld queue
         return result
 
-    def nodes(self):
-        return SlurmrestdFiltered.filter_fields(super().nodes(), self.filters.nodes)
+    def nodes(self, **kwargs):
+        return SlurmrestdFiltered.filter_fields(super().nodes(**kwargs), self.filters.nodes)
 
-    def nodes_unfiltered(self):
-        return super().nodes()
+    def nodes_unfiltered(self, **kwargs):
+        return super().nodes(**kwargs)
 
     def node(self, node_name: str):
         return SlurmrestdFiltered.filter_fields(
@@ -560,23 +758,23 @@ class SlurmrestdFiltered(SlurmrestdAdapter):
             super().partitions(), self.filters.partitions
         )
 
-    def accounts(self):
+    def accounts(self, **kwargs):
         return SlurmrestdFiltered.filter_fields(
-            super().accounts(), self.filters.accounts
+            super().accounts(**kwargs), self.filters.accounts
         )
 
-    def associations(self: str):
+    def associations(self: str, **kwargs):
         return SlurmrestdFiltered.filter_fields(
-            super().associations(), self.filters.associations
+            super().associations(**kwargs), self.filters.associations
         )
 
-    def reservations(self: str):
+    def reservations(self: str, **kwargs):
         return SlurmrestdFiltered.filter_fields(
-            super().reservations(), self.filters.reservations
+            super().reservations(**kwargs), self.filters.reservations
         )
 
-    def qos(self: str):
-        return SlurmrestdFiltered.filter_fields(super().qos(), self.filters.qos)
+    def qos(self: str, **kwargs):
+        return SlurmrestdFiltered.filter_fields(super().qos(**kwargs), self.filters.qos)
 
 
 class SlurmrestdFilteredCached(SlurmrestdFiltered):
@@ -613,7 +811,9 @@ class SlurmrestdFilteredCached(SlurmrestdFiltered):
             self.service.count_hit(key)
         return data
 
-    def jobs(self):
+    def jobs(self, **kwargs):
+        if kwargs:
+            return super().jobs(**kwargs)
         return self._cached(CacheKey("jobs"), self.cache.jobs, super().jobs)
 
     def job(self, job_id: int):
@@ -624,10 +824,14 @@ class SlurmrestdFilteredCached(SlurmrestdFiltered):
             job_id,
         )
 
-    def nodes(self):
+    def nodes(self, **kwargs):
+        if kwargs:
+            return super().nodes(**kwargs)
         return self._cached(CacheKey("nodes"), self.cache.nodes, super().nodes)
 
-    def nodes_unfiltered(self):
+    def nodes_unfiltered(self, **kwargs):
+        if kwargs:
+            return super().nodes_unfiltered(**kwargs)
         return self._cached(
             CacheKey("nodes-unfiltered", "nodes"),
             self.cache.nodes,
@@ -647,18 +851,26 @@ class SlurmrestdFilteredCached(SlurmrestdFiltered):
             CacheKey("partitions"), self.cache.partitions, super().partitions
         )
 
-    def accounts(self):
+    def accounts(self, **kwargs):
+        if kwargs:
+            return super().accounts(**kwargs)
         return self._cached(CacheKey("accounts"), self.cache.accounts, super().accounts)
 
-    def associations(self):
+    def associations(self, **kwargs):
+        if kwargs:
+            return super().associations(**kwargs)
         return self._cached(
             CacheKey("associations"), self.cache.associations, super().associations
         )
 
-    def reservations(self):
+    def reservations(self, **kwargs):
+        if kwargs:
+            return super().reservations(**kwargs)
         return self._cached(
             CacheKey("reservations"), self.cache.reservations, super().reservations
         )
 
-    def qos(self):
+    def qos(self, **kwargs):
+        if kwargs:
+            return super().qos(**kwargs)
         return self._cached(CacheKey("qos"), self.cache.qos, super().qos)

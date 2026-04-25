@@ -146,7 +146,10 @@ function hitRateKey(key: string, value: number): number | null {
       </div>
 
       <div
-        v-if="runtimeStore.hasRoutePermission(cluster.name, 'settings/cache', 'edit')"
+        v-if="
+          runtimeStore.hasRoutePermission(cluster.name, 'settings/cache', 'edit') ||
+          runtimeStore.hasRoutePermission(cluster.name, 'admin/cache', 'edit')
+        "
         class="border-t border-[rgba(80,105,127,0.08)] px-6 py-4"
       >
         <button type="button" class="ui-button-secondary" @click="resetCache(cluster.name)">

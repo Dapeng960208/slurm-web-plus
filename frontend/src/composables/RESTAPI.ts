@@ -138,13 +138,18 @@ export function useRESTAPI() {
 
   async function deleteRequest<CType>(
     resource: string,
+    data?: unknown,
     withToken: boolean = true,
     responseType: ResponseType = 'json'
   ): Promise<CType> {
     console.log(`Slurm Web Plus gateway API delete ${resource}`)
     return (
       await requestServer(() => {
-        return http.delete(resource, requestConfig(withToken, responseType))
+        const config = requestConfig(withToken, responseType)
+        if (data !== undefined) {
+          config.data = data
+        }
+        return http.delete(resource, config)
       })
     ).data as CType
   }

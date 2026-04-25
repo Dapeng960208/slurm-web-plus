@@ -26,6 +26,9 @@
 - Cache
   - [需求说明](./features/cache/requirements.md)
   - [测试计划](./features/cache/test-plan.md)
+- Management Center
+  - [需求说明](./features/management-center/requirements.md)
+  - [测试计划](./features/management-center/test-plan.md)
 - 用户分析
   - [后端与页面契约](./features/user-analytics/backend.md)
 - LDAP Cache
@@ -54,13 +57,12 @@
 
 ## 本轮重点
 
-本轮已落地的重点是两件事：
+本轮已落地的重点包括：
 
-- 路由权限模型切换为 `resource:operation:scope`，支持精细资源、前缀资源、`self` 和 `*:*:*`。
-- Agent 能力开关收敛为自动推导：
-  - 数据库开启后自动提供 LDAP Cache、Jobs History、Access Control、AI。
-  - Prometheus 开启后自动提供 metrics、node metrics。
-  - 数据库和 Prometheus 同时开启后自动提供 user metrics / user analytics。
+- 基于现有业务页面增强 Slurm 管理能力，补齐单对象创建、编辑、删除、取消。
+- 新增集群级 `/:cluster/admin`，统一承载 `System`、`AI`、`LDAP Cache`、`Cache`、`Access Control`。
+- `jobs` 资源正式落地 `self` scope，普通用户默认只允许查看和取消自己的作业。
+- `analysis` 页面新增 `Slurm ping` 与 `diag` 面板。
 
 补充说明：
 

@@ -7,7 +7,7 @@
 -->
 
 <script setup lang="ts">
-import { computed, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { ChevronLeftIcon } from '@heroicons/vue/20/solid'
 import ClusterMainLayout from '@/components/ClusterMainLayout.vue'
@@ -16,16 +16,20 @@ import ErrorAlert from '@/components/ErrorAlert.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import AccountBreadcrumb from '@/components/accounts/AccountBreadcrumb.vue'
 import { useClusterDataPoller } from '@/composables/DataPoller'
+import { useGatewayAPI } from '@/composables/GatewayAPI'
 import type { ClusterAssociation } from '@/composables/GatewayAPI'
 import DetailSkeletonList from '@/components/DetailSkeletonList.vue'
 import PanelSkeleton from '@/components/PanelSkeleton.vue'
 import StatCardSkeleton from '@/components/StatCardSkeleton.vue'
+import ActionDialog from '@/components/operations/ActionDialog.vue'
 import {
   renderClusterOptionalNumber,
   renderClusterTRES,
   renderQosLabel,
   renderWalltime
 } from '@/composables/GatewayAPI'
+import { parseCsvList, stringifyList } from '@/composables/management'
+import { useRuntimeStore } from '@/stores/runtime'
 
 const { cluster, account } = defineProps<{
   cluster: string
@@ -33,6 +37,12 @@ const { cluster, account } = defineProps<{
 }>()
 
 const router = useRouter()
+const gateway = useGatewayAPI()
+const runtimeStore = useRuntimeStore()
+const editOpen = ref(false)
+const deleteOpen = ref(false)
+const operationBusy = ref(false)
+const operationError = ref<string | null>(null)
 const { data, unable, loaded, initialLoading, setCluster } = useClusterDataPoller<ClusterAssociation[]>(
   cluster,
   'associations',
@@ -107,6 +117,44 @@ const timeLimits = computed(() => {
     { id: 'MaxWall', label: 'Per job', value: currentAccount.max.jobs.per.wall_clock }
   ]
 })
+
+const canEditAccount = computed(() => runtimeStore.hasRoutePermission(cluster, 'accounts', 'edit'))
+const canDeleteAccount = computed(() =>
+  runtimeStore.hasRoutePermission(cluster, 'accounts', 'delete')
+)
+
+async function saveAccount(payload: Record<string, string>) {
+  operationBusy.value = true
+  operationError.value = null
+  try {
+    await gateway.save_account(cluster, {
+      name: account,
+      description: payload.description || null,
+      parent_account: payload.parent_account || undefined,
+      qos: parseCsvList(payload.qos)
+    })
+    runtimeStore.reportInfo(`Account ${account} update requested.`)
+    editOpen.value = false
+  } catch (error: unknown) {
+    operationError.value = error instanceof Error ? error.message : String(error)
+  } finally {
+    operationBusy.value = false
+  }
+}
+
+async function removeAccount() {
+  operationBusy.value = true
+  operationError.value = null
+  try {
+    await gateway.delete_account(cluster, account)
+    runtimeStore.reportInfo(`Account ${account} deletion requested.`)
+    deleteOpen.value = false
+  } catch (error: unknown) {
+    operationError.value = error instanceof Error ? error.message : String(error)
+  } finally {
+    operationBusy.value = false
+  }
+}
 
 function userJobLimits(association: ClusterAssociation) {
   if (!accountAssociation.value) return []
@@ -248,12 +296,30 @@ function hasDifferentQos(userAssociation: ClusterAssociation): boolean {
             :metric-label="`user association${userAssociations.length === 1 ? '' : 's'}`"
           >
             <template #actions>
-              <RouterLink
-                :to="{ name: 'jobs', params: { cluster }, query: { accounts: account } }"
-                class="ui-button-primary"
-              >
-                View jobs
-              </RouterLink>
+              <div class="flex flex-wrap gap-3">
+                <RouterLink
+                  :to="{ name: 'jobs', params: { cluster }, query: { accounts: account } }"
+                  class="ui-button-primary"
+                >
+                  View jobs
+                </RouterLink>
+                <button
+                  v-if="canEditAccount"
+                  type="button"
+                  class="ui-button-secondary"
+                  @click="editOpen = true"
+                >
+                  Edit
+                </button>
+                <button
+                  v-if="canDeleteAccount"
+                  type="button"
+                  class="ui-button-secondary"
+                  @click="deleteOpen = true"
+                >
+                  Delete
+                </button>
+              </div>
             </template>
           </PageHeader>
         </div>
@@ -480,5 +546,38 @@ function hasDifferentQos(userAssociation: ClusterAssociation): boolean {
       </div>
       </div>
     </div>
+
+    <ActionDialog
+      :open="editOpen"
+      title="Edit Account"
+      :description="`Update account ${account}.`"
+      submit-label="Save changes"
+      :loading="operationBusy"
+      :error="operationError"
+      :initial-values="{
+        description: '',
+        parent_account: accountAssociation?.parent_account ?? '',
+        qos: stringifyList(accountAssociation?.qos)
+      }"
+      :fields="[
+        { key: 'description', label: 'Description', type: 'textarea' },
+        { key: 'parent_account', label: 'Parent account' },
+        { key: 'qos', label: 'QOS (comma separated)' }
+      ]"
+      @close="editOpen = false"
+      @submit="saveAccount"
+    />
+
+    <ActionDialog
+      :open="deleteOpen"
+      title="Delete Account"
+      :description="`Delete account ${account}. This action is destructive.`"
+      submit-label="Delete account"
+      :loading="operationBusy"
+      :error="operationError"
+      :fields="[]"
+      @close="deleteOpen = false"
+      @submit="removeAccount"
+    />
   </ClusterMainLayout>
 </template>

@@ -15,6 +15,7 @@ import type { JobSortCriterion, JobSortOrder } from '@/stores/runtime/jobs'
 import { useClusterDataPoller } from '@/composables/DataPoller'
 import { compareClusterJobSortOrder } from '@/composables/GatewayAPI'
 import type { ClusterJob } from '@/composables/GatewayAPI'
+import { useGatewayAPI } from '@/composables/GatewayAPI'
 import JobsSorter from '@/components/jobs/JobsSorter.vue'
 import JobStatusBadge from '@/components/job/JobStatusBadge.vue'
 import ClusterMainLayout from '@/components/ClusterMainLayout.vue'
@@ -26,9 +27,11 @@ import ErrorAlert from '@/components/ErrorAlert.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import TableSkeletonRows from '@/components/TableSkeletonRows.vue'
 import PaginationControls from '@/components/PaginationControls.vue'
+import ActionDialog from '@/components/operations/ActionDialog.vue'
 import { lastPage, parsePageSize, parsePositivePage, type PageSizeOption } from '@/composables/Pagination'
+import { useAuthStore } from '@/stores/auth'
 
-import { PlusSmallIcon, WindowIcon } from '@heroicons/vue/24/outline'
+import { PencilSquareIcon, PlusSmallIcon, WindowIcon, XMarkIcon } from '@heroicons/vue/24/outline'
 
 const { cluster } = defineProps<{ cluster: string }>()
 
@@ -41,7 +44,15 @@ const { data, unable, loaded, initialLoading, setCluster } = useClusterDataPolle
 
 const router = useRouter()
 const runtimeStore = useRuntimeStore()
+const authStore = useAuthStore()
+const gateway = useGatewayAPI()
 const hydratingQuery = ref(false)
+const operationError = ref<string | null>(null)
+const operationBusy = ref(false)
+const submitOpen = ref(false)
+const editOpen = ref(false)
+const cancelOpen = ref(false)
+const selectedJob = ref<ClusterJob | null>(null)
 
 function compareClusterJob(a: ClusterJob, b: ClusterJob): number {
   return compareClusterJobSortOrder(a, b, runtimeStore.jobs.sort, runtimeStore.jobs.order)
@@ -74,6 +85,104 @@ function jobPriority(job: ClusterJob): string {
     return job.priority.number.toString()
   }
   return '-'
+}
+
+const canSubmitJobs = computed(
+  () =>
+    runtimeStore.hasRoutePermission(cluster, 'jobs', 'edit') ||
+    runtimeStore.hasRoutePermission(cluster, 'jobs', 'edit', 'self')
+)
+
+function canEditJob(job: ClusterJob): boolean {
+  return (
+    runtimeStore.hasRoutePermission(cluster, 'jobs', 'edit') ||
+    (runtimeStore.hasRoutePermission(cluster, 'jobs', 'edit', 'self') &&
+      authStore.username === job.user_name)
+  )
+}
+
+function canCancelJob(job: ClusterJob): boolean {
+  return (
+    runtimeStore.hasRoutePermission(cluster, 'jobs', 'delete') ||
+    (runtimeStore.hasRoutePermission(cluster, 'jobs', 'delete', 'self') &&
+      authStore.username === job.user_name)
+  )
+}
+
+function openSubmitDialog() {
+  operationError.value = null
+  submitOpen.value = true
+}
+
+function openEditDialog(job: ClusterJob) {
+  selectedJob.value = job
+  operationError.value = null
+  editOpen.value = true
+}
+
+function openCancelDialog(job: ClusterJob) {
+  selectedJob.value = job
+  operationError.value = null
+  cancelOpen.value = true
+}
+
+async function submitJob(payload: Record<string, string>) {
+  operationBusy.value = true
+  operationError.value = null
+  try {
+    await gateway.submit_job(cluster, {
+      name: payload.name || undefined,
+      script: payload.script || undefined,
+      partition: payload.partition || undefined,
+      account: payload.account || undefined,
+      qos: payload.qos || undefined
+    })
+    runtimeStore.reportInfo(`Job submission requested on ${cluster}.`)
+    submitOpen.value = false
+  } catch (error: unknown) {
+    operationError.value = error instanceof Error ? error.message : String(error)
+  } finally {
+    operationBusy.value = false
+  }
+}
+
+async function editJob(payload: Record<string, string>) {
+  if (!selectedJob.value) return
+  operationBusy.value = true
+  operationError.value = null
+  try {
+    await gateway.update_job(cluster, selectedJob.value.job_id, {
+      partition: payload.partition || undefined,
+      qos: payload.qos || undefined,
+      priority: payload.priority ? Number(payload.priority) : null,
+      time_limit: payload.time_limit || undefined,
+      comment: payload.comment || undefined
+    })
+    runtimeStore.reportInfo(`Job ${selectedJob.value.job_id} update requested.`)
+    editOpen.value = false
+  } catch (error: unknown) {
+    operationError.value = error instanceof Error ? error.message : String(error)
+  } finally {
+    operationBusy.value = false
+  }
+}
+
+async function cancelJob(payload: Record<string, string>) {
+  if (!selectedJob.value) return
+  operationBusy.value = true
+  operationError.value = null
+  try {
+    await gateway.cancel_job(cluster, selectedJob.value.job_id, {
+      signal: payload.signal || undefined,
+      reason: payload.reason || undefined
+    })
+    runtimeStore.reportInfo(`Job ${selectedJob.value.job_id} cancel requested.`)
+    cancelOpen.value = false
+  } catch (error: unknown) {
+    operationError.value = error instanceof Error ? error.message : String(error)
+  } finally {
+    operationBusy.value = false
+  }
 }
 
 function sortJobs() {
@@ -196,7 +305,13 @@ onMounted(async () => {
         description="Queue visibility, active states, account context and fast drill-down into job details."
         :metric-value="loaded ? sortedJobs.length : undefined"
         :metric-label="`job${sortedJobs.length > 1 ? 's' : ''} found`"
-      />
+      >
+        <template #actions>
+          <button v-if="canSubmitJobs" type="button" class="ui-button-primary" @click="openSubmitDialog">
+            Submit job
+          </button>
+        </template>
+      </PageHeader>
 
       <section aria-labelledby="filter-heading" class="-mx-4 -my-2 sm:-mx-6 lg:-mx-8">
         <h2 id="filter-heading" class="sr-only">Filters</h2>
@@ -237,8 +352,8 @@ onMounted(async () => {
                   <th scope="col" class="hidden px-3 py-3.5 text-left 2xl:table-cell 2xl:min-w-[100px]">
                     Reason
                   </th>
-                  <th scope="col" class="max-w-fit py-3.5 pr-4 pl-3 sm:pr-6 lg:pr-8">
-                    <span class="sr-only">View</span>
+                  <th scope="col" class="max-w-fit py-3.5 pr-4 pl-3 text-right sm:pr-6 lg:pr-8">
+                    Actions
                   </th>
                 </tr>
               </thead>
@@ -279,14 +394,34 @@ onMounted(async () => {
                       {{ job.state_reason }}
                     </template>
                   </td>
-                  <td class="h-full text-right font-medium">
-                    <RouterLink
-                      :to="{ name: 'job', params: { cluster: cluster, id: job.job_id } }"
-                      class="text-[var(--color-brand-blue)] transition hover:text-[var(--color-brand-ink-strong)]"
-                    >
-                      <WindowIcon class="mr-4 inline-block h-5 w-5 lg:mr-6" aria-hidden="true" />
-                      <span class="sr-only">View {{ job.job_id }}</span>
-                    </RouterLink>
+                  <td class="h-full py-3 text-right font-medium">
+                    <div class="flex flex-wrap items-center justify-end gap-2 pr-4 sm:pr-6 lg:pr-8">
+                      <button
+                        v-if="canEditJob(job)"
+                        type="button"
+                        class="ui-button-secondary"
+                        @click="openEditDialog(job)"
+                      >
+                        <PencilSquareIcon class="h-4 w-4" aria-hidden="true" />
+                        Edit
+                      </button>
+                      <button
+                        v-if="canCancelJob(job)"
+                        type="button"
+                        class="ui-button-secondary"
+                        @click="openCancelDialog(job)"
+                      >
+                        <XMarkIcon class="h-4 w-4" aria-hidden="true" />
+                        Cancel
+                      </button>
+                      <RouterLink
+                        :to="{ name: 'job', params: { cluster: cluster, id: job.job_id } }"
+                        class="ui-button-secondary"
+                      >
+                        <WindowIcon class="h-4 w-4" aria-hidden="true" />
+                        View
+                      </RouterLink>
+                    </div>
                   </td>
                 </tr>
               </tbody>
@@ -312,5 +447,63 @@ onMounted(async () => {
         </div>
       </div>
     </div>
+
+    <ActionDialog
+      :open="submitOpen"
+      title="Submit Job"
+      description="Create a new Slurm job from the Jobs workspace."
+      submit-label="Submit job"
+      :loading="operationBusy"
+      :error="operationError"
+      :fields="[
+        { key: 'name', label: 'Job name', required: true },
+        { key: 'script', label: 'Script', type: 'textarea', required: true },
+        { key: 'partition', label: 'Partition' },
+        { key: 'account', label: 'Account' },
+        { key: 'qos', label: 'QOS' }
+      ]"
+      @close="submitOpen = false"
+      @submit="submitJob"
+    />
+
+    <ActionDialog
+      :open="editOpen"
+      title="Edit Job"
+      :description="selectedJob ? `Update job ${selectedJob.job_id} on ${cluster}.` : ''"
+      submit-label="Save changes"
+      :loading="operationBusy"
+      :error="operationError"
+      :initial-values="{
+        partition: selectedJob?.partition ?? '',
+        qos: selectedJob?.qos ?? '',
+        priority: selectedJob?.priority?.set ? String(selectedJob.priority.number) : '',
+        time_limit: '',
+        comment: ''
+      }"
+      :fields="[
+        { key: 'partition', label: 'Partition' },
+        { key: 'qos', label: 'QOS' },
+        { key: 'priority', label: 'Priority', type: 'number' },
+        { key: 'time_limit', label: 'Time limit' },
+        { key: 'comment', label: 'Comment', type: 'textarea' }
+      ]"
+      @close="editOpen = false"
+      @submit="editJob"
+    />
+
+    <ActionDialog
+      :open="cancelOpen"
+      title="Cancel Job"
+      :description="selectedJob ? `Cancel job ${selectedJob.job_id}. This action is destructive.` : ''"
+      submit-label="Cancel job"
+      :loading="operationBusy"
+      :error="operationError"
+      :fields="[
+        { key: 'signal', label: 'Signal' },
+        { key: 'reason', label: 'Reason', type: 'textarea' }
+      ]"
+      @close="cancelOpen = false"
+      @submit="cancelJob"
+    />
   </ClusterMainLayout>
 </template>

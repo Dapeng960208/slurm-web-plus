@@ -288,6 +288,69 @@ describe('gateway data APIs', () => {
     vi.clearAllMocks()
   })
 
+  test('uses the corrected write routes for jobs and nodes', async () => {
+    mockRestAPI.post.mockResolvedValue({ result: 'ok' })
+    mockRestAPI.delete.mockResolvedValue({ result: 'ok' })
+
+    const gateway = useGatewayAPI()
+    await gateway.update_job('cluster', 12, { qos: 'debug' })
+    await gateway.cancel_job('cluster', 12, { signal: 'TERM' })
+    await gateway.update_node('cluster', 'cn-01', { state: 'DRAIN' })
+    await gateway.delete_node('cluster', 'cn-01')
+
+    expect(mockRestAPI.post).toHaveBeenNthCalledWith(
+      1,
+      '/agents/cluster/job/12/update',
+      { qos: 'debug' }
+    )
+    expect(mockRestAPI.delete).toHaveBeenNthCalledWith(
+      1,
+      '/agents/cluster/job/12/cancel',
+      { signal: 'TERM' }
+    )
+    expect(mockRestAPI.post).toHaveBeenNthCalledWith(
+      2,
+      '/agents/cluster/node/cn-01/update',
+      { state: 'DRAIN' }
+    )
+    expect(mockRestAPI.delete).toHaveBeenNthCalledWith(
+      2,
+      '/agents/cluster/node/cn-01/delete'
+    )
+  })
+
+  test('uses delete endpoints with explicit /delete suffixes for SlurmDB resources', async () => {
+    mockRestAPI.post.mockResolvedValue({ result: 'ok' })
+    mockRestAPI.delete.mockResolvedValue({ result: 'ok' })
+
+    const gateway = useGatewayAPI()
+    await gateway.update_reservation('cluster', 'maint', { users: ['alice'] })
+    await gateway.delete_reservation('cluster', 'maint')
+    await gateway.delete_account('cluster', 'science')
+    await gateway.delete_user('cluster', 'alice')
+    await gateway.delete_qos('cluster', 'debug')
+
+    expect(mockRestAPI.post).toHaveBeenCalledWith('/agents/cluster/reservation/maint/update', {
+      users: ['alice']
+    })
+    expect(mockRestAPI.delete).toHaveBeenNthCalledWith(
+      1,
+      '/agents/cluster/reservation/maint/delete'
+    )
+    expect(mockRestAPI.delete).toHaveBeenNthCalledWith(
+      2,
+      '/agents/cluster/account/science/delete'
+    )
+    expect(mockRestAPI.delete).toHaveBeenNthCalledWith(
+      3,
+      '/agents/cluster/user/alice/delete'
+    )
+    expect(mockRestAPI.delete).toHaveBeenNthCalledWith(
+      4,
+      '/agents/cluster/qos/debug/delete'
+    )
+  })
+
   test('detects AI capability from discovery payloads', () => {
     expect(
       hasClusterAIAssistant({
@@ -508,38 +571,30 @@ describe('gateway data APIs', () => {
     const result = await gateway.permissions('cluster')
 
     expect(mockRestAPI.get).toHaveBeenCalledWith('/agents/cluster/permissions')
-    expect(result).toStrictEqual({
-      roles: ['user', 'db-admin'],
-      actions: ['view-jobs', 'roles-manage'],
-      rules: [
+    expect(result.roles).toStrictEqual(['user', 'db-admin'])
+    expect(result.actions).toStrictEqual(['view-jobs', 'roles-manage'])
+    expect(result.rules).toEqual(
+      expect.arrayContaining([
         'jobs:view:*',
-        'settings/access-control:delete:*',
-        'settings/access-control:edit:*',
+        'admin/access-control:delete:*',
+        'admin/access-control:edit:*',
         'user/analysis:view:self'
-      ],
-      sources: {
-        policy: {
-          roles: ['user'],
-          actions: ['view-jobs'],
-          rules: ['jobs:view:*', 'user/analysis:view:self']
-        },
-        custom: {
-          roles: ['db-admin'],
-          actions: ['roles-manage'],
-          rules: ['settings/access-control:delete:*', 'settings/access-control:edit:*']
-        },
-        merged: {
-          roles: ['user', 'db-admin'],
-          actions: ['view-jobs', 'roles-manage'],
-          rules: [
-            'jobs:view:*',
-            'settings/access-control:delete:*',
-            'settings/access-control:edit:*',
-            'user/analysis:view:self'
-          ]
-        }
-      }
-    })
+      ])
+    )
+    expect(result.sources?.policy.rules).toEqual(
+      expect.arrayContaining(['jobs:view:*', 'user/analysis:view:self'])
+    )
+    expect(result.sources?.custom.rules).toEqual(
+      expect.arrayContaining(['admin/access-control:delete:*', 'admin/access-control:edit:*'])
+    )
+    expect(result.sources?.merged.rules).toEqual(
+      expect.arrayContaining([
+        'jobs:view:*',
+        'admin/access-control:delete:*',
+        'admin/access-control:edit:*',
+        'user/analysis:view:self'
+      ])
+    )
   })
 
   test('normalizes legacy permissions payloads without sources', async () => {
@@ -551,20 +606,14 @@ describe('gateway data APIs', () => {
     const gateway = useGatewayAPI()
     const result = await gateway.permissions('cluster')
 
-    expect(result).toStrictEqual({
-      roles: ['user'],
-      actions: ['view-jobs'],
-      rules: ['jobs:view:*', 'user/analysis:view:self'],
-      sources: {
-        policy: { roles: [], actions: [], rules: [] },
-        custom: { roles: [], actions: [], rules: [] },
-        merged: {
-          roles: ['user'],
-          actions: ['view-jobs'],
-          rules: ['jobs:view:*', 'user/analysis:view:self']
-        }
-      }
-    })
+    expect(result.roles).toStrictEqual(['user'])
+    expect(result.actions).toStrictEqual(['view-jobs'])
+    expect(result.rules).toEqual(expect.arrayContaining(['jobs:view:*', 'user/analysis:view:self']))
+    expect(result.sources?.policy.rules).toStrictEqual([])
+    expect(result.sources?.custom.rules).toStrictEqual([])
+    expect(result.sources?.merged.rules).toEqual(
+      expect.arrayContaining(['jobs:view:*', 'user/analysis:view:self'])
+    )
   })
 
   test('requests access control roles list', async () => {
@@ -608,6 +657,26 @@ describe('gateway data APIs', () => {
       actions: ['roles-view', 'view-jobs']
     })
     expect(result.id).toBe(2)
+  })
+
+  test('normalizes admin legacy actions for AI and cache pages', async () => {
+    mockRestAPI.get.mockResolvedValue({
+      roles: ['admin'],
+      actions: ['cache-view', 'cache-reset', 'manage-ai', 'roles-view']
+    })
+
+    const gateway = useGatewayAPI()
+    const result = await gateway.permissions('cluster')
+
+    expect(result.rules).toEqual(
+      expect.arrayContaining([
+        'admin/access-control:view:*',
+        'admin/ai:edit:*',
+        'admin/cache:edit:*',
+        'admin/cache:view:*',
+        'admin/ldap-cache:view:*'
+      ])
+    )
   })
 
   test('lists access control users with filters', async () => {

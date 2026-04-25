@@ -63,6 +63,7 @@ enabled=yes
 {% if node_metrics %}
 [node_metrics]
 enabled=yes
+prometheus_host=http://localhost:9090
 {% endif %}
 
 {% if cache %}
@@ -262,6 +263,15 @@ class TestAgentBase(TestSlurmrestdClient):
                 )
             )
 
+        if getattr(self.app, "metrics_collector", None) is not None:
+            def _cleanup_metrics_collector():
+                try:
+                    self.app.metrics_collector.unregister()
+                except KeyError:
+                    pass
+
+            self.addCleanup(_cleanup_metrics_collector)
+
         if not anonymous_enabled:
             self.app.policy.disable_anonymous()
 
@@ -309,19 +319,21 @@ class RemoveActionInPolicy:
         self.policy = policy
         self.role = role
         self.action = action
+        self.removed_in_role = False
         self.removed_in_anonymous = False
 
     def __enter__(self):
         for _role in self.policy.loader.roles:
-            if _role.name == self.role:
+            if _role.name == self.role and self.action in _role.actions:
                 _role.actions.remove(self.action)
+                self.removed_in_role = True
             if _role.name == ANONYMOUS_ROLE and self.action in _role.actions:
                 _role.actions.remove(self.action)
                 self.removed_in_anonymous = True
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         for _role in self.policy.loader.roles:
-            if _role.name == self.role:
+            if _role.name == self.role and self.removed_in_role:
                 _role.actions.add(self.action)
             if _role.name == ANONYMOUS_ROLE and self.removed_in_anonymous:
                 _role.actions.add(self.action)

@@ -12,7 +12,9 @@ const mockGatewayAPI = {
   metrics_cores: vi.fn(),
   metrics_memory: vi.fn(),
   metrics_gpus: vi.fn(),
-  jobs_history: vi.fn()
+  jobs_history: vi.fn(),
+  analysis_ping: vi.fn(),
+  analysis_diag: vi.fn()
 }
 
 vi.mock('@/composables/GatewayAPI', async (importOriginal) => {
@@ -190,9 +192,15 @@ describe('ClusterAnalysisView.vue', () => {
         }
       ]
     })
+    mockGatewayAPI.analysis_ping.mockResolvedValue({
+      pings: [{ hostname: 'slurmctld', mode: 'primary', latency_ms: 12 }]
+    })
+    mockGatewayAPI.analysis_diag.mockResolvedValue({
+      statistics: { jobs_submitted: 10, schedule_cycle_max: 2.4 }
+    })
   })
 
-  test('renders cluster analysis workspace and recommendations', async () => {
+  test('renders cluster analysis workspace, recommendations, and controller health panels', async () => {
     const wrapper = mount(ClusterAnalysisView, {
       props: { cluster: 'foo' },
       global: {
@@ -207,9 +215,13 @@ describe('ClusterAnalysisView.vue', () => {
 
     expect(wrapper.text()).toContain('Cluster Efficiency')
     expect(wrapper.text()).toContain('Queue Blockers')
-    expect(wrapper.text()).toContain('Resources')
+    expect(wrapper.text()).toContain('Open resources')
     expect(wrapper.text()).toContain('Recommended Actions')
     expect(wrapper.text()).toContain('Keep admission balanced across job sizes')
+    expect(wrapper.text()).toContain('Controller Health')
+    expect(wrapper.text()).toContain('Ping')
+    expect(wrapper.text()).toContain('Diag')
+    expect(wrapper.text()).toContain('jobs_submitted')
     expect(mockGatewayAPI.jobs_history).toHaveBeenCalledWith(
       'foo',
       expect.objectContaining({
@@ -217,5 +229,7 @@ describe('ClusterAnalysisView.vue', () => {
         page_size: 200
       })
     )
+    expect(mockGatewayAPI.analysis_ping).toHaveBeenCalledWith('foo')
+    expect(mockGatewayAPI.analysis_diag).toHaveBeenCalledWith('foo')
   })
 })

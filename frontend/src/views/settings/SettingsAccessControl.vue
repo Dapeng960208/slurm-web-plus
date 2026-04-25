@@ -8,6 +8,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import type {
   AccessControlCatalog,
   AccessControlUserAssignment,
@@ -21,6 +22,8 @@ import { hasClusterAccessControl, useGatewayAPI } from '@/composables/GatewayAPI
 import { useRuntimeStore } from '@/stores/runtime'
 import SettingsTabs from '@/components/settings/SettingsTabs.vue'
 import SettingsHeader from '@/components/settings/SettingsHeader.vue'
+import AdminTabs from '@/components/admin/AdminTabs.vue'
+import AdminHeader from '@/components/admin/AdminHeader.vue'
 import InfoAlert from '@/components/InfoAlert.vue'
 import ErrorAlert from '@/components/ErrorAlert.vue'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
@@ -30,7 +33,11 @@ type PermissionScope = '*' | 'self'
 
 const gateway = useGatewayAPI()
 const runtimeStore = useRuntimeStore()
+const route = useRoute()
 
+const isAdminRoute = computed(() => String(route.name ?? '').startsWith('admin-'))
+const tabsComponent = computed(() => (isAdminRoute.value ? AdminTabs : SettingsTabs))
+const headerComponent = computed(() => (isAdminRoute.value ? AdminHeader : SettingsHeader))
 const catalog = ref<AccessControlCatalog | null>(null)
 const catalogLoading = ref(false)
 const catalogError = ref<string | null>(null)
@@ -82,17 +89,29 @@ const accessControlAvailable = computed(() => hasClusterAccessControl(settingsCl
 const canView = computed(
   () =>
     !!settingsCluster.value &&
-    runtimeStore.hasRoutePermission(settingsCluster.value.name, 'settings/access-control', 'view')
+    runtimeStore.hasRoutePermission(
+      settingsCluster.value.name,
+      isAdminRoute.value ? 'admin/access-control' : 'settings/access-control',
+      'view'
+    )
 )
 const canManage = computed(
   () =>
     !!settingsCluster.value &&
-    runtimeStore.hasRoutePermission(settingsCluster.value.name, 'settings/access-control', 'edit')
+    runtimeStore.hasRoutePermission(
+      settingsCluster.value.name,
+      isAdminRoute.value ? 'admin/access-control' : 'settings/access-control',
+      'edit'
+    )
 )
 const canDelete = computed(
   () =>
     !!settingsCluster.value &&
-    runtimeStore.hasRoutePermission(settingsCluster.value.name, 'settings/access-control', 'delete')
+    runtimeStore.hasRoutePermission(
+      settingsCluster.value.name,
+      isAdminRoute.value ? 'admin/access-control' : 'settings/access-control',
+      'delete'
+    )
 )
 const currentClusterName = computed(() => settingsCluster.value?.name ?? '')
 const selectedRoleNames = computed(() =>
@@ -409,9 +428,10 @@ onMounted(async () => {
 
 <template>
   <div class="ui-section-stack">
-    <SettingsTabs entry="Access Control" />
+    <component :is="tabsComponent" entry="Access Control" :cluster="currentClusterName" />
     <div class="ui-panel ui-section">
-      <SettingsHeader
+      <component
+        :is="headerComponent"
         title="Access Control"
         description="Manage database-backed custom roles, route permission rules and user role bindings for the current cluster."
       />
@@ -556,7 +576,10 @@ onMounted(async () => {
             </div>
 
             <InfoAlert v-if="!canManage" class="mt-4">
-              You can inspect roles on this cluster, but editing requires `settings/access-control:edit:*`.
+              You can inspect roles on this cluster, but editing requires
+              <code>{{
+                isAdminRoute ? 'admin/access-control:edit:*' : 'settings/access-control:edit:*'
+              }}</code>.
             </InfoAlert>
 
             <form class="mt-5 space-y-5" @submit.prevent="submitRole">

@@ -15,6 +15,7 @@ import {
   CalendarIcon,
   ChartBarSquareIcon,
   ChatBubbleLeftRightIcon,
+  ShieldCheckIcon,
   Cog6ToothIcon,
   HomeIcon,
   PlayCircleIcon,
@@ -61,6 +62,14 @@ const navigation: Array<{
     route: 'analysis',
     icon: ChartBarSquareIcon,
     resource: 'analysis',
+    operation: 'view',
+    feature: undefined
+  },
+  {
+    name: 'Admin',
+    route: 'admin-system',
+    icon: ShieldCheckIcon,
+    resource: 'admin/system',
     operation: 'view',
     feature: undefined
   },
@@ -139,6 +148,14 @@ function hasNavigationPermission(resource?: string, operation: 'view' | 'edit' |
   if (!resource) return true
   const cluster = navigationCluster.value
   if (cluster) {
+    if (resource === 'jobs' && operation === 'view') {
+      return runtimeStore.hasRoutePermissionAnyScope(cluster.name, resource, operation)
+    }
+    if (resource === 'admin/system' && operation === 'view') {
+      return ['admin/system', 'admin/ai', 'admin/access-control', 'admin/cache', 'admin/ldap-cache'].some(
+        (adminResource) => runtimeStore.hasRoutePermission(cluster.name, adminResource, 'view')
+      )
+    }
     return runtimeStore.hasRoutePermission(cluster.name, resource, operation)
   }
   return false

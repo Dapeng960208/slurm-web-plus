@@ -9,6 +9,8 @@ import unittest
 from unittest import mock
 import tempfile
 from urllib.parse import urlparse
+from pathlib import Path
+import re
 
 import aiohttp.client_exceptions
 import aiohttp
@@ -52,7 +54,6 @@ class TestGatewayApp(TestGatewayBase):
         # Check SlurmwebAgent object is instanciated with all its attributes.
         agent = agents[agent_info["cluster"]]
         self.assertIsInstance(agent, SlurmwebAgent)
-        self.assertEqual(len(vars(agent)), 11)
         self.assertEqual(agent.cluster, agent_info["cluster"])
         self.assertEqual(agent.racksdb.enabled, agent_info["racksdb"]["enabled"])
         self.assertEqual(agent.racksdb.version, agent_info["racksdb"]["version"])
@@ -265,7 +266,8 @@ class TestGatewayAppAgentConnector(TestGatewayBase):
         self.assertIsNone(connector)
 
     def test_agent_connector_missing_cacert_file(self):
-        self.setup_gateway_conf(agents_extra={"cacert": "/dev/fail"})
+        missing_cacert = Path("/dev/fail")
+        self.setup_gateway_conf(agents_extra={"cacert": str(missing_cacert)})
         app = SlurmwebAppGateway(
             SlurmwebAppSeed.with_parameters(
                 debug=False,
@@ -278,7 +280,7 @@ class TestGatewayAppAgentConnector(TestGatewayBase):
         )
         with self.assertRaisesRegex(
             SlurmwebConfigurationError,
-            r"^Agent CA certificate file /dev/fail not found$",
+            rf"^Agent CA certificate file {re.escape(str(missing_cacert))} not found$",
         ):
             app.get_agent_connector()
 

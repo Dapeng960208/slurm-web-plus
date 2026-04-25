@@ -21,6 +21,13 @@ class TestAgentMetricsRequest(TestAgentBase):
     def tearDown(self):
         self.app.metrics_collector.unregister()
 
+    def _enable_custom_rules(self, *rules):
+        self.app.access_control_enabled = True
+        self.app.access_control_store = mock.Mock()
+        self.app.access_control_store.user_permissions.return_value = ([], [], list(rules))
+        self.app.policy._access_control_enabled = True
+        self.app.policy.set_access_control_store(self.app.access_control_store)
+
     def test_request_metrics_error(self):
         self.app.metrics_db.request = mock.Mock(
             side_effect=SlurmwebMetricsDBError("fake metrics request error")
@@ -82,6 +89,7 @@ class TestAgentMetricsRequest(TestAgentBase):
 
     @mock.patch("slurmweb.metrics.db.aiohttp.ClientSession.get")
     def test_request_metrics_jobs(self, mock_get):
+        self._enable_custom_rules("jobs:view:*")
         _, mock_get.return_value = mock_prometheus_response("jobs-hour")
         response = self.client.get(f"/v{get_version()}/metrics/jobs")
         self.assertEqual(response.status_code, 200)
@@ -101,6 +109,7 @@ class TestAgentMetricsRequest(TestAgentBase):
 
     @mock.patch("slurmweb.metrics.db.aiohttp.ClientSession.get")
     def test_request_metrics_cache(self, mock_get):
+        self._enable_custom_rules("admin/cache:view:*")
         _, mock_get.return_value = mock_prometheus_response("cache-hour")
         response = self.client.get(f"/v{get_version()}/metrics/cache")
         self.assertEqual(response.status_code, 200)
@@ -127,6 +136,7 @@ class TestAgentMetricsRequest(TestAgentBase):
     @mock.patch("slurmweb.metrics.db.aiohttp.ClientSession.get")
     def test_request_metrics_users(self, mock_get):
         self.app.user_metrics_enabled = True
+        self._enable_custom_rules("jobs:view:*")
         _, mock_get.return_value = mock_prometheus_response("users-hour")
         response = self.client.get(f"/v{get_version()}/metrics/users")
         self.assertEqual(response.status_code, 200)
@@ -134,7 +144,7 @@ class TestAgentMetricsRequest(TestAgentBase):
 
     def test_request_user_metrics_history_disabled(self):
         response = self.client.get(
-            f"/v{get_version()}/user/alice/metrics/history?range=hour"
+            f"/v{get_version()}/user/{self.user.login}/metrics/history?range=hour"
         )
         self.assertEqual(response.status_code, 501)
         self.assertEqual(response.json["description"], "User metrics is disabled")
@@ -147,13 +157,13 @@ class TestAgentMetricsRequest(TestAgentBase):
         }
 
         response = self.client.get(
-            f"/v{get_version()}/user/alice/metrics/history?range=hour"
+            f"/v{get_version()}/user/{self.user.login}/metrics/history?range=hour"
         )
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json, {"submissions": [[1713956400000, 2]]})
         self.app.user_metrics_store.user_metrics_history.assert_called_once_with(
-            "alice", "hour"
+            self.user.login, "hour"
         )
 
     def test_request_user_activity_summary(self):
@@ -168,7 +178,7 @@ class TestAgentMetricsRequest(TestAgentBase):
         }
 
         response = self.client.get(
-            f"/v{get_version()}/user/alice/activity/summary"
+            f"/v{get_version()}/user/{self.user.login}/activity/summary"
         )
 
         self.assertEqual(response.status_code, 200)
@@ -192,7 +202,7 @@ class TestAgentMetricsRequest(TestAgentBase):
             cm.output,
             [
                 "WARNING:slurmweb.views.agent:Unauthorized access from user test (∅) "
-                "[group] to nodes metric (missing permission on view-nodes)"
+                "[group] to nodes metric (missing permission on resources:view:*)"
             ],
         )
 
@@ -213,7 +223,7 @@ class TestAgentMetricsRequest(TestAgentBase):
             cm.output,
             [
                 "WARNING:slurmweb.views.agent:Unauthorized access from user test (∅) "
-                "[group] to cores metric (missing permission on view-nodes)"
+                "[group] to cores metric (missing permission on resources:view:*)"
             ],
         )
 
@@ -236,14 +246,13 @@ class TestAgentMetricsRequest(TestAgentBase):
             cm.output[0],
         )
         self.assertIn(
-            "to memory metric (missing permission on view-nodes)",
+            "to memory metric (missing permission on resources:view:*)",
             cm.output[0],
         )
 
     def test_request_metrics_jobs_denied(self):
-        with RemoveActionInPolicy(self.app.policy, "user", "view-jobs"):
-            with self.assertLogs("slurmweb", level="WARNING") as cm:
-                response = self.client.get(f"/v{get_version()}/metrics/jobs")
+        with self.assertLogs("slurmweb", level="WARNING") as cm:
+            response = self.client.get(f"/v{get_version()}/metrics/jobs")
         self.assertEqual(response.status_code, 403)
         self.assertEqual(
             response.json,
@@ -257,14 +266,13 @@ class TestAgentMetricsRequest(TestAgentBase):
             cm.output,
             [
                 "WARNING:slurmweb.views.agent:Unauthorized access from user test (∅) "
-                "[group] to jobs metric (missing permission on view-jobs)"
+                "[group] to jobs metric (missing permission on jobs:view:*)"
             ],
         )
 
     def test_request_metrics_cache_denied(self):
-        with RemoveActionInPolicy(self.app.policy, "user", "cache-view"):
-            with self.assertLogs("slurmweb", level="WARNING") as cm:
-                response = self.client.get(f"/v{get_version()}/metrics/cache")
+        with self.assertLogs("slurmweb", level="WARNING") as cm:
+            response = self.client.get(f"/v{get_version()}/metrics/cache")
         self.assertEqual(response.status_code, 403)
         self.assertEqual(
             response.json,
@@ -278,12 +286,13 @@ class TestAgentMetricsRequest(TestAgentBase):
             cm.output,
             [
                 "WARNING:slurmweb.views.agent:Unauthorized access from user test (∅) "
-                "[group] to cache metric (missing permission on cache-view)"
+                "[group] to cache metric (missing permission on admin/cache:view:*)"
             ],
         )
 
     @mock.patch("slurmweb.metrics.db.aiohttp.ClientSession.get")
     def test_request_metrics_unexpected(self, mock_get):
+        self._enable_custom_rules("jobs:view:*")
         _, mock_get.return_value = mock_prometheus_response("unknown-metric")
         response = self.client.get(f"/v{get_version()}/metrics/jobs")
         self.assertEqual(response.status_code, 500)
@@ -380,7 +389,7 @@ class TestAgentUserMetricsRequests(TestAgentBase):
 
     def test_request_user_metrics_history_disabled(self):
         response = self.client.get(
-            f"/v{get_version()}/user/alice/metrics/history?range=hour"
+            f"/v{get_version()}/user/{self.user.login}/metrics/history?range=hour"
         )
         self.assertEqual(response.status_code, 501)
         self.assertEqual(
@@ -400,13 +409,13 @@ class TestAgentUserMetricsRequests(TestAgentBase):
         }
 
         response = self.client.get(
-            f"/v{get_version()}/user/alice/metrics/history?range=hour"
+            f"/v{get_version()}/user/{self.user.login}/metrics/history?range=hour"
         )
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json, {"submissions": [[1713956400000, 2]]})
         self.app.user_metrics_store.user_metrics_history.assert_called_once_with(
-            "alice", "hour"
+            self.user.login, "hour"
         )
 
     def test_request_user_metrics_history_invalid_range(self):
@@ -418,7 +427,7 @@ class TestAgentUserMetricsRequests(TestAgentBase):
 
         with self.assertLogs("slurmweb", level="WARNING") as cm:
             response = self.client.get(
-                f"/v{get_version()}/user/alice/metrics/history?range=month"
+                f"/v{get_version()}/user/{self.user.login}/metrics/history?range=month"
             )
 
         self.assertEqual(response.status_code, 400)
@@ -436,13 +445,13 @@ class TestAgentUserMetricsRequests(TestAgentBase):
         self.assertEqual(
             cm.output,
             [
-                "WARNING:slurmweb.views.agent:Unsupported user metrics history range for alice: Unsupported metric range month"
+                f"WARNING:slurmweb.views.agent:Unsupported user metrics history range for {self.user.login}: Unsupported metric range month"
             ],
         )
 
     def test_request_user_activity_summary_disabled(self):
         response = self.client.get(
-            f"/v{get_version()}/user/alice/activity/summary"
+            f"/v{get_version()}/user/{self.user.login}/activity/summary"
         )
         self.assertEqual(response.status_code, 501)
         self.assertEqual(
@@ -481,14 +490,14 @@ class TestAgentUserMetricsRequests(TestAgentBase):
         }
 
         response = self.client.get(
-            f"/v{get_version()}/user/alice/activity/summary"
+            f"/v{get_version()}/user/{self.user.login}/activity/summary"
         )
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json["username"], "alice")
         self.assertEqual(response.json["totals"]["submitted_jobs_today"], 3)
         self.app.user_metrics_store.user_activity_summary.assert_called_once_with(
-            "alice"
+            self.user.login
         )
 
     def test_request_user_activity_summary_error(self):
@@ -500,7 +509,7 @@ class TestAgentUserMetricsRequests(TestAgentBase):
 
         with self.assertLogs("slurmweb", level="WARNING") as cm:
             response = self.client.get(
-                f"/v{get_version()}/user/alice/activity/summary"
+                f"/v{get_version()}/user/{self.user.login}/activity/summary"
             )
 
         self.assertEqual(response.status_code, 500)
@@ -515,6 +524,6 @@ class TestAgentUserMetricsRequests(TestAgentBase):
         self.assertEqual(
             cm.output,
             [
-                "WARNING:slurmweb.views.agent:Unable to query user activity summary for alice: boom"
+                f"WARNING:slurmweb.views.agent:Unable to query user activity summary for {self.user.login}: boom"
             ],
         )

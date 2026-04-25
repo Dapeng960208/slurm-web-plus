@@ -4,6 +4,7 @@ import type { VueWrapper } from '@vue/test-utils'
 import SettingsAIView from '@/views/settings/SettingsAI.vue'
 import { init_plugins } from '../../lib/common'
 import { useRuntimeStore } from '@/stores/runtime'
+import type { RouterMock } from 'vue-router-mock'
 
 const mockGatewayAPI = {
   ai_configs: vi.fn(),
@@ -22,6 +23,43 @@ vi.mock('@/composables/GatewayAPI', async (importOriginal) => {
 })
 
 describe('views/settings/SettingsAI.vue', () => {
+  function seedRuntime() {
+    const runtimeStore = useRuntimeStore()
+    runtimeStore.availableClusters = [
+      {
+        name: 'foo',
+        permissions: {
+          roles: [],
+          actions: [],
+          rules: [
+            'admin/ai:view:*',
+            'admin/ai:edit:*',
+            'settings/ai:view:*',
+            'settings/ai:edit:*',
+            'ai:view:*'
+          ]
+        },
+        capabilities: {
+          ai: {
+            enabled: true,
+            streaming: true,
+            providers: [{ key: 'qwen', label: 'Qwen' }]
+          }
+        },
+        racksdb: true,
+        infrastructure: 'foo',
+        metrics: true,
+        cache: true
+      }
+    ] as never
+    runtimeStore.currentCluster = runtimeStore.availableClusters[0] as never
+  }
+
+  async function mountOnAdminRoute(router: RouterMock) {
+    await router.push({ name: 'admin-ai', params: { cluster: 'foo' } })
+    await router.getPendingNavigation()
+  }
+
   function getButtonByText(wrapper: VueWrapper, label: string) {
     const match = wrapper
       .findAll('button')
@@ -41,30 +79,13 @@ describe('views/settings/SettingsAI.vue', () => {
   }
 
   beforeEach(() => {
-    init_plugins()
+    void init_plugins()
     vi.clearAllMocks()
-    const runtimeStore = useRuntimeStore()
-    runtimeStore.availableClusters = [
-      {
-        name: 'foo',
-        permissions: { roles: [], actions: ['manage-ai', 'view-ai'] },
-        capabilities: {
-          ai: {
-            enabled: true,
-            streaming: true,
-            providers: [{ key: 'qwen', label: 'Qwen' }]
-          }
-        },
-        racksdb: true,
-        infrastructure: 'foo',
-        metrics: true,
-        cache: true
-      }
-    ]
-    runtimeStore.currentCluster = runtimeStore.availableClusters[0] as never
   })
 
   test('loads AI configs and renders masked secret details', async () => {
+    const router = init_plugins()
+    seedRuntime()
     mockGatewayAPI.ai_configs.mockResolvedValue([
       {
         id: 1,
@@ -90,9 +111,15 @@ describe('views/settings/SettingsAI.vue', () => {
       }
     ])
 
+    await mountOnAdminRoute(router)
+
     const wrapper = mount(SettingsAIView, {
       global: {
-        stubs: globalStubs
+        stubs: {
+          ...globalStubs,
+          AdminTabs: true,
+          AdminHeader: true
+        }
       }
     })
 
@@ -105,15 +132,23 @@ describe('views/settings/SettingsAI.vue', () => {
   })
 
   test('creates a new AI config', async () => {
+    const router = init_plugins()
+    seedRuntime()
     mockGatewayAPI.ai_configs.mockResolvedValue([])
     mockGatewayAPI.create_ai_config.mockResolvedValue({
       id: 1,
       name: 'qwen-prod'
     })
 
+    await mountOnAdminRoute(router)
+
     const wrapper = mount(SettingsAIView, {
       global: {
-        stubs: globalStubs
+        stubs: {
+          ...globalStubs,
+          AdminTabs: true,
+          AdminHeader: true
+        }
       }
     })
 

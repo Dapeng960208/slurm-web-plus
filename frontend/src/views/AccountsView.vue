@@ -12,6 +12,8 @@ import { useRoute, useRouter } from 'vue-router'
 import type { LocationQueryRaw } from 'vue-router'
 import ClusterMainLayout from '@/components/ClusterMainLayout.vue'
 import { useClusterDataPoller } from '@/composables/DataPoller'
+import { useGatewayAPI } from '@/composables/GatewayAPI'
+import { parseCsvList } from '@/composables/management'
 import type { ClusterAssociation, ClusterAccountTreeNode } from '@/composables/GatewayAPI'
 import InfoAlert from '@/components/InfoAlert.vue'
 import ErrorAlert from '@/components/ErrorAlert.vue'
@@ -19,6 +21,7 @@ import AccountTreeNode from '@/components/accounts/AccountTreeNode.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import PanelSkeleton from '@/components/PanelSkeleton.vue'
 import PaginationControls from '@/components/PaginationControls.vue'
+import ActionDialog from '@/components/operations/ActionDialog.vue'
 import {
   DEFAULT_PAGE_SIZE,
   lastPage,
@@ -26,10 +29,13 @@ import {
   parsePositivePage,
   type PageSizeOption
 } from '@/composables/Pagination'
+import { useRuntimeStore } from '@/stores/runtime'
 
 const { cluster } = defineProps<{ cluster: string }>()
 const route = useRoute()
 const router = useRouter()
+const gateway = useGatewayAPI()
+const runtimeStore = useRuntimeStore()
 
 const { data, unable, loaded, initialLoading } = useClusterDataPoller<ClusterAssociation[]>(
   cluster,
@@ -42,6 +48,11 @@ const autoExpandedOnce = ref(false)
 const MAX_AUTO_EXPANDED = 10
 const page = ref(1)
 const pageSize = ref(DEFAULT_PAGE_SIZE)
+const createOpen = ref(false)
+const operationBusy = ref(false)
+const operationError = ref<string | null>(null)
+
+const canCreateAccount = computed(() => runtimeStore.hasRoutePermission(cluster, 'accounts', 'edit'))
 
 function toggleAccount(account: string) {
   if (expandedAccounts.value.has(account)) {
@@ -157,6 +168,25 @@ function updatePageSize(newPageSize: PageSizeOption) {
   updateQueryParameters()
 }
 
+async function createAccount(payload: Record<string, string>) {
+  operationBusy.value = true
+  operationError.value = null
+  try {
+    await gateway.save_account(cluster, {
+      name: payload.name || undefined,
+      description: payload.description || null,
+      parent_account: payload.parent_account || undefined,
+      qos: parseCsvList(payload.qos)
+    })
+    runtimeStore.reportInfo(`Account ${payload.name || ''} creation requested.`)
+    createOpen.value = false
+  } catch (error: unknown) {
+    operationError.value = error instanceof Error ? error.message : String(error)
+  } finally {
+    operationBusy.value = false
+  }
+}
+
 watch(
   accountTree,
   (tree) => {
@@ -200,7 +230,13 @@ if (route.query.page_size) {
       description="Accounts defined on cluster, with hierarchy, delegated users and structure laid out in one tree."
       :metric-value="loaded ? availableAccounts.size : undefined"
       :metric-label="`account${availableAccounts.size > 1 ? 's' : ''} found`"
-    />
+    >
+      <template #actions>
+        <button v-if="canCreateAccount" type="button" class="ui-button-primary" @click="createOpen = true">
+          Create account
+        </button>
+      </template>
+    </PageHeader>
     <ErrorAlert v-if="unable"
       >Unable to retrieve associations from cluster
       <span class="font-medium">{{ cluster }}</span></ErrorAlert
@@ -234,5 +270,22 @@ if (route.query.page_size) {
         />
       </div>
     </div>
+
+    <ActionDialog
+      :open="createOpen"
+      title="Create Account"
+      description="Add a new SlurmDB account from the account tree workspace."
+      submit-label="Create account"
+      :loading="operationBusy"
+      :error="operationError"
+      :fields="[
+        { key: 'name', label: 'Account name', required: true },
+        { key: 'description', label: 'Description', type: 'textarea' },
+        { key: 'parent_account', label: 'Parent account' },
+        { key: 'qos', label: 'QOS (comma separated)' }
+      ]"
+      @close="createOpen = false"
+      @submit="createAccount"
+    />
   </ClusterMainLayout>
 </template>

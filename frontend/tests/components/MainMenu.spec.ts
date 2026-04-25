@@ -223,4 +223,73 @@ describe('MainMenu.vue', () => {
 
     expect(wrapper.text()).not.toContain('AI')
   })
+
+  test('shows Admin when the cluster exposes admin permissions', async () => {
+    const wrapper = shallowMount(MainMenu, {
+      props: {
+        entry: 'dashboard',
+        clusterContext: 'foo',
+        modelValue: true
+      },
+      global: {
+        plugins: [
+          [
+            runtimeConfiguration,
+            {
+              api_server: 'http://localhost',
+              authentication: true,
+              racksdb_rows_labels: false,
+              racksdb_racks_labels: false,
+              version: 'test-version'
+            }
+          ],
+          createTestingPinia({
+            stubActions: false
+          })
+        ],
+        stubs: {
+          RouterLink: {
+            template: '<a><slot /></a>'
+          },
+          TransitionRoot: {
+            template: '<div><slot /></div>'
+          },
+          TransitionChild: {
+            template: '<div><slot /></div>'
+          },
+          Dialog: {
+            template: '<div><slot /></div>'
+          },
+          DialogPanel: {
+            template: '<div><slot /></div>'
+          },
+          BrandLogo: {
+            props: ['framed', 'size'],
+            template:
+              '<div class="brand-logo-stub" :data-framed="String(framed)" :data-size="size" />'
+          }
+        }
+      }
+    })
+
+    const runtimeStore = useRuntimeStore()
+    runtimeStore.availableClusters = [
+      {
+        name: 'foo',
+        permissions: {
+          roles: ['admin'],
+          actions: [],
+          rules: ['admin/system:view:*']
+        },
+        racksdb: true,
+        infrastructure: 'foo',
+        metrics: true,
+        cache: true
+      }
+    ]
+    runtimeStore.currentCluster = runtimeStore.availableClusters[0]
+    await nextTick()
+
+    expect(wrapper.text()).toContain('Admin')
+  })
 })

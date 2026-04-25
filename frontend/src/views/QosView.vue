@@ -13,6 +13,7 @@ import { useRoute, useRouter } from 'vue-router'
 import type { LocationQueryRaw } from 'vue-router'
 import ClusterMainLayout from '@/components/ClusterMainLayout.vue'
 import { useClusterDataPoller } from '@/composables/DataPoller'
+import { useGatewayAPI } from '@/composables/GatewayAPI'
 import {
   renderClusterOptionalNumber,
   renderClusterTRES,
@@ -27,6 +28,7 @@ import type { QosModalLimitDescription } from '@/components/qos/QosHelpModal.vue
 import PageHeader from '@/components/PageHeader.vue'
 import TableSkeletonRows from '@/components/TableSkeletonRows.vue'
 import PaginationControls from '@/components/PaginationControls.vue'
+import ActionDialog from '@/components/operations/ActionDialog.vue'
 import {
   DEFAULT_PAGE_SIZE,
   lastPage,
@@ -35,10 +37,13 @@ import {
   type PageSizeOption
 } from '@/composables/Pagination'
 import { QuestionMarkCircleIcon } from '@heroicons/vue/20/solid'
+import { useRuntimeStore } from '@/stores/runtime'
 
 const { cluster } = defineProps<{ cluster: string }>()
 const route = useRoute()
 const router = useRouter()
+const gateway = useGatewayAPI()
+const runtimeStore = useRuntimeStore()
 
 const { data, unable, loaded, setCluster } = useClusterDataPoller<ClusterQos[]>(
   cluster,
@@ -50,6 +55,12 @@ const helpModalShow: Ref<boolean> = ref(false)
 const modalQosLimit: Ref<QosModalLimitDescription | undefined> = ref()
 const page = ref(1)
 const pageSize = ref(DEFAULT_PAGE_SIZE)
+const createOpen = ref(false)
+const editOpen = ref(false)
+const deleteOpen = ref(false)
+const selectedQos = ref<ClusterQos | null>(null)
+const operationBusy = ref(false)
+const operationError = ref<string | null>(null)
 
 const pagedQos = computed(() => {
   const items = data.value ?? []
@@ -57,6 +68,8 @@ const pagedQos = computed(() => {
   return items.slice(start, start + pageSize.value)
 })
 const totalPages = computed(() => lastPage(data.value?.length ?? 0, pageSize.value))
+const canEditQos = computed(() => runtimeStore.hasRoutePermission(cluster, 'qos', 'edit'))
+const canDeleteQos = computed(() => runtimeStore.hasRoutePermission(cluster, 'qos', 'delete'))
 
 function updateQueryParameters() {
   const query: LocationQueryRaw = {}
@@ -84,6 +97,75 @@ function openHelpModal(qos: string, limit: string, value: ClusterOptionalNumber 
 function closeHelpModal() {
   helpModalShow.value = false
   modalQosLimit.value = undefined
+}
+
+function openCreateDialog() {
+  operationError.value = null
+  createOpen.value = true
+}
+
+function openEditDialog(qos: ClusterQos) {
+  selectedQos.value = qos
+  operationError.value = null
+  editOpen.value = true
+}
+
+function openDeleteDialog(qos: ClusterQos) {
+  selectedQos.value = qos
+  operationError.value = null
+  deleteOpen.value = true
+}
+
+async function createQos(payload: Record<string, string>) {
+  operationBusy.value = true
+  operationError.value = null
+  try {
+    await gateway.save_qos(cluster, {
+      name: payload.name || undefined,
+      description: payload.description || null,
+      priority: payload.priority ? Number(payload.priority) : undefined
+    })
+    runtimeStore.reportInfo(`QOS ${payload.name || ''} creation requested.`)
+    createOpen.value = false
+  } catch (error: unknown) {
+    operationError.value = error instanceof Error ? error.message : String(error)
+  } finally {
+    operationBusy.value = false
+  }
+}
+
+async function updateQos(payload: Record<string, string>) {
+  if (!selectedQos.value) return
+  operationBusy.value = true
+  operationError.value = null
+  try {
+    await gateway.save_qos(cluster, {
+      name: selectedQos.value.name,
+      description: payload.description || null,
+      priority: payload.priority ? Number(payload.priority) : undefined
+    })
+    runtimeStore.reportInfo(`QOS ${selectedQos.value.name} update requested.`)
+    editOpen.value = false
+  } catch (error: unknown) {
+    operationError.value = error instanceof Error ? error.message : String(error)
+  } finally {
+    operationBusy.value = false
+  }
+}
+
+async function removeQos() {
+  if (!selectedQos.value) return
+  operationBusy.value = true
+  operationError.value = null
+  try {
+    await gateway.delete_qos(cluster, selectedQos.value.name)
+    runtimeStore.reportInfo(`QOS ${selectedQos.value.name} deletion requested.`)
+    deleteOpen.value = false
+  } catch (error: unknown) {
+    operationError.value = error instanceof Error ? error.message : String(error)
+  } finally {
+    operationBusy.value = false
+  }
 }
 
 function qosJobLimits(qos: ClusterQos) {
@@ -143,7 +225,13 @@ if (route.query.page_size) {
       description="Quality-of-service policies, resource ceilings and scheduling constraints defined on this cluster."
       :metric-value="loaded ? data?.length : undefined"
       metric-label="qos policies"
-    />
+    >
+      <template #actions>
+        <button v-if="canEditQos" type="button" class="ui-button-primary" @click="openCreateDialog">
+          Create QOS
+        </button>
+      </template>
+    </PageHeader>
     <QosHelpModal
       :help-modal-show="helpModalShow"
       :limit="modalQosLimit"
@@ -170,7 +258,7 @@ if (route.query.page_size) {
                 <th scope="col" class="hidden w-72 px-3 py-3.5 text-left lg:table-cell">Resources</th>
                 <th scope="col" class="w-12 px-3 py-3.5 text-left">Time</th>
                 <th scope="col" class="hidden w-12 px-3 py-3.5 text-left align-top 2xl:table-cell">Flags</th>
-                <th scope="col" class="w-12"></th>
+                <th scope="col" class="py-3.5 pr-4 pl-3 text-right sm:pr-6 lg:pr-8">Actions</th>
               </tr>
             </thead>
             <tbody
@@ -233,11 +321,30 @@ if (route.query.page_size) {
                   <span v-for="flag in qos.flags" :key="flag" class="ui-chip m-1">{{ renderQosFlag(flag) }}</span>
                 </td>
                 <td class="py-4 pl-3 text-right whitespace-nowrap sm:pr-6 lg:pr-8">
-                  <RouterLink
-                    :to="{ name: 'jobs', params: { cluster: cluster }, query: { qos: qos.name } }"
-                    class="font-bold text-[var(--color-brand-blue)] transition hover:text-[var(--color-brand-ink-strong)]"
-                    >View jobs</RouterLink
-                  >
+                  <div class="flex flex-wrap items-center justify-end gap-2">
+                    <button
+                      v-if="canEditQos"
+                      type="button"
+                      class="ui-button-secondary"
+                      @click="openEditDialog(qos)"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      v-if="canDeleteQos"
+                      type="button"
+                      class="ui-button-secondary"
+                      @click="openDeleteDialog(qos)"
+                    >
+                      Delete
+                    </button>
+                    <RouterLink
+                      :to="{ name: 'jobs', params: { cluster: cluster }, query: { qos: qos.name } }"
+                      class="ui-button-secondary"
+                    >
+                      View jobs
+                    </RouterLink>
+                  </div>
                 </td>
               </tr>
             </tbody>
@@ -261,5 +368,51 @@ if (route.query.page_size) {
           </div>
         </div>
       </div>
+    <ActionDialog
+      :open="createOpen"
+      title="Create QOS"
+      description="Add a new quality-of-service policy for this cluster."
+      submit-label="Create QOS"
+      :loading="operationBusy"
+      :error="operationError"
+      :fields="[
+        { key: 'name', label: 'Name', required: true },
+        { key: 'description', label: 'Description', type: 'textarea' },
+        { key: 'priority', label: 'Priority', type: 'number' }
+      ]"
+      @close="createOpen = false"
+      @submit="createQos"
+    />
+
+    <ActionDialog
+      :open="editOpen"
+      title="Edit QOS"
+      :description="selectedQos ? `Update ${selectedQos.name}.` : ''"
+      submit-label="Save changes"
+      :loading="operationBusy"
+      :error="operationError"
+      :initial-values="{
+        description: selectedQos?.description ?? '',
+        priority: selectedQos?.priority?.set ? String(selectedQos.priority.number) : ''
+      }"
+      :fields="[
+        { key: 'description', label: 'Description', type: 'textarea' },
+        { key: 'priority', label: 'Priority', type: 'number' }
+      ]"
+      @close="editOpen = false"
+      @submit="updateQos"
+    />
+
+    <ActionDialog
+      :open="deleteOpen"
+      title="Delete QOS"
+      :description="selectedQos ? `Delete QOS ${selectedQos.name}. This action is destructive.` : ''"
+      submit-label="Delete QOS"
+      :loading="operationBusy"
+      :error="operationError"
+      :fields="[]"
+      @close="deleteOpen = false"
+      @submit="removeQos"
+    />
   </ClusterMainLayout>
 </template>

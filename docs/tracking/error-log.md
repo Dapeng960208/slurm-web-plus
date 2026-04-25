@@ -17,6 +17,42 @@
 
 ## 条目
 
+### 2026-04-25：共享操作对话框复用时会把上一次表单字段带入后续删除/取消请求
+
+- 场景：Slurm 管理扩展上线后，多个业务页复用 `frontend/src/components/operations/ActionDialog.vue` 承载提交、编辑、删除、取消等单对象操作。
+- 现象：先打开带字段的编辑/提交对话框，再切到 `fields=[]` 的删除/取消对话框时，组件仍可能提交上一次残留的 payload。
+- 复现：渲染 `ActionDialog`，先以 `fields=[{ key: 'comment', ... }]` 提交一次，再在同一个组件实例上切换到空字段配置并再次提交；第二次 `submit` 事件会带出旧 `comment`。
+- 根因：`resetForm()` 只覆盖当前 `props.fields` 对应的键，没有清理响应式 `form` 中上一次操作留下的旧键值。
+- 解决：`resetForm()` 先删除 `form` 上已有键，再按当前字段重新填充默认值，并补 `frontend/tests/components/operations/ActionDialog.spec.ts` 做回归。
+- 预防：后续复用型表单/弹窗组件在“编辑 -> 删除”“创建 -> 取消”这类跨场景切换时，必须补状态清理测试，不能只验证单次打开场景。
+
+### 2026-04-25：全量后端测试时 Prometheus collector 注册表残留，导致 `/metrics` 用例串扰
+
+- 场景：执行 `.venv\Scripts\python.exe -m pytest -q slurmweb/tests` 做后端全量回归。
+- 现象：`slurmweb/tests/views/test_agent_metrics_collector.py` 在单独运行时通过，但放进全量测试会批量失败，并在 Windows 上掉进 `socket.AF_UNIX` 不可用的真实 Unix socket 请求栈。
+- 复现：先运行会创建 `metrics_collector` 的 Agent 测试，再运行 `/metrics` 相关视图测试；Prometheus 全局注册表会同时采集旧 collector。
+- 根因：`TestAgentBase.setup_client()` 创建带 `/metrics` 的 app 后，没有统一注册测试清理逻辑；部分测试虽然手动 `unregister()`，但并不能覆盖所有调用路径。
+- 解决：`slurmweb/tests/lib/agent.py` 已在测试基类里对 `metrics_collector.unregister()` 做统一 cleanup，并兼容重复清理。
+- 预防：后续凡是往全局注册表、事件循环、线程、后台任务注册对象的测试基类，都必须在基类层统一 cleanup，不要依赖单个测试自己记得回收。
+
+### 2026-04-25：Slurm 管理扩展后，Agent 装饰器未保留函数名导致 Flask 路由 endpoint 冲突
+
+- 场景：补 `jobs self`、analysis/admin 扩展相关后端测试，运行 `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/views/test_agent_jobs_self_permissions.py`。
+- 现象：`setup_client()` 初始化 Agent 时直接报 `AssertionError: View function mapping is overwriting an existing endpoint function: wrapper`。
+- 复现：在仓库根目录执行 `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/views/test_agent_jobs_self_permissions.py`。
+- 根因：`slurmweb/views/agent.py` 中 `handle_slurmrestd_errors` 返回的包装函数统一命名为 `wrapper`，没有用 `functools.wraps` 保留原视图函数名；新增 POST/DELETE 管理路由后，Flask endpoint 名冲突被放大并阻塞应用启动。
+- 解决：`slurmweb/views/agent.py` 的 `handle_slurmrestd_errors` 已补 `@wraps`，相关定向回归已恢复。
+- 预防：后续新增 Flask 视图装饰器时必须保留原函数元数据，新增路由后至少跑一轮最小化 app 初始化测试。
+
+### 2026-04-25：`default_seed_roles()` 仍给 `user` 注入 `admin/*` 资源，导致默认角色越权
+
+- 场景：补权限模型测试，运行 `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/test_permission_rules.py`。
+- 现象：`test_default_seed_roles_grant_jobs_self_to_user_and_admin_pages_to_admin` 失败，`user` 角色实际包含 `admin/system:view:*`、`admin/cache:view:*`、`admin/access-control:view:*` 等管理权限。
+- 复现：在仓库根目录执行 `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/test_permission_rules.py`。
+- 根因：默认种子角色还沿用旧的宽泛能力集合，新增的 `admin/xx` 资源没有从普通用户默认权限中剥离。
+- 解决：`default_seed_roles()` 已收紧，`user` 不再包含 `admin/*`，并补了对应权限目录测试。
+- 预防：凡是权限模型升级到资源级 `view/edit/delete` 时，都要同步检查 seed role、vendor policy、前端路由守卫三处是否一致。
+
 ### 2026-04-25：前端测试夹具只写 `actions[]` 时，新规则页面会被误判为无权限
 
 - 场景：迁移前端页面到 `hasRoutePermission(...)` 后，运行 Settings、AI、用户空间相关单测。

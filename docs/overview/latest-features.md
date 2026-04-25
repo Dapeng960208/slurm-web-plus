@@ -1,5 +1,118 @@
 ﻿# 最新功能
 
+## 本轮：发布后审查补了共享操作对话框的安全回归修复
+
+针对本轮新增的大量单对象写操作，发布后代码审查已补一个前端共享组件缺陷修复：
+
+- `ActionDialog` 在复用到不同操作时会先清空旧表单字段
+- 避免编辑/提交阶段的残留参数被错误带到删除、取消等空表单请求
+- 已新增 `ActionDialog` 组件级回归测试覆盖该场景
+
+## 本轮：基于现有页面增强的 Slurm 管理扩展
+
+本轮继续采用“现有业务页面增强 + 集群级 `Admin` 页面 + `analysis` 页面补系统状态”的结构，没有再新增独立全量管理中心。
+
+已落地的重点包括：
+
+- `Jobs` / `Job`
+  - 单作业提交、编辑、取消
+- `Resources` / `Node`
+  - 单节点更新、删除
+- `Reservations`
+  - 创建、更新、删除
+- `Accounts` / `Account`
+  - 创建、更新、删除
+- `User`
+  - SlurmDB 用户创建/更新、删除
+- `QOS`
+  - 创建、更新、删除
+- `analysis`
+  - 新增 `Slurm ping`
+  - 新增 `Slurm diag`
+
+明确未做：
+
+- 批量取消作业
+- 批量节点操作
+
+## 本轮：后台管理入口统一迁移到 `/:cluster/admin`
+
+以下原 `settings` 管理能力已迁移到集群级 `Admin`：
+
+- `AI`
+- `LDAP Cache`
+- `Cache`
+- `Access Control`
+
+同时补充了 `Admin > System`，统一承载：
+
+- `licenses`
+- `shares`
+- `reconfigure`
+- `slurmdb diag`
+- `slurmdb config`
+- `instances`
+- `tres`
+
+旧路由会重定向到：
+
+- `/settings/ai` -> `/:cluster/admin/ai`
+- `/settings/access-control` -> `/:cluster/admin/access-control`
+- `/settings/cache` -> `/:cluster/admin/cache`
+- `/settings/ldap-cache` -> `/:cluster/admin/ldap-cache`
+
+## 本轮：`jobs:self` 已落地到后端 owner-aware 校验
+
+`jobs` 资源现在正式支持：
+
+- `jobs:view:self`
+- `jobs:edit:self`
+- `jobs:delete:self`
+
+当前语义：
+
+- 列表查询优先注入 `user=<login>` 到 `slurmrestd`
+- 详情、更新、取消都先查询作业 owner
+- 如果用户只有 `self`，只能查看和取消自己的作业
+- 前端只做辅助隐藏/禁用，不作为最终安全边界
+
+为兼容旧动作，新增：
+
+- `view-own-jobs`
+- `cancel-own-jobs`
+
+vendor policy 中普通 `user` 已从全量 `view-jobs` 切到 `view-own-jobs` / `cancel-own-jobs`，且不再默认带 cache/admin 管理动作。
+
+## 本轮：slurmrestd 写路径补齐并加入版本降级
+
+`slurmweb.slurmrestd` 已扩展为通用请求层，支持：
+
+- `GET`
+- `POST`
+- `DELETE`
+- `DELETE` body
+
+当前兼容策略：
+
+- `0.41-0.44`
+  - 开放主写路径
+- `0.39-0.40`
+  - 保持读兼容
+  - 写操作返回 `501`
+
+## 本轮验证结果
+
+已通过：
+
+- `npm --prefix frontend run type-check`
+- `cd frontend && npx vitest run tests/router/AdminRoutesContract.spec.ts tests/composables/GatewayAPIAdminContract.spec.ts tests/views/ClusterAnalysisView.spec.ts tests/components/MainMenu.spec.ts tests/stores/runtime.spec.ts`
+- `cd frontend && npx vitest run tests/views/JobsView.spec.ts tests/views/ReservationsView.spec.ts tests/views/QosView.spec.ts tests/views/AccountView.spec.ts tests/views/AccountsView.spec.ts tests/views/UserView.spec.ts tests/views/resources/ResourcesView.spec.ts`
+- `cd frontend && npx vitest run tests/composables/GatewayAPI.spec.ts tests/composables/GatewayAPIAdminContract.spec.ts tests/router/AdminRoutesContract.spec.ts tests/stores/runtime.spec.ts tests/components/MainMenu.spec.ts tests/components/settings/SettingsTabs.spec.ts tests/components/settings/SettingsTabsAIContract.spec.ts tests/views/settings/SettingsAI.spec.ts tests/views/settings/SettingsAccessControl.spec.ts tests/views/settings/SettingsCache.spec.ts tests/views/settings/SettingsLdapCache.spec.ts`
+- `cd frontend && npx vitest run`
+- `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/test_permission_rules.py slurmweb/tests/test_access_control_policy.py slurmweb/tests/views/test_gateway.py slurmweb/tests/views/test_agent_operations.py`
+- `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/test_permission_rules.py slurmweb/tests/test_access_control_policy.py slurmweb/tests/views/test_agent_operations.py slurmweb/tests/views/test_gateway_operations.py slurmweb/tests/slurmrestd/test_slurmrestd_write_operations.py`
+- `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/views/test_agent.py slurmweb/tests/views/test_gateway.py slurmweb/tests/views/test_gateway_clusters.py`
+
 ## 1. 路由权限系统切换为规则模型
 
 当前权限模型已经从单一 `actions[]` 扩展为 `resource:operation:scope`：

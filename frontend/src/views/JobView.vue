@@ -15,6 +15,7 @@ import ClusterMainLayout from '@/components/ClusterMainLayout.vue'
 import { useClusterDataPoller } from '@/composables/DataPoller'
 import { formatJobExitCode, jobRequestedGPU, jobAllocatedGPU } from '@/composables/GatewayAPI'
 import type { ClusterIndividualJob } from '@/composables/GatewayAPI'
+import { useGatewayAPI } from '@/composables/GatewayAPI'
 import JobStatusBadge from '@/components/job/JobStatusBadge.vue'
 import JobProgress from '@/components/job/JobProgress.vue'
 import JobBackButton from '@/components/job/JobBackButton.vue'
@@ -27,10 +28,20 @@ import JobFieldRaw from '@/components/job/JobFieldRaw.vue'
 import JobFieldComment from '@/components/job/JobFieldComment.vue'
 import JobResources from '@/components/job/JobResources.vue'
 import DetailSummaryStrip from '@/components/details/DetailSummaryStrip.vue'
+import ActionDialog from '@/components/operations/ActionDialog.vue'
+import { useRuntimeStore } from '@/stores/runtime'
+import { useAuthStore } from '@/stores/auth'
 
 const { cluster, id } = defineProps<{ cluster: string; id: number }>()
 
 const route = useRoute()
+const gateway = useGatewayAPI()
+const runtimeStore = useRuntimeStore()
+const authStore = useAuthStore()
+const operationError = ref<string | null>(null)
+const operationBusy = ref(false)
+const editOpen = ref(false)
+const cancelOpen = ref(false)
 
 const jobsFields = [
   'user',
@@ -236,6 +247,57 @@ const summaryItems = computed(() => {
   ]
 })
 
+const canEdit = computed(
+  () =>
+    runtimeStore.hasRoutePermission(cluster, 'jobs', 'edit') ||
+    (runtimeStore.hasRoutePermission(cluster, 'jobs', 'edit', 'self') &&
+      data.value?.user === authStore.username)
+)
+
+const canCancel = computed(
+  () =>
+    runtimeStore.hasRoutePermission(cluster, 'jobs', 'delete') ||
+    (runtimeStore.hasRoutePermission(cluster, 'jobs', 'delete', 'self') &&
+      data.value?.user === authStore.username)
+)
+
+async function saveJobEdits(payload: Record<string, string>) {
+  operationBusy.value = true
+  operationError.value = null
+  try {
+    await gateway.update_job(cluster, id, {
+      partition: payload.partition || undefined,
+      qos: payload.qos || undefined,
+      priority: payload.priority ? Number(payload.priority) : null,
+      time_limit: payload.time_limit || undefined,
+      comment: payload.comment || undefined
+    })
+    runtimeStore.reportInfo(`Job ${id} update requested.`)
+    editOpen.value = false
+  } catch (error: unknown) {
+    operationError.value = error instanceof Error ? error.message : String(error)
+  } finally {
+    operationBusy.value = false
+  }
+}
+
+async function cancelJob(payload: Record<string, string>) {
+  operationBusy.value = true
+  operationError.value = null
+  try {
+    await gateway.cancel_job(cluster, id, {
+      signal: payload.signal || undefined,
+      reason: payload.reason || undefined
+    })
+    runtimeStore.reportInfo(`Job ${id} cancel requested.`)
+    cancelOpen.value = false
+  } catch (error: unknown) {
+    operationError.value = error instanceof Error ? error.message : String(error)
+  } finally {
+    operationBusy.value = false
+  }
+}
+
 function highlightField(field: JobField) {
   displayTags.value[field].highlight = true
   setTimeout(() => {
@@ -295,6 +357,12 @@ watch(
                 >
                   {{ data.state.reason }}
                 </span>
+                <button v-if="canEdit" type="button" class="ui-button-secondary" @click="editOpen = true">
+                  Edit
+                </button>
+                <button v-if="canCancel" type="button" class="ui-button-secondary" @click="cancelOpen = true">
+                  Cancel
+                </button>
               </template>
               <div
                 v-else-if="initialLoading"
@@ -395,5 +463,45 @@ watch(
         </div>
       </div>
     </div>
+
+    <ActionDialog
+      :open="editOpen"
+      title="Edit Job"
+      :description="`Update job ${id} on ${cluster}.`"
+      submit-label="Save changes"
+      :loading="operationBusy"
+      :error="operationError"
+      :initial-values="{
+        partition: data?.partition ?? '',
+        qos: data?.qos ?? '',
+        priority: data?.priority?.set ? String(data.priority.number) : '',
+        time_limit: '',
+        comment: data?.comment?.administrator || data?.comment?.job || ''
+      }"
+      :fields="[
+        { key: 'partition', label: 'Partition' },
+        { key: 'qos', label: 'QOS' },
+        { key: 'priority', label: 'Priority', type: 'number' },
+        { key: 'time_limit', label: 'Time limit' },
+        { key: 'comment', label: 'Comment', type: 'textarea' }
+      ]"
+      @close="editOpen = false"
+      @submit="saveJobEdits"
+    />
+
+    <ActionDialog
+      :open="cancelOpen"
+      title="Cancel Job"
+      :description="`Cancel job ${id}. This action is destructive.`"
+      submit-label="Cancel job"
+      :loading="operationBusy"
+      :error="operationError"
+      :fields="[
+        { key: 'signal', label: 'Signal' },
+        { key: 'reason', label: 'Reason', type: 'textarea' }
+      ]"
+      @close="cancelOpen = false"
+      @submit="cancelJob"
+    />
   </ClusterMainLayout>
 </template>

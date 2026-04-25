@@ -63,7 +63,11 @@ const clusterDetails = computed<ClusterDescription | undefined>(() =>
 )
 const aiAvailable = computed(() => hasClusterAIAssistant(clusterDetails.value))
 const canView = computed(() => runtimeStore.hasRoutePermission(cluster, 'ai', 'view'))
-const canManage = computed(() => runtimeStore.hasRoutePermission(cluster, 'settings/ai', 'edit'))
+const canManage = computed(
+  () =>
+    runtimeStore.hasRoutePermission(cluster, 'admin/ai', 'edit') ||
+    runtimeStore.hasRoutePermission(cluster, 'settings/ai', 'edit')
+)
 const enabledModels = computed(() =>
   [...configs.value]
     .filter((config) => config.enabled)
@@ -352,7 +356,11 @@ watch(
         metric-label="enabled models"
       >
         <template #actions>
-          <RouterLink v-if="canManage" :to="{ name: 'settings-ai' }" class="ui-button-secondary">
+          <RouterLink
+            v-if="canManage"
+            :to="{ name: 'admin-ai', params: { cluster } }"
+            class="ui-button-secondary"
+          >
             Manage models
           </RouterLink>
           <button type="button" class="ui-button-primary" :disabled="sending" @click="startNewConversation">
@@ -506,7 +514,7 @@ watch(
               {{ sendError }}
             </ErrorAlert>
             <InfoAlert v-if="enabledModels.length === 0">
-              No enabled model exists for this cluster yet. Create one in Settings > AI first.
+              No enabled model exists for this cluster yet. Create one in Admin > AI first.
             </InfoAlert>
 
             <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_280px]">

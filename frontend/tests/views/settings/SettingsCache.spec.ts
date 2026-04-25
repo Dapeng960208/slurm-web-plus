@@ -3,11 +3,17 @@ import { mount } from '@vue/test-utils'
 import SettingsCacheView from '@/views/settings/SettingsCache.vue'
 import { useRuntimeStore } from '@/stores/runtime'
 import { init_plugins } from '../../lib/common'
+import type { RouterMock } from 'vue-router-mock'
 
 describe('settings/SettingsCache.vue', () => {
   beforeEach(() => {
-    init_plugins()
+    void init_plugins()
   })
+
+  async function primeAdminRoute(router: RouterMock) {
+    await router.setParams({ cluster: 'foo' })
+    router.currentRoute.value.name = 'admin-cache'
+  }
 
   function renderView() {
     return mount(SettingsCacheView, {
@@ -15,6 +21,8 @@ describe('settings/SettingsCache.vue', () => {
         stubs: {
           SettingsTabs: true,
           SettingsHeader: true,
+          AdminTabs: true,
+          AdminHeader: true,
           SettingsCacheStatistics: {
             props: ['cluster'],
             template: '<div data-testid="cache-statistics">statistics {{ cluster.name }}</div>'
@@ -28,11 +36,12 @@ describe('settings/SettingsCache.vue', () => {
     })
   }
 
-  test('renders cache statistics and metrics when cache and metrics are enabled', () => {
+  test('renders cache statistics and metrics when cache and metrics are enabled', async () => {
+    const router = init_plugins()
     useRuntimeStore().availableClusters = [
       {
         name: 'foo',
-        permissions: { roles: [], actions: ['cache-view'] },
+        permissions: { roles: [], actions: [], rules: ['admin/cache:view:*'] },
         racksdb: true,
         infrastructure: 'foo',
         metrics: true,
@@ -40,6 +49,7 @@ describe('settings/SettingsCache.vue', () => {
       }
     ]
 
+    await primeAdminRoute(router)
     const wrapper = renderView()
 
     expect(wrapper.text()).toContain('Cluster foo')
@@ -50,11 +60,12 @@ describe('settings/SettingsCache.vue', () => {
     expect(wrapper.text()).not.toContain('Live cache metrics are unavailable')
   })
 
-  test('renders cache statistics without metrics when metrics are disabled', () => {
+  test('renders cache statistics without metrics when metrics are disabled', async () => {
+    const router = init_plugins()
     useRuntimeStore().availableClusters = [
       {
         name: 'foo',
-        permissions: { roles: [], actions: ['cache-view'] },
+        permissions: { roles: [], actions: [], rules: ['admin/cache:view:*'] },
         racksdb: true,
         infrastructure: 'foo',
         metrics: false,
@@ -62,6 +73,7 @@ describe('settings/SettingsCache.vue', () => {
       }
     ]
 
+    await primeAdminRoute(router)
     const wrapper = renderView()
 
     expect(wrapper.text()).toContain('Cluster foo')
@@ -71,7 +83,8 @@ describe('settings/SettingsCache.vue', () => {
     expect(wrapper.text()).toContain('Live cache metrics are unavailable')
   })
 
-  test('renders permission message without cache children when cache-view is denied', () => {
+  test('renders permission message without cache children when cache-view is denied', async () => {
+    const router = init_plugins()
     useRuntimeStore().availableClusters = [
       {
         name: 'foo',
@@ -83,6 +96,7 @@ describe('settings/SettingsCache.vue', () => {
       }
     ]
 
+    await primeAdminRoute(router)
     const wrapper = renderView()
 
     expect(wrapper.text()).toContain('Cluster foo')
@@ -92,11 +106,12 @@ describe('settings/SettingsCache.vue', () => {
     expect(wrapper.text()).not.toContain('Live cache metrics are unavailable')
   })
 
-  test('renders cache disabled message without cache children when cache is turned off', () => {
+  test('renders cache disabled message without cache children when cache is turned off', async () => {
+    const router = init_plugins()
     useRuntimeStore().availableClusters = [
       {
         name: 'foo',
-        permissions: { roles: [], actions: ['cache-view'] },
+        permissions: { roles: [], actions: [], rules: ['admin/cache:view:*'] },
         racksdb: true,
         infrastructure: 'foo',
         metrics: true,
@@ -104,6 +119,7 @@ describe('settings/SettingsCache.vue', () => {
       }
     ]
 
+    await primeAdminRoute(router)
     const wrapper = renderView()
 
     expect(wrapper.text()).toContain('Cluster foo')

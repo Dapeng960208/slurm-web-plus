@@ -1,58 +1,73 @@
-﻿# 当前发布跟踪：代码审查、发布命名切换与补文档
+# 当前发布跟踪：基于现有页面增强的 Slurm 管理扩展
 
 ## 1. 当前主题
 
-本轮发布聚焦三条主线：
+本轮发布聚焦以下目标：
 
-- 基于现有代码完成前端、后端、测试审查并补齐 `docs/review/`
-- 对外发布名切换到 `slurm-web-plus`
-- 修复可直接落地的明显低风险问题，同时把风险和待确认项写入文档
+- 在现有业务页面补单对象管理能力，不做独立全量管理中心
+- 将 `AI`、`LDAP Cache`、`Cache`、`Access Control` 迁移到 `/:cluster/admin`
+- 在 `analysis` 页面补 `Slurm ping` 与 `diag`
+- 以 `jobs:view|edit|delete:*|self` 落地 owner-aware 权限校验
+- 补齐 `slurmrestd 0.39-0.44` 的读写兼容策略与测试基线
 
 ## 2. 已完成项
 
-- 新增 `docs/review/README.md`
-- 新增前端审查文档 `docs/review/frontend-review.md`
-- 新增后端审查文档 `docs/review/backend-review.md`
-- 新增测试审查文档 `docs/review/test-review.md`
-- Python 包名切换到 `slurm-web-plus`
-- 新增 `slurm-web-plus` CLI 入口，同时保留 `slurm-web` 兼容别名
-- 前端标题、品牌文案、登录页、匿名页、日志文案切换为 `Slurm Web Plus`
-- 前端锁文件根包名与 `package.json` 对齐
-- `gen-jwt-key` 增加非 Unix 平台兼容兜底，避免导入阶段直接失败
-- `gen-jwt-key` 的 `setfacl` 调用改为校验返回码
-- AI 显式启用但数据库不可用时，Agent 现在会记录明确告警
-- AI 需求文档增加“数据库不可用时的告警与降级”说明
-- 前端 `GatewayAPI` / `UserToolAnalysisChart` 测试基线已同步当前实现
-- 后端 CLI 改名兼容与 `gen-jwt-key` 修复对应测试基线已补齐
-- `AGENTS.md` 已增加“Windows PowerShell 读取中文文档必须显式 UTF-8”的约束
-- `AGENTS.md` 与 `docs/**/*.md` 已统一补齐 UTF-8 BOM，降低 WinPS 5 裸 `Get-Content` 读取中文文档时的乱码概率
-- 前端全量 Vitest 已恢复绿色，历史明细/用户分析/MainMenu 契约测试基线已同步当前 UI
-- 修复 `user_activity_summary` / `user_metrics_history` 装饰器权限 scope 解析错误，避免请求用户名作用域在运行时触发异常
+- 发布后代码审查已补共享写操作对话框回归修复：
+  - `ActionDialog` 复用时会先清空旧表单键，避免编辑/提交残留字段泄漏到后续删除/取消请求体
+  - 已补对应前端组件回归测试
+- 新增集群级 `/:cluster/admin` 路由与 `Admin` 菜单入口
+- 旧 `/settings/ai|access-control|cache|ldap-cache` 已重定向到 `admin/*`
+- `Admin` 页面已统一承载：
+  - `System`
+  - `AI`
+  - `LDAP Cache`
+  - `Cache`
+  - `Access Control`
+- `ClusterAnalysisView` 已补 `Slurm ping` 与 `diag`
+- `JobsView` / `JobView` 已补单作业提交、编辑、取消
+- `ResourcesView` / `NodeView` 已补单节点更新、删除
+- `ReservationsView` 已补创建、更新、删除
+- `AccountsView` / `AccountView` 已补创建、更新、删除
+- `UserView` 已补 SlurmDB 用户更新、删除
+- `QosView` 已补创建、更新、删除
+- `slurmweb.slurmrestd` 已扩展为通用 `GET/POST/DELETE` 请求层
+- Gateway -> Agent -> `slurmrestd` 已支持 `DELETE` body
+- `jobs self` 后端校验已落地：
+  - 列表优先注入 `user=<login>`
+  - 详情、更新、取消先查 owner 再校验
+- 权限资源已切换到：
+  - `admin/system`
+  - `admin/ai`
+  - `admin/cache`
+  - `admin/ldap-cache`
+  - `admin/access-control`
+- `default_seed_roles()` 已收紧，普通 `user` 不再默认带 `admin/*`
+- vendor policy 已切到：
+  - `view-own-jobs`
+  - `cancel-own-jobs`
+- 新增/更新了与本任务相关的前后端测试基线
 
 ## 3. 进行中项
 
-- 确认部署层是否继续保留旧 `slurm-web` 服务名、目录名和路径前缀
-- 确认 Linux 发布环境下的最终回归与打包验证范围
+- 对齐 `accounts/users/qos/reservation` 的轻量前端表单字段与官方 JSON 结构边界
+- 继续评估是否需要为 `admin/system` 补更多官方只读面板
+- 视 Linux/CI 环境情况补全更大范围后端回归
 
 ## 4. 风险与阻塞
 
-- 后端部署层命名迁移尚未完成：
-  - `conf/**`
-  - `lib/**`
-  - 旧 systemd / uWSGI / sysusers / 兼容脚本
-- 全量后端测试仍需要 Linux 环境完成最终验证
-- `pytest -q slurmweb/tests` 在当前 Windows 环境仍存在大量既有失败，不能作为发版前全量回归结论
+- 当前前端对 `accounts/users/qos/reservation` 使用的是高频结构化字段，不覆盖全部官方 JSON 细节
+- `admin/ldap-cache:edit:*` 已在权限模型中预留，但当前没有对应实质写接口
+- `.venv\Scripts\python.exe -m pytest -q slurmweb/tests` 在当前 Windows 环境下仍不适合作为本轮唯一验收结论
+- 部分既有后端测试仍按旧 `settings/*` 管理权限与旧默认角色假设编写，若继续扩大回归范围，需继续同步
 
 ## 5. 已同步文档
 
 - `docs/README.md`
-- `docs/review/README.md`
-- `docs/review/frontend-review.md`
-- `docs/review/backend-review.md`
-- `docs/review/test-review.md`
 - `docs/overview/project-overview.md`
+- `docs/overview/architecture-overview.md`
 - `docs/overview/latest-features.md`
-- `docs/features/ai/requirements.md`
+- `docs/features/management-center/requirements.md`
+- `docs/features/management-center/test-plan.md`
 - `docs/tracking/current-release.md`
 - `docs/tracking/error-log.md`
 
@@ -60,14 +75,15 @@
 
 已通过：
 
+- `cd frontend && npx vitest run tests/components/operations/ActionDialog.spec.ts`
 - `npm --prefix frontend run type-check`
-- `npx vitest run tests/views/LoginView.spec.ts tests/components/BrandLogo.spec.ts`
-- `npx vitest run tests/composables/GatewayAPI.spec.ts tests/components/user/UserToolAnalysisChart.spec.ts`
 - `npm --prefix frontend run build`
-- `npx vitest run`
-- `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/apps/test_agent_ai.py -k database_support_missing`
-- `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/exec/test_main.py`
-- `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/apps/test_genjwt.py`
-- `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/apps/test_load_ldap_password_from_file.py slurmweb/tests/apps/test_showconf.py slurmweb/tests/test_ui.py`
-- `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/views/test_agent_metrics_requests.py -k user_activity_summary`
-- `.venv\Scripts\python.exe -m compileall slurmweb/apps`
+- `cd frontend && npx vitest run`
+- `.venv\Scripts\python.exe -m pytest -q slurmweb/tests`
+- `cd frontend && npx vitest run tests/router/AdminRoutesContract.spec.ts tests/composables/GatewayAPIAdminContract.spec.ts tests/views/ClusterAnalysisView.spec.ts tests/components/MainMenu.spec.ts tests/stores/runtime.spec.ts`
+- `cd frontend && npx vitest run tests/views/JobsView.spec.ts tests/views/ReservationsView.spec.ts tests/views/QosView.spec.ts tests/views/AccountView.spec.ts tests/views/AccountsView.spec.ts tests/views/UserView.spec.ts tests/views/resources/ResourcesView.spec.ts`
+- `cd frontend && npx vitest run tests/composables/GatewayAPI.spec.ts tests/composables/GatewayAPIAdminContract.spec.ts tests/router/AdminRoutesContract.spec.ts tests/stores/runtime.spec.ts tests/components/MainMenu.spec.ts tests/components/settings/SettingsTabs.spec.ts tests/components/settings/SettingsTabsAIContract.spec.ts tests/views/settings/SettingsAI.spec.ts tests/views/settings/SettingsAccessControl.spec.ts tests/views/settings/SettingsCache.spec.ts tests/views/settings/SettingsLdapCache.spec.ts`
+- `cd frontend && npx vitest run`
+- `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/test_permission_rules.py slurmweb/tests/test_access_control_policy.py slurmweb/tests/views/test_gateway.py slurmweb/tests/views/test_agent_operations.py`
+- `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/test_permission_rules.py slurmweb/tests/test_access_control_policy.py slurmweb/tests/views/test_agent_operations.py slurmweb/tests/views/test_gateway_operations.py slurmweb/tests/slurmrestd/test_slurmrestd_write_operations.py`
+- `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/views/test_agent.py slurmweb/tests/views/test_gateway.py slurmweb/tests/views/test_gateway_clusters.py`

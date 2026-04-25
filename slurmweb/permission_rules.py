@@ -38,8 +38,9 @@ PERMISSION_CATALOG = [
             {
                 "resource": "jobs",
                 "label": "Jobs",
-                "operations": ["view"],
-                "scopes": ["*"],
+                "operations": ["view", "edit", "delete"],
+                "scopes": ["*", "self"],
+                "owner_aware": True,
             },
             {
                 "resource": "jobs-history",
@@ -50,25 +51,31 @@ PERMISSION_CATALOG = [
             {
                 "resource": "resources",
                 "label": "Resources",
-                "operations": ["view"],
+                "operations": ["view", "edit", "delete"],
                 "scopes": ["*"],
             },
             {
                 "resource": "qos",
                 "label": "QOS",
-                "operations": ["view"],
+                "operations": ["view", "edit", "delete"],
                 "scopes": ["*"],
             },
             {
                 "resource": "reservations",
                 "label": "Reservations",
-                "operations": ["view"],
+                "operations": ["view", "edit", "delete"],
                 "scopes": ["*"],
             },
             {
                 "resource": "accounts",
                 "label": "Accounts",
-                "operations": ["view"],
+                "operations": ["view", "edit", "delete"],
+                "scopes": ["*"],
+            },
+            {
+                "resource": "users-admin",
+                "label": "Users Admin",
+                "operations": ["view", "edit", "delete"],
                 "scopes": ["*"],
             },
         ],
@@ -96,27 +103,33 @@ PERMISSION_CATALOG = [
                 "scopes": ["*"],
             },
             {
-                "resource": "settings/ai",
-                "label": "Settings / AI",
+                "resource": "admin/ai",
+                "label": "Admin / AI",
                 "operations": ["view", "edit", "delete"],
                 "scopes": ["*"],
             },
             {
-                "resource": "settings/access-control",
-                "label": "Settings / Access Control",
+                "resource": "admin/access-control",
+                "label": "Admin / Access Control",
                 "operations": ["view", "edit", "delete"],
                 "scopes": ["*"],
             },
             {
-                "resource": "settings/cache",
-                "label": "Settings / Cache",
+                "resource": "admin/cache",
+                "label": "Admin / Cache",
                 "operations": ["view", "edit"],
                 "scopes": ["*"],
             },
             {
-                "resource": "settings/ldap-cache",
-                "label": "Settings / LDAP Cache",
-                "operations": ["view"],
+                "resource": "admin/ldap-cache",
+                "label": "Admin / LDAP Cache",
+                "operations": ["view", "edit"],
+                "scopes": ["*"],
+            },
+            {
+                "resource": "admin/system",
+                "label": "Admin / System",
+                "operations": ["view", "edit", "delete"],
                 "scopes": ["*"],
             },
         ],
@@ -176,7 +189,9 @@ PERMISSION_CATALOG = [
 
 DEFAULT_LEGACY_PERMISSION_MAP = {
     "view-stats": ["dashboard:view:*", "analysis:view:*"],
-    "view-jobs": ["jobs:view:*", "user/analysis:view:self"],
+    "view-jobs": ["jobs:view:*"],
+    "view-own-jobs": ["jobs:view:self", "user/analysis:view:self"],
+    "cancel-own-jobs": ["jobs:delete:self"],
     "view-history-jobs": ["jobs-history:view:*"],
     "view-nodes": ["resources:view:*"],
     "view-qos": ["qos:view:*", "jobs/filter-qos:view:*"],
@@ -187,15 +202,15 @@ DEFAULT_LEGACY_PERMISSION_MAP = {
         "jobs/filter-partitions:view:*",
         "resources/filter-partitions:view:*",
     ],
-    "cache-view": ["settings/cache:view:*"],
-    "cache-reset": ["settings/cache:edit:*"],
-    "roles-view": ["settings/access-control:view:*"],
+    "cache-view": ["admin/cache:view:*", "admin/ldap-cache:view:*"],
+    "cache-reset": ["admin/cache:edit:*"],
+    "roles-view": ["admin/access-control:view:*"],
     "roles-manage": [
-        "settings/access-control:edit:*",
-        "settings/access-control:delete:*",
+        "admin/access-control:edit:*",
+        "admin/access-control:delete:*",
     ],
-    "view-ai": ["ai:view:*"],
-    "manage-ai": ["settings/ai:edit:*"],
+    "view-ai": ["ai:view:*", "admin/ai:view:*"],
+    "manage-ai": ["admin/ai:view:*", "admin/ai:edit:*", "admin/ai:delete:*"],
 }
 
 
@@ -300,7 +315,7 @@ def permission_rules_to_legacy_actions(
     normalized_rules = sort_permission_rules(rules)
     actions = []
     for action, required_rules in legacy_map.items():
-        if all(
+        if any(
             permission_rules_allow(
                 normalized_rules,
                 normalize_permission_rule(required_rule).split(":")[0],
@@ -326,20 +341,38 @@ def access_control_catalog() -> Dict[str, object]:
 
 
 def default_seed_roles() -> List[Dict[str, object]]:
-    view_rules = []
+    user_rules = [
+        "dashboard:view:*",
+        "analysis:view:*",
+        "ai:view:*",
+        "jobs:view:self",
+        "jobs:delete:self",
+        "jobs-history:view:*",
+        "resources:view:*",
+        "qos:view:*",
+        "reservations:view:*",
+        "accounts:view:*",
+        "user/profile:view:self",
+        "user/analysis:view:self",
+        "jobs/filter-accounts:view:*",
+        "jobs/filter-partitions:view:*",
+        "jobs/filter-qos:view:*",
+        "resources/filter-partitions:view:*",
+        "settings/general:view:*",
+        "settings/errors:view:*",
+        "settings/account:view:*",
+    ]
     admin_rules = []
     for group in PERMISSION_CATALOG:
         for resource in group["resources"]:
             scopes = resource.get("scopes", ["*"])
-            if "view" in resource.get("operations", []):
-                view_rules.append(f"{resource['resource']}:view:{scopes[0]}")
             for operation in resource.get("operations", []):
                 admin_rules.append(f"{resource['resource']}:{operation}:{scopes[0]}")
     return [
         {
             "name": "user",
             "description": "Read-only access to available routes and settings.",
-            "permissions": sort_permission_rules(view_rules),
+            "permissions": sort_permission_rules(user_rules),
         },
         {
             "name": "admin",

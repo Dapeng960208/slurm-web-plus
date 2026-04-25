@@ -9,6 +9,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
+import { useRouter } from 'vue-router'
 import { useRuntimeStore } from '@/stores/runtime'
 import ClusterMainLayout from '@/components/ClusterMainLayout.vue'
 import { useClusterDataPoller } from '@/composables/DataPoller'
@@ -38,12 +39,18 @@ import StatCardSkeleton from '@/components/StatCardSkeleton.vue'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
 import NodeMetricsHistoryChart from '@/components/node/NodeMetricsHistoryChart.vue'
 import PercentMetric from '@/components/PercentMetric.vue'
+import ActionDialog from '@/components/operations/ActionDialog.vue'
 import { XCircleIcon } from '@heroicons/vue/20/solid'
 
 const { cluster, nodeName } = defineProps<{ cluster: string; nodeName: string }>()
 
+const router = useRouter()
 const runtimeStore = useRuntimeStore()
 const gateway = useGatewayAPI()
+const operationError = ref<string | null>(null)
+const operationBusy = ref(false)
+const editOpen = ref(false)
+const deleteOpen = ref(false)
 
 const nodeMetrics = ref<NodeInstantMetrics | null>(null)
 const nodeMetricsHistory = ref<NodeMetricsHistory | null>(null)
@@ -192,6 +199,49 @@ const nodeMetricsHistoryHasData = computed(() => {
   )
 })
 
+const canEditNode = computed(() => runtimeStore.hasRoutePermission(cluster, 'resources', 'edit'))
+const canDeleteNode = computed(() => runtimeStore.hasRoutePermission(cluster, 'resources', 'delete'))
+
+async function saveNode(payload: Record<string, string>) {
+  operationBusy.value = true
+  operationError.value = null
+  try {
+    await gateway.update_node(cluster, nodeName, {
+      state: payload.state || undefined,
+      reason: payload.reason || undefined
+    })
+    runtimeStore.reportInfo(`Node ${nodeName} update requested.`)
+    editOpen.value = false
+  } catch (error: unknown) {
+    operationError.value = error instanceof Error ? error.message : String(error)
+  } finally {
+    operationBusy.value = false
+  }
+}
+
+async function removeNode() {
+  operationBusy.value = true
+  operationError.value = null
+  try {
+    await gateway.delete_node(cluster, nodeName)
+    runtimeStore.reportInfo(`Node ${nodeName} delete requested.`)
+    deleteOpen.value = false
+    void router.push({ name: 'resources', params: { cluster } })
+  } catch (error: unknown) {
+    operationError.value = error instanceof Error ? error.message : String(error)
+  } finally {
+    operationBusy.value = false
+  }
+}
+
+function confirmDeleteNode(payload: Record<string, string>) {
+  if (payload.confirmation !== 'DELETE') {
+    operationError.value = 'Type DELETE to confirm.'
+    return
+  }
+  void removeNode()
+}
+
 function setMetricsRange(range: MetricRange) {
   nodeMetricsRange.value = range
 }
@@ -286,6 +336,12 @@ onUnmounted(() => {
                 >
                   {{ node.data.value.reason }}
                 </span>
+                <button v-if="canEditNode" type="button" class="ui-button-secondary" @click="editOpen = true">
+                  Edit
+                </button>
+                <button v-if="canDeleteNode" type="button" class="ui-button-secondary" @click="deleteOpen = true">
+                  Delete
+                </button>
               </template>
               <div
                 v-else-if="node.initialLoading.value"
@@ -689,5 +745,36 @@ onUnmounted(() => {
         </div>
       </div>
     </div>
+
+    <ActionDialog
+      :open="editOpen"
+      title="Edit Node"
+      :description="`Update node ${nodeName} on ${cluster}.`"
+      submit-label="Save changes"
+      :loading="operationBusy"
+      :error="operationError"
+      :initial-values="{
+        state: node.data.value?.state?.join(',') ?? '',
+        reason: node.data.value?.reason ?? ''
+      }"
+      :fields="[
+        { key: 'state', label: 'State', required: true },
+        { key: 'reason', label: 'Reason', type: 'textarea' }
+      ]"
+      @close="editOpen = false"
+      @submit="saveNode"
+    />
+
+    <ActionDialog
+      :open="deleteOpen"
+      title="Delete Node"
+      :description="`Delete node ${nodeName}. This action is destructive.`"
+      submit-label="Delete node"
+      :loading="operationBusy"
+      :error="operationError"
+      :fields="[{ key: 'confirmation', label: 'Type DELETE to confirm', required: true }]"
+      @close="deleteOpen = false"
+      @submit="confirmDeleteNode"
+    />
   </ClusterMainLayout>
 </template>

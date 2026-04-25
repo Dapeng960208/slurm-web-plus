@@ -13,12 +13,15 @@ import type { LocationQueryRaw } from 'vue-router'
 import ClusterMainLayout from '@/components/ClusterMainLayout.vue'
 import { useClusterDataPoller } from '@/composables/DataPoller'
 import type { ClusterReservation } from '@/composables/GatewayAPI'
+import { useGatewayAPI } from '@/composables/GatewayAPI'
 import { representDuration } from '@/composables/TimeDuration'
+import { parseCsvList, stringifyList } from '@/composables/management'
 import InfoAlert from '@/components/InfoAlert.vue'
 import ErrorAlert from '@/components/ErrorAlert.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import TableSkeletonRows from '@/components/TableSkeletonRows.vue'
 import PaginationControls from '@/components/PaginationControls.vue'
+import ActionDialog from '@/components/operations/ActionDialog.vue'
 import {
   DEFAULT_PAGE_SIZE,
   lastPage,
@@ -27,10 +30,13 @@ import {
   type PageSizeOption
 } from '@/composables/Pagination'
 import { XMarkIcon } from '@heroicons/vue/24/outline'
+import { useRuntimeStore } from '@/stores/runtime'
 
 const { cluster } = defineProps<{ cluster: string }>()
 const route = useRoute()
 const router = useRouter()
+const gateway = useGatewayAPI()
+const runtimeStore = useRuntimeStore()
 
 const { data, unable, loaded, setCluster } = useClusterDataPoller<ClusterReservation[]>(
   cluster,
@@ -40,12 +46,29 @@ const { data, unable, loaded, setCluster } = useClusterDataPoller<ClusterReserva
 
 const page = ref(1)
 const pageSize = ref(DEFAULT_PAGE_SIZE)
+const operationBusy = ref(false)
+const operationError = ref<string | null>(null)
+const createOpen = ref(false)
+const editOpen = ref(false)
+const deleteOpen = ref(false)
+const selectedReservation = ref<ClusterReservation | null>(null)
+
 const pagedReservations = computed(() => {
   const items = data.value ?? []
   const start = (page.value - 1) * pageSize.value
   return items.slice(start, start + pageSize.value)
 })
 const totalPages = computed(() => lastPage(data.value?.length ?? 0, pageSize.value))
+
+const canCreateReservation = computed(() =>
+  runtimeStore.hasRoutePermission(cluster, 'reservations', 'edit')
+)
+const canEditReservation = computed(() =>
+  runtimeStore.hasRoutePermission(cluster, 'reservations', 'edit')
+)
+const canDeleteReservation = computed(() =>
+  runtimeStore.hasRoutePermission(cluster, 'reservations', 'delete')
+)
 
 function updateQueryParameters() {
   const query: LocationQueryRaw = {}
@@ -63,6 +86,79 @@ function updatePageSize(newPageSize: PageSizeOption) {
   pageSize.value = newPageSize
   page.value = 1
   updateQueryParameters()
+}
+
+function openCreateDialog() {
+  operationError.value = null
+  createOpen.value = true
+}
+
+function openEditDialog(reservation: ClusterReservation) {
+  selectedReservation.value = reservation
+  operationError.value = null
+  editOpen.value = true
+}
+
+function openDeleteDialog(reservation: ClusterReservation) {
+  selectedReservation.value = reservation
+  operationError.value = null
+  deleteOpen.value = true
+}
+
+async function createReservation(payload: Record<string, string>) {
+  operationBusy.value = true
+  operationError.value = null
+  try {
+    await gateway.save_reservation(cluster, {
+      name: payload.name || undefined,
+      node_list: payload.node_list || undefined,
+      partition: payload.partition || undefined,
+      users: parseCsvList(payload.users),
+      accounts: parseCsvList(payload.accounts)
+    })
+    runtimeStore.reportInfo(`Reservation ${payload.name || ''} creation requested.`)
+    createOpen.value = false
+  } catch (error: unknown) {
+    operationError.value = error instanceof Error ? error.message : String(error)
+  } finally {
+    operationBusy.value = false
+  }
+}
+
+async function updateReservation(payload: Record<string, string>) {
+  if (!selectedReservation.value) return
+  operationBusy.value = true
+  operationError.value = null
+  try {
+    await gateway.update_reservation(cluster, selectedReservation.value.name, {
+      name: selectedReservation.value.name,
+      node_list: payload.node_list || undefined,
+      partition: payload.partition || undefined,
+      users: parseCsvList(payload.users),
+      accounts: parseCsvList(payload.accounts)
+    })
+    runtimeStore.reportInfo(`Reservation ${selectedReservation.value.name} update requested.`)
+    editOpen.value = false
+  } catch (error: unknown) {
+    operationError.value = error instanceof Error ? error.message : String(error)
+  } finally {
+    operationBusy.value = false
+  }
+}
+
+async function deleteReservation() {
+  if (!selectedReservation.value) return
+  operationBusy.value = true
+  operationError.value = null
+  try {
+    await gateway.delete_reservation(cluster, selectedReservation.value.name)
+    runtimeStore.reportInfo(`Reservation ${selectedReservation.value.name} deletion requested.`)
+    deleteOpen.value = false
+  } catch (error: unknown) {
+    operationError.value = error instanceof Error ? error.message : String(error)
+  } finally {
+    operationBusy.value = false
+  }
 }
 
 watch(
@@ -94,7 +190,18 @@ if (route.query.page_size) {
       description="Advanced reservations, affected nodes and account or user access windows."
       :metric-value="loaded ? data?.length : undefined"
       metric-label="reservations"
-    />
+    >
+      <template #actions>
+        <button
+          v-if="canCreateReservation"
+          type="button"
+          class="ui-button-primary"
+          @click="openCreateDialog"
+        >
+          Create reservation
+        </button>
+      </template>
+    </PageHeader>
     <ErrorAlert v-if="unable"
       >Unable to retrieve reservations from cluster
       <span class="font-medium">{{ cluster }}</span></ErrorAlert
@@ -116,7 +223,7 @@ if (route.query.page_size) {
                 <th scope="col" class="w-12 px-3 py-3.5 text-left">Users</th>
                 <th scope="col" class="w-12 px-3 py-3.5 text-left">Accounts</th>
                 <th scope="col" class="hidden w-24 px-3 py-3.5 text-left align-top 2xl:table-cell">Flags</th>
-                <th scope="col" class="w-12"></th>
+                <th scope="col" class="py-3.5 pr-4 pl-3 text-right sm:pr-6 lg:pr-8">Actions</th>
               </tr>
             </thead>
             <tbody v-if="loaded" class="divide-y divide-gray-200 text-[var(--color-brand-ink-strong)]">
@@ -157,6 +264,26 @@ if (route.query.page_size) {
                 <td class="hidden pl-3 text-sm sm:pr-6 lg:pr-8 2xl:table-cell">
                   <span v-for="flag in reservation.flags" :key="flag" class="ui-chip m-1">{{ flag }}</span>
                 </td>
+                <td class="py-4 pl-3 text-right whitespace-nowrap sm:pr-6 lg:pr-8">
+                  <div class="flex flex-wrap items-center justify-end gap-2">
+                    <button
+                      v-if="canEditReservation"
+                      type="button"
+                      class="ui-button-secondary"
+                      @click="openEditDialog(reservation)"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      v-if="canDeleteReservation"
+                      type="button"
+                      class="ui-button-secondary"
+                      @click="openDeleteDialog(reservation)"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </td>
               </tr>
             </tbody>
             <TableSkeletonRows
@@ -179,5 +306,58 @@ if (route.query.page_size) {
         </div>
       </div>
     </div>
+
+    <ActionDialog
+      :open="createOpen"
+      title="Create Reservation"
+      description="Create a new reservation on this cluster."
+      submit-label="Create reservation"
+      :loading="operationBusy"
+      :error="operationError"
+      :fields="[
+        { key: 'name', label: 'Reservation name', required: true },
+        { key: 'node_list', label: 'Node list', required: true, type: 'textarea' },
+        { key: 'partition', label: 'Partition' },
+        { key: 'users', label: 'Users (comma separated)' },
+        { key: 'accounts', label: 'Accounts (comma separated)' }
+      ]"
+      @close="createOpen = false"
+      @submit="createReservation"
+    />
+
+    <ActionDialog
+      :open="editOpen"
+      title="Edit Reservation"
+      :description="selectedReservation ? `Update reservation ${selectedReservation.name}.` : ''"
+      submit-label="Save changes"
+      :loading="operationBusy"
+      :error="operationError"
+      :initial-values="{
+        node_list: selectedReservation?.node_list ?? '',
+        partition: '',
+        users: stringifyList(selectedReservation?.users),
+        accounts: stringifyList(selectedReservation?.accounts)
+      }"
+      :fields="[
+        { key: 'node_list', label: 'Node list', required: true, type: 'textarea' },
+        { key: 'partition', label: 'Partition' },
+        { key: 'users', label: 'Users (comma separated)' },
+        { key: 'accounts', label: 'Accounts (comma separated)' }
+      ]"
+      @close="editOpen = false"
+      @submit="updateReservation"
+    />
+
+    <ActionDialog
+      :open="deleteOpen"
+      title="Delete Reservation"
+      :description="selectedReservation ? `Delete reservation ${selectedReservation.name}. This action is destructive.` : ''"
+      submit-label="Delete reservation"
+      :loading="operationBusy"
+      :error="operationError"
+      :fields="[]"
+      @close="deleteOpen = false"
+      @submit="deleteReservation"
+    />
   </ClusterMainLayout>
 </template>

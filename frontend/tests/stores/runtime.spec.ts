@@ -146,4 +146,43 @@ describe('Runtime Store', () => {
     expect(runtime.hasClusterPermission('foo', 'view-nodes')).toBeTruthy()
     expect(runtime.hasClusterPermission('bar', 'view-nodes')).toBeFalsy()
   })
+
+  test('has route permission respects jobs self scope', () => {
+    const runtime = useRuntimeStore()
+    runtime.addCluster({
+      name: 'foo',
+      infrastructure: 'foo',
+      racksdb: true,
+      metrics: true,
+      cache: true,
+      permissions: { roles: [], actions: [], rules: ['jobs:view:self', 'jobs:delete:self'] }
+    })
+
+    expect(runtime.hasRoutePermission('foo', 'jobs', 'view', 'self')).toBe(true)
+    expect(runtime.hasRoutePermission('foo', 'jobs', 'delete', 'self')).toBe(true)
+    expect(runtime.hasRoutePermission('foo', 'jobs', 'view')).toBe(false)
+    expect(runtime.hasRoutePermission('foo', 'jobs', 'delete')).toBe(false)
+  })
+
+  test('has route permission supports admin resources independently of legacy settings resources', () => {
+    const runtime = useRuntimeStore()
+    runtime.addCluster({
+      name: 'foo',
+      infrastructure: 'foo',
+      racksdb: true,
+      metrics: true,
+      cache: true,
+      permissions: {
+        roles: ['admin'],
+        actions: [],
+        rules: ['admin/system:view:*', 'admin/cache:edit:*', 'admin/access-control:delete:*']
+      }
+    })
+
+    expect(runtime.hasRoutePermission('foo', 'admin/system', 'view')).toBe(true)
+    expect(runtime.hasRoutePermission('foo', 'admin/cache', 'edit')).toBe(true)
+    expect(runtime.hasRoutePermission('foo', 'admin/access-control', 'delete')).toBe(true)
+    expect(runtime.hasRoutePermission('foo', 'settings/cache', 'view')).toBe(false)
+    expect(runtime.hasRoutePermission('foo', 'settings/access-control', 'view')).toBe(false)
+  })
 })

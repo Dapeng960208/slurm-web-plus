@@ -7,6 +7,7 @@
 import unittest
 import tempfile
 from pathlib import Path
+import re
 
 from rfl.authentication.jwt import JWTBaseManager, JWTPrivateKeyFileLoader, jwt_gen_key
 
@@ -15,6 +16,11 @@ from slurmweb.errors import SlurmwebConfigurationError
 
 
 class TestSlurmrestdAuthentifier(unittest.TestCase):
+    def _generate_key_path(self) -> Path:
+        tmpdir = tempfile.TemporaryDirectory()
+        self.addCleanup(tmpdir.cleanup)
+        return Path(tmpdir.name) / "slurmrestd.key"
+
     def test_local(self):
         authentifier = SlurmrestdAuthentifier(
             "local",
@@ -27,11 +33,10 @@ class TestSlurmrestdAuthentifier(unittest.TestCase):
         self.assertEqual(authentifier.headers(), {})
 
     def test_static(self):
-        with tempfile.NamedTemporaryFile() as fh:
-            key_path = Path(fh.name)
-            jwt_gen_key(key_path)
-            manager = JWTBaseManager("HS256", JWTPrivateKeyFileLoader(key_path))
-            key = manager.generate(duration=1, claimset={"sun": "slurm"})
+        key_path = self._generate_key_path()
+        jwt_gen_key(key_path)
+        manager = JWTBaseManager("HS256", JWTPrivateKeyFileLoader(key_path))
+        key = manager.generate(duration=1, claimset={"sun": "slurm"})
 
         authentifier = SlurmrestdAuthentifier(
             "jwt",
@@ -76,11 +81,10 @@ class TestSlurmrestdAuthentifier(unittest.TestCase):
             )
 
     def test_static_token_expired(self):
-        with tempfile.NamedTemporaryFile() as fh:
-            key_path = Path(fh.name)
-            jwt_gen_key(key_path)
-            manager = JWTBaseManager("HS256", JWTPrivateKeyFileLoader(key_path))
-            key = manager.generate(duration=-1, claimset={"sun": "slurm"})
+        key_path = self._generate_key_path()
+        jwt_gen_key(key_path)
+        manager = JWTBaseManager("HS256", JWTPrivateKeyFileLoader(key_path))
+        key = manager.generate(duration=-1, claimset={"sun": "slurm"})
 
         with self.assertRaisesRegex(
             SlurmwebConfigurationError, "^Invalid slurmrestd JWT: Token is expired$"
@@ -95,11 +99,10 @@ class TestSlurmrestdAuthentifier(unittest.TestCase):
             )
 
     def test_static_headers_expiration_warning(self):
-        with tempfile.NamedTemporaryFile() as fh:
-            key_path = Path(fh.name)
-            jwt_gen_key(key_path)
-            manager = JWTBaseManager("HS256", JWTPrivateKeyFileLoader(key_path))
-            key = manager.generate(duration=1 / 25, claimset={"sun": "slurm"})
+        key_path = self._generate_key_path()
+        jwt_gen_key(key_path)
+        manager = JWTBaseManager("HS256", JWTPrivateKeyFileLoader(key_path))
+        key = manager.generate(duration=1 / 25, claimset={"sun": "slurm"})
 
         authentifier = SlurmrestdAuthentifier(
             "jwt",
@@ -120,22 +123,21 @@ class TestSlurmrestdAuthentifier(unittest.TestCase):
         )
 
     def test_static_headers_expiration_(self):
-        with tempfile.NamedTemporaryFile() as fh:
-            key_path = Path(fh.name)
-            jwt_gen_key(key_path)
-            manager = JWTBaseManager("HS256", JWTPrivateKeyFileLoader(key_path))
-            key = manager.generate(duration=1 / 86400, claimset={"sun": "slurm"})
+        key_path = self._generate_key_path()
+        jwt_gen_key(key_path)
+        manager = JWTBaseManager("HS256", JWTPrivateKeyFileLoader(key_path))
+        key = manager.generate(duration=1 / 86400, claimset={"sun": "slurm"})
 
-            authentifier = SlurmrestdAuthentifier(
-                "jwt",
-                "static",
-                "slurm",
-                Path("/var/lib/slurm-web/slurmrestd.key"),
-                3600,
-                key,
-            )
-            # Force expiration of token.
-            authentifier.expiration = 0
+        authentifier = SlurmrestdAuthentifier(
+            "jwt",
+            "static",
+            "slurm",
+            Path("/var/lib/slurm-web/slurmrestd.key"),
+            3600,
+            key,
+        )
+        # Force expiration of token.
+        authentifier.expiration = 0
         with self.assertLogs("slurmweb", level="WARNING") as cm:
             authentifier.headers()
         self.assertCountEqual(
@@ -147,47 +149,46 @@ class TestSlurmrestdAuthentifier(unittest.TestCase):
         )
 
     def test_auto(self):
-        with tempfile.NamedTemporaryFile() as fh:
-            key_path = Path(fh.name)
-            jwt_gen_key(key_path)
+        key_path = self._generate_key_path()
+        jwt_gen_key(key_path)
 
-            SlurmrestdAuthentifier(
-                "jwt",
-                "auto",
-                "slurm",
-                key_path,
-                3600,
-                None,
-            )
+        SlurmrestdAuthentifier(
+            "jwt",
+            "auto",
+            "slurm",
+            key_path,
+            3600,
+            None,
+        )
 
     def test_auto_key_missing(self):
+        missing_key_path = Path("/dev/fail")
         with self.assertRaisesRegex(
             SlurmwebConfigurationError,
             "^Unable to load JWT key for slurmrestd authentication: Token private key "
-            "file /dev/fail not found$",
+            f"file {re.escape(str(missing_key_path))} not found$",
         ):
             SlurmrestdAuthentifier(
                 "jwt",
                 "auto",
                 "slurm",
-                Path("/dev/fail"),
+                missing_key_path,
                 3600,
                 None,
             )
 
     def test_auto_token_generate(self):
-        with tempfile.NamedTemporaryFile() as fh:
-            key_path = Path(fh.name)
-            jwt_gen_key(key_path)
+        key_path = self._generate_key_path()
+        jwt_gen_key(key_path)
 
-            authentifier = SlurmrestdAuthentifier(
-                "jwt",
-                "auto",
-                "slurm",
-                key_path,
-                3600,
-                None,
-            )
+        authentifier = SlurmrestdAuthentifier(
+            "jwt",
+            "auto",
+            "slurm",
+            key_path,
+            3600,
+            None,
+        )
 
         with self.assertLogs("slurmweb", level="INFO") as cm:
             headers = authentifier.headers()
@@ -204,18 +205,17 @@ class TestSlurmrestdAuthentifier(unittest.TestCase):
         )
 
     def test_auto_token_renew(self):
-        with tempfile.NamedTemporaryFile() as fh:
-            key_path = Path(fh.name)
-            jwt_gen_key(key_path)
+        key_path = self._generate_key_path()
+        jwt_gen_key(key_path)
 
-            authentifier = SlurmrestdAuthentifier(
-                "jwt",
-                "auto",
-                "slurm",
-                key_path,
-                3600,
-                None,
-            )
+        authentifier = SlurmrestdAuthentifier(
+            "jwt",
+            "auto",
+            "slurm",
+            key_path,
+            3600,
+            None,
+        )
 
         authentifier.jwt_token = authentifier.jwt_manager.generate(
             duration=0, claimset={"sun": "slurm"}

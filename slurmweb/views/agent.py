@@ -164,6 +164,117 @@ def _resolved_scope(scope: Union[str, Callable[..., str]], *args, **kwargs) -> s
     return scope
 
 
+def _user_login() -> Union[str, None]:
+    return getattr(request.user, "login", None)
+
+
+def _allowed_permission(resource: str, operation: str, scope: str = "*") -> bool:
+    return current_app.policy.allowed_user_permission(
+        request.user,
+        resource,
+        operation,
+        scope,
+    )
+
+
+def _require_permission_scope(resource: str, operation: str) -> str:
+    if _allowed_permission(resource, operation, "*"):
+        return "*"
+    if _allowed_permission(resource, operation, "self"):
+        login = _user_login()
+        if not login:
+            abort(403, "Access not permitted")
+        return "self"
+    abort(403, "Access not permitted")
+
+
+def _filter_jobs_for_owner(jobs: Iterable[dict], owner: str) -> list:
+    return [job for job in jobs if _job_owner(job) == owner]
+
+
+def _job_owner(job_data: dict) -> Union[str, None]:
+    association = job_data.get("association")
+    if isinstance(association, dict):
+        owner = association.get("user")
+        if owner:
+            return owner
+    for key in ("user_name", "user"):
+        owner = job_data.get(key)
+        if owner:
+            return owner
+    return None
+
+
+def _job_payload() -> dict:
+    payload = request.get_json(silent=True) or {}
+    if not isinstance(payload, dict):
+        abort(400, "Request body must be a JSON object")
+    return payload
+
+
+def _ensure_write_supported(operation: str):
+    _, _, api_version = current_app.slurmrestd.discover()
+    if current_app.slurmrestd.supports_write_operations():
+        return api_version
+    response = {
+        "code": "unsupported_on_version",
+        "supported": False,
+        "operation": operation,
+        "target": None,
+        "api_version": api_version,
+        "warnings": [],
+        "errors": [f"{operation} is unsupported on slurmrestd API {api_version}"],
+        "result": None,
+    }
+    return jsonify(response), 501
+
+
+def _operation_response(operation: str, target, response: dict, status: int = 200):
+    api_version = current_app.slurmrestd.api_version or current_app.slurmrestd.discover()[2]
+    result = {
+        key: value
+        for key, value in response.items()
+        if key not in {"meta", "warnings", "errors"}
+    }
+    return jsonify(
+        {
+            "supported": True,
+            "operation": operation,
+            "target": target,
+            "api_version": api_version,
+            "warnings": response.get("warnings", []),
+            "errors": response.get("errors", []),
+            "result": result,
+        }
+    ), status
+
+
+def _authorize_job_owner(job_id: int, operation: str) -> dict:
+    scope = _require_permission_scope("jobs", operation)
+    job_data = current_app.slurmrestd.job(job_id)
+    if scope == "*":
+        return job_data
+    owner = _job_owner(job_data)
+    if owner is None or owner != _user_login():
+        abort(403, "Access not permitted")
+    return job_data
+
+
+def _system_query_mapping(query: str):
+    mapping = {
+        "licenses": ("licenses", "view", "licenses"),
+        "shares": ("shares", "view", "shares"),
+        "reconfigure": ("reconfigure", "edit", None),
+        "slurmdb/diag": ("slurmdb_diag", "view", "statistics"),
+        "slurmdb/config": ("slurmdb_config", "view", None),
+        "slurmdb/instances": ("instances", "view", "instances"),
+        "slurmdb/tres": ("tres", "view", None),
+        "slurmdb/clusters": ("clusters", "view", "clusters"),
+        "slurmdb/wckeys": ("wckeys", "view", "wckeys"),
+    }
+    return mapping.get(query)
+
+
 def permission_required(*requirements: Tuple[str, str, str], legacy_action: str = None):
     def decorator(func):
         @wraps(func)
@@ -298,6 +409,7 @@ def handle_slurmrestd_errors(func):
     error responses. Also handles SlurmwebCacheError for cache-related issues.
     """
 
+    @wraps(func)
     def wrapper(*args, **kwargs):
         try:
             return func(*args, **kwargs)
@@ -349,8 +461,39 @@ def ping():
 
 
 @handle_slurmrestd_errors
+@permission_required(("analysis", "view", "*"), legacy_action="view-stats")
+def analysis_ping():
+    return jsonify({"pings": current_app.slurmrestd.ping_data()})
+
+
+@handle_slurmrestd_errors
+@permission_required(("analysis", "view", "*"), legacy_action="view-stats")
+def analysis_diag():
+    return jsonify({"statistics": current_app.slurmrestd.diag()})
+
+
+@handle_slurmrestd_errors
 def slurmrest(method: str, *args: Tuple[Any, ...]):
     return getattr(current_app.slurmrestd, method)(*args)
+
+
+@handle_slurmrestd_errors
+@permission_required(
+    ("admin/system", "edit", "*"),
+    ("admin/system", "view", "*"),
+    legacy_action="view-stats",
+)
+def admin_system_query(query: str):
+    mapped = _system_query_mapping(query)
+    if mapped is None:
+        abort(404, f"Unknown admin system query {query}")
+    method_name, required_operation, result_key = mapped
+    if required_operation == "edit" and not _allowed_permission("admin/system", "edit", "*"):
+        abort(403, "Access not permitted")
+    response = getattr(current_app.slurmrestd, method_name)()
+    if isinstance(response, dict) and "errors" in response:
+        return _operation_response(f"admin.system.{query.replace('/', '.')}", query, response)
+    return jsonify({result_key or "result": response})
 
 
 @permission_required(
@@ -405,19 +548,79 @@ def stats():
     )
 
 
-@permission_required(("jobs", "view", "*"), legacy_action="view-jobs")
+@handle_slurmrestd_errors
+@permission_required(
+    ("jobs", "view", "*"),
+    ("jobs", "view", "self"),
+    legacy_action="view-jobs",
+)
 def jobs():
+    scope = _require_permission_scope("jobs", "view")
     node = request.args.get("node")
     if node:
         result = slurmrest("jobs_by_node", node)
+    elif scope == "self":
+        result = current_app.slurmrestd.jobs(query={"user": _user_login()})
     else:
         result = slurmrest("jobs")
+    if scope == "self":
+        result = _filter_jobs_for_owner(result, _user_login())
     return jsonify(result)
 
 
-@permission_required(("jobs", "view", "*"), legacy_action="view-jobs")
+@handle_slurmrestd_errors
+@permission_required(
+    ("jobs", "view", "*"),
+    ("jobs", "view", "self"),
+    legacy_action="view-jobs",
+)
 def job(job: int):
-    return jsonify(slurmrest("job", job))
+    result = _authorize_job_owner(job, "view")
+    return jsonify(result)
+
+
+@handle_slurmrestd_errors
+@permission_required(
+    ("jobs", "edit", "*"),
+    ("jobs", "edit", "self"),
+    legacy_action="view-jobs",
+)
+def job_submit():
+    supported = _ensure_write_supported("jobs.submit")
+    if not isinstance(supported, str):
+        return supported
+    response = current_app.slurmrestd.job_submit(_job_payload())
+    return _operation_response("jobs.submit", None, response, status=201)
+
+
+@handle_slurmrestd_errors
+@permission_required(
+    ("jobs", "edit", "*"),
+    ("jobs", "edit", "self"),
+    legacy_action="view-jobs",
+)
+def job_update(job: int):
+    supported = _ensure_write_supported("jobs.update")
+    if not isinstance(supported, str):
+        return supported
+    _authorize_job_owner(job, "edit")
+    response = current_app.slurmrestd.job_update(job, _job_payload())
+    return _operation_response("jobs.update", {"job_id": job}, response)
+
+
+@handle_slurmrestd_errors
+@permission_required(
+    ("jobs", "delete", "*"),
+    ("jobs", "delete", "self"),
+    legacy_action="view-jobs",
+)
+def job_cancel(job: int):
+    supported = _ensure_write_supported("jobs.cancel")
+    if not isinstance(supported, str):
+        return supported
+    _authorize_job_owner(job, "delete")
+    response = current_app.slurmrestd.job_cancel(job, request.get_json(silent=True))
+    return _operation_response("jobs.cancel", {"job_id": job}, response)
 
 
 @permission_required(("resources", "view", "*"), legacy_action="view-nodes")
@@ -428,6 +631,26 @@ def nodes():
 @permission_required(("resources", "view", "*"), legacy_action="view-nodes")
 def node(name: str):
     return jsonify(slurmrest("node", name))
+
+
+@handle_slurmrestd_errors
+@permission_required(("resources", "edit", "*"), legacy_action="view-nodes")
+def node_update(name: str):
+    supported = _ensure_write_supported("resources.node.update")
+    if not isinstance(supported, str):
+        return supported
+    response = current_app.slurmrestd.node_update(name, _job_payload())
+    return _operation_response("resources.node.update", {"node": name}, response)
+
+
+@handle_slurmrestd_errors
+@permission_required(("resources", "delete", "*"), legacy_action="view-nodes")
+def node_delete(name: str):
+    supported = _ensure_write_supported("resources.node.delete")
+    if not isinstance(supported, str):
+        return supported
+    response = current_app.slurmrestd.node_delete(name)
+    return _operation_response("resources.node.delete", {"node": name}, response)
 
 
 @permission_required(
@@ -453,9 +676,72 @@ def reservations():
     return jsonify(slurmrest("reservations"))
 
 
-@permission_required(("jobs/filter-accounts", "view", "*"), legacy_action="view-accounts")
+@handle_slurmrestd_errors
+@permission_required(("reservations", "edit", "*"), legacy_action="view-reservations")
+def reservation_create():
+    supported = _ensure_write_supported("reservations.create")
+    if not isinstance(supported, str):
+        return supported
+    response = current_app.slurmrestd.reservation_create(_job_payload())
+    return _operation_response("reservations.create", None, response, status=201)
+
+
+@handle_slurmrestd_errors
+@permission_required(("reservations", "edit", "*"), legacy_action="view-reservations")
+def reservation_update(name: str):
+    supported = _ensure_write_supported("reservations.update")
+    if not isinstance(supported, str):
+        return supported
+    response = current_app.slurmrestd.reservation_update(name, _job_payload())
+    return _operation_response("reservations.update", {"reservation": name}, response)
+
+
+@handle_slurmrestd_errors
+@permission_required(
+    ("reservations", "delete", "*"),
+    legacy_action="view-reservations",
+)
+def reservation_delete(name: str):
+    supported = _ensure_write_supported("reservations.delete")
+    if not isinstance(supported, str):
+        return supported
+    response = current_app.slurmrestd.reservation_delete(name)
+    return _operation_response("reservations.delete", {"reservation": name}, response)
+
+
+@permission_required(
+    ("accounts", "view", "*"),
+    ("jobs/filter-accounts", "view", "*"),
+    legacy_action="view-accounts",
+)
 def accounts():
     return jsonify(slurmrest("accounts"))
+
+
+@handle_slurmrestd_errors
+@permission_required(("accounts", "view", "*"), legacy_action="associations-view")
+def account(name: str):
+    return jsonify(current_app.slurmrestd.account(name))
+
+
+@handle_slurmrestd_errors
+@permission_required(("accounts", "edit", "*"), legacy_action="associations-view")
+def accounts_update():
+    supported = _ensure_write_supported("accounts.update")
+    if not isinstance(supported, str):
+        return supported
+    response = current_app.slurmrestd.accounts_update(_job_payload())
+    return _operation_response("accounts.update", None, response)
+
+
+@handle_slurmrestd_errors
+@permission_required(("accounts", "delete", "*"), legacy_action="associations-view")
+def account_delete(name: str):
+    supported = _ensure_write_supported("accounts.delete")
+    if not isinstance(supported, str):
+        return supported
+    response = current_app.slurmrestd.account_delete(name)
+    return _operation_response("accounts.delete", {"account": name}, response)
 
 
 @permission_required(
@@ -467,7 +753,131 @@ def associations():
     return jsonify(slurmrest("associations"))
 
 
-@permission_required(("settings/cache", "view", "*"), legacy_action="cache-view")
+@handle_slurmrestd_errors
+@permission_required(("users-admin", "view", "*"), legacy_action="associations-view")
+def users():
+    return jsonify(current_app.slurmrestd.users())
+
+
+@handle_slurmrestd_errors
+@permission_required(("users-admin", "view", "*"), legacy_action="associations-view")
+def user(name: str):
+    return jsonify(current_app.slurmrestd.user(name))
+
+
+@handle_slurmrestd_errors
+@permission_required(("users-admin", "edit", "*"), legacy_action="associations-view")
+def users_update():
+    supported = _ensure_write_supported("users.update")
+    if not isinstance(supported, str):
+        return supported
+    response = current_app.slurmrestd.users_update(_job_payload())
+    return _operation_response("users.update", None, response)
+
+
+@handle_slurmrestd_errors
+@permission_required(("users-admin", "delete", "*"), legacy_action="associations-view")
+def user_delete(name: str):
+    supported = _ensure_write_supported("users.delete")
+    if not isinstance(supported, str):
+        return supported
+    response = current_app.slurmrestd.user_delete(name)
+    return _operation_response("users.delete", {"user": name}, response)
+
+
+@handle_slurmrestd_errors
+@permission_required(("qos", "edit", "*"), legacy_action="view-qos")
+def qos_update():
+    supported = _ensure_write_supported("qos.update")
+    if not isinstance(supported, str):
+        return supported
+    response = current_app.slurmrestd.qos_update(_job_payload())
+    return _operation_response("qos.update", None, response)
+
+
+@handle_slurmrestd_errors
+@permission_required(("qos", "delete", "*"), legacy_action="view-qos")
+def qos_delete(name: str):
+    supported = _ensure_write_supported("qos.delete")
+    if not isinstance(supported, str):
+        return supported
+    response = current_app.slurmrestd.qos_delete(name)
+    return _operation_response("qos.delete", {"qos": name}, response)
+
+
+@handle_slurmrestd_errors
+@permission_required(("admin/system", "view", "*"), legacy_action="view-stats")
+def wckeys():
+    return jsonify(current_app.slurmrestd.wckeys())
+
+
+@handle_slurmrestd_errors
+@permission_required(("admin/system", "edit", "*"), legacy_action="view-stats")
+def wckeys_update():
+    supported = _ensure_write_supported("admin.system.wckeys.update")
+    if not isinstance(supported, str):
+        return supported
+    response = current_app.slurmrestd.wckeys_update(_job_payload())
+    return _operation_response("admin.system.wckeys.update", None, response)
+
+
+@handle_slurmrestd_errors
+@permission_required(("admin/system", "delete", "*"), legacy_action="view-stats")
+def wckey_delete(wckey_id: str):
+    supported = _ensure_write_supported("admin.system.wckeys.delete")
+    if not isinstance(supported, str):
+        return supported
+    response = current_app.slurmrestd.wckey_delete(wckey_id)
+    return _operation_response("admin.system.wckeys.delete", {"wckey": wckey_id}, response)
+
+
+@handle_slurmrestd_errors
+@permission_required(("admin/system", "view", "*"), legacy_action="view-stats")
+def clusters_admin():
+    return jsonify(current_app.slurmrestd.clusters())
+
+
+@handle_slurmrestd_errors
+@permission_required(("admin/system", "edit", "*"), legacy_action="view-stats")
+def clusters_update():
+    supported = _ensure_write_supported("admin.system.clusters.update")
+    if not isinstance(supported, str):
+        return supported
+    response = current_app.slurmrestd.clusters_update(_job_payload())
+    return _operation_response("admin.system.clusters.update", None, response)
+
+
+@handle_slurmrestd_errors
+@permission_required(("admin/system", "delete", "*"), legacy_action="view-stats")
+def cluster_delete(name: str):
+    supported = _ensure_write_supported("admin.system.clusters.delete")
+    if not isinstance(supported, str):
+        return supported
+    response = current_app.slurmrestd.cluster_delete(name)
+    return _operation_response("admin.system.clusters.delete", {"cluster": name}, response)
+
+
+@handle_slurmrestd_errors
+@permission_required(("accounts", "edit", "*"), legacy_action="associations-view")
+def associations_update():
+    supported = _ensure_write_supported("accounts.associations.update")
+    if not isinstance(supported, str):
+        return supported
+    response = current_app.slurmrestd.associations_update(_job_payload())
+    return _operation_response("accounts.associations.update", None, response)
+
+
+@handle_slurmrestd_errors
+@permission_required(("accounts", "delete", "*"), legacy_action="associations-view")
+def associations_delete():
+    supported = _ensure_write_supported("accounts.associations.delete")
+    if not isinstance(supported, str):
+        return supported
+    response = current_app.slurmrestd.associations_delete(_job_payload())
+    return _operation_response("accounts.associations.delete", None, response)
+
+
+@permission_required(("admin/cache", "view", "*"), legacy_action="cache-view")
 def cache_stats():
     if current_app.cache is None:
         error = "Cache service is disabled, unable to query cache statistics"
@@ -482,7 +892,7 @@ def cache_stats():
     )
 
 
-@permission_required(("settings/cache", "edit", "*"), legacy_action="cache-reset")
+@permission_required(("admin/cache", "edit", "*"), legacy_action="cache-reset")
 def cache_reset():
     if current_app.cache is None:
         error = "Cache service is disabled, unable to reset cache"
@@ -517,7 +927,7 @@ def metrics(metric):
         "memory": ("resources", "view", "*"),
         "jobs": ("jobs", "view", "*"),
         "users": ("jobs", "view", "*"),
-        "cache": ("settings/cache", "view", "*"),
+        "cache": ("admin/cache", "view", "*"),
     }
 
     # Check metric is supported or send HTTP/404
@@ -644,7 +1054,7 @@ def cache_authenticated_user():
     return jsonify({"result": "User cache updated"})
 
 
-@permission_required(("settings/ldap-cache", "view", "*"), legacy_action="cache-view")
+@permission_required(("admin/ldap-cache", "view", "*"), legacy_action="cache-view")
 def ldap_cache_users():
     """Return cached LDAP users stored in the local database."""
     if current_app.users_store is None:
@@ -670,7 +1080,7 @@ def ldap_cache_users():
 
 
 @permission_required(
-    ("settings/access-control", "view", "*"),
+    ("admin/access-control", "view", "*"),
     legacy_action="roles-view",
 )
 def access_catalog():
@@ -679,7 +1089,7 @@ def access_catalog():
 
 
 @permission_required(
-    ("settings/access-control", "view", "*"),
+    ("admin/access-control", "view", "*"),
     legacy_action="roles-view",
 )
 def access_roles():
@@ -692,7 +1102,7 @@ def access_roles():
 
 
 @permission_required(
-    ("settings/access-control", "edit", "*"),
+    ("admin/access-control", "edit", "*"),
     legacy_action="roles-manage",
 )
 def create_access_role():
@@ -714,7 +1124,7 @@ def create_access_role():
 
 
 @permission_required(
-    ("settings/access-control", "edit", "*"),
+    ("admin/access-control", "edit", "*"),
     legacy_action="roles-manage",
 )
 def update_access_role(role_id: int):
@@ -740,7 +1150,7 @@ def update_access_role(role_id: int):
 
 
 @permission_required(
-    ("settings/access-control", "delete", "*"),
+    ("admin/access-control", "delete", "*"),
     legacy_action="roles-manage",
 )
 def delete_access_role(role_id: int):
@@ -756,7 +1166,7 @@ def delete_access_role(role_id: int):
 
 
 @permission_required(
-    ("settings/access-control", "view", "*"),
+    ("admin/access-control", "view", "*"),
     legacy_action="roles-view",
 )
 def access_users():
@@ -776,7 +1186,7 @@ def access_users():
 
 
 @permission_required(
-    ("settings/access-control", "view", "*"),
+    ("admin/access-control", "view", "*"),
     legacy_action="roles-view",
 )
 def access_user_roles(username: str):
@@ -792,7 +1202,7 @@ def access_user_roles(username: str):
 
 
 @permission_required(
-    ("settings/access-control", "edit", "*"),
+    ("admin/access-control", "edit", "*"),
     legacy_action="roles-manage",
 )
 def update_access_user_roles(username: str):
@@ -815,13 +1225,13 @@ def update_access_user_roles(username: str):
     return jsonify(details)
 
 
-@permission_required(("settings/ai", "view", "*"), legacy_action="view-ai")
+@permission_required(("admin/ai", "view", "*"), legacy_action="view-ai")
 def ai_configs():
     _require_ai()
     return jsonify({"items": current_app.ai_service.list_configs()})
 
 
-@permission_required(("settings/ai", "edit", "*"), legacy_action="manage-ai")
+@permission_required(("admin/ai", "edit", "*"), legacy_action="manage-ai")
 def create_ai_config():
     _require_ai()
     payload, _ = _ai_model_payload()
@@ -835,7 +1245,7 @@ def create_ai_config():
         abort(500, str(err))
 
 
-@permission_required(("settings/ai", "edit", "*"), legacy_action="manage-ai")
+@permission_required(("admin/ai", "edit", "*"), legacy_action="manage-ai")
 def update_ai_config(config_id: int):
     _require_ai()
     payload, _ = _ai_model_payload()
@@ -851,7 +1261,7 @@ def update_ai_config(config_id: int):
     return jsonify(updated)
 
 
-@permission_required(("settings/ai", "delete", "*"), legacy_action="manage-ai")
+@permission_required(("admin/ai", "delete", "*"), legacy_action="manage-ai")
 def delete_ai_config(config_id: int):
     _require_ai()
     try:
@@ -864,7 +1274,7 @@ def delete_ai_config(config_id: int):
     return jsonify({"result": "AI model config deleted"})
 
 
-@permission_required(("settings/ai", "edit", "*"), legacy_action="manage-ai")
+@permission_required(("admin/ai", "edit", "*"), legacy_action="manage-ai")
 def validate_ai_config(config_id: int):
     _require_ai()
     try:
