@@ -92,6 +92,15 @@ const canManage = computed(
       'edit'
     )
 )
+const canDelete = computed(
+  () =>
+    !!currentClusterName.value &&
+    runtimeStore.hasRoutePermission(
+      currentClusterName.value,
+      isAdminRoute.value ? 'admin/ai' : 'settings/ai',
+      'delete'
+    )
+)
 const canView = computed(
   () =>
     !!currentClusterName.value &&
@@ -579,9 +588,10 @@ onMounted(async () => {
                 {{ config.enabled ? 'Disable' : 'Enable' }}
               </button>
               <button
+                v-if="canDelete"
                 type="button"
                 class="ui-button-secondary"
-                :disabled="deletingId === config.id || !canManage"
+                :disabled="deletingId === config.id"
                 @click="deleteConfig(config)"
               >
                 {{ deletingId === config.id ? 'Deleting...' : 'Delete' }}

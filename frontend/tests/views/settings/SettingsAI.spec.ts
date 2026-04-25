@@ -34,8 +34,10 @@ describe('views/settings/SettingsAI.vue', () => {
           rules: [
             'admin/ai:view:*',
             'admin/ai:edit:*',
+            'admin/ai:delete:*',
             'settings/ai:view:*',
             'settings/ai:edit:*',
+            'settings/ai:delete:*',
             'ai:view:*'
           ]
         },
@@ -129,6 +131,7 @@ describe('views/settings/SettingsAI.vue', () => {
     expect(wrapper.text()).toContain('Qwen Prod')
     expect(wrapper.text()).toContain('***1234')
     expect(wrapper.text()).toContain('Default')
+    expect(wrapper.text()).toContain('Delete')
   })
 
   test('creates a new AI config', async () => {
@@ -181,5 +184,74 @@ describe('views/settings/SettingsAI.vue', () => {
       extra_options: {},
       api_key: 'sk-secret'
     })
+  })
+
+  test('keeps delete entry hidden when the user lacks admin delete permission', async () => {
+    const router = init_plugins()
+    const runtimeStore = useRuntimeStore()
+    runtimeStore.availableClusters = [
+      {
+        name: 'foo',
+        permissions: {
+          roles: [],
+          actions: ['manage-ai'],
+          rules: ['admin/ai:view:*', 'admin/ai:edit:*', 'settings/ai:view:*', 'settings/ai:edit:*', 'ai:view:*']
+        },
+        capabilities: {
+          ai: {
+            enabled: true,
+            streaming: true,
+            providers: [{ key: 'qwen', label: 'Qwen' }]
+          }
+        },
+        racksdb: true,
+        infrastructure: 'foo',
+        metrics: true,
+        cache: true
+      }
+    ] as never
+    runtimeStore.currentCluster = runtimeStore.availableClusters[0] as never
+    mockGatewayAPI.ai_configs.mockResolvedValue([
+      {
+        id: 1,
+        name: 'qwen-prod',
+        provider: 'qwen',
+        provider_label: 'Qwen',
+        model: 'qwen3-coder',
+        display_name: 'Qwen Prod',
+        enabled: true,
+        is_default: true,
+        sort_order: 10,
+        base_url: null,
+        deployment: null,
+        api_version: null,
+        request_timeout: null,
+        temperature: null,
+        system_prompt: null,
+        extra_options: {},
+        secret_configured: true,
+        secret_mask: '***1234',
+        last_validated_at: null,
+        last_validation_error: null
+      }
+    ])
+
+    await mountOnAdminRoute(router)
+
+    const wrapper = mount(SettingsAIView, {
+      global: {
+        stubs: {
+          ...globalStubs,
+          AdminTabs: true,
+          AdminHeader: true
+        }
+      }
+    })
+
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Edit')
+    expect(wrapper.text()).toContain('Test connection')
+    expect(wrapper.text()).not.toContain('Delete')
   })
 })

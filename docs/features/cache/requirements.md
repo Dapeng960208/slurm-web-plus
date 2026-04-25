@@ -30,14 +30,14 @@ Cache 功能当前包括：
 
 | 页面/动作 | 新规则 |
 |---|---|
-| `Settings > Cache` 查看 | `settings/cache:view:*` |
-| reset 统计 | `settings/cache:edit:*` |
-| `Settings > LDAP Cache` 查看 | `settings/ldap-cache:view:*` |
+| `/:cluster/admin/cache` 查看 | `admin/cache:view:*` |
+| reset 统计 | `admin/cache:edit:*` |
+| `/:cluster/admin/ldap-cache` 查看 | `admin/ldap-cache:view:*` |
 
 旧权限兼容：
 
-- `cache-view` -> `settings/cache:view:*`
-- `cache-reset` -> `settings/cache:edit:*`
+- `cache-view` -> `admin/cache:view:*` + `admin/ldap-cache:view:*`
+- `cache-reset` -> `admin/cache:edit:*`
 
 说明：
 

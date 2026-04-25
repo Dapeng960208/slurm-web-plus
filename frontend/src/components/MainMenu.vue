@@ -41,6 +41,13 @@ const sidebarOpen = defineModel<boolean>()
 
 const runtimeStore = useRuntimeStore()
 const runtimeConfiguration = useRuntimeConfiguration()
+const ADMIN_RESOURCES = [
+  'admin/system',
+  'admin/ai',
+  'admin/access-control',
+  'admin/cache',
+  'admin/ldap-cache'
+] as const
 const navigation: Array<{
   name: string
   route: string
@@ -152,8 +159,11 @@ function hasNavigationPermission(resource?: string, operation: 'view' | 'edit' |
       return runtimeStore.hasRoutePermissionAnyScope(cluster.name, resource, operation)
     }
     if (resource === 'admin/system' && operation === 'view') {
-      return ['admin/system', 'admin/ai', 'admin/access-control', 'admin/cache', 'admin/ldap-cache'].some(
-        (adminResource) => runtimeStore.hasRoutePermission(cluster.name, adminResource, 'view')
+      return (
+        runtimeStore.hasRoutePermission(cluster.name, 'admin/*', 'view') ||
+        ADMIN_RESOURCES.some((adminResource) =>
+          runtimeStore.hasRoutePermission(cluster.name, adminResource, 'view')
+        )
       )
     }
     return runtimeStore.hasRoutePermission(cluster.name, resource, operation)

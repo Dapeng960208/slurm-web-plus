@@ -37,14 +37,14 @@ AI 当前按数据库能力自动启用：
 | 页面/接口 | 新规则 |
 |---|---|
 | `/:cluster/ai` | `ai:view:*` |
-| `Settings > AI` 查看 | `settings/ai:view:*` |
-| `Settings > AI` 新增/修改 | `settings/ai:edit:*` |
-| `Settings > AI` 删除 | `settings/ai:delete:*` |
+| `/:cluster/admin/ai` 查看 | `admin/ai:view:*` |
+| `/:cluster/admin/ai` 新增/修改 | `admin/ai:edit:*` |
+| `/:cluster/admin/ai` 删除 | `admin/ai:delete:*` |
 
 旧权限兼容：
 
-- `view-ai` -> `ai:view:*`
-- `manage-ai` -> `settings/ai:edit:*`
+- `view-ai` -> `ai:view:*` + `admin/ai:view:*`
+- `manage-ai` -> `admin/ai:view:*` + `admin/ai:edit:*` + `admin/ai:delete:*`
 
 由于 `edit` 自动满足 `view`，只有编辑权限的用户仍可打开设置页。
 

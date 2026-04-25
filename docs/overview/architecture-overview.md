@@ -52,6 +52,13 @@ Browser (Vue SPA)
 
 `jobs` 资源同时支持 `*` 与 `self` scope，最终 owner 判定只在 Agent 后端执行。
 
+当前默认角色语义为：
+
+- `user`：非 `Admin` 页面默认 `view`，同时拥有 `jobs:view|edit|delete:self`
+- `admin`：默认拥有 `*:view:*` 与 `*:edit:*`
+- `admin` 不默认拥有 `*:delete:*`
+- `super-admin`：默认拥有 `*:*:*`
+
 ## 3. 能力推导链路
 
 Agent 当前不再以独立业务开关驱动能力，而是根据基础依赖推导：

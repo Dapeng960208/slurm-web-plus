@@ -50,17 +50,30 @@ const LEGACY_PERMISSION_RULES: Record<string, PermissionRule[]> = {
   'associations-view': ['accounts:view:*', 'user/profile:view:*'],
   'view-accounts': ['jobs/filter-accounts:view:*'],
   'view-partitions': ['jobs/filter-partitions:view:*', 'resources/filter-partitions:view:*'],
-  'cache-view': ['settings/cache:view:*', 'admin/cache:view:*', 'admin/ldap-cache:view:*'],
-  'cache-reset': ['settings/cache:edit:*', 'admin/cache:edit:*'],
-  'roles-view': ['settings/access-control:view:*', 'admin/access-control:view:*'],
-  'roles-manage': [
-    'settings/access-control:edit:*',
-    'settings/access-control:delete:*',
-    'admin/access-control:edit:*',
-    'admin/access-control:delete:*'
-  ],
+  'view-own-jobs': ['jobs:view:self', 'user/analysis:view:self'],
+  'edit-own-jobs': ['jobs:edit:self'],
+  'cancel-own-jobs': ['jobs:delete:self'],
+  'cache-view': ['admin/cache:view:*', 'admin/ldap-cache:view:*'],
+  'cache-reset': ['admin/cache:edit:*'],
+  'roles-view': ['admin/access-control:view:*'],
+  'roles-manage': ['admin/access-control:edit:*', 'admin/access-control:delete:*'],
   'view-ai': ['ai:view:*', 'admin/ai:view:*'],
-  'manage-ai': ['settings/ai:edit:*', 'admin/ai:edit:*']
+  'manage-ai': ['admin/ai:view:*', 'admin/ai:edit:*', 'admin/ai:delete:*'],
+  'admin-manage': [
+    'admin/system:view:*',
+    'admin/system:edit:*',
+    'admin/system:delete:*',
+    'admin/ai:view:*',
+    'admin/ai:edit:*',
+    'admin/ai:delete:*',
+    'admin/access-control:view:*',
+    'admin/access-control:edit:*',
+    'admin/access-control:delete:*',
+    'admin/cache:view:*',
+    'admin/cache:edit:*',
+    'admin/ldap-cache:view:*',
+    'admin/ldap-cache:edit:*'
+  ]
 }
 
 export interface ClusterPermissionAssignment {

@@ -44,7 +44,15 @@
 - `default_seed_roles()` 已收紧，普通 `user` 不再默认带 `admin/*`
 - vendor policy 已切到：
   - `view-own-jobs`
+  - `edit-own-jobs`
   - `cancel-own-jobs`
+- 默认角色已进一步修正为：
+  - `user`：非 `Admin` 页面默认只读 + `jobs:view|edit|delete:self`
+  - `admin`：`*:view:*` + `*:edit:*`
+  - `admin`：默认不含 `*:delete:*`
+- 新增旧动作兼容：
+  - `admin-manage`
+  - `edit-own-jobs`
 - 新增/更新了与本任务相关的前后端测试基线
 
 ## 3. 进行中项
@@ -58,7 +66,8 @@
 - 当前前端对 `accounts/users/qos/reservation` 使用的是高频结构化字段，不覆盖全部官方 JSON 细节
 - `admin/ldap-cache:edit:*` 已在权限模型中预留，但当前没有对应实质写接口
 - `.venv\Scripts\python.exe -m pytest -q slurmweb/tests` 在当前 Windows 环境下仍不适合作为本轮唯一验收结论
-- 部分既有后端测试仍按旧 `settings/*` 管理权限与旧默认角色假设编写，若继续扩大回归范围，需继续同步
+- 部分前端测试夹具仍以旧 `actions[]` 为主，若继续扩大回归范围，需继续向 `rules[]` 夹具收敛
+- `admin-manage` 只覆盖 `/:cluster/admin` 下资源，不会自动授予独立 AI 工作台 `ai:view:*`
 
 ## 5. 已同步文档
 
@@ -66,10 +75,14 @@
 - `docs/overview/project-overview.md`
 - `docs/overview/architecture-overview.md`
 - `docs/overview/latest-features.md`
+- `docs/features/access-control/requirements.md`
+- `docs/features/access-control/test-plan.md`
+- `docs/features/ai/requirements.md`
+- `docs/features/cache/requirements.md`
 - `docs/features/management-center/requirements.md`
 - `docs/features/management-center/test-plan.md`
+- `docs/guides/deployment-guide.md`
 - `docs/tracking/current-release.md`
-- `docs/tracking/error-log.md`
 
 ## 6. 验证状态
 
@@ -87,3 +100,4 @@
 - `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/test_permission_rules.py slurmweb/tests/test_access_control_policy.py slurmweb/tests/views/test_gateway.py slurmweb/tests/views/test_agent_operations.py`
 - `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/test_permission_rules.py slurmweb/tests/test_access_control_policy.py slurmweb/tests/views/test_agent_operations.py slurmweb/tests/views/test_gateway_operations.py slurmweb/tests/slurmrestd/test_slurmrestd_write_operations.py`
 - `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/views/test_agent.py slurmweb/tests/views/test_gateway.py slurmweb/tests/views/test_gateway_clusters.py`
+- `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/test_permission_rules.py slurmweb/tests/test_access_control_policy.py slurmweb/tests/views/test_agent_permissions.py slurmweb/tests/apps/test_agent.py`

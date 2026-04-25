@@ -405,13 +405,16 @@ function clusterHasAdminAccess(
   runtime: ReturnType<typeof useRuntimeStore>,
   clusterName: string
 ): boolean {
-  return [
-    'admin/system',
-    'admin/ai',
-    'admin/access-control',
-    'admin/cache',
-    'admin/ldap-cache'
-  ].some((resource) => runtime.hasRoutePermission(clusterName, resource, 'view'))
+  return (
+    runtime.hasRoutePermission(clusterName, 'admin/*', 'view') ||
+    [
+      'admin/system',
+      'admin/ai',
+      'admin/access-control',
+      'admin/cache',
+      'admin/ldap-cache'
+    ].some((resource) => runtime.hasRoutePermission(clusterName, resource, 'view'))
+  )
 }
 
 router.beforeEach(async (to, from) => {

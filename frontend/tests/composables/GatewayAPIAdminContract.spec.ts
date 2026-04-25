@@ -7,6 +7,8 @@ const source = readFileSync(sourcePath, 'utf8')
 
 describe('GatewayAPI admin contract', () => {
   test('maps legacy admin actions to admin permission resources', () => {
+    expect(source).toContain("'edit-own-jobs'")
+    expect(source).toContain('jobs:edit:self')
     expect(source).toContain("'cache-view'")
     expect(source).toContain('admin/cache:view:*')
     expect(source).toContain('admin/ldap-cache:view:*')
@@ -18,7 +20,17 @@ describe('GatewayAPI admin contract', () => {
     expect(source).toContain('admin/access-control:edit:*')
     expect(source).toContain('admin/access-control:delete:*')
     expect(source).toContain("'manage-ai'")
+    expect(source).toContain('admin/ai:view:*')
     expect(source).toContain('admin/ai:edit:*')
+    expect(source).toContain('admin/ai:delete:*')
+    expect(source).toContain("'admin-manage'")
+    expect(source).toContain('admin/system:view:*')
+    expect(source).toContain('admin/system:delete:*')
+    expect(source).toContain('admin/cache:edit:*')
+    expect(source).toContain('admin/ldap-cache:edit:*')
+    expect(source).not.toContain('settings/cache:view:*')
+    expect(source).not.toContain('settings/access-control:view:*')
+    expect(source).not.toContain('settings/ai:edit:*')
   })
 
   test('declares analysis diag and ping endpoints and avoids bulk operation helpers', () => {

@@ -64,9 +64,7 @@ const clusterDetails = computed<ClusterDescription | undefined>(() =>
 const aiAvailable = computed(() => hasClusterAIAssistant(clusterDetails.value))
 const canView = computed(() => runtimeStore.hasRoutePermission(cluster, 'ai', 'view'))
 const canManage = computed(
-  () =>
-    runtimeStore.hasRoutePermission(cluster, 'admin/ai', 'edit') ||
-    runtimeStore.hasRoutePermission(cluster, 'settings/ai', 'edit')
+  () => runtimeStore.hasRoutePermission(cluster, 'admin/ai', 'edit')
 )
 const enabledModels = computed(() =>
   [...configs.value]

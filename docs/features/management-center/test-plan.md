@@ -13,8 +13,11 @@
 - `jobs:view:self` 只返回当前用户自己的作业
 - `jobs:delete:self` 只能取消本人作业
 - `jobs:edit:self` 只能更新本人作业
-- 管理员持有 `jobs:*:*` 时可操作所有作业
+- `default_seed_roles()` 中 `user` 包含 `jobs:view:self`、`jobs:edit:self`、`jobs:delete:self`
 - `default_seed_roles()` 中 `user` 不包含 `admin/*`
+- `default_seed_roles()` 中 `admin` 只包含 `*:view:*` 与 `*:edit:*`
+- `default_seed_roles()` 中 `admin` 不包含 `*:delete:*`
+- `admin-manage` 放行全部 `admin/*`，但不自动放行独立 `ai:view:*`
 
 对应重点：
 
@@ -67,6 +70,7 @@
 - `admin-ldap-cache`
 - 旧 `settings/*` 管理路由重定向到 `admin/*`
 - 主菜单 `Admin` 入口只在具备任一 `admin/*:view:*` 时显示
+- 主菜单 `Admin` 入口在仅拥有 `admin-manage` 时也显示
 
 对应重点：
 
@@ -81,6 +85,7 @@
 - `ClusterAnalysisView` 请求并展示 `Ping` / `Diag`
 - `JobsView` 在 `jobs:view|edit|delete:self` 下只对本人作业显示 `Edit/Cancel`
 - `JobView` 在 `self` 下只对本人作业显示 `Edit/Cancel`
+- 默认 `admin` 用户可见编辑入口，但删除入口仍继续受 `delete` 权限控制
 - 页面无批量取消入口
 - `ResourcesView` 无批量节点操作入口
 
@@ -105,22 +110,12 @@
 - `frontend/tests/composables/GatewayAPI.spec.ts`
 - `frontend/tests/composables/GatewayAPIAdminContract.spec.ts`
 
-## 4. 已执行的定向验证
+## 4. 验证入口
 
-已通过：
+本轮至少执行：
 
 - `npm --prefix frontend run type-check`
-- `cd frontend && npx vitest run tests/router/AdminRoutesContract.spec.ts tests/composables/GatewayAPIAdminContract.spec.ts tests/views/ClusterAnalysisView.spec.ts tests/components/MainMenu.spec.ts tests/stores/runtime.spec.ts`
-- `cd frontend && npx vitest run tests/views/JobsView.spec.ts tests/views/ReservationsView.spec.ts tests/views/QosView.spec.ts tests/views/AccountView.spec.ts tests/views/AccountsView.spec.ts tests/views/UserView.spec.ts tests/views/resources/ResourcesView.spec.ts`
-- `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/test_permission_rules.py slurmweb/tests/test_access_control_policy.py slurmweb/tests/views/test_agent_operations.py slurmweb/tests/views/test_gateway_operations.py slurmweb/tests/slurmrestd/test_slurmrestd_write_operations.py`
+- `cd frontend && npx vitest run`
+- `.venv\Scripts\python.exe -m pytest -q slurmweb/tests`
 
-## 5. 待补充验证
-
-当前未在本轮完成：
-
-- `npx vitest run` 全量前端回归
-- `.venv\Scripts\python.exe -m pytest -q slurmweb/tests` 全量后端回归
-
-说明：
-
-- 当前 Windows 环境下全量后端测试仍受既有平台依赖与旧测试基线影响，不能作为本轮唯一验收结论。
+若存在失败，需要在 `docs/tracking/current-release.md` 记录失败项和结论。

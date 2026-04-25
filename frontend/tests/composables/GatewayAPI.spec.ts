@@ -662,7 +662,7 @@ describe('gateway data APIs', () => {
   test('normalizes admin legacy actions for AI and cache pages', async () => {
     mockRestAPI.get.mockResolvedValue({
       roles: ['admin'],
-      actions: ['cache-view', 'cache-reset', 'manage-ai', 'roles-view']
+      actions: ['cache-view', 'cache-reset', 'manage-ai', 'roles-view', 'admin-manage']
     })
 
     const gateway = useGatewayAPI()
@@ -671,11 +671,34 @@ describe('gateway data APIs', () => {
     expect(result.rules).toEqual(
       expect.arrayContaining([
         'admin/access-control:view:*',
+        'admin/access-control:edit:*',
+        'admin/access-control:delete:*',
+        'admin/ai:view:*',
         'admin/ai:edit:*',
+        'admin/ai:delete:*',
+        'admin/system:view:*',
+        'admin/system:edit:*',
+        'admin/system:delete:*',
         'admin/cache:edit:*',
         'admin/cache:view:*',
-        'admin/ldap-cache:view:*'
+        'admin/ldap-cache:view:*',
+        'admin/ldap-cache:edit:*'
       ])
+    )
+    expect(result.rules).not.toEqual(expect.arrayContaining(['admin/cache:delete:*']))
+  })
+
+  test('normalizes legacy own-job actions to self-scoped rules', async () => {
+    mockRestAPI.get.mockResolvedValue({
+      roles: ['user'],
+      actions: ['view-own-jobs', 'edit-own-jobs', 'cancel-own-jobs']
+    })
+
+    const gateway = useGatewayAPI()
+    const result = await gateway.permissions('cluster')
+
+    expect(result.rules).toEqual(
+      expect.arrayContaining(['jobs:view:self', 'jobs:edit:self', 'jobs:delete:self'])
     )
   })
 

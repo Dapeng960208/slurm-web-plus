@@ -124,7 +124,7 @@ enabled = yes
 - Agent `/info` 中 `ai.enabled = true` 且 `capabilities.ai.enabled = true`
 - 前端 AI 菜单/设置页受 capability + 权限门控：
   - `view-ai`：进入 `/:cluster/ai`
-  - `manage-ai`：进入 `/settings/ai`
+  - `manage-ai`：进入 `/:cluster/admin/ai`
 
 ### 3.6 节点指标（node_metrics）
 

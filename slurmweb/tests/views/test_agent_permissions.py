@@ -56,6 +56,11 @@ class TestAgentPermissions(TestAgentBase):
             response.json["sources"]["policy"]["rules"],
             self.app.policy.file_rules(self.user),
         )
+        self.assertIn("edit-own-jobs", response.json["actions"])
+        self.assertIn("jobs:view:self", response.json["rules"])
+        self.assertIn("jobs:edit:self", response.json["rules"])
+        self.assertIn("jobs:delete:self", response.json["rules"])
+        self.assertNotIn("jobs:edit:*", response.json["rules"])
 
     def test_permissions_custom_roles_union_from_access_control_store(self):
         self.setup_client()
@@ -73,7 +78,8 @@ class TestAgentPermissions(TestAgentBase):
         )
         self.assertCountEqual(
             response.json["actions"],
-            list(self.app.policy.file_roles_actions(self.user)[1]) + ["roles-view", "roles-manage"],
+            list(self.app.policy.file_roles_actions(self.user)[1])
+            + ["roles-view", "roles-manage", "admin-manage"],
         )
         self.assertCountEqual(
             response.json["sources"]["policy"]["roles"],
@@ -91,6 +97,31 @@ class TestAgentPermissions(TestAgentBase):
             response.json["sources"]["custom"]["rules"],
             self.app.policy.action_rules(["roles-view", "roles-manage"]),
         )
+
+    def test_permissions_custom_actions_expand_admin_manage_and_edit_own_jobs(self):
+        self.setup_client()
+        custom_actions = ["admin-manage", "edit-own-jobs"]
+        self._enable_access_control(
+            custom_roles=["db-admin"],
+            custom_actions=custom_actions,
+        )
+
+        response = self.client.get(f"/v{get_version()}/permissions")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertCountEqual(response.json["sources"]["custom"]["roles"], ["db-admin"])
+        self.assertCountEqual(response.json["sources"]["custom"]["actions"], custom_actions)
+        self.assertCountEqual(
+            response.json["sources"]["custom"]["rules"],
+            self.app.policy.action_rules(custom_actions),
+        )
+        self.assertIn("admin/system:view:*", response.json["rules"])
+        self.assertIn("admin/system:delete:*", response.json["rules"])
+        self.assertIn("admin/cache:edit:*", response.json["rules"])
+        self.assertNotIn("admin/cache:delete:*", response.json["rules"])
+        self.assertIn("jobs:edit:self", response.json["rules"])
+        self.assertIn("admin-manage", response.json["actions"])
+        self.assertIn("edit-own-jobs", response.json["actions"])
 
     def test_permissions_anonymous(self):
         self.setup_client(anonymous_user=True)

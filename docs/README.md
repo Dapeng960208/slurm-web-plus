@@ -61,10 +61,11 @@
 
 - 基于现有业务页面增强 Slurm 管理能力，补齐单对象创建、编辑、删除、取消。
 - 新增集群级 `/:cluster/admin`，统一承载 `System`、`AI`、`LDAP Cache`、`Cache`、`Access Control`。
-- `jobs` 资源正式落地 `self` scope，普通用户默认只允许查看和取消自己的作业。
+- `jobs` 资源正式落地 `self` scope，普通用户默认只读非 `admin/*` 页面，并允许查看、编辑、取消自己的作业。
+- 默认 `admin` 角色改为全局 `view/edit`，但不默认拥有全局 `delete`。
 - `analysis` 页面新增 `Slurm ping` 与 `diag` 面板。
 
 补充说明：
 
-- 旧权限名如 `cache-view`、`roles-manage`、`view-ai` 仍可通过内置映射自动转换为新规则。
+- 旧权限名如 `cache-view`、`roles-manage`、`admin-manage`、`edit-own-jobs`、`view-ai` 仍可通过内置映射自动转换为新规则。
 - 旧能力开关目前仅保留兼容占位定义，不再作为实际功能语义来源。

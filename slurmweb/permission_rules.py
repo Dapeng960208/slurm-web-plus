@@ -191,6 +191,7 @@ DEFAULT_LEGACY_PERMISSION_MAP = {
     "view-stats": ["dashboard:view:*", "analysis:view:*"],
     "view-jobs": ["jobs:view:*"],
     "view-own-jobs": ["jobs:view:self", "user/analysis:view:self"],
+    "edit-own-jobs": ["jobs:edit:self"],
     "cancel-own-jobs": ["jobs:delete:self"],
     "view-history-jobs": ["jobs-history:view:*"],
     "view-nodes": ["resources:view:*"],
@@ -211,6 +212,21 @@ DEFAULT_LEGACY_PERMISSION_MAP = {
     ],
     "view-ai": ["ai:view:*", "admin/ai:view:*"],
     "manage-ai": ["admin/ai:view:*", "admin/ai:edit:*", "admin/ai:delete:*"],
+    "admin-manage": [
+        "admin/system:view:*",
+        "admin/system:edit:*",
+        "admin/system:delete:*",
+        "admin/ai:view:*",
+        "admin/ai:edit:*",
+        "admin/ai:delete:*",
+        "admin/access-control:view:*",
+        "admin/access-control:edit:*",
+        "admin/access-control:delete:*",
+        "admin/cache:view:*",
+        "admin/cache:edit:*",
+        "admin/ldap-cache:view:*",
+        "admin/ldap-cache:edit:*",
+    ],
 }
 
 
@@ -346,6 +362,7 @@ def default_seed_roles() -> List[Dict[str, object]]:
         "analysis:view:*",
         "ai:view:*",
         "jobs:view:self",
+        "jobs:edit:self",
         "jobs:delete:self",
         "jobs-history:view:*",
         "resources:view:*",
@@ -362,12 +379,6 @@ def default_seed_roles() -> List[Dict[str, object]]:
         "settings/errors:view:*",
         "settings/account:view:*",
     ]
-    admin_rules = []
-    for group in PERMISSION_CATALOG:
-        for resource in group["resources"]:
-            scopes = resource.get("scopes", ["*"])
-            for operation in resource.get("operations", []):
-                admin_rules.append(f"{resource['resource']}:{operation}:{scopes[0]}")
     return [
         {
             "name": "user",
@@ -376,8 +387,8 @@ def default_seed_roles() -> List[Dict[str, object]]:
         },
         {
             "name": "admin",
-            "description": "Operational access across routes and editable settings.",
-            "permissions": sort_permission_rules(admin_rules),
+            "description": "Global read and edit access across routes and settings.",
+            "permissions": sort_permission_rules(["*:view:*", "*:edit:*"]),
         },
         {
             "name": "super-admin",

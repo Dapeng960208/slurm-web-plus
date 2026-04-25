@@ -155,12 +155,18 @@ describe('Runtime Store', () => {
       racksdb: true,
       metrics: true,
       cache: true,
-      permissions: { roles: [], actions: [], rules: ['jobs:view:self', 'jobs:delete:self'] }
+      permissions: {
+        roles: [],
+        actions: [],
+        rules: ['jobs:view:self', 'jobs:edit:self', 'jobs:delete:self']
+      }
     })
 
     expect(runtime.hasRoutePermission('foo', 'jobs', 'view', 'self')).toBe(true)
+    expect(runtime.hasRoutePermission('foo', 'jobs', 'edit', 'self')).toBe(true)
     expect(runtime.hasRoutePermission('foo', 'jobs', 'delete', 'self')).toBe(true)
     expect(runtime.hasRoutePermission('foo', 'jobs', 'view')).toBe(false)
+    expect(runtime.hasRoutePermission('foo', 'jobs', 'edit')).toBe(false)
     expect(runtime.hasRoutePermission('foo', 'jobs', 'delete')).toBe(false)
   })
 
@@ -184,5 +190,48 @@ describe('Runtime Store', () => {
     expect(runtime.hasRoutePermission('foo', 'admin/access-control', 'delete')).toBe(true)
     expect(runtime.hasRoutePermission('foo', 'settings/cache', 'view')).toBe(false)
     expect(runtime.hasRoutePermission('foo', 'settings/access-control', 'view')).toBe(false)
+  })
+
+  test('legacy actions normalize admin-manage and edit-own-jobs without granting cache delete access', () => {
+    const runtime = useRuntimeStore()
+    runtime.addCluster({
+      name: 'foo',
+      infrastructure: 'foo',
+      racksdb: true,
+      metrics: true,
+      cache: true,
+      permissions: {
+        roles: ['admin'],
+        actions: ['admin-manage', 'edit-own-jobs'],
+        rules: []
+      }
+    })
+
+    expect(runtime.hasRoutePermission('foo', 'jobs', 'edit', 'self')).toBe(true)
+    expect(runtime.hasRoutePermission('foo', 'admin/system', 'view')).toBe(true)
+    expect(runtime.hasRoutePermission('foo', 'admin/system', 'edit')).toBe(true)
+    expect(runtime.hasRoutePermission('foo', 'admin/system', 'delete')).toBe(true)
+    expect(runtime.hasRoutePermission('foo', 'admin/cache', 'edit')).toBe(true)
+    expect(runtime.hasRoutePermission('foo', 'admin/cache', 'delete')).toBe(false)
+  })
+
+  test('wildcard admin rules grant global view and edit without implying delete', () => {
+    const runtime = useRuntimeStore()
+    runtime.addCluster({
+      name: 'foo',
+      infrastructure: 'foo',
+      racksdb: true,
+      metrics: true,
+      cache: true,
+      permissions: {
+        roles: ['admin'],
+        actions: [],
+        rules: ['*:view:*', '*:edit:*']
+      }
+    })
+
+    expect(runtime.hasRoutePermission('foo', 'dashboard', 'view')).toBe(true)
+    expect(runtime.hasRoutePermission('foo', 'resources', 'edit')).toBe(true)
+    expect(runtime.hasRoutePermission('foo', 'resources', 'delete')).toBe(false)
   })
 })

@@ -53,8 +53,8 @@ resource:operation:scope
 
 - `resource`
   - 精确资源，例如 `jobs`
-  - 子资源，例如 `settings/cache`
-  - 前缀资源，例如 `settings/*`
+  - 子资源，例如 `admin/cache`
+  - 前缀资源，例如 `admin/*`
   - 全局通配 `*`
 - `operation`
   - `view`
@@ -86,10 +86,12 @@ resource:operation:scope
   - `settings/general`
   - `settings/errors`
   - `settings/account`
-  - `settings/ai`
-  - `settings/access-control`
-  - `settings/cache`
-  - `settings/ldap-cache`
+- admin：
+  - `admin/ai`
+  - `admin/access-control`
+  - `admin/cache`
+  - `admin/ldap-cache`
+  - `admin/system`
 - 用户空间：
   - `user/profile`
   - `user/analysis`
@@ -106,7 +108,10 @@ resource:operation:scope
 | 旧权限 | 新规则 |
 |---|---|
 | `view-stats` | `dashboard:view:*` + `analysis:view:*` |
-| `view-jobs` | `jobs:view:*` + `user/analysis:view:self` |
+| `view-jobs` | `jobs:view:*` |
+| `view-own-jobs` | `jobs:view:self` + `user/analysis:view:self` |
+| `edit-own-jobs` | `jobs:edit:self` |
+| `cancel-own-jobs` | `jobs:delete:self` |
 | `view-history-jobs` | `jobs-history:view:*` |
 | `view-nodes` | `resources:view:*` |
 | `view-qos` | `qos:view:*` + `jobs/filter-qos:view:*` |
@@ -114,12 +119,13 @@ resource:operation:scope
 | `associations-view` | `accounts:view:*` + `user/profile:view:*` |
 | `view-accounts` | `jobs/filter-accounts:view:*` |
 | `view-partitions` | `jobs/filter-partitions:view:*` + `resources/filter-partitions:view:*` |
-| `cache-view` | `settings/cache:view:*` |
-| `cache-reset` | `settings/cache:edit:*` |
-| `roles-view` | `settings/access-control:view:*` |
-| `roles-manage` | `settings/access-control:edit:*` + `settings/access-control:delete:*` |
-| `view-ai` | `ai:view:*` |
-| `manage-ai` | `settings/ai:edit:*` |
+| `cache-view` | `admin/cache:view:*` + `admin/ldap-cache:view:*` |
+| `cache-reset` | `admin/cache:edit:*` |
+| `roles-view` | `admin/access-control:view:*` |
+| `roles-manage` | `admin/access-control:edit:*` + `admin/access-control:delete:*` |
+| `view-ai` | `ai:view:*` + `admin/ai:view:*` |
+| `manage-ai` | `admin/ai:view:*` + `admin/ai:edit:*` + `admin/ai:delete:*` |
+| `admin-manage` | `admin/system`、`admin/ai`、`admin/access-control`、`admin/cache`、`admin/ldap-cache` 的管理规则集合 |
 
 扩展方式：
 
@@ -159,9 +165,14 @@ resource:operation:scope
 数据库支持开启且 `roles` 表为空时，自动写入：
 
 - `user`
-  - 全量可查看权限
+  - 默认包含非 `admin/*` 页面只读权限
+  - 默认包含 `jobs:view:self`
+  - 默认包含 `jobs:edit:self`
+  - 默认包含 `jobs:delete:self`
 - `admin`
-  - 全量资源的 `view/edit/delete`
+  - 默认包含 `*:view:*`
+  - 默认包含 `*:edit:*`
+  - 不默认包含 `*:delete:*`
 - `super-admin`
   - `*:*:*`
 
@@ -175,6 +186,7 @@ resource:operation:scope
 - 当前版本只做 allow，不做 deny
 - `self` 只在 owner-aware 资源中使用
 - 页面详情默认继承主页面资源，不额外拆权限
+- 非 `admin/*` 页面默认只读，写权限需要单独授予具体资源或兼容动作
 
 ## 10. 相关验证入口
 

@@ -12,14 +12,19 @@
 
 - 精确资源匹配
 - 前缀资源匹配
+- `*:view:*` / `*:edit:*`
 - `*:*:*`
 - `self`
 - `edit` / `delete` 满足 `view`
 - 旧权限映射到新规则
+- `edit-own-jobs` -> `jobs:edit:self`
+- `admin-manage` -> `admin/system|ai|access-control|cache|ldap-cache`
 
 对应重点：
 
 - `slurmweb/permission_rules.py`
+- `slurmweb/tests/test_permission_rules.py`
+- `slurmweb/tests/test_access_control_policy.py`
 - `slurmweb/tests/views/test_agent_permissions.py`
 
 ### 2.2 能力推导
@@ -50,6 +55,8 @@
 - 角色新旧字段双读双写
 - 旧角色只有 `actions[]` 时可推导出 `permissions[]`
 - 角色表为空时自动写入 `user`、`admin`、`super-admin`
+- `user` 默认值为“非 admin 页面只读 + jobs:view|edit|delete:self”
+- `admin` 默认值为 `*:view:*` + `*:edit:*`
 
 ## 3. 前端测试
 
@@ -92,12 +99,29 @@
 3. 数据库 + Prometheus 同时开启
 4. 旧角色只有 `actions[]`，启用新权限后页面仍可访问
 
-## 5. 已执行的定向验证
+## 5. 本轮矩阵审查结论
+
+已确认并已补/修正的关键断言：
+
+- 普通用户默认权限不是 `jobs:view:*`，而是非 `admin/*` 页面只读 + `jobs:view|edit|delete:self`
+- `admin` 默认角色不是全量 delete，而是 `*:view:*` + `*:edit:*`
+- `admin` 子树不再使用 `settings/ai|cache|ldap-cache|access-control` 资源名，统一切到 `admin/*`
+- 兼容动作 `edit-own-jobs` 与 `admin-manage` 已纳入后端测试基线
+
+仍待主线程继续补齐的缺口：
+
+- 前端只读模式矩阵仍需继续覆盖 `Admin` 页面下各 tab 的禁用/隐藏细节
+- 仍有部分前端测试夹具以旧 `actions[]` 为主，需要逐步收敛到 `rules[]`
+- Windows 本地环境不适合直接用全量后端 pytest 作为唯一验收结论
+
+## 6. 已执行的定向验证
 
 已通过：
 
 - `npm --prefix frontend run type-check`
 - `npx vitest run tests/stores/runtime.spec.ts tests/views/settings/SettingsAccessControl.spec.ts`
+- `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/test_permission_rules.py`
+- `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/test_access_control_policy.py`
 - `.venv\Scripts\python.exe -m pytest slurmweb/tests/views/test_agent_permissions.py -q`
 - `.venv\Scripts\python.exe -m pytest slurmweb/tests/apps/test_agent.py -q`
 

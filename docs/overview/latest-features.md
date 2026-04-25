@@ -1,5 +1,23 @@
 ﻿# 最新功能
 
+## 本轮：默认权限模型按 `jobs:*:self` 与全局 `admin view/edit` 修正
+
+本轮对权限基线做了审查修正，当前默认行为固定为：
+
+- 普通 `user` 默认拥有非 `Admin` 页面只读权限
+- 普通 `user` 默认拥有 `jobs:view:self`
+- 普通 `user` 默认拥有 `jobs:edit:self`
+- 普通 `user` 默认拥有 `jobs:delete:self`
+- 默认 `admin` 角色拥有 `*:view:*` 与 `*:edit:*`
+- 默认 `admin` 角色不拥有 `*:delete:*`
+
+同时新增两个旧动作兼容映射：
+
+- `edit-own-jobs` -> `jobs:edit:self`
+- `admin-manage` -> `/:cluster/admin` 下全部 `admin/*` 管理规则
+
+这次修正不会改变资源级鉴权框架；最终判定仍然只依赖 `resource:operation:scope` 规则。
+
 ## 本轮：发布后审查补了共享操作对话框的安全回归修复
 
 针对本轮新增的大量单对象写操作，发布后代码审查已补一个前端共享组件缺陷修复：
@@ -73,15 +91,16 @@
 
 - 列表查询优先注入 `user=<login>` 到 `slurmrestd`
 - 详情、更新、取消都先查询作业 owner
-- 如果用户只有 `self`，只能查看和取消自己的作业
+- 如果用户只有 `self`，只能查看、编辑、取消自己的作业
 - 前端只做辅助隐藏/禁用，不作为最终安全边界
 
 为兼容旧动作，新增：
 
 - `view-own-jobs`
+- `edit-own-jobs`
 - `cancel-own-jobs`
 
-vendor policy 中普通 `user` 已从全量 `view-jobs` 切到 `view-own-jobs` / `cancel-own-jobs`，且不再默认带 cache/admin 管理动作。
+vendor policy 中普通 `user` 已从全量 `view-jobs` 切到 `view-own-jobs` / `edit-own-jobs` / `cancel-own-jobs`，且不再默认带 cache/admin 管理动作。
 
 ## 本轮：slurmrestd 写路径补齐并加入版本降级
 
@@ -117,12 +136,12 @@ vendor policy 中普通 `user` 已从全量 `view-jobs` 切到 `view-own-jobs` /
 
 当前权限模型已经从单一 `actions[]` 扩展为 `resource:operation:scope`：
 
-- 支持主路由资源和子资源，例如 `settings/cache`
-- 支持前缀资源，例如 `settings/*:view:*`
+- 支持主路由资源和子资源，例如 `admin/cache`
+- 支持前缀资源，例如 `admin/*:view:*`
 - 支持 `self` 场景，例如 `user/profile:view:self`
 - 支持全局最高权限 `*:*:*`
 
-同时保留旧权限名兼容层，`view-ai`、`roles-manage`、`cache-reset` 等历史动作会自动映射到新规则。
+同时保留旧权限名兼容层，`view-ai`、`roles-manage`、`admin-manage`、`edit-own-jobs`、`cache-reset` 等历史动作会自动映射到新规则。
 
 ## 2. Access Control 页面改为资源矩阵
 
@@ -156,9 +175,10 @@ vendor policy 中普通 `user` 已从全量 `view-jobs` 切到 `view-own-jobs` /
 以下页面和入口已经按新规则判定：
 
 - `/:cluster/ai` 使用 `ai:view:*`
-- `Settings > AI` 使用 `settings/ai:view|edit|delete:*`
-- `Settings > Cache` 使用 `settings/cache:view|edit:*`
-- `Settings > LDAP Cache` 使用 `settings/ldap-cache:view:*`
+- `/:cluster/admin/ai` 使用 `admin/ai:view|edit|delete:*`
+- `/:cluster/admin/cache` 使用 `admin/cache:view|edit:*`
+- `/:cluster/admin/ldap-cache` 使用 `admin/ldap-cache:view|edit:*`
+- `/:cluster/admin/access-control` 使用 `admin/access-control:view|edit|delete:*`
 - 用户空间使用 `user/profile:view:*|self` 与 `user/analysis:view:*|self`
 
 ## 5. 本轮验证结果

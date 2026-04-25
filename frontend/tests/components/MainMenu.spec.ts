@@ -292,4 +292,140 @@ describe('MainMenu.vue', () => {
 
     expect(wrapper.text()).toContain('Admin')
   })
+
+  test('shows Admin when permissions come from admin-manage legacy action', async () => {
+    const wrapper = shallowMount(MainMenu, {
+      props: {
+        entry: 'dashboard',
+        clusterContext: 'foo',
+        modelValue: true
+      },
+      global: {
+        plugins: [
+          [
+            runtimeConfiguration,
+            {
+              api_server: 'http://localhost',
+              authentication: true,
+              racksdb_rows_labels: false,
+              racksdb_racks_labels: false,
+              version: 'test-version'
+            }
+          ],
+          createTestingPinia({
+            stubActions: false
+          })
+        ],
+        stubs: {
+          RouterLink: {
+            template: '<a><slot /></a>'
+          },
+          TransitionRoot: {
+            template: '<div><slot /></div>'
+          },
+          TransitionChild: {
+            template: '<div><slot /></div>'
+          },
+          Dialog: {
+            template: '<div><slot /></div>'
+          },
+          DialogPanel: {
+            template: '<div><slot /></div>'
+          },
+          BrandLogo: {
+            props: ['framed', 'size'],
+            template:
+              '<div class="brand-logo-stub" :data-framed="String(framed)" :data-size="size" />'
+          }
+        }
+      }
+    })
+
+    const runtimeStore = useRuntimeStore()
+    runtimeStore.availableClusters = [
+      {
+        name: 'foo',
+        permissions: {
+          roles: ['ops-admin'],
+          actions: ['admin-manage']
+        },
+        racksdb: true,
+        infrastructure: 'foo',
+        metrics: true,
+        cache: true
+      }
+    ]
+    runtimeStore.currentCluster = runtimeStore.availableClusters[0]
+    await nextTick()
+
+    expect(wrapper.text()).toContain('Admin')
+  })
+
+  test('does not show Admin for a regular user with self-scoped job actions only', async () => {
+    const wrapper = shallowMount(MainMenu, {
+      props: {
+        entry: 'dashboard',
+        clusterContext: 'foo',
+        modelValue: true
+      },
+      global: {
+        plugins: [
+          [
+            runtimeConfiguration,
+            {
+              api_server: 'http://localhost',
+              authentication: true,
+              racksdb_rows_labels: false,
+              racksdb_racks_labels: false,
+              version: 'test-version'
+            }
+          ],
+          createTestingPinia({
+            stubActions: false
+          })
+        ],
+        stubs: {
+          RouterLink: {
+            template: '<a><slot /></a>'
+          },
+          TransitionRoot: {
+            template: '<div><slot /></div>'
+          },
+          TransitionChild: {
+            template: '<div><slot /></div>'
+          },
+          Dialog: {
+            template: '<div><slot /></div>'
+          },
+          DialogPanel: {
+            template: '<div><slot /></div>'
+          },
+          BrandLogo: {
+            props: ['framed', 'size'],
+            template:
+              '<div class="brand-logo-stub" :data-framed="String(framed)" :data-size="size" />'
+          }
+        }
+      }
+    })
+
+    const runtimeStore = useRuntimeStore()
+    runtimeStore.availableClusters = [
+      {
+        name: 'foo',
+        permissions: {
+          roles: ['user'],
+          actions: ['view-own-jobs', 'edit-own-jobs', 'cancel-own-jobs']
+        },
+        racksdb: true,
+        infrastructure: 'foo',
+        metrics: true,
+        cache: true
+      }
+    ]
+    runtimeStore.currentCluster = runtimeStore.availableClusters[0]
+    await nextTick()
+
+    expect(wrapper.text()).not.toContain('Admin')
+  })
 })
