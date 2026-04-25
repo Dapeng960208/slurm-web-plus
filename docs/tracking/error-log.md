@@ -43,3 +43,12 @@
 - 根因：网络不可用或访问 GitHub 被阻断（非仓库内容问题）。
 - 解决：按规范先完成本地 `git commit`，待网络恢复后再 push。
 - 预防：提交前不以 push 成功为前提；若 push 失败，必须在 `docs/tracking/` 留下“已本地提交、待 push”的记录。
+
+### 2026-04-25：PowerShell 环境中不存在 `python` 命令导致临时脚本无法执行
+
+- 场景：为排查文档读取乱码，尝试用内联 Python 脚本按字节解码 Markdown 文件。
+- 现象：执行 `@' ... '@ | python -` 时返回 `python : The term 'python' is not recognized as the name of a cmdlet...`。
+- 复现：在当前仓库终端直接执行 `python` 或把脚本管道给 `python -`。
+- 根因：当前 PowerShell 环境未安装 `python`，或 `python` 未加入 `PATH`。
+- 解决：改用纯 PowerShell 方式读取字节并通过 `[System.Text.Encoding]::UTF8.GetString(...)` 解码文件内容。
+- 预防：在依赖解释器前先确认命令是否存在；本仓库的简单文件读取、编码排查优先使用 PowerShell 原生命令，避免把 `python` 作为默认前置条件。
