@@ -1,4 +1,4 @@
-# Cache 测试计划（Settings > Cache）
+﻿# Cache 测试计划（Settings > Cache）
 
 ## 1. 测试范围
 

@@ -158,9 +158,9 @@ def _ai_model_payload():
         abort(500, "AI service is unavailable")
 
 
-def _resolved_scope(scope: Union[str, Callable[[], str]]) -> str:
+def _resolved_scope(scope: Union[str, Callable[..., str]], *args, **kwargs) -> str:
     if callable(scope):
-        return scope()
+        return scope(*args, **kwargs)
     return scope
 
 
@@ -188,7 +188,7 @@ def permission_required(*requirements: Tuple[str, str, str], legacy_action: str 
                     user,
                     resource,
                     operation,
-                    _resolved_scope(scope),
+                    _resolved_scope(scope, *args, **kwargs),
                 ):
                     return func(*args, **kwargs)
             logger.warning(
@@ -930,7 +930,7 @@ def ai_conversation_detail(conversation_id: int):
     (
         "user/analysis",
         "view",
-        lambda: "self" if getattr(request.user, "login", None) == username else "*",
+        lambda username: "self" if getattr(request.user, "login", None) == username else "*",
     ),
     ("jobs", "view", "*"),
     legacy_action="view-jobs",
@@ -958,7 +958,7 @@ def user_metrics_history(username: str):
     (
         "user/analysis",
         "view",
-        lambda: "self" if getattr(request.user, "login", None) == username else "*",
+        lambda username: "self" if getattr(request.user, "login", None) == username else "*",
     ),
     ("jobs", "view", "*"),
     legacy_action="view-jobs",

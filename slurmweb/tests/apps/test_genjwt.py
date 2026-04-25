@@ -80,7 +80,8 @@ class TestGenJwtApp(TestAgentConfBase):
             Path(self.app.settings.jwt.key), user="slurm-web"
         )
         mock_subprocess_run.assert_called_once_with(
-            ["setfacl", "-m", "u:slurm:r", Path(self.app.settings.jwt.key)]
+            ["setfacl", "-m", "u:slurm:r", Path(self.app.settings.jwt.key)],
+            check=True,
         )
 
     @mock.patch("slurmweb.apps.genjwt.subprocess.run")
@@ -100,8 +101,10 @@ class TestGenJwtApp(TestAgentConfBase):
         self.assertEqual(
             cm.output,
             [
+                f"WARNING:slurmweb.apps.genjwt:JWT key {self.app.settings.jwt.key} "
+                "already exist",
                 "WARNING:slurmweb.apps.genjwt:User slurm-web not found, unable to set "
-                "permission on JWT key for this user"
+                "permission on JWT key for this user",
             ],
         )
 
@@ -125,7 +128,9 @@ class TestGenJwtApp(TestAgentConfBase):
         self.assertEqual(
             cm.output,
             [
+                f"WARNING:slurmweb.apps.genjwt:JWT key {self.app.settings.jwt.key} "
+                "already exist",
                 "WARNING:slurmweb.apps.genjwt:User slurm not found, unable to set "
-                "permission on JWT key for this user"
+                "permission on JWT key for this user",
             ],
         )

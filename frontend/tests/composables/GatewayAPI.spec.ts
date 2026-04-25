@@ -511,10 +511,33 @@ describe('gateway data APIs', () => {
     expect(result).toStrictEqual({
       roles: ['user', 'db-admin'],
       actions: ['view-jobs', 'roles-manage'],
+      rules: [
+        'jobs:view:*',
+        'settings/access-control:delete:*',
+        'settings/access-control:edit:*',
+        'user/analysis:view:self'
+      ],
       sources: {
-        policy: { roles: ['user'], actions: ['view-jobs'] },
-        custom: { roles: ['db-admin'], actions: ['roles-manage'] },
-        merged: { roles: ['user', 'db-admin'], actions: ['view-jobs', 'roles-manage'] }
+        policy: {
+          roles: ['user'],
+          actions: ['view-jobs'],
+          rules: ['jobs:view:*', 'user/analysis:view:self']
+        },
+        custom: {
+          roles: ['db-admin'],
+          actions: ['roles-manage'],
+          rules: ['settings/access-control:delete:*', 'settings/access-control:edit:*']
+        },
+        merged: {
+          roles: ['user', 'db-admin'],
+          actions: ['view-jobs', 'roles-manage'],
+          rules: [
+            'jobs:view:*',
+            'settings/access-control:delete:*',
+            'settings/access-control:edit:*',
+            'user/analysis:view:self'
+          ]
+        }
       }
     })
   })
@@ -531,10 +554,15 @@ describe('gateway data APIs', () => {
     expect(result).toStrictEqual({
       roles: ['user'],
       actions: ['view-jobs'],
+      rules: ['jobs:view:*', 'user/analysis:view:self'],
       sources: {
-        policy: { roles: [], actions: [] },
-        custom: { roles: [], actions: [] },
-        merged: { roles: ['user'], actions: ['view-jobs'] }
+        policy: { roles: [], actions: [], rules: [] },
+        custom: { roles: [], actions: [], rules: [] },
+        merged: {
+          roles: ['user'],
+          actions: ['view-jobs'],
+          rules: ['jobs:view:*', 'user/analysis:view:self']
+        }
       }
     })
   })
@@ -549,7 +577,13 @@ describe('gateway data APIs', () => {
 
     expect(mockRestAPI.get).toHaveBeenCalledWith('/agents/cluster/access/roles')
     expect(result).toStrictEqual([
-      { id: 1, name: 'db-admin', description: null, actions: ['roles-manage'] }
+      {
+        id: 1,
+        name: 'db-admin',
+        description: null,
+        actions: ['roles-manage'],
+        permissions: []
+      }
     ])
   })
 

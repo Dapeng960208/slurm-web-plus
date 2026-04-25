@@ -67,6 +67,8 @@ class SlurmwebGenericApp:
     NAME = None
 
     def __init__(self, seed: SlurmwebAppSeed):
+        self.settings_definition_path = Path(seed.conf_defs)
+        self.site_configuration_path = Path(seed.conf)
         # load configuration files
         setup_logger(
             debug=seed.debug,

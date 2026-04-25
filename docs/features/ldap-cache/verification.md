@@ -1,4 +1,4 @@
-# LDAP Cache 验证说明（Settings > LDAP Cache）
+﻿# LDAP Cache 验证说明（Settings > LDAP Cache）
 
 本文档补充说明本次 LDAP Cache 改动的验证方式，适用于以下变更：
 

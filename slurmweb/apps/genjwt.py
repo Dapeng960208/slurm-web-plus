@@ -7,7 +7,6 @@
 import os
 import shutil
 import sys
-import pwd
 import subprocess
 import logging
 
@@ -18,6 +17,20 @@ from rfl.authentication.jwt import jwt_gen_key
 from rfl.authentication.errors import JWTPrivateKeyGeneratorError
 
 logger = logging.getLogger(__name__)
+
+try:
+    import pwd
+except ImportError:
+    class _PwdCompat:
+        @staticmethod
+        def getpwnam(_user):
+            raise OSError("pwd module is not available on this platform")
+
+    pwd = _PwdCompat()
+
+
+if not hasattr(os, "geteuid"):
+    os.geteuid = lambda: 1
 
 
 class SlurmwebAppGenJWT(SlurmwebGenericApp):
@@ -54,12 +67,19 @@ class SlurmwebAppGenJWT(SlurmwebGenericApp):
                 "User %s not found, unable to set permission on JWT key for this user",
                 user,
             )
+        except OSError as err:
+            logger.warning(
+                "Unable to validate user %s on this platform before setting JWT key "
+                "permissions: %s",
+                user,
+                err,
+            )
         else:
             logger.info("Setting read permission on key for %s user", user)
             if acl:
                 try:
                     cmd = ["setfacl", "-m", f"u:{user}:r", self.settings.jwt.key]
-                    subprocess.run(cmd)
+                    subprocess.run(cmd, check=True)
                 except subprocess.CalledProcessError as err:
                     logger.error(
                         "Error while running command: %s: %s", shlex_join(cmd), err

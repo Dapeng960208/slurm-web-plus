@@ -1,4 +1,4 @@
-# 数据库迁移说明（Alembic）
+﻿# 数据库迁移说明（Alembic）
 
 本文说明 Slurm Web Plus 在 Agent 侧数据库（PostgreSQL）上的 schema 迁移体系、推荐升级流程、近期 revision 影响范围与回滚边界。
 

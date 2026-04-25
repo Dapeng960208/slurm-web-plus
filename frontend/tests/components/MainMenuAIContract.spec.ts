@@ -9,7 +9,8 @@ describe('MainMenu AI contract', () => {
   test('binds AI menu entry to the new route and permission gate', () => {
     expect(source).toContain("name: 'AI'")
     expect(source).toContain("route: 'ai'")
-    expect(source).toContain("permission: 'view-ai'")
+    expect(source).toContain("resource: 'ai'")
+    expect(source).toContain("operation: 'view'")
     expect(source).toContain("feature: 'ai'")
   })
 

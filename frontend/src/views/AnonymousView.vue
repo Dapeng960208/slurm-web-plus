@@ -56,8 +56,8 @@ onMounted(async () => {
             <p class="ui-page-kicker">Anonymous Access</p>
             <h1 class="text-4xl font-bold text-white md:text-5xl">Preparing public session access.</h1>
             <p class="max-w-xl text-sm leading-7 text-white/72 md:text-base">
-              When authentication is disabled, Slurm-web can still route visitors into the control
-              center with a lightweight anonymous session.
+              When authentication is disabled, Slurm Web Plus can still route visitors into the
+              control center with a lightweight anonymous session.
             </p>
           </div>
         </div>

@@ -1,10 +1,9 @@
 import { describe, test, expect } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
-import { Chart } from 'chart.js/auto'
 import UserToolAnalysisChart from '@/components/user/UserToolAnalysisChart.vue'
 
 describe('UserToolAnalysisChart.vue', () => {
-  test('maps tool labels and job counts into the chart dataset', async () => {
+  test('renders tool rows with labels, metrics, and proportional bars', async () => {
     const wrapper = mount(UserToolAnalysisChart, {
       props: {
         tools: [
@@ -28,15 +27,27 @@ describe('UserToolAnalysisChart.vue', () => {
 
     await flushPromises()
 
-    const canvas = wrapper.get({ ref: 'chartCanvas' }).element as HTMLCanvasElement
-    const chart = Chart.getChart(canvas)
+    const rows = wrapper.findAll('[data-testid^="tool-chart-"]')
+    expect(rows).toHaveLength(2)
 
-    expect(chart).toBeDefined()
-    expect(chart?.data.labels).toEqual(['bwa', 'samtools'])
-    expect(chart?.data.datasets[0].data).toEqual([8, 3])
+    expect(wrapper.get('[data-testid="tool-chart-bwa"]').text()).toContain('8 completed job(s)')
+    expect(wrapper.get('[data-testid="tool-chart-bwa"]').text()).toContain('9GB')
+    expect(wrapper.get('[data-testid="tool-chart-bwa"]').text()).toContain('CPU: 8.0 cores')
+    expect(wrapper.get('[data-testid="tool-chart-bwa"]').text()).toContain('Runtime: 2h')
+
+    expect(wrapper.get('[data-testid="tool-chart-samtools"]').text()).toContain('3 completed job(s)')
+    expect(wrapper.get('[data-testid="tool-chart-samtools"]').text()).toContain('4GB')
+    expect(wrapper.get('[data-testid="tool-chart-samtools"]').text()).toContain('Runtime: 30m')
+
+    const fills = wrapper.findAll('.ui-tool-chart-fill')
+    expect(fills).toHaveLength(4)
+    expect(fills[0].attributes('style')).toContain('width: 100%')
+    expect(fills[1].attributes('style')).toContain('width: 100%')
+    expect(fills[2].attributes('style')).toContain('width: 44.44444444444444%')
+    expect(fills[3].attributes('style')).toContain('width: 37.5%')
   })
 
-  test('formats tooltip details for missing values', async () => {
+  test('renders fallback values when tool metrics are missing', async () => {
     const wrapper = mount(UserToolAnalysisChart, {
       props: {
         tools: [
@@ -53,16 +64,13 @@ describe('UserToolAnalysisChart.vue', () => {
 
     await flushPromises()
 
-    const canvas = wrapper.get({ ref: 'chartCanvas' }).element as HTMLCanvasElement
-    const chart = Chart.getChart(canvas)
-    const afterBody = chart?.options.plugins?.tooltip?.callbacks?.afterBody as
-      | ((items: Array<{ dataIndex: number }>) => string[])
-      | undefined
-
-    expect(afterBody?.([{ dataIndex: 0 }])).toEqual([
-      'Avg memory: N/A',
-      'Avg CPU: N/A',
-      'Avg runtime: N/A'
-    ])
+    const row = wrapper.get('[data-testid="tool-chart-unknown"]')
+    expect(row.text()).toContain('1 completed job(s)')
+    expect(row.text()).toContain('N/A')
+    expect(row.text()).toContain('CPU: N/A')
+    expect(row.text()).toContain('Runtime: N/A')
+    expect(row.text()).toContain('Peak reference: N/A')
+    expect(wrapper.find('.ui-tool-chart-fill-memory').attributes('style')).toContain('width: 0%')
+    expect(wrapper.find('.ui-tool-chart-fill-jobs').attributes('style')).toContain('width: 100%')
   })
 })

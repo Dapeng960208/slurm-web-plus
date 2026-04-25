@@ -1,4 +1,4 @@
-# Documentation Rules For Future AI
+﻿# Documentation Rules For Future AI
 
 后续 AI 在本仓库工作时，必须遵守以下要求：
 
@@ -24,3 +24,5 @@
 - `docs/overview/latest-features.md` 视为面向全局的 change log 入口；只要发生可感知变更，AI 必须补充对应摘要，不能只更新 `docs/features/` 或 `docs/tracking/`。
 - AI 开发过程中遇到可复现错误时，必须复盘并写入 `docs/tracking/error-log.md`（标准见 `docs/standards/development-error-summary.md`）。
 - AI 进行 Git 提交时必须遵循提交规范，并在每次提交前检查工作区；对未提交改动必须先与开发者确认是否提交（标准见 `docs/standards/ai-development-standard.md`）。
+- 本仓库中文文档按 UTF-8 维护；在 Windows PowerShell 中读取 `AGENTS.md`、`docs/**/*.md` 等中文文档时，不允许直接用裸 `Get-Content <path>` 作为默认做法，必须优先使用 `Get-Content -Encoding UTF8 <path>`。
+- 如果终端仍出现乱码，必须先设置 `[Console]::InputEncoding`、`[Console]::OutputEncoding` 与 `$OutputEncoding` 为 UTF-8，然后再用 `Get-Content -Encoding UTF8 <path>`，或改用 `[System.IO.File]::ReadAllText(<path>, [System.Text.UTF8Encoding]::new($false))` 按字节读取。

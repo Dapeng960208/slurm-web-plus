@@ -5,6 +5,7 @@
 # SPDX-License-Identifier: MIT
 
 import io
+import tempfile
 from unittest import mock
 from pathlib import Path
 
@@ -59,21 +60,19 @@ class TestShowConfApp(TestGatewayConfBase, TestAgentConfBase):
 
     def test_run_agent_missing_conf_defs(self):
         self.setup(component="agent")
-        self.app.conf_defs = Path("/dev/fail")
+        self.app.conf_defs = Path(tempfile.gettempdir()) / "missing-agent-showconf-defs.yml"
         with self.assertRaisesRegex(SystemExit, "1"):
             with self.assertLogs("slurmweb", level="CRITICAL") as cm:
                 self.app.run()
-        self.assertEqual(
-            cm.output,
-            [
-                "CRITICAL:slurmweb.apps.showconf:Settings definition file /dev/fail "
-                "not found"
-            ],
+        self.assertEqual(len(cm.output), 1)
+        self.assertIn(
+            f"Settings definition file {self.app.conf_defs} not found",
+            cm.output[0],
         )
 
     def test_run_agent_missing_conf(self):
         self.setup(component="agent")
-        self.conf.close()
+        self.app.conf = Path(tempfile.gettempdir()) / "missing-agent-showconf.ini"
         with self.assertRaisesRegex(SystemExit, "1"):
             with self.assertLogs("slurmweb", level="CRITICAL") as cm:
                 self.app.run()
@@ -96,21 +95,21 @@ class TestShowConfApp(TestGatewayConfBase, TestAgentConfBase):
 
     def test_run_gateway_missing_conf_defs(self):
         self.setup(component="gateway")
-        self.app.conf_defs = Path("/dev/fail")
+        self.app.conf_defs = (
+            Path(tempfile.gettempdir()) / "missing-gateway-showconf-defs.yml"
+        )
         with self.assertRaisesRegex(SystemExit, "1"):
             with self.assertLogs("slurmweb", level="CRITICAL") as cm:
                 self.app.run()
-        self.assertEqual(
-            cm.output,
-            [
-                "CRITICAL:slurmweb.apps.showconf:Settings definition file /dev/fail "
-                "not found"
-            ],
+        self.assertEqual(len(cm.output), 1)
+        self.assertIn(
+            f"Settings definition file {self.app.conf_defs} not found",
+            cm.output[0],
         )
 
     def test_run_gateway_missing_conf(self):
         self.setup(component="gateway")
-        self.conf.close()
+        self.app.conf = Path(tempfile.gettempdir()) / "missing-gateway-showconf.ini"
         with self.assertRaisesRegex(SystemExit, "1"):
             with self.assertLogs("slurmweb", level="CRITICAL") as cm:
                 self.app.run()

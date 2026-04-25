@@ -76,7 +76,7 @@ async function submitLogin() {
           <div class="space-y-4">
             <p class="ui-page-kicker">Secure Access</p>
             <h1 class="text-4xl font-bold text-white md:text-5xl">
-              Enter the Slurm-web control center.
+              Enter the Slurm Web Plus control center.
             </h1>
             <p class="max-w-xl text-sm leading-7 text-white/72 md:text-base">
               Unified cluster operations, job observability and infrastructure navigation in a
@@ -108,7 +108,9 @@ async function submitLogin() {
         <div class="w-full max-w-md space-y-6">
           <div class="space-y-3">
             <p class="ui-page-kicker">Authentication</p>
-            <h2 class="text-3xl font-bold text-[var(--color-brand-ink-strong)]">Access Slurm-web</h2>
+            <h2 class="text-3xl font-bold text-[var(--color-brand-ink-strong)]">
+              Access Slurm Web Plus
+            </h2>
             <p class="text-sm leading-6 text-[var(--color-brand-muted)]">
               Sign in to continue to the requested page or open the cluster gateway.
             </p>
@@ -149,7 +151,7 @@ async function submitLogin() {
                 name="password"
                 class="block w-full rounded-[18px] border border-[rgba(80,105,127,0.16)] bg-white/90 px-4 py-3 text-sm text-[var(--color-brand-ink-strong)] shadow-[var(--shadow-soft)] outline-hidden focus:border-[rgba(182,232,44,0.65)] focus:bg-white focus:ring-4 focus:ring-[rgba(182,232,44,0.18)]"
                 :class="{ 'bg-gray-50': !highlightPassword, 'bg-red-200': highlightPassword }"
-                placeholder="••••••••"
+                placeholder="Enter password"
               />
             </div>
             <button

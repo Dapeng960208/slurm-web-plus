@@ -1,19 +1,19 @@
-# Slurm-web
+# Slurm Web Plus
 
 ## Overview
 
 <img
   src="assets/logo/bitmaps/slurm-web_full_white_medium.png"
-  alt="Slurm-web logo"
+  alt="Slurm Web Plus logo"
   align="right">
 
-Slurm-web is an open source web dashboard for Slurm based HPC clusters.
+Slurm Web Plus is an open source web dashboard for Slurm based HPC clusters.
 
 [Slurm](https://slurm.schedmd.com/) is the world leading workload manager for
 HPC clusters with all most advanced features to manage jobs and resources
 efficiently with a powerful command-line interface (CLI).
 
-Slurm-web provides a clear graphical user interface with views to track your
+Slurm Web Plus provides a clear graphical user interface with views to track your
 jobs, intuitive insights and advanced visualizations on top of Slurm to monitor
 status of HPC supercomputers in your organization, in a web browser on all your
 devices.
@@ -21,7 +21,7 @@ devices.
 <p align="center">
 <img
   src="assets/screenshots/assemblies/bitmaps/slurm-web_devices-medium.png"
-  alt="Slurm-web on all devices"
+  alt="Slurm Web Plus on all devices"
   width="600px"
   style="margin: 0 auto;">
 <p>
@@ -43,12 +43,12 @@ Many features in a reactive & responsive web UI:
 * Integration with Prometheus to collect and chart timeseries metrics of Slurm
 
 Get more details in
-[Slurm-web advanced features overview](https://docs.rackslab.io/slurm-web/overview/overview.html).
+[Slurm Web Plus advanced features overview](https://docs.rackslab.io/slurm-web/overview/overview.html).
 
 <p align="center">
 <img
   src="assets/screenshots/assemblies/bitmaps/slurm-web_dark_mode-tiny.png"
-  alt="Slurm-web on all devices"
+  alt="Slurm Web Plus on all devices"
   width="500px"
   style="margin: 0 auto;">
 <p>
@@ -56,30 +56,33 @@ Get more details in
 
 ## Quickstart
 
-To install and start using Slurm-web in a few steps, follow the
+To install and start using Slurm Web Plus in a few steps, follow the
 [quickstart guide](https://docs.rackslab.io/slurm-web/install/quickstart.html)!
 Packages are available for most Linux distributions for easy installation and
 upgrade.
 
 ## Documentation
 
-The [full documentation](https://docs.rackslab.io/slurm-web/) of Slurm-web is
+The [full documentation](https://docs.rackslab.io/slurm-web/) of Slurm Web Plus is
 available online with software architecture details, installation guide,
 configuration references, troubleshooting guide, etc.
 
+The public documentation and repository links still use the legacy `/slurm-web/`
+slug until the external publication workflow is switched over.
+
 ## Status
 
-Slurm-web is considered stable and ready for production.
+Slurm Web Plus is considered stable and ready for production.
 
 ## Authors
 
-Slurm-web is developed and maintained by [Rackslab](https://rackslab.io),
+Slurm Web Plus is developed and maintained by [Rackslab](https://rackslab.io),
 software editor of open source solutions designed to help HPC supercomputers
 administration, operations and management.
 
 ## Support
 
-Need help to deploy or setup Slurm-web? There are multiple ways to get technical
+Need help to deploy or setup Slurm Web Plus? There are multiple ways to get technical
 support.
 
 ### Community
@@ -105,7 +108,7 @@ questions.
 ### Professional
 
 [Rackslab](https://rackslab.io) offers commercial support to help organizations
-secure their deployment of Slurm-web with service level agreement (SLA) and
+secure their deployment of Slurm Web Plus with service level agreement (SLA) and
 minimal response time.
 
 Our professional team has a unique expertise to offer a wide range of services
@@ -120,4 +123,4 @@ available in
 
 ## License
 
-Slurm-web is distributed under the terms of the MIT license.
+Slurm Web Plus is distributed under the terms of the MIT license.

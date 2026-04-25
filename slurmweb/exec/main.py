@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 # Copyright (c) 2025 Rackslab
 #
-# This file is part of Slurm-web.
+# This file is part of Slurm Web Plus.
 #
 # SPDX-License-Identifier: MIT
 
 import argparse
 import sys
+from pathlib import Path
 
 from ..version import get_version
 from ..apps import SlurmwebAppSeed
@@ -20,7 +21,7 @@ from .connect import SlurmwebExecConnectCheck
 
 
 class SlurmwebExecMain(SlurmwebExecBase):
-    """Unified entrypoint for all Slurm-web commands."""
+    """Unified entrypoint for all Slurm Web Plus commands."""
 
     SUBCOMMANDS = {
         "agent": SlurmwebExecAgent,
@@ -33,9 +34,15 @@ class SlurmwebExecMain(SlurmwebExecBase):
 
     @classmethod
     def register_args(cls) -> argparse.ArgumentParser:
+        invoked_name = Path(sys.argv[0]).name
+        prog_name = (
+            invoked_name
+            if invoked_name in {"slurm-web", "slurm-web-plus"}
+            else "slurm-web-plus"
+        )
         parser = argparse.ArgumentParser(
-            prog="slurm-web",
-            description="Slurm-web command line interface",
+            prog=prog_name,
+            description="Slurm Web Plus command line interface",
         )
         parser.add_argument(
             "-v",
@@ -49,7 +56,7 @@ class SlurmwebExecMain(SlurmwebExecBase):
             title="subcommands",
             dest="command",
             metavar="SUBCOMMAND",
-            help="slurm-web subcommand to execute",
+            help="Slurm Web Plus subcommand to execute",
         )
 
         for name, cls in cls.SUBCOMMANDS.items():

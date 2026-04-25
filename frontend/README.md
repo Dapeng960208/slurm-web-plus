@@ -1,4 +1,4 @@
-# Slurm-web frontend
+# Slurm Web Plus Frontend
 
 ## Project Setup
 
@@ -16,7 +16,7 @@ When running `npm run dev` you can simulate hosting the UI under any URL prefix
 by setting the `VITE_BASE_PATH` environment variable. For example:
 
 ```sh
-VITE_BASE_PATH=/slurm-web/ npm run dev
+VITE_BASE_PATH=/slurm-web-plus/ npm run dev
 ```
 Leave `VITE_BASE_PATH` unset (or `/`) to serve the app from the root as usual.
 

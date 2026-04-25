@@ -1,4 +1,4 @@
-# AI 功能需求说明
+﻿# AI 功能需求说明
 
 ## 1. 范围
 
@@ -28,6 +28,7 @@ AI 当前按数据库能力自动启用：
 
 - 旧 `ai.enabled` 仅保留兼容占位定义，不再作为实际业务语义来源。
 - 数据库不可用时，AI 不会对外暴露能力。
+- 如果站点配置里显式写了 `[ai] enabled = yes`，但数据库初始化失败，Agent 会额外输出 “AI assistant is enabled but database support is unavailable” 告警，便于排障。
 
 ## 3. 权限要求
 

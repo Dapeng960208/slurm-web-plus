@@ -182,7 +182,10 @@ class TestPrepareUIAssets(unittest.TestCase):
         """Test that symlinks are preserved."""
         # Create a file and a symlink to it
         (self.source_dir / "target.txt").write_text("target content")
-        (self.source_dir / "link.txt").symlink_to("target.txt")
+        try:
+            (self.source_dir / "link.txt").symlink_to("target.txt")
+        except (NotImplementedError, OSError) as err:
+            self.skipTest(f"Symlinks are not available in this environment: {err}")
 
         target_dir = prepare_ui_assets(self.source_dir, "/")
 

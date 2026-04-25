@@ -11,7 +11,7 @@ withDefaults(
     framed?: boolean
   }>(),
   {
-    alt: 'Slurm-web',
+    alt: 'Slurm Web Plus',
     size: 'md',
     framed: true
   }

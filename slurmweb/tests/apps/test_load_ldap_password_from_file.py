@@ -1,3 +1,4 @@
+import re
 import os
 import tempfile
 import unittest
@@ -19,14 +20,16 @@ class TestLoadLdapPasswordFromFile(unittest.TestCase):
             passfile.unlink()
 
     def test_nonexistent(self):
-        passfile = Path("/nonexistent/file/path")
+        passfile = Path(tempfile.gettempdir()) / "missing-ldap-bind-password.txt"
         with self.assertRaisesRegex(
             SlurmwebConfigurationError,
-            f"LDAP bind password file path {passfile} is not a file",
+            re.escape(f"LDAP bind password file path {passfile} is not a file"),
         ):
             load_ldap_password_from_file(passfile)
 
     def test_no_permission(self):
+        if os.name == "nt":
+            self.skipTest("chmod(0) does not reliably deny reads on Windows")
         if os.geteuid() == 0:
             self.skipTest("Cannot test permission error as root")
 
@@ -61,7 +64,7 @@ class TestLoadLdapPasswordFromFile(unittest.TestCase):
         try:
             with self.assertRaisesRegex(
                 SlurmwebConfigurationError,
-                f"Bind Password loaded from file {passfile} is empty",
+                re.escape(f"Bind Password loaded from file {passfile} is empty"),
             ):
                 load_ldap_password_from_file(passfile)
         finally:

@@ -1,6 +1,6 @@
 # Copyright (c) 2023 Rackslab
 #
-# This file is part of Slurm-web.
+# This file is part of Slurm Web Plus.
 #
 # SPDX-License-Identifier: MIT
 
@@ -11,4 +11,10 @@ except ImportError:
 
 
 def get_version():
-    return metadata.version("slurm-web")
+    for package_name in ("slurm-web-plus", "slurm-web"):
+        try:
+            return metadata.version(package_name)
+        except metadata.PackageNotFoundError:
+            continue
+
+    raise metadata.PackageNotFoundError("Neither slurm-web-plus nor slurm-web is installed")

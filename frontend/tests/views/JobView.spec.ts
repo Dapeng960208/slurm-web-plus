@@ -52,29 +52,27 @@ describe('JobView.vue', () => {
     expect(backButton.props('cluster')).toBe('foo')
     expect(backButton.text()).toBe('Back to jobs')
 
-    const overview = wrapper.get('[data-testid="job-overview-grid"]')
+    const summary = wrapper.get('[data-testid="detail-summary-strip"]')
     const details = wrapper.get('[data-testid="job-detail-list"]')
-    const userLink = wrapper.get('#user').findComponent({ name: 'RouterLink' })
+    const links = summary.findAllComponents({ name: 'RouterLink' })
+    const userLink = links[0]
 
-    expect(overview.text()).toContain('User')
+    expect(summary.text()).toContain('User')
     expect(userLink.props('to')).toEqual({
       name: 'user',
       params: { cluster: 'foo', user: jobRunning.user }
     })
-    expect(overview.text()).toContain('Group')
-    expect(overview.text()).toContain(jobRunning.group)
-    expect(overview.text()).toContain('Priority')
-    expect(overview.text()).toContain(jobRunning.priority.number.toString())
-    expect(overview.text()).toContain('Nodes')
-    expect(overview.text()).toContain(jobRunning.nodes)
-    expect(overview.text()).toContain('Partition')
-    expect(overview.text()).toContain(jobRunning.partition)
-    expect(overview.text()).toContain('QOS')
-    expect(overview.text()).toContain(jobRunning.qos)
-    expect(overview.text()).toContain('Exit Code')
-    expect(overview.text()).toContain('SUCCESS (0)')
-    expect(wrapper.get('#account').text()).toContain('-')
-    expect(wrapper.get('#account').findComponent({ name: 'RouterLink' }).exists()).toBe(false)
+    expect(summary.text()).toContain('Account')
+    expect(summary.text()).toContain('-')
+    expect(links).toHaveLength(1)
+    expect(summary.text()).toContain('Partition')
+    expect(summary.text()).toContain(jobRunning.partition)
+    expect(summary.text()).toContain('Nodes')
+    expect(summary.text()).toContain(jobRunning.nodes)
+    expect(summary.text()).toContain('Exit Code')
+    expect(summary.text()).toContain('SUCCESS (0)')
+    expect(summary.text()).toContain('Requested')
+    expect(summary.text()).toContain('Allocated')
 
     expect(details.text()).toContain('Working directory')
     expect(wrapper.get('#workdir').text()).toContain(jobRunning.working_directory)
@@ -84,7 +82,7 @@ describe('JobView.vue', () => {
   })
 
   test('highlight job field in route hash', async () => {
-    await router.setHash('#user')
+    await router.setHash('#workdir')
     mockClusterDataPoller.data.value = jobRunning
     const wrapper = mount(JobView, {
       props: {
@@ -94,8 +92,9 @@ describe('JobView.vue', () => {
     })
     await nextTick()
 
-    expect(wrapper.get('#user').classes('ring-2')).toBe(true)
-    expect(wrapper.get('#group').classes('ring-2')).toBe(false)
+    expect(wrapper.get('#workdir').text()).toContain(jobRunning.working_directory)
+    expect(wrapper.get('#workdir').classes()).toContain('bg-[rgba(182,232,44,0.16)]')
+    expect(wrapper.get('#script').classes()).not.toContain('bg-[rgba(182,232,44,0.16)]')
   })
 
   test('renders job skeleton before data arrives', () => {

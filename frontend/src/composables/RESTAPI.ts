@@ -74,7 +74,7 @@ export function useRESTAPI() {
     withToken: boolean = true,
     responseType: ResponseType = 'json'
   ): Promise<CType> {
-    console.log(`Slurm-web gateway API get ${resource}`)
+    console.log(`Slurm Web Plus gateway API get ${resource}`)
     return (
       await requestServer(() => {
         return http.get(resource, requestConfig(withToken, responseType))
@@ -88,7 +88,7 @@ export function useRESTAPI() {
     withToken: boolean = true,
     responseType: ResponseType = 'json'
   ): Promise<CType> {
-    console.log(`Slurm-web gateway API post ${resource}`)
+    console.log(`Slurm Web Plus gateway API post ${resource}`)
     return (
       await requestServer(() => {
         return http.post(resource, data, requestConfig(withToken, responseType))
@@ -102,7 +102,7 @@ export function useRESTAPI() {
     withToken: boolean = true,
     responseType: ResponseType = 'json'
   ): Promise<CType> {
-    console.log(`Slurm-web gateway API post ${resource}`)
+    console.log(`Slurm Web Plus gateway API post ${resource}`)
     return (await requestServer(() => {
       return http.post(resource, data, requestConfig(withToken, responseType))
     })) as CType
@@ -114,7 +114,7 @@ export function useRESTAPI() {
     withToken: boolean = true,
     responseType: ResponseType = 'json'
   ): Promise<CType> {
-    console.log(`Slurm-web gateway API put ${resource}`)
+    console.log(`Slurm Web Plus gateway API put ${resource}`)
     return (
       await requestServer(() => {
         return http.put(resource, data, requestConfig(withToken, responseType))
@@ -128,7 +128,7 @@ export function useRESTAPI() {
     withToken: boolean = true,
     responseType: ResponseType = 'json'
   ): Promise<CType> {
-    console.log(`Slurm-web gateway API patch ${resource}`)
+    console.log(`Slurm Web Plus gateway API patch ${resource}`)
     return (
       await requestServer(() => {
         return http.patch(resource, data, requestConfig(withToken, responseType))
@@ -141,7 +141,7 @@ export function useRESTAPI() {
     withToken: boolean = true,
     responseType: ResponseType = 'json'
   ): Promise<CType> {
-    console.log(`Slurm-web gateway API delete ${resource}`)
+    console.log(`Slurm Web Plus gateway API delete ${resource}`)
     return (
       await requestServer(() => {
         return http.delete(resource, requestConfig(withToken, responseType))
