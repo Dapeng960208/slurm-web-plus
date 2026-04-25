@@ -26,6 +26,9 @@
 - Cache
   - [需求说明](./features/cache/requirements.md)
   - [测试计划](./features/cache/test-plan.md)
+- CI
+  - [需求说明](./features/ci/requirements.md)
+  - [验证说明](./features/ci/verification.md)
 - Management Center
   - [需求说明](./features/management-center/requirements.md)
   - [测试计划](./features/management-center/test-plan.md)
@@ -59,6 +62,7 @@
 
 本轮已落地的重点包括：
 
+- GitHub Actions 已切到 `main` 分支自动测试，并补结构化 CI 结果 artifact 与手工 triage 入口。
 - 基于现有业务页面增强 Slurm 管理能力，补齐单对象创建、编辑、删除、取消。
 - 新增集群级 `/:cluster/admin`，统一承载 `System`、`AI`、`LDAP Cache`、`Cache`、`Access Control`。
 - `jobs` 资源正式落地 `self` scope，普通用户默认只读非 `admin/*` 页面，并允许查看、编辑、取消自己的作业。

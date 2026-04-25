@@ -1,0 +1,55 @@
+---
+name: CI Triage
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: Workflow run ID to inspect
+        required: true
+        type: string
+      scope:
+        description: Artifact scope to include in triage
+        required: true
+        default: all
+        type: choice
+        options:
+        - all
+        - backend
+        - frontend
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  triage:
+    name: Aggregate CI artifacts
+    runs-on: ubuntu-latest
+    env:
+      RESULTS_DIR: ci-results/triage
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download run artifacts
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ inputs.run_id }}
+          path: downloaded-artifacts
+
+      - name: Build triage context
+        run: |
+          node .github/scripts/build-triage-context.mjs \
+            --artifacts-dir downloaded-artifacts \
+            --out-dir "$RESULTS_DIR" \
+            --scope "${{ inputs.scope }}" \
+            --run-id "${{ inputs.run_id }}"
+
+      - name: Upload triage artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: triage-context-${{ inputs.run_id }}
+          path: ${{ env.RESULTS_DIR }}
+          if-no-files-found: error

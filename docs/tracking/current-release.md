@@ -9,6 +9,7 @@
 - 在 `analysis` 页面补 `Slurm ping` 与 `diag`
 - 以 `jobs:view|edit|delete:*|self` 落地 owner-aware 权限校验
 - 补齐 `slurmrestd 0.39-0.44` 的读写兼容策略与测试基线
+- 收敛 GitHub CI 到 `main` 分支自动测试，并为后续 AI / 脚本补结构化结果产物
 
 ## 2. 已完成项
 
@@ -54,12 +55,33 @@
   - `admin-manage`
   - `edit-own-jobs`
 - 新增/更新了与本任务相关的前后端测试基线
+- GitHub Actions 已补自动触发：
+  - `pull_request` 到 `main`
+  - `push` 到 `main`
+- 自动 CI 当前固定版本为：
+  - 后端 `Python 3.12`
+  - 前端 `Node 18`
+- 自动 CI 当前覆盖：
+  - 后端单元测试
+  - 前端单元测试
+  - 前端 `ESLint`
+  - 前端 `TypeScript type-check`
+  - 前端生产构建
+- 后端 rpm/deb OS 集成矩阵已拆到手工 `python-os-ci.yml`
+- 新增统一 CI 结果产物：
+  - `stdout.log`
+  - `result.json`
+  - `failure-context.json`
+  - `junit.xml`（测试类 job）
+- 新增手工 `CI Triage` workflow，可按 `run_id` 聚合 `backend` / `frontend` / `all` artifact
 
 ## 3. 进行中项
 
 - 对齐 `accounts/users/qos/reservation` 的轻量前端表单字段与官方 JSON 结构边界
 - 继续评估是否需要为 `admin/system` 补更多官方只读面板
 - 视 Linux/CI 环境情况补全更大范围后端回归
+- 评估后续是否需要把 `CI Triage` 结果继续接给外部 AI agent 做只读诊断
+- 评估是否需要为结构化 CI 结果补 GitHub issue / PR comment 自动摘要
 
 ## 4. 风险与阻塞
 
@@ -68,6 +90,7 @@
 - `.venv\Scripts\python.exe -m pytest -q slurmweb/tests` 在当前 Windows 环境下仍不适合作为本轮唯一验收结论
 - 部分前端测试夹具仍以旧 `actions[]` 为主，若继续扩大回归范围，需继续向 `rules[]` 夹具收敛
 - `admin-manage` 只覆盖 `/:cluster/admin` 下资源，不会自动授予独立 AI 工作台 `ai:view:*`
+- 当前仓库内置 AI 仍不能直接读取 GitHub Actions run；本轮只打通“结构化结果可查询”，未实现自动修复
 
 ## 5. 已同步文档
 
@@ -79,6 +102,8 @@
 - `docs/features/access-control/test-plan.md`
 - `docs/features/ai/requirements.md`
 - `docs/features/cache/requirements.md`
+- `docs/features/ci/requirements.md`
+- `docs/features/ci/verification.md`
 - `docs/features/management-center/requirements.md`
 - `docs/features/management-center/test-plan.md`
 - `docs/guides/deployment-guide.md`
@@ -101,3 +126,11 @@
 - `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/test_permission_rules.py slurmweb/tests/test_access_control_policy.py slurmweb/tests/views/test_agent_operations.py slurmweb/tests/views/test_gateway_operations.py slurmweb/tests/slurmrestd/test_slurmrestd_write_operations.py`
 - `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/views/test_agent.py slurmweb/tests/views/test_gateway.py slurmweb/tests/views/test_gateway_clusters.py`
 - `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/test_permission_rules.py slurmweb/tests/test_access_control_policy.py slurmweb/tests/views/test_agent_permissions.py slurmweb/tests/apps/test_agent.py`
+- `node --check .github/scripts/run-ci-command.mjs`
+- `node --check .github/scripts/ensure-ci-result.mjs`
+- `node --check .github/scripts/build-triage-context.mjs`
+- `Get-Content -Raw -Encoding UTF8 .github/workflows/python-ci.yml | npx --yes yaml valid`
+- `Get-Content -Raw -Encoding UTF8 .github/workflows/python-os-ci.yml | npx --yes yaml valid`
+- `Get-Content -Raw -Encoding UTF8 .github/workflows/frontend-ci.yml | npx --yes yaml valid`
+- `Get-Content -Raw -Encoding UTF8 .github/workflows/frontend-static.yml | npx --yes yaml valid`
+- `Get-Content -Raw -Encoding UTF8 .github/workflows/ci-triage.yml | npx --yes yaml valid`

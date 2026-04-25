@@ -164,3 +164,21 @@
   - `_resolved_scope(...)` 改为向 callable 透传 `*args, **kwargs`
   - `user_metrics_history` / `user_activity_summary` 的 scope lambda 显式接收 `username`
 - 预防：凡是按请求参数动态判定 `self` / `*` 的权限装饰器，都要补对应回归测试，避免闭包或参数绑定错误在运行时才暴露。
+
+### 2026-04-25：当前 PowerShell 环境缺少 `ConvertFrom-Yaml`，不能把它当成 workflow 校验默认工具
+
+- 场景：为验证新增 GitHub Actions workflow，尝试在当前 Windows PowerShell 环境执行 `Get-Content -Raw -Encoding UTF8 <workflow> | ConvertFrom-Yaml`。
+- 现象：终端返回 `ConvertFrom-Yaml : The term 'ConvertFrom-Yaml' is not recognized as the name of a cmdlet...`。
+- 复现：在当前仓库终端执行 `Get-Content -Raw -Encoding UTF8 .github/workflows/python-ci.yml | ConvertFrom-Yaml`。
+- 根因：当前 PowerShell 环境未提供 `ConvertFrom-Yaml` cmdlet，不能假定它像 `ConvertFrom-Json` 一样默认可用。
+- 解决：改用 `Get-Content -Raw -Encoding UTF8 <workflow> | npx --yes yaml valid` 做 YAML 语法校验，同时保留人工检查。
+- 预防：后续在 Windows 环境校验 YAML 时，不要默认依赖 `ConvertFrom-Yaml`；先确认 cmdlet 是否存在，或直接使用独立 YAML CLI。
+
+### 2026-04-25：GitHub Actions job 名包含 `:` 但未加引号时，workflow YAML 会直接解析失败
+
+- 场景：新增手工 `python-os-ci.yml` 后，用 YAML CLI 校验 workflow 语法。
+- 现象：`Get-Content -Raw -Encoding UTF8 .github/workflows/python-os-ci.yml | npx --yes yaml valid` 返回 `YAMLParseError: Nested mappings are not allowed in compact mappings`，错误定位到 job `name:` 行。
+- 复现：在 job 名写入 `name: OS integration tests (rpm: ${{ matrix.envs.artifact }})` 这类未加引号的值后执行 YAML 校验。
+- 根因：YAML 把未加引号的 `:` 解释为映射分隔符，导致 job 名字符串被错误拆解。
+- 解决：把含 `:` 的 job 名改为带双引号的标量，例如 `name: "OS integration tests (rpm: ...)"`。
+- 预防：后续在 workflow 里凡是名称、说明、命令片段包含 `:`、`{}`、`${{ ... }}` 等复杂字符时，优先显式加引号，并在提交前跑一轮 YAML 语法校验。

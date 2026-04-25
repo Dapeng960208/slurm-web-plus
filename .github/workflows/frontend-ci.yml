@@ -1,6 +1,10 @@
 ---
 name: Frontend Tests
 on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
   workflow_dispatch: {}
 
 permissions:
@@ -8,21 +12,42 @@ permissions:
 
 jobs:
   vuejs_tests:
-    name: Vue.js unit tests (Node ${{ matrix.node-version }})
-    runs-on: "ubuntu-latest"
-    strategy:
-      fail-fast: false
-      matrix:
-        node-version: [18, 20, 22, lts/*]
+    name: Vue.js unit tests (Node 18)
+    runs-on: ubuntu-latest
+    env:
+      RESULTS_DIR: ci-results/frontend-unit-node-18
+      ARTIFACT_NAME: frontend-unit-node-18
     steps:
       - uses: actions/checkout@v4
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: ${{ matrix.node-version }}
+          node-version: "18"
           cache: 'npm'
           cache-dependency-path: frontend/package-lock.json
-      - name: Install npm packages
-        run: cd frontend && npm ci
-      - name: Run tests
-        run: cd frontend && npm run test:unit
+      - name: Run frontend unit test command
+        run: |
+          COMMAND="cd frontend && npm ci && npx vitest run --reporter=default --reporter=junit --outputFile=${GITHUB_WORKSPACE}/${RESULTS_DIR}/junit.xml"
+          node .github/scripts/run-ci-command.mjs \
+            --results-dir "$RESULTS_DIR" \
+            --artifact-name "$ARTIFACT_NAME" \
+            --label "frontend-unit-tests" \
+            --junit-path "${RESULTS_DIR}/junit.xml" \
+            --command "$COMMAND"
+
+      - name: Ensure frontend unit test result
+        if: always()
+        run: |
+          node .github/scripts/ensure-ci-result.mjs \
+            --results-dir "$RESULTS_DIR" \
+            --artifact-name "$ARTIFACT_NAME" \
+            --label "frontend-unit-tests" \
+            --command "npx vitest run --reporter=default --reporter=junit"
+
+      - name: Upload frontend unit test artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.ARTIFACT_NAME }}
+          path: ${{ env.RESULTS_DIR }}
+          if-no-files-found: error

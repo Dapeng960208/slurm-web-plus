@@ -1,0 +1,134 @@
+---
+name: Backend OS Integration Tests
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  os_rpm_tests:
+    name: "OS integration tests (rpm: ${{ matrix.envs.artifact }})"
+    strategy:
+      fail-fast: false
+      matrix:
+        envs:
+        - container: rockylinux/rockylinux:8
+          epel: 8
+          repo: powertools
+          rackslab-repo: el8
+          racksdb-pkg: python3-racksdb-web
+          artifact: rockylinux-8
+          needs-epel: "true"
+        - container: rockylinux/rockylinux:9
+          epel: 9
+          rackslab-repo: el9
+          repo: crb
+          racksdb-pkg: python3-racksdb+web
+          artifact: rockylinux-9
+          needs-epel: "true"
+        - container: fedora:42
+          rackslab-repo: fc42
+          racksdb-pkg: python3-racksdb+web
+          artifact: fedora-42
+          needs-epel: "false"
+    runs-on: ubuntu-latest
+    container:
+      image: ${{ matrix.envs.container }}
+    env:
+      RESULTS_DIR: ci-results/backend-rpm-${{ matrix.envs.artifact }}
+      ARTIFACT_NAME: backend-rpm-${{ matrix.envs.artifact }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run backend rpm integration command
+        run: |
+          COMMAND=""
+          if [[ '${{ matrix.envs.needs-epel }}' == 'true' ]]; then
+            COMMAND="dnf -y install 'dnf-command(config-manager)' && dnf config-manager --set-enabled ${{ matrix.envs.repo }} && dnf -y install https://dl.fedoraproject.org/pub/epel/epel-release-latest-${{ matrix.envs.epel }}.noarch.rpm && "
+          fi
+          COMMAND="${COMMAND}curl --silent https://pkgs.rackslab.io/keyring.asc --output /etc/pki/rpm-gpg/RPM-GPG-KEY-Rackslab && printf '%s\n' '[rackslab]' 'name=Rackslab' 'baseurl=https://pkgs.rackslab.io/rpm/${{ matrix.envs.rackslab-repo }}/main/x86_64/' 'gpgcheck=1' 'gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-Rackslab' > /etc/yum.repos.d/rackslab.repo && dnf -y install python3-aiohttp python3-clustershell python3-flask python3-importlib-metadata python3-markdown python3-parameterized python3-pip python3-prometheus_client python3-pytest python3-PyYAML ${{ matrix.envs.racksdb-pkg }} python3-redis python3-requests python3-rfl-authentication python3-rfl-build python3-rfl-core python3-rfl-log python3-rfl-settings python3-rfl-web"
+          if [[ '${{ matrix.envs.container }}' == 'rockylinux/rockylinux:8' ]]; then
+            COMMAND="${COMMAND} && cp -v /usr/lib/python3.6/site-packages/rfl/build/scripts/setup setup.py && sed -i 's/RFL\\./rfl-/' pyproject.toml"
+          fi
+          COMMAND="${COMMAND} && pip3 install -e . && pytest-3 --junitxml=${RESULTS_DIR}/junit.xml"
+          node .github/scripts/run-ci-command.mjs \
+            --results-dir "$RESULTS_DIR" \
+            --artifact-name "$ARTIFACT_NAME" \
+            --label "backend-rpm-integration" \
+            --junit-path "${RESULTS_DIR}/junit.xml" \
+            --command "$COMMAND"
+
+      - name: Ensure backend rpm integration result
+        if: always()
+        run: |
+          node .github/scripts/ensure-ci-result.mjs \
+            --results-dir "$RESULTS_DIR" \
+            --artifact-name "$ARTIFACT_NAME" \
+            --label "backend-rpm-integration" \
+            --command "pytest-3 --junitxml=${RESULTS_DIR}/junit.xml"
+
+      - name: Upload backend rpm integration artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.ARTIFACT_NAME }}
+          path: ${{ env.RESULTS_DIR }}
+          if-no-files-found: error
+
+  os_deb_tests:
+    name: "OS integration tests (deb: ${{ matrix.envs.artifact }})"
+    strategy:
+      fail-fast: false
+      matrix:
+        envs:
+        - container: debian:oldstable
+          rackslab-repo: bookworm
+          artifact: debian-bookworm
+        - container: debian:stable
+          rackslab-repo: trixie
+          artifact: debian-trixie
+        - container: debian:testing
+          rackslab-repo: forky
+          artifact: debian-forky
+        - container: debian:unstable
+          rackslab-repo: sid
+          artifact: debian-sid
+        - container: ubuntu:noble
+          rackslab-repo: ubuntu24.04
+          artifact: ubuntu-24-04
+    runs-on: ubuntu-latest
+    container:
+      image: ${{ matrix.envs.container }}
+    env:
+      RESULTS_DIR: ci-results/backend-deb-${{ matrix.envs.artifact }}
+      ARTIFACT_NAME: backend-deb-${{ matrix.envs.artifact }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run backend deb integration command
+        run: |
+          COMMAND="apt update && apt install -y ca-certificates curl gpg && curl -sS https://pkgs.rackslab.io/keyring.asc | gpg --dearmor | tee /usr/share/keyrings/rackslab.gpg > /dev/null && printf '%s\n' 'Types: deb' 'URIs: https://pkgs.rackslab.io/deb' 'Suites: ${{ matrix.envs.rackslab-repo }}' 'Components: main' 'Architectures: amd64' 'Signed-By: /usr/share/keyrings/rackslab.gpg' > /etc/apt/sources.list.d/rackslab.sources && apt update && apt install -y python3-aiohttp python3-clustershell python3-flask python3-markdown python3-parameterized python3-pip python3-prometheus-client python3-pytest python3-yaml python3-racksdb-web python3-redis python3-requests python3-rfl-authentication python3-rfl-build python3-rfl-core python3-rfl-log python3-rfl-settings python3-rfl-web python3-venv && python3 -m venv --system-site-packages ~/venv && ~/venv/bin/pip install -e . && pytest --junitxml=${RESULTS_DIR}/junit.xml"
+          node .github/scripts/run-ci-command.mjs \
+            --results-dir "$RESULTS_DIR" \
+            --artifact-name "$ARTIFACT_NAME" \
+            --label "backend-deb-integration" \
+            --junit-path "${RESULTS_DIR}/junit.xml" \
+            --command "$COMMAND"
+
+      - name: Ensure backend deb integration result
+        if: always()
+        run: |
+          node .github/scripts/ensure-ci-result.mjs \
+            --results-dir "$RESULTS_DIR" \
+            --artifact-name "$ARTIFACT_NAME" \
+            --label "backend-deb-integration" \
+            --command "pytest --junitxml=${RESULTS_DIR}/junit.xml"
+
+      - name: Upload backend deb integration artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.ARTIFACT_NAME }}
+          path: ${{ env.RESULTS_DIR }}
+          if-no-files-found: error

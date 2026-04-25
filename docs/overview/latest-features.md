@@ -1,5 +1,48 @@
 ﻿# 最新功能
 
+## 本轮：GitHub Actions 已切到 `main` 分支自动测试，并补结构化结果 artifact
+
+本轮把仓库 CI 从“以手工触发为主”收敛到“提交即自动验证”：
+
+- `pull_request` 到 `main` 自动触发
+- `push` 到 `main` 自动触发
+- 仍保留 `workflow_dispatch`
+
+当前自动 CI 固定版本为：
+
+- 后端 `Python 3.12`
+- 前端 `Node 18`
+
+本轮自动运行的检查包括：
+
+- 后端单元测试
+- 前端单元测试
+- 前端 `ESLint`
+- 前端 `TypeScript type-check`
+- 前端生产构建
+
+同时补了统一的 CI 结果产物契约，每个 job 都会尝试上传：
+
+- `stdout.log`
+- `result.json`
+- `failure-context.json`
+
+测试类 job 额外上传：
+
+- `junit.xml`
+
+为便于后续 AI 或脚本消费失败上下文，本轮新增手工 `CI Triage` workflow：
+
+- 输入 `run_id`
+- 可按 `backend` / `frontend` / `all` 聚合 artifact
+- 输出 `triage-context.json`
+
+明确边界：
+
+- 当前仓库内置 AI 还不能直接读取 GitHub Actions
+- 当前也不会自动修复失败测试或自动提 PR
+- 本轮只把“结果可查询、可聚合”的基础设施铺平
+
 ## 本轮：默认权限模型按 `jobs:*:self` 与全局 `admin view/edit` 修正
 
 本轮对权限基线做了审查修正，当前默认行为固定为：

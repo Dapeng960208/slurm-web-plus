@@ -165,3 +165,45 @@ Vue 页面
 - `ClusterAnalysisView.vue`
 
 旧 `hasClusterPermission(...)` 仍保留，用于兼容尚未迁移的 action 级消费点和旧测试数据。
+
+## 8. GitHub 自动 CI 与 triage 链路
+
+本轮新增一条独立于运行时架构之外的仓库交付链路：
+
+```text
+GitHub push / pull_request(main)
+  -> GitHub Actions workflows
+     -> 单版本后端/前端检查
+     -> 统一 artifact 目录
+        -> stdout.log
+        -> result.json
+        -> failure-context.json
+        -> junit.xml (tests only)
+  -> 手工 CI Triage workflow
+     -> 按 run_id 下载 artifact
+     -> 生成 triage-context.json
+```
+
+当前职责分工：
+
+- `python-ci.yml`
+  - 自动后端单元测试
+  - 固定 `Python 3.12`
+- `frontend-ci.yml`
+  - 自动前端单元测试
+  - 固定 `Node 18`
+- `frontend-static.yml`
+  - 自动 `lint`、`type-check`、`build`
+  - 固定 `Node 18`
+- `python-os-ci.yml`
+  - 手工 rpm/deb OS 集成矩阵
+- `ci-triage.yml`
+  - 手工聚合结构化 CI artifact
+
+仓库内置 AI 当前不在这条链路内：
+
+- 不直接读取 GitHub Actions run
+- 不自动修改代码
+- 不自动创建 PR
+
+因此本轮 CI 设计目标不是“自动修复”，而是先把失败上下文标准化为后续 agent 可消费的数据接口。

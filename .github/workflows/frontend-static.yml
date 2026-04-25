@@ -1,6 +1,10 @@
 ---
 name: Frontend Static Analysis
 on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
   workflow_dispatch: {}
 
 permissions:
@@ -10,37 +14,125 @@ jobs:
   lint:
     name: Frontend ESLint
     runs-on: ubuntu-latest
+    env:
+      RESULTS_DIR: ci-results/frontend-lint-node-18
+      ARTIFACT_NAME: frontend-lint-node-18
     steps:
       - uses: actions/checkout@v4
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: lts/*
+          node-version: "18"
           cache: 'npm'
           cache-dependency-path: frontend/package-lock.json
 
-      - name: Install dependencies
-        run: cd frontend && npm ci
+      - name: Run frontend lint command
+        run: |
+          COMMAND="cd frontend && npm ci && npx eslint ."
+          node .github/scripts/run-ci-command.mjs \
+            --results-dir "$RESULTS_DIR" \
+            --artifact-name "$ARTIFACT_NAME" \
+            --label "frontend-eslint" \
+            --command "$COMMAND"
 
-      - name: Run ESLint
-        run: cd frontend && npm run lint
+      - name: Ensure frontend lint result
+        if: always()
+        run: |
+          node .github/scripts/ensure-ci-result.mjs \
+            --results-dir "$RESULTS_DIR" \
+            --artifact-name "$ARTIFACT_NAME" \
+            --label "frontend-eslint" \
+            --command "npx eslint ."
+
+      - name: Upload frontend lint artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.ARTIFACT_NAME }}
+          path: ${{ env.RESULTS_DIR }}
+          if-no-files-found: error
 
   typecheck:
     name: Frontend TypeScript type checking
     runs-on: ubuntu-latest
+    env:
+      RESULTS_DIR: ci-results/frontend-typecheck-node-18
+      ARTIFACT_NAME: frontend-typecheck-node-18
     steps:
       - uses: actions/checkout@v4
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: lts/*
+          node-version: "18"
           cache: 'npm'
           cache-dependency-path: frontend/package-lock.json
 
-      - name: Install dependencies
-        run: cd frontend && npm ci
+      - name: Run frontend typecheck command
+        run: |
+          COMMAND="cd frontend && npm ci && npm run type-check"
+          node .github/scripts/run-ci-command.mjs \
+            --results-dir "$RESULTS_DIR" \
+            --artifact-name "$ARTIFACT_NAME" \
+            --label "frontend-typecheck" \
+            --command "$COMMAND"
 
-      - name: Run TypeScript type checking
-        run: cd frontend && npm run type-check
+      - name: Ensure frontend typecheck result
+        if: always()
+        run: |
+          node .github/scripts/ensure-ci-result.mjs \
+            --results-dir "$RESULTS_DIR" \
+            --artifact-name "$ARTIFACT_NAME" \
+            --label "frontend-typecheck" \
+            --command "npm run type-check"
+
+      - name: Upload frontend typecheck artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.ARTIFACT_NAME }}
+          path: ${{ env.RESULTS_DIR }}
+          if-no-files-found: error
+
+  build:
+    name: Frontend production build
+    runs-on: ubuntu-latest
+    env:
+      RESULTS_DIR: ci-results/frontend-build-node-18
+      ARTIFACT_NAME: frontend-build-node-18
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Run frontend build command
+        run: |
+          COMMAND="cd frontend && npm ci && npm run build"
+          node .github/scripts/run-ci-command.mjs \
+            --results-dir "$RESULTS_DIR" \
+            --artifact-name "$ARTIFACT_NAME" \
+            --label "frontend-build" \
+            --command "$COMMAND"
+
+      - name: Ensure frontend build result
+        if: always()
+        run: |
+          node .github/scripts/ensure-ci-result.mjs \
+            --results-dir "$RESULTS_DIR" \
+            --artifact-name "$ARTIFACT_NAME" \
+            --label "frontend-build" \
+            --command "npm run build"
+
+      - name: Upload frontend build artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.ARTIFACT_NAME }}
+          path: ${{ env.RESULTS_DIR }}
+          if-no-files-found: error
