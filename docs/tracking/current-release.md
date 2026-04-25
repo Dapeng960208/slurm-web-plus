@@ -82,6 +82,7 @@
 - 视 Linux/CI 环境情况补全更大范围后端回归
 - 评估后续是否需要把 `CI Triage` 结果继续接给外部 AI agent 做只读诊断
 - 评估是否需要为结构化 CI 结果补 GitHub issue / PR comment 自动摘要
+- `ci(workflows): automate main branch checks` 已完成本地提交 `5733012`，当前待网络恢复后 push 到 `origin/main`
 
 ## 4. 风险与阻塞
 
