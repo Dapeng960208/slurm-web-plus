@@ -50,6 +50,54 @@ export interface RuntimeStore {
   reportError: CallableFunction
 }
 
+type PermissionOperation = 'view' | 'edit' | 'delete' | '*'
+type PermissionScope = '*' | 'self'
+
+const LEGACY_PERMISSION_RULES: Record<string, string[]> = {
+  'view-stats': ['dashboard:view:*', 'analysis:view:*'],
+  'view-jobs': ['jobs:view:*', 'user/analysis:view:self'],
+  'view-history-jobs': ['jobs-history:view:*'],
+  'view-nodes': ['resources:view:*'],
+  'view-qos': ['qos:view:*', 'jobs/filter-qos:view:*'],
+  'view-reservations': ['reservations:view:*'],
+  'associations-view': ['accounts:view:*', 'user/profile:view:*'],
+  'view-accounts': ['jobs/filter-accounts:view:*'],
+  'view-partitions': ['jobs/filter-partitions:view:*', 'resources/filter-partitions:view:*'],
+  'cache-view': ['settings/cache:view:*', 'settings/ldap-cache:view:*'],
+  'cache-reset': ['settings/cache:edit:*'],
+  'roles-view': ['settings/access-control:view:*'],
+  'roles-manage': ['settings/access-control:edit:*', 'settings/access-control:delete:*'],
+  'view-ai': ['ai:view:*', 'settings/ai:view:*'],
+  'manage-ai': ['settings/ai:edit:*']
+}
+
+function operationAllows(granted: PermissionOperation, requested: PermissionOperation): boolean {
+  if (granted === '*') return true
+  if (requested === 'view') return ['view', 'edit', 'delete'].includes(granted)
+  return granted === requested
+}
+
+function resourceAllows(granted: string, requested: string): boolean {
+  if (granted === '*') return true
+  if (granted === requested) return true
+  return granted.endsWith('/*') && requested.startsWith(granted.slice(0, -1))
+}
+
+function ruleAllows(
+  rule: string,
+  resource: string,
+  operation: PermissionOperation,
+  scope: PermissionScope
+): boolean {
+  const [grantedResource, grantedOperation, grantedScope] = rule.split(':')
+  if (!grantedResource || !grantedOperation || !grantedScope) return false
+  return (
+    resourceAllows(grantedResource, resource) &&
+    operationAllows(grantedOperation as PermissionOperation, operation) &&
+    (grantedScope === '*' || grantedScope === scope)
+  )
+}
+
 export const useRuntimeStore = defineStore('runtime', () => {
   const routePath: Ref<string> = ref('/')
   const beforeSettingsRoute: Ref<RouteLocation | undefined> = ref(undefined)
@@ -77,7 +125,11 @@ export const useRuntimeStore = defineStore('runtime', () => {
   }
 
   function getAllowedClusters() {
-    return availableClusters.value.filter((cluster) => cluster.permissions.actions.length > 0)
+    return availableClusters.value.filter(
+      (cluster) =>
+        (cluster.permissions.actions?.length ?? 0) > 0 ||
+        (cluster.permissions.rules?.length ?? 0) > 0
+    )
   }
 
   function checkClusterAvailable(name: string): boolean {
@@ -87,14 +139,33 @@ export const useRuntimeStore = defineStore('runtime', () => {
   function hasPermission(permission: string): boolean {
     return (
       currentCluster.value === undefined ||
-      currentCluster.value.permissions.actions.includes(permission)
+      (currentCluster.value.permissions.actions ?? []).includes(permission)
     )
   }
 
   function hasClusterPermission(clusterName: string, permission: string): boolean {
     const cluster = getCluster(clusterName)
     if (!cluster) return false
-    return cluster.permissions.actions.includes(permission)
+    return (cluster.permissions.actions ?? []).includes(permission)
+  }
+
+  function hasRoutePermission(
+    clusterName: string,
+    resource: string,
+    operation: PermissionOperation = 'view',
+    scope: PermissionScope = '*'
+  ): boolean {
+    const cluster = getCluster(clusterName)
+    if (!cluster) return false
+    const rules = new Set(cluster.permissions.sources?.merged?.rules ?? cluster.permissions.rules ?? [])
+    if (rules.size === 0) {
+      for (const action of cluster.permissions.actions ?? []) {
+        for (const rule of LEGACY_PERMISSION_RULES[action] ?? []) {
+          rules.add(rule)
+        }
+      }
+    }
+    return [...rules].some((rule) => ruleAllows(rule, resource, operation, scope))
   }
 
   function addNotification(notification: Notification) {
@@ -137,6 +208,7 @@ export const useRuntimeStore = defineStore('runtime', () => {
     checkClusterAvailable,
     hasPermission,
     hasClusterPermission,
+    hasRoutePermission,
     addNotification,
     removeNotification,
     reportError,

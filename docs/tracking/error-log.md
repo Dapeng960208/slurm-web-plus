@@ -17,6 +17,24 @@
 
 ## 条目
 
+### 2026-04-25：前端测试夹具只写 `actions[]` 时，新规则页面会被误判为无权限
+
+- 场景：迁移前端页面到 `hasRoutePermission(...)` 后，运行 Settings、AI、用户空间相关单测。
+- 现象：页面直接进入“无权限”分支，测试里原本可见的按钮、表格和链接全部消失。
+- 复现：在测试里直接给 `runtimeStore.availableClusters` 塞只有 `permissions.actions`、没有 `permissions.rules` 的对象，然后渲染新权限页面。
+- 根因：这些测试夹具绕过了 `normalizeClusterPermissions(...)`，而新页面优先按规则判权。
+- 解决：在 `runtime.hasRoutePermission(...)` 中增加从旧 `actions[]` 到规则的兼容回退，并逐步为新测试数据补充 `rules[]`。
+- 预防：后续前端测试若直接构造 cluster 权限对象，优先写入 `rules[]`，或先经过统一的权限归一化逻辑。
+
+### 2026-04-25：Windows 下执行全量 `pytest -q` 会在收集阶段因平台依赖和旧测试树失败
+
+- 场景：提交前尝试在当前开发机上执行仓库全量后端测试。
+- 现象：`pytest -q` 在收集阶段直接失败，典型错误包括 `ModuleNotFoundError: No module named 'pwd'`、`ModuleNotFoundError: No module named 'racksdb'`，以及 `slurmweb4.2` 测试树依赖 `SlurmwebConfSeed` 导入失败。
+- 复现：在当前 Windows 环境执行 `.venv\Scripts\python.exe -m pytest -q`。
+- 根因：仓库里同时包含 Unix 依赖模块、可选依赖未安装的测试，以及 `slurmweb4.2` 兼容测试树；这些条件在当前 Windows 环境下并不满足。
+- 解决：本次改动仅对受影响模块执行定向 pytest，未继续扩大到当前环境无法收集的全量测试树。
+- 预防：后续若需要跑全量后端测试，应先按平台拆分测试入口，或在 CI / 文档中明确哪些测试需在 Linux 且装齐可选依赖后执行。
+
 ### 2026-04-24：ripgrep 的 look-around 默认不可用导致搜索表达式报错
 
 - 场景：在仓库内用 `rg` 搜索旧文档路径引用时，想用 look-ahead/behind 过滤结果。

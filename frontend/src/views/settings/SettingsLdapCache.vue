@@ -43,7 +43,7 @@ const pageVisible = computed(
 )
 
 async function fetchClusterUsers(cluster: ClusterDescription) {
-  if (!cluster.database || !runtimeStore.hasClusterPermission(cluster.name, 'cache-view')) return
+  if (!cluster.database || !runtimeStore.hasRoutePermission(cluster.name, 'settings/ldap-cache', 'view')) return
 
   if (clusterPages[cluster.name] === undefined) clusterPages[cluster.name] = 1
   if (clusterQueries[cluster.name] === undefined) clusterQueries[cluster.name] = ''
@@ -154,7 +154,7 @@ onMounted(async () => {
         </h3>
       </div>
 
-      <InfoAlert v-if="!runtimeStore.hasClusterPermission(cluster.name, 'cache-view')">
+      <InfoAlert v-if="!runtimeStore.hasRoutePermission(cluster.name, 'settings/ldap-cache', 'view')">
         No permission to get LDAP cache information on this cluster.
       </InfoAlert>
       <InfoAlert v-else-if="!cluster.database">
@@ -244,7 +244,7 @@ onMounted(async () => {
                         Open analysis
                       </RouterLink>
                       <RouterLink
-                        v-if="runtimeStore.hasClusterPermission(cluster.name, 'view-history-jobs')"
+                        v-if="runtimeStore.hasRoutePermission(cluster.name, 'jobs-history', 'view')"
                         :to="{ name: 'jobs-history', params: { cluster: cluster.name }, query: { user: user.username } }"
                         class="ui-button-secondary"
                       >

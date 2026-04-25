@@ -318,6 +318,39 @@ function forbiddenRoute(
   }
 }
 
+function clusterRoutePermission(
+  routeName: string | symbol | null | undefined
+): { resource: string; operation: 'view' } | null {
+  switch (routeName) {
+    case 'dashboard':
+      return { resource: 'dashboard', operation: 'view' }
+    case 'analysis':
+      return { resource: 'analysis', operation: 'view' }
+    case 'ai':
+      return { resource: 'ai', operation: 'view' }
+    case 'jobs':
+    case 'job':
+      return { resource: 'jobs', operation: 'view' }
+    case 'jobs-history':
+    case 'job-history':
+      return { resource: 'jobs-history', operation: 'view' }
+    case 'resources':
+    case 'resources-diagram-nodes':
+    case 'resources-diagram-cores':
+    case 'node':
+      return { resource: 'resources', operation: 'view' }
+    case 'qos':
+      return { resource: 'qos', operation: 'view' }
+    case 'reservations':
+      return { resource: 'reservations', operation: 'view' }
+    case 'accounts':
+    case 'account':
+      return { resource: 'accounts', operation: 'view' }
+    default:
+      return null
+  }
+}
+
 router.beforeEach(async (to, from) => {
   /* redirect to login page if not logged in and trying to access a restricted page */
   const publicPages = [
@@ -351,7 +384,21 @@ router.beforeEach(async (to, from) => {
     if (!runtime.currentCluster || to.params.cluster !== runtime.currentCluster.name) {
       runtime.currentCluster = runtime.getCluster(to.params.cluster as string)
       console.log(
-        `New cluster ${runtime.currentCluster?.name} permissions: ${runtime.currentCluster?.permissions.actions}`
+        `New cluster ${runtime.currentCluster?.name} permissions: ${runtime.currentCluster?.permissions.rules}`
+      )
+    }
+    const requiredPermission = clusterRoutePermission(to.name)
+    if (
+      requiredPermission &&
+      !runtime.hasRoutePermission(
+        to.params.cluster as string,
+        requiredPermission.resource,
+        requiredPermission.operation
+      )
+    ) {
+      return forbiddenRoute(
+        to.params.cluster as string,
+        `${requiredPermission.resource}:${requiredPermission.operation}:*`
       )
     }
     // Guard feature-gated routes
@@ -363,9 +410,9 @@ router.beforeEach(async (to, from) => {
     }
     if (
       (to.name === 'jobs-history' || to.name === 'job-history') &&
-      !runtime.hasClusterPermission(to.params.cluster as string, 'view-history-jobs')
+      !runtime.hasRoutePermission(to.params.cluster as string, 'jobs-history', 'view')
     ) {
-      return forbiddenRoute(to.params.cluster as string, 'view-history-jobs')
+      return forbiddenRoute(to.params.cluster as string, 'jobs-history:view:*')
     }
   } else {
     console.log(`Unsetting current cluster`)
@@ -380,9 +427,13 @@ router.beforeEach(async (to, from) => {
   }
   if (
     to.name === 'settings-access-control' &&
-    !runtime.hasClusterPermission(getSettingsCluster(runtime)?.name ?? '', 'roles-view')
+    !runtime.hasRoutePermission(
+      getSettingsCluster(runtime)?.name ?? '',
+      'settings/access-control',
+      'view'
+    )
   ) {
-    return forbiddenRoute(getSettingsCluster(runtime)?.name, 'roles-view')
+    return forbiddenRoute(getSettingsCluster(runtime)?.name, 'settings/access-control:view:*')
   }
   if (to.name === 'settings-ai') {
     const settingsCluster = getSettingsCluster(runtime)
@@ -392,8 +443,8 @@ router.beforeEach(async (to, from) => {
     ) {
       return { name: 'settings' }
     }
-    if (!runtime.hasClusterPermission(settingsCluster.name, 'manage-ai')) {
-      return forbiddenRoute(settingsCluster.name, 'manage-ai')
+    if (!runtime.hasRoutePermission(settingsCluster.name, 'settings/ai', 'view')) {
+      return forbiddenRoute(settingsCluster.name, 'settings/ai:view:*')
     }
   }
   if (to.name === 'ai' && !hasClusterAIAssistant(runtime.currentCluster)) {
@@ -401,9 +452,9 @@ router.beforeEach(async (to, from) => {
   }
   if (
     to.name === 'ai' &&
-    !runtime.hasClusterPermission(to.params.cluster as string, 'view-ai')
+    !runtime.hasRoutePermission(to.params.cluster as string, 'ai', 'view')
   ) {
-    return forbiddenRoute(to.params.cluster as string, 'view-ai')
+    return forbiddenRoute(to.params.cluster as string, 'ai:view:*')
   }
 
   if (to.name === 'user' || to.name === 'my-profile') {
@@ -419,7 +470,7 @@ router.beforeEach(async (to, from) => {
       auth.username
     )
     if (!sections.any) {
-      return forbiddenRoute(clusterName, 'associations-view or view-jobs')
+      return forbiddenRoute(clusterName, 'user/profile:view:* or user/analysis:view:*')
     }
   }
 

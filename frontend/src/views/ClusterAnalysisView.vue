@@ -65,12 +65,12 @@ let refreshTimer: ReturnType<typeof setInterval> | null = null
 const clusterDetails = computed(() => runtimeStore.getCluster(cluster))
 const metricsEnabled = computed(() => Boolean(clusterDetails.value?.metrics))
 const persistenceEnabled = computed(() => Boolean(clusterDetails.value?.persistence))
-const canViewJobs = computed(() => runtimeStore.hasClusterPermission(cluster, 'view-jobs'))
-const canViewNodes = computed(() => runtimeStore.hasClusterPermission(cluster, 'view-nodes'))
+const canViewJobs = computed(() => runtimeStore.hasRoutePermission(cluster, 'jobs', 'view'))
+const canViewNodes = computed(() => runtimeStore.hasRoutePermission(cluster, 'resources', 'view'))
 const canViewHistory = computed(
-  () => persistenceEnabled.value && runtimeStore.hasClusterPermission(cluster, 'view-history-jobs')
+  () => persistenceEnabled.value && runtimeStore.hasRoutePermission(cluster, 'jobs-history', 'view')
 )
-const canViewResources = computed(() => runtimeStore.hasClusterPermission(cluster, 'view-nodes'))
+const canViewResources = computed(() => runtimeStore.hasRoutePermission(cluster, 'resources', 'view'))
 
 const analysis = computed(() =>
   analyzeCluster({

@@ -52,7 +52,7 @@ const runtimeStore = useRuntimeStore()
                 class="group relative flex gap-x-6 rounded-[20px] p-4 transition hover:bg-[rgba(182,232,44,0.12)]"
               >
                 <div
-                  v-if="cluster.permissions.actions.length > 0"
+                  v-if="(cluster.permissions.actions?.length ?? 0) > 0 || (cluster.permissions.rules?.length ?? 0) > 0"
                   class="mt-1 flex items-center justify-evenly gap-x-1.5"
                 >
                   <div

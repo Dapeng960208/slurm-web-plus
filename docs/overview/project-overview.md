@@ -2,95 +2,95 @@
 
 ## 1. 项目定位
 
-Slurm Web Plus 是面向 Slurm HPC 集群的 Web 管理与分析平台。它在不替代 Slurm 原生能力的前提下，提供统一的监控、查询、分析和权限入口。
+Slurm Web Plus 是面向 Slurm HPC 集群的 Web 管理与分析平台。它在不替代 Slurm 原生能力的前提下，提供统一的监控、查询、分析、权限和设置入口。
 
-当前仓库主要覆盖：
+当前仓库覆盖的核心能力包括：
 
 - 集群实时概览与分析
 - 作业、历史作业、节点、资源、账户、用户、QOS、预约查询
-- 基于 PostgreSQL 的历史作业持久化与用户分析
-- LDAP 登录、用户缓存和访问控制
-- 可选的 AI 助手能力
+- 基于 PostgreSQL 的历史作业持久化、LDAP 用户缓存、访问控制和 AI 配置持久化
+- 基于 Prometheus 的集群指标、节点指标和用户分析
+- 基于角色的细粒度路由权限控制
 
-## 2. 当前前端核心入口
+## 2. 当前主要入口
 
-前端采用 `Vue 3 + TypeScript + Vue Router + Pinia`，高频入口分为两类：
+全局入口：
 
-- 全局入口
-  - `/clusters`
-  - `/settings`
-  - `/login`
-  - `/anonymous`
-  - `/signout`
-  - `/forbidden`
-- 集群范围入口
-  - `/:cluster/dashboard`
-  - `/:cluster/analysis`
-  - `/:cluster/jobs`
-  - `/:cluster/jobs/history`
-  - `/:cluster/resources`
-  - `/:cluster/accounts`
-  - `/:cluster/users/:user`
-  - `/:cluster/me`
-  - `/:cluster/ai`
+- `/clusters`
+- `/settings`
+- `/login`
+- `/anonymous`
+- `/signout`
+- `/forbidden`
 
-## 3. 用户工作台
+集群范围入口：
 
-本轮把用户相关入口统一收口到“用户工作台”：
+- `/:cluster/dashboard`
+- `/:cluster/analysis`
+- `/:cluster/ai`
+- `/:cluster/jobs`
+- `/:cluster/jobs/history`
+- `/:cluster/resources`
+- `/:cluster/qos`
+- `/:cluster/reservations`
+- `/:cluster/accounts`
+- `/:cluster/users/:user`
+- `/:cluster/me`
 
-- 主入口：`/:cluster/users/:user`
-- 自助入口：`/:cluster/me`
-- 兼容入口：`/:cluster/users/:user/analysis`
-  - 该旧路由保留，但会重定向到 `user` 路由并附带 `query.section=analysis`
+## 3. 权限模型
 
-用户工作台由三个区块组成：
+当前有效权限模型为 `resource:operation:scope`：
 
-- 我的身份与权限摘要
-  - 仅 `my-profile` 自助入口始终可见
-  - 数据来自 `authStore` 和当前 cluster 的 merged permissions
-- 用户资料区
-  - 依赖 `associations-view`
-  - 展示账户关联、配额和历史作业快捷入口
-- 用户分析区
-  - 依赖 `view-jobs`
-  - 同时要求当前 cluster `user_metrics=true`
-  - 展示提交趋势、工具分析和统计卡片
+- `resource` 采用“主路由 + 子资源”形式，例如 `settings/cache`、`user/profile`、`jobs/filter-qos`
+- `operation` 当前支持 `view`、`edit`、`delete`
+- `scope` 当前支持 `*` 和 `self`
 
-## 4. 权限与降级原则
+已实现的规则特性：
 
-系统同时依赖 capability 和 permission：
+- 精确资源匹配，例如 `jobs:view:*`
+- 前缀资源匹配，例如 `settings/*:view:*`
+- 全局通配，例如 `*:*:*`
+- owner-aware 规则，例如 `user/profile:view:self`
+- `edit` / `delete` 自动满足 `view`
 
-- capability 解决“当前集群是否支持该能力”
-- permission 解决“当前用户是否被授权访问该页面或动作”
+## 4. 能力启用条件
 
-本轮新增的统一规则如下：
+系统当前按基础依赖自动推导能力，不再依赖独立业务开关：
 
-- 整页级权限不足统一跳转 `/forbidden`
-- capability 缺失或功能未启用，仍保留原有降级逻辑，不混成权限错误
-- 多集群聚合型 settings 页面继续采用页内局部提示，不强制整页拦截
+| 基础条件 | 自动启用能力 |
+|---|---|
+| `[database] enabled = yes` | LDAP Cache、Jobs History、Access Control、AI |
+| `[metrics] enabled = yes` | cluster metrics |
+| `node_metrics.prometheus_host` 已配置 | node metrics |
+| 数据库 + metrics | user metrics、user analytics |
 
-## 5. 全站表达统一
+说明：
 
-本轮对高频 UI 做了统一收口：
+- 旧配置项 `persistence.enabled`、`persistence.access_control_enabled`、`user_metrics.enabled`、`node_metrics.enabled`、`ai.enabled` 仍保留兼容定义，但不应继续作为新配置语义使用。
+- 前端和 `/info` 看到的是推导后的能力状态。
 
-- 百分比展示统一为数字主值 + 百分比图标组件
-- Jobs / History / Account / LDAP Cache 等页面中的用户名统一改为用户工作台链接
-- 顶栏右上角用户名改为可点击的用户菜单，提供 `My workspace`、`Account permissions`、`Sign out`
-- 用户分析中的工具图改为双指标横向条，重点展示平均最大内存和作业数
+## 5. 角色模型
 
-## 6. 开发与验证入口
+数据库支持开启后，如果 `roles` 表为空，系统会自动预置三个角色：
 
-前端常用命令：
+- `user`
+  - 默认只包含可查看权限
+- `admin`
+  - 包含全量资源的 `view/edit/delete` 组合
+- `super-admin`
+  - 直接使用 `*:*:*`
 
-```powershell
-npm --prefix frontend run type-check
-npm --prefix frontend run test:unit -- --run
-npm --prefix frontend run build
-```
+这些角色只会在首次空表时写入，后续允许通过页面继续编辑。
 
-后端常用命令：
+## 6. 旧权限兼容
 
-```powershell
-.venv\Scripts\python.exe -m pytest
-.venv\Scripts\python.exe -m alembic upgrade head
-```
+新权限启用后，旧权限名仍通过内置映射自动转换，例如：
+
+- `cache-view` -> `settings/cache:view:*`
+- `cache-reset` -> `settings/cache:edit:*`
+- `roles-view` -> `settings/access-control:view:*`
+- `roles-manage` -> `settings/access-control:edit:*` + `settings/access-control:delete:*`
+- `view-ai` -> `ai:view:*`
+- `manage-ai` -> `settings/ai:edit:*`
+
+当新权限系统不可用时，系统继续按旧 `actions[]` 逻辑鉴权，不改变原有行为。

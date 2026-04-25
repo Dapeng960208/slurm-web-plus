@@ -469,6 +469,12 @@ def access_roles(cluster: str):
 
 @check_jwt
 @validate_cluster
+def access_catalog(cluster: str):
+    return proxy_agent(cluster, "access/catalog", request.token)
+
+
+@check_jwt
+@validate_cluster
 def create_access_role(cluster: str):
     return proxy_agent(cluster, "access/roles", request.token)
 

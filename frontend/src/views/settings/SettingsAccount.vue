@@ -111,7 +111,7 @@ function sortedValues(values: string[]) {
               Open my analysis
             </RouterLink>
             <RouterLink
-              v-if="runtimeStore.hasClusterPermission(cluster.name, 'view-history-jobs')"
+              v-if="runtimeStore.hasRoutePermission(cluster.name, 'jobs-history', 'view')"
               :to="{ name: 'jobs-history', params: { cluster: cluster.name }, query: { user: authStore.username } }"
               class="ui-button-secondary"
             >
@@ -168,6 +168,25 @@ function sortedValues(values: string[]) {
                 </div>
                 <p v-else class="mt-3 text-sm text-[var(--color-brand-muted)]">
                   No actions declared.
+                </p>
+              </div>
+
+              <div>
+                <p class="text-sm font-semibold text-[var(--color-brand-ink-strong)]">Rules</p>
+                <div
+                  v-if="cluster.permissions.sources?.[source.key]?.rules.length"
+                  class="mt-3 flex flex-wrap gap-2"
+                >
+                  <span
+                    v-for="rule in sortedValues(cluster.permissions.sources?.[source.key]?.rules ?? [])"
+                    :key="`${cluster.name}-${source.key}-rule-${rule}`"
+                    class="ui-chip"
+                  >
+                    {{ rule }}
+                  </span>
+                </div>
+                <p v-else class="mt-3 text-sm text-[var(--color-brand-muted)]">
+                  No route rules declared.
                 </p>
               </div>
             </div>

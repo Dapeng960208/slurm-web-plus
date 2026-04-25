@@ -101,10 +101,8 @@ class TestAgentApp(TestAgentBase):
             "WARNING:slurmweb.apps.agent:Unable to initialize database support: boom",
             cm.output,
         )
-        self.assertIn(
-            "WARNING:slurmweb.apps.agent:Job history persistence is enabled but database support is unavailable: boom",
-            cm.output,
-        )
+        self.assertIsNone(self.app.users_store)
+        self.assertIsNone(self.app.jobs_store)
 
     @mock.patch("slurmweb.persistence.access_control_store.AccessControlStore")
     @mock.patch("slurmweb.persistence.users_store.UsersStore")
@@ -124,7 +122,7 @@ class TestAgentApp(TestAgentBase):
         with self.assertLogs("slurmweb", level="WARNING") as cm:
             self.setup_client(database=True, persistence=True, access_control_enabled=True)
         self.assertIn(
-            "WARNING:slurmweb.apps.agent:Access control is enabled but database support is unavailable: boom",
+            "WARNING:slurmweb.apps.agent:Unable to initialize database support: boom",
             cm.output,
         )
         mock_users_store.return_value.list_cached_users_for_policy_refresh.assert_not_called()
@@ -153,14 +151,14 @@ class TestAgentApp(TestAgentBase):
 
     @mock.patch("slurmweb.persistence.access_control_store.AccessControlStore")
     @mock.patch("slurmweb.persistence.users_store.UsersStore")
-    def test_app_does_not_refresh_cached_policy_snapshots_when_access_control_disabled(
+    def test_app_refreshes_cached_policy_snapshots_when_database_enabled_even_if_legacy_flag_false(
         self, mock_users_store, mock_access_control_store
     ):
         self.setup_client(database=True, persistence=True, access_control_enabled=False)
 
-        mock_access_control_store.assert_not_called()
-        mock_users_store.return_value.list_cached_users_for_policy_refresh.assert_not_called()
-        mock_users_store.return_value.update_policy_snapshot.assert_not_called()
+        mock_access_control_store.assert_called_once()
+        mock_access_control_store.return_value.seed_default_roles.assert_called_once()
+        mock_users_store.return_value.list_cached_users_for_policy_refresh.assert_called_once_with()
 
     @mock.patch("slurmweb.persistence.access_control_store.AccessControlStore")
     @mock.patch("slurmweb.persistence.users_store.UsersStore")
@@ -224,14 +222,15 @@ class TestAgentApp(TestAgentBase):
         mock_user_analytics_store.return_value.start.assert_called_once()
         self.assertTrue(self.app.user_metrics_enabled)
 
+    @mock.patch("slurmweb.persistence.user_analytics_store.UserAnalyticsStore")
     @mock.patch("slurmweb.persistence.jobs_store.JobsStore")
     @mock.patch("slurmweb.persistence.users_store.UsersStore")
-    def test_app_warns_when_user_metrics_dependencies_missing(
-        self, mock_users_store, mock_jobs_store
+    def test_app_enables_user_metrics_when_database_and_metrics_are_available(
+        self, mock_users_store, mock_jobs_store, mock_user_analytics_store
     ):
-        with self.assertLogs("slurmweb", level="WARNING") as cm:
-            self.setup_client(database=True, persistence=False, metrics=True, user_metrics=True)
-        self.assertIn(
-            "WARNING:slurmweb.apps.agent:User metrics is enabled but required metrics/database support is unavailable",
-            cm.output,
-        )
+        self.setup_client(database=True, persistence=False, metrics=True, user_metrics=True)
+        mock_users_store.assert_called_once()
+        mock_jobs_store.assert_called_once()
+        mock_user_analytics_store.assert_called_once()
+        mock_user_analytics_store.return_value.start.assert_called_once()
+        self.assertTrue(self.app.user_metrics_enabled)

@@ -99,7 +99,7 @@ const associatedAccounts = computed(() => {
 })
 
 const canViewHistoryJobs = computed(() =>
-  runtimeStore.hasClusterPermission(props.cluster, 'view-history-jobs')
+  runtimeStore.hasRoutePermission(props.cluster, 'jobs-history', 'view')
 )
 
 const breadcrumb = computed(() => {
@@ -292,6 +292,30 @@ function goBack() {
                   </span>
                 </div>
               </div>
+
+              <div class="ui-panel-soft px-5 py-5">
+                <div class="flex items-center gap-3">
+                  <span class="ui-user-workspace-icon">
+                    <ShieldCheckIcon class="h-5 w-5" aria-hidden="true" />
+                  </span>
+                  <div class="font-semibold text-[var(--color-brand-ink-strong)]">Merged rules</div>
+                </div>
+                <div class="mt-4 flex flex-wrap gap-2">
+                  <span
+                    v-for="rule in clusterPermissions.rules"
+                    :key="`self-rule-${rule}`"
+                    class="ui-chip"
+                  >
+                    {{ rule }}
+                  </span>
+                  <span
+                    v-if="clusterPermissions.rules.length === 0"
+                    class="text-sm text-[var(--color-brand-muted)]"
+                  >
+                    No route rules declared.
+                  </span>
+                </div>
+              </div>
             </div>
           </section>
         </div>
@@ -455,7 +479,7 @@ function goBack() {
           <div>
             <h2 class="ui-panel-title">Additional sections are unavailable</h2>
             <p class="ui-panel-description mt-2">
-              This workspace can show account associations with `associations-view` and analytics with `view-jobs` on clusters where user metrics are enabled.
+              This workspace can show account associations through `user/profile:view:*` and analytics through `user/analysis:view:*` on clusters where user metrics are enabled.
             </p>
           </div>
         </section>

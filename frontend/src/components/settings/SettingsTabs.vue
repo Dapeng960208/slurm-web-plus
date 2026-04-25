@@ -36,17 +36,30 @@ const tabs = computed(() => {
   if (
     hasClusterAIAssistant(settingsCluster.value) &&
     settingsCluster.value &&
-    runtimeStore.hasClusterPermission(settingsCluster.value.name, 'manage-ai')
+    runtimeStore.hasRoutePermission(settingsCluster.value.name, 'settings/ai', 'view')
   ) {
     result.push({ name: 'AI', href: 'settings-ai' })
   }
-  if (hasClusterAccessControl(settingsCluster.value)) {
+  if (
+    hasClusterAccessControl(settingsCluster.value) &&
+    settingsCluster.value &&
+    runtimeStore.hasRoutePermission(settingsCluster.value.name, 'settings/access-control', 'view')
+  ) {
     result.push({ name: 'Access Control', href: 'settings-access-control' })
   }
-  result.push({ name: 'Cache', href: 'settings-cache' })
+  if (
+    settingsCluster.value &&
+    runtimeStore.hasRoutePermission(settingsCluster.value.name, 'settings/cache', 'view')
+  ) {
+    result.push({ name: 'Cache', href: 'settings-cache' })
+  }
   if (
     runtimeConfiguration.authentication &&
-    runtimeStore.availableClusters.some((cluster) => cluster.database)
+    runtimeStore.availableClusters.some(
+      (cluster) =>
+        cluster.database &&
+        runtimeStore.hasRoutePermission(cluster.name, 'settings/ldap-cache', 'view')
+    )
   ) {
     result.push({ name: 'LDAP Cache', href: 'settings-ldap-cache' })
   }

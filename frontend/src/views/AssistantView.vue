@@ -62,8 +62,8 @@ const clusterDetails = computed<ClusterDescription | undefined>(() =>
   runtimeStore.availableClusters.find((value) => value.name === cluster)
 )
 const aiAvailable = computed(() => hasClusterAIAssistant(clusterDetails.value))
-const canView = computed(() => runtimeStore.hasClusterPermission(cluster, 'view-ai'))
-const canManage = computed(() => runtimeStore.hasClusterPermission(cluster, 'manage-ai'))
+const canView = computed(() => runtimeStore.hasRoutePermission(cluster, 'ai', 'view'))
+const canManage = computed(() => runtimeStore.hasRoutePermission(cluster, 'settings/ai', 'edit'))
 const enabledModels = computed(() =>
   [...configs.value]
     .filter((config) => config.enabled)
@@ -365,7 +365,7 @@ watch(
         This cluster does not expose AI capability.
       </InfoAlert>
       <InfoAlert v-else-if="!canView">
-        The current user does not have the `view-ai` permission.
+        The current user does not have permission to use the AI workspace.
       </InfoAlert>
       <ErrorAlert v-else-if="configsError">
         {{ configsError }}

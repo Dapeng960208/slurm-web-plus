@@ -49,7 +49,9 @@ async function getClustersDescriptions() {
     loaded.value = true
 
     const clustersWithPermissions = clusters.value.filter(
-      (cluster) => cluster.permissions.actions.length > 0
+      (cluster) =>
+        (cluster.permissions.actions?.length ?? 0) > 0 ||
+        (cluster.permissions.rules?.length ?? 0) > 0
     )
     if (clustersWithPermissions.length === 1) {
       awaitingAutoRedirect.value = true

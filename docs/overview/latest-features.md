@@ -1,99 +1,58 @@
 # 最新功能
 
-## 1. 用户工作台合并
+## 1. 路由权限系统切换为规则模型
 
-本轮前端把“用户信息页”“用户分析页”“右上角我的入口”合并成一个统一的用户工作台。
+当前权限模型已经从单一 `actions[]` 扩展为 `resource:operation:scope`：
 
-涉及路由：
+- 支持主路由资源和子资源，例如 `settings/cache`
+- 支持前缀资源，例如 `settings/*:view:*`
+- 支持 `self` 场景，例如 `user/profile:view:self`
+- 支持全局最高权限 `*:*:*`
 
-- `/:cluster/users/:user`
-- `/:cluster/me`
-- `/:cluster/users/:user/analysis`
-  - 保留旧入口
-  - 自动重定向到 `user` 路由并附带 `query.section=analysis`
+同时保留旧权限名兼容层，`view-ai`、`roles-manage`、`cache-reset` 等历史动作会自动映射到新规则。
 
-页面结构固定为三类区块：
+## 2. Access Control 页面改为资源矩阵
 
-- 我的身份与权限摘要
-- 用户资料区
-- 用户分析区
+`Settings > Access Control` 已从 action 复选框切换为目录驱动的权限矩阵：
 
-权限矩阵：
+- 页面通过 `GET /access/catalog` 获取全部资源目录
+- 角色编辑以 `permissions[]` 为主
+- 同时展示兼容 `actions[]`
+- 支持首次空角色表自动预置 `user`、`admin`、`super-admin`
 
-| 场景 | `associations-view` | `view-jobs` + `user_metrics` | 结果 |
-|---|---|---|---|
-| 查看自己 | 否 | 否 | 可进入，只显示身份与权限摘要 |
-| 查看自己 | 是 | 否 | 显示摘要和资料区 |
-| 查看自己 | 否 | 是 | 显示摘要和分析区 |
-| 查看别人 | 是 | 否 | 仅显示资料区 |
-| 查看别人 | 否 | 是 | 仅显示分析区 |
-| 查看别人 | 否 | 否 | 跳 `/forbidden` |
+## 3. Agent 能力开关收敛
 
-## 2. 统一 403 无权限拦截页
+系统当前的业务能力按基础依赖自动推导：
 
-新增 `/forbidden` 整页拦截页，用于所有整页级权限不足的场景。
+- 数据库开启后，自动提供：
+  - LDAP Cache
+  - Jobs History
+  - Access Control
+  - AI
+- Prometheus 开启后，自动提供：
+  - metrics
+  - node metrics
+- 数据库和 Prometheus 同时开启后，自动提供：
+  - user metrics
+  - user analytics
 
-页面固定包含：
+旧 feature flag 仅保留兼容占位定义，不再作为实际产品语义来源。
 
-- 当前页面无访问权限
-- 缺少的 permission 说明
-- 请联系管理员申请权限
-- 返回上一路由
-- 回 dashboard / clusters 的快捷入口
+## 4. AI、Cache、用户空间全部接入新权限
 
-当前已经接入统一 403 的页面：
+以下页面和入口已经按新规则判定：
 
-- `/:cluster/ai`
-- `/:cluster/jobs/history`
-- `/:cluster/jobs/history/:id`
-- `/settings/access-control`
-- `/settings/ai`
-- 用户工作台相关页面
+- `/:cluster/ai` 使用 `ai:view:*`
+- `Settings > AI` 使用 `settings/ai:view|edit|delete:*`
+- `Settings > Cache` 使用 `settings/cache:view|edit:*`
+- `Settings > LDAP Cache` 使用 `settings/ldap-cache:view:*`
+- 用户空间使用 `user/profile:view:*|self` 与 `user/analysis:view:*|self`
 
-## 3. 全站百分比统一样式
+## 5. 本轮验证结果
 
-新增共享百分比展示组件，统一约束为：
-
-- 主值始终显示数字
-- 搭配百分比图标
-- 不能只靠颜色表达状态
-- 空值和 `0` 值有稳定渲染
-
-已替换的高频页面：
-
-- `NodeView.vue`
-- `ClusterAnalysisView.vue`
-- `NodeMetricsHistoryChart.vue`
-- `SettingsCacheStatistics.vue`
-
-## 4. 用户分析工具图升级
-
-用户分析里的工具模块已经改为双指标横向条，不再使用单一 canvas 柱状图。
-
-新行为：
-
-- 按平均最大内存降序
-- 同时展示平均最大内存和作业数
-- 每行附带 CPU、Runtime、jobs 标签
-- 配色沿用现有绿灰风格变量，不引入新的主色体系
-
-## 5. 高频 UI 补强
-
-为了保持站点整体风格一致，本轮只做共享层增强，不做大面积重排：
-
-- 顶栏用户名改为带图标的用户菜单
-- Jobs / History / Account / LDAP Cache 中的用户名改为统一链接样式
-- filter chips 改为更贴近现有绿灰玻璃风格
-- 空状态、无权限态、统计卡片和分区标题补充轻量图标与统一微样式
-
-## 6. 本轮验证
-
-已完成：
+已完成的定向验证包括：
 
 - `npm --prefix frontend run type-check`
-- 关键改动相关的 Vitest 定向用例
-- `npm --prefix frontend run build`
-
-说明：
-
-- `npm --prefix frontend run test:unit -- --run` 在当前环境中运行超过 300 秒后超时中断，尚未得到完整结果。
+- `npx vitest run tests/stores/runtime.spec.ts tests/views/settings/SettingsAccessControl.spec.ts`
+- `.venv\Scripts\python.exe -m pytest slurmweb/tests/views/test_agent_permissions.py -q`
+- `.venv\Scripts\python.exe -m pytest slurmweb/tests/apps/test_agent.py -q`

@@ -30,7 +30,7 @@ const emit = defineEmits<{
 }>()
 
 async function getClustersPing() {
-  if (cluster.permissions.actions.length == 0) {
+  if ((cluster.permissions.actions?.length ?? 0) === 0 && (cluster.permissions.rules?.length ?? 0) === 0) {
     loading.value = false
     emit('pinged', cluster)
     return
@@ -58,13 +58,13 @@ onMounted(() => {
 <template>
   <li
     :class="[
-      cluster.permissions.actions.length > 0
+      (cluster.permissions.actions?.length ?? 0) > 0 || (cluster.permissions.rules?.length ?? 0) > 0
         ? 'cursor-pointer hover:bg-[rgba(182,232,44,0.12)]'
         : 'cursor-not-allowed bg-[rgba(239,244,246,0.8)]',
       'relative flex min-h-24 items-center justify-between px-5 py-5 sm:px-6'
     ]"
     @click="
-      cluster.permissions.actions.length > 0 &&
+      ((cluster.permissions.actions?.length ?? 0) > 0 || (cluster.permissions.rules?.length ?? 0) > 0) &&
         router.push({ name: 'dashboard', params: { cluster: cluster.name } })
     "
   >
@@ -83,7 +83,7 @@ onMounted(() => {
     </span>
     <ClusterStats
       v-if="
-        runtimeStore.hasClusterPermission(cluster.name, 'view-stats') && !loading && !cluster.error
+        runtimeStore.hasRoutePermission(cluster.name, 'dashboard', 'view') && !loading && !cluster.error
       "
       :cluster-name="cluster.name"
     />
@@ -97,7 +97,7 @@ onMounted(() => {
           <ChevronRightIcon class="h-5 w-5 flex-none text-[var(--color-brand-muted)]" aria-hidden="true" />
         </div>
         <div
-          v-else-if="cluster.permissions.actions.length == 0"
+          v-else-if="(cluster.permissions.actions?.length ?? 0) === 0 && (cluster.permissions.rules?.length ?? 0) === 0"
           class="mt-1 flex items-center gap-x-1.5"
         >
           <div class="flex-none rounded-full bg-[rgba(216,75,80,0.16)] p-1.5">

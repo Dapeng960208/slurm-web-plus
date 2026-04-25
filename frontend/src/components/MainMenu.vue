@@ -40,62 +40,84 @@ const sidebarOpen = defineModel<boolean>()
 
 const runtimeStore = useRuntimeStore()
 const runtimeConfiguration = useRuntimeConfiguration()
-const navigation = [
+const navigation: Array<{
+  name: string
+  route: string
+  icon: object
+  resource: string
+  operation: 'view' | 'edit' | 'delete'
+  feature?: string
+}> = [
   {
     name: 'Dashboard',
     route: 'dashboard',
     icon: HomeIcon,
-    permission: 'view-stats',
+    resource: 'dashboard',
+    operation: 'view',
     feature: undefined
   },
   {
     name: 'Analysis',
     route: 'analysis',
     icon: ChartBarSquareIcon,
-    permission: 'view-stats',
+    resource: 'analysis',
+    operation: 'view',
     feature: undefined
   },
   {
     name: 'AI',
     route: 'ai',
     icon: ChatBubbleLeftRightIcon,
-    permission: 'view-ai',
+    resource: 'ai',
+    operation: 'view',
     feature: 'ai'
   },
   {
     name: 'Jobs',
     route: 'jobs',
     icon: PlayCircleIcon,
-    permission: 'view-jobs',
+    resource: 'jobs',
+    operation: 'view',
     feature: undefined
   },
   {
     name: 'Jobs History',
     route: 'jobs-history',
     icon: ClockIcon,
-    permission: 'view-history-jobs',
-    feature: 'persistence'
+    resource: 'jobs-history',
+    operation: 'view',
+    feature: 'job_history'
   },
   {
     name: 'Resources',
     route: 'resources',
     icon: CpuChipIcon,
-    permission: 'view-nodes',
+    resource: 'resources',
+    operation: 'view',
     feature: undefined
   },
-  { name: 'QOS', route: 'qos', icon: SwatchIcon, permission: 'view-qos', feature: undefined },
+  {
+    name: 'QOS',
+    route: 'qos',
+    icon: SwatchIcon,
+    resource: 'qos',
+    operation: 'view',
+    feature: undefined
+  },
   {
     name: 'Reservations',
     route: 'reservations',
     icon: CalendarIcon,
-    permission: 'view-reservations',
+    resource: 'reservations',
+    operation: 'view',
     feature: undefined
   },
   {
     name: 'Accounts',
     route: 'accounts',
     icon: UserGroupIcon,
-    permission: 'associations-view',
+    resource: 'accounts',
+    operation: 'view',
     feature: undefined
   }
 ]
@@ -107,16 +129,19 @@ function isFeatureEnabled(feature: string | undefined): boolean {
   if (feature === 'ai') {
     return hasClusterAIAssistant(cluster)
   }
+  if (feature === 'job_history') {
+    return cluster.capabilities?.job_history === true || cluster.persistence === true
+  }
   return !!(cluster as unknown as Record<string, unknown>)[feature]
 }
 
-function hasNavigationPermission(permission?: string): boolean {
-  if (!permission) return true
+function hasNavigationPermission(resource?: string, operation: 'view' | 'edit' | 'delete' = 'view'): boolean {
+  if (!resource) return true
   const cluster = navigationCluster.value
   if (cluster) {
-    return runtimeStore.hasClusterPermission(cluster.name, permission)
+    return runtimeStore.hasRoutePermission(cluster.name, resource, operation)
   }
-  return runtimeStore.hasPermission(permission)
+  return false
 }
 
 const navigationCluster = computed(() => {
@@ -196,7 +221,7 @@ function navigationTarget(route: string): RouteLocationRaw {
                       <li v-for="item in navigation" :key="item.name">
                         <RouterLink
                           v-if="
-                            hasNavigationPermission(item.permission) &&
+                            hasNavigationPermission(item.resource, item.operation) &&
                             isFeatureEnabled(item.feature)
                           "
                           :to="navigationTarget(item.route)"
@@ -267,7 +292,7 @@ function navigationTarget(route: string): RouteLocationRaw {
             <ul role="list" class="space-y-1.5">
               <li v-for="item in navigation" :key="item.name">
                 <RouterLink
-                  v-if="hasNavigationPermission(item.permission) && isFeatureEnabled(item.feature)"
+                  v-if="hasNavigationPermission(item.resource, item.operation) && isFeatureEnabled(item.feature)"
                   :to="navigationTarget(item.route)"
                   :class="[
                     item.route == entry

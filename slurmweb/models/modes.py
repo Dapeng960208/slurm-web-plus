@@ -61,6 +61,11 @@ class Role(Base):
         nullable=False,
         server_default=sa.text("'[]'::jsonb"),
     )
+    permissions = sa.Column(
+        postgresql.JSONB(astext_type=sa.Text()),
+        nullable=False,
+        server_default=sa.text("'[]'::jsonb"),
+    )
     created_at = sa.Column(
         sa.TIMESTAMP(timezone=True),
         nullable=False,

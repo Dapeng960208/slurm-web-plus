@@ -36,7 +36,7 @@ describe('SettingsTabs.vue', () => {
     const wrapper = mountTabs(true, [
       {
         name: 'foo',
-        permissions: { roles: [], actions: [] },
+        permissions: { roles: [], actions: ['cache-view'] },
         racksdb: true,
         infrastructure: 'foo',
         metrics: true,
@@ -89,7 +89,7 @@ describe('SettingsTabs.vue', () => {
       [
         {
           name: 'foo',
-          permissions: { roles: [], actions: [] },
+          permissions: { roles: [], actions: ['roles-view'] },
           capabilities: { access_control: true },
           racksdb: true,
           infrastructure: 'foo',

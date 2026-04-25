@@ -9,11 +9,13 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import type {
+  AccessControlCatalog,
   AccessControlUserAssignment,
   AccessControlUserRow,
   ClusterDescription,
   CustomRole,
-  CustomRolePayload
+  CustomRolePayload,
+  PermissionRule
 } from '@/composables/GatewayAPI'
 import { hasClusterAccessControl, useGatewayAPI } from '@/composables/GatewayAPI'
 import { useRuntimeStore } from '@/stores/runtime'
@@ -23,24 +25,15 @@ import InfoAlert from '@/components/InfoAlert.vue'
 import ErrorAlert from '@/components/ErrorAlert.vue'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
 
-const ACTION_OPTIONS = [
-  'view-stats',
-  'view-jobs',
-  'view-history-jobs',
-  'view-nodes',
-  'view-partitions',
-  'view-qos',
-  'view-accounts',
-  'associations-view',
-  'view-reservations',
-  'cache-view',
-  'cache-reset',
-  'roles-view',
-  'roles-manage'
-] as const
+type PermissionOperation = 'view' | 'edit' | 'delete' | '*'
+type PermissionScope = '*' | 'self'
 
 const gateway = useGatewayAPI()
 const runtimeStore = useRuntimeStore()
+
+const catalog = ref<AccessControlCatalog | null>(null)
+const catalogLoading = ref(false)
+const catalogError = ref<string | null>(null)
 
 const roles = ref<CustomRole[]>([])
 const rolesLoading = ref(false)
@@ -65,12 +58,12 @@ const roleForm = reactive<{
   id: number | null
   name: string
   description: string
-  actions: string[]
+  permissions: PermissionRule[]
 }>({
   id: null,
   name: '',
   description: '',
-  actions: []
+  permissions: []
 })
 
 const assignedRoleIds = ref<number[]>([])
@@ -89,32 +82,104 @@ const accessControlAvailable = computed(() => hasClusterAccessControl(settingsCl
 const canView = computed(
   () =>
     !!settingsCluster.value &&
-    runtimeStore.hasClusterPermission(settingsCluster.value.name, 'roles-view')
+    runtimeStore.hasRoutePermission(settingsCluster.value.name, 'settings/access-control', 'view')
 )
 const canManage = computed(
   () =>
     !!settingsCluster.value &&
-    runtimeStore.hasClusterPermission(settingsCluster.value.name, 'roles-manage')
+    runtimeStore.hasRoutePermission(settingsCluster.value.name, 'settings/access-control', 'edit')
+)
+const canDelete = computed(
+  () =>
+    !!settingsCluster.value &&
+    runtimeStore.hasRoutePermission(settingsCluster.value.name, 'settings/access-control', 'delete')
 )
 const currentClusterName = computed(() => settingsCluster.value?.name ?? '')
 const selectedRoleNames = computed(() =>
   roles.value.filter((role) => assignedRoleIds.value.includes(role.id)).map((role) => role.name)
 )
 const totalUserPages = computed(() => Math.max(Math.ceil(usersTotal.value / usersPageSize), 1))
+const sortedCatalogGroups = computed(() => catalog.value?.groups ?? [])
+const catalogOperations = computed(() => catalog.value?.operations ?? [])
+const totalCatalogResources = computed(() =>
+  sortedCatalogGroups.value.reduce((count, group) => count + group.resources.length, 0)
+)
+
+function sortRules(rules: PermissionRule[]): PermissionRule[] {
+  return [...new Set(rules)].sort()
+}
+
+function operationAllows(granted: PermissionOperation, requested: PermissionOperation): boolean {
+  if (granted === '*') return true
+  if (requested === 'view') return ['view', 'edit', 'delete'].includes(granted)
+  return granted === requested
+}
+
+function resourceAllows(granted: string, requested: string): boolean {
+  if (granted === '*') return true
+  if (granted === requested) return true
+  return granted.endsWith('/*') && requested.startsWith(granted.slice(0, -1))
+}
+
+function permissionRuleAllows(
+  rule: PermissionRule,
+  resource: string,
+  operation: PermissionOperation,
+  scope: PermissionScope
+): boolean {
+  const [grantedResource, grantedOperation, grantedScope] = rule.split(':')
+  if (!grantedResource || !grantedOperation || !grantedScope) return false
+  return (
+    resourceAllows(grantedResource, resource) &&
+    operationAllows(grantedOperation as PermissionOperation, operation) &&
+    (grantedScope === '*' || grantedScope === scope)
+  )
+}
+
+function ruleKey(resource: string, operation: string, scope: string): PermissionRule {
+  return `${resource}:${operation}:${scope}`
+}
+
+function permissionsToActions(permissions: PermissionRule[]): string[] {
+  const rules = sortRules(permissions)
+  const legacyMap = catalog.value?.legacy_map ?? {}
+  return Object.entries(legacyMap)
+    .filter(([, requiredRules]) =>
+      requiredRules.every((requiredRule) => {
+        const [resource, operation, scope] = requiredRule.split(':')
+        return permissionRuleAllows(
+          rules.find((rule) =>
+            permissionRuleAllows(rule, resource, operation as PermissionOperation, scope as PermissionScope)
+          ) ?? '',
+          resource,
+          operation as PermissionOperation,
+          scope as PermissionScope
+        )
+      })
+    )
+    .map(([action]) => action)
+    .sort()
+}
+
+function roleActions(role: CustomRole): string[] {
+  return role.actions.length > 0 ? [...role.actions].sort() : permissionsToActions(role.permissions)
+}
 
 function resetRoleForm() {
   roleForm.id = null
   roleForm.name = ''
   roleForm.description = ''
-  roleForm.actions = []
+  roleForm.permissions = []
   rolesFormError.value = null
 }
 
 function rolePayload(): CustomRolePayload {
+  const permissions = sortRules(roleForm.permissions)
   return {
     name: roleForm.name.trim(),
     description: roleForm.description.trim() || null,
-    actions: [...roleForm.actions].sort()
+    actions: permissionsToActions(permissions),
+    permissions
   }
 }
 
@@ -122,8 +187,35 @@ function editRole(role: CustomRole) {
   roleForm.id = role.id
   roleForm.name = role.name
   roleForm.description = role.description ?? ''
-  roleForm.actions = [...role.actions]
+  roleForm.permissions = [...role.permissions]
   rolesFormError.value = null
+}
+
+function hasSelectedRule(resource: string, operation: string, scope: string): boolean {
+  return roleForm.permissions.includes(ruleKey(resource, operation, scope))
+}
+
+function togglePermission(resource: string, operation: string, scope: string) {
+  if (!canManage.value || rolesSubmitting.value) return
+  const targetRule = ruleKey(resource, operation, scope)
+  if (roleForm.permissions.includes(targetRule)) {
+    roleForm.permissions = roleForm.permissions.filter((rule) => rule !== targetRule)
+    return
+  }
+  roleForm.permissions = sortRules([...roleForm.permissions, targetRule])
+}
+
+async function loadCatalog() {
+  if (!currentClusterName.value || !accessControlAvailable.value || !canView.value) return
+  catalogLoading.value = true
+  catalogError.value = null
+  try {
+    catalog.value = await gateway.access_catalog(currentClusterName.value)
+  } catch (error: unknown) {
+    catalogError.value = error instanceof Error ? error.message : String(error)
+  } finally {
+    catalogLoading.value = false
+  }
 }
 
 async function loadRoles() {
@@ -200,7 +292,7 @@ async function reloadAll() {
   resetRoleForm()
   selectedUserDetails.value = null
   assignedRoleIds.value = []
-  await Promise.all([loadRoles(), loadUsers()])
+  await Promise.all([loadCatalog(), loadRoles(), loadUsers()])
   await loadSelectedUser()
 }
 
@@ -211,8 +303,8 @@ async function submitRole() {
     rolesFormError.value = 'Role name is required.'
     return
   }
-  if (!payload.actions.length) {
-    rolesFormError.value = 'Select at least one action.'
+  if (!payload.permissions.length) {
+    rolesFormError.value = 'Select at least one permission rule.'
     return
   }
   rolesSubmitting.value = true
@@ -321,7 +413,7 @@ onMounted(async () => {
     <div class="ui-panel ui-section">
       <SettingsHeader
         title="Access Control"
-        description="Manage database-backed custom roles and assign them to cached users for the current cluster."
+        description="Manage database-backed custom roles, route permission rules and user role bindings for the current cluster."
       />
       <div
         v-if="settingsCluster"
@@ -329,6 +421,7 @@ onMounted(async () => {
       >
         <span class="ui-page-kicker !mb-0">Active Cluster</span>
         <span class="ui-chip">{{ settingsCluster.name }}</span>
+        <span v-if="catalog" class="ui-chip">{{ totalCatalogResources }} resources</span>
       </div>
     </div>
 
@@ -343,17 +436,21 @@ onMounted(async () => {
     </InfoAlert>
 
     <template v-else>
-      <div class="grid gap-4 xl:grid-cols-[1.15fr_1fr]">
+      <ErrorAlert v-if="catalogError">
+        {{ catalogError }}
+      </ErrorAlert>
+
+      <div class="grid gap-4 xl:grid-cols-[1.2fr_1fr]">
         <section class="ui-panel ui-section">
           <div class="flex items-start justify-between gap-4">
             <div>
               <p class="ui-page-kicker">Custom Roles</p>
               <h2 class="ui-panel-title">Role Definitions</h2>
               <p class="ui-panel-description mt-2">
-                Define reusable action bundles stored in the local database.
+                Edit exact route permissions with `resource:operation:scope` rules. Legacy actions are derived automatically for compatibility.
               </p>
             </div>
-            <button type="button" class="ui-button-secondary" @click="loadRoles">
+            <button type="button" class="ui-button-secondary" @click="reloadAll">
               Refresh
             </button>
           </div>
@@ -365,12 +462,12 @@ onMounted(async () => {
             {{ rolesFormError }}
           </ErrorAlert>
 
-          <div v-if="rolesLoading" class="mt-6 text-[var(--color-brand-muted)]">
+          <div v-if="rolesLoading || catalogLoading" class="mt-6 text-[var(--color-brand-muted)]">
             <LoadingSpinner :size="5" />
-            Loading custom roles...
+            Loading access control data...
           </div>
           <InfoAlert v-else-if="roles.length === 0" class="mt-6">
-            No custom roles have been created yet.
+            No custom roles have been created yet. Seed roles are created automatically on first database-backed startup.
           </InfoAlert>
           <div v-else class="mt-6 space-y-3">
             <article
@@ -387,19 +484,53 @@ onMounted(async () => {
                     {{ role.description || 'No description provided.' }}
                   </p>
                 </div>
-                <div v-if="canManage" class="flex gap-2">
-                  <button type="button" class="ui-button-secondary" @click="editRole(role)">
+                <div class="flex gap-2">
+                  <button
+                    v-if="canManage"
+                    type="button"
+                    class="ui-button-secondary"
+                    @click="editRole(role)"
+                  >
                     Edit
                   </button>
-                  <button type="button" class="ui-button-secondary" @click="removeRole(role)">
+                  <button
+                    v-if="canDelete"
+                    type="button"
+                    class="ui-button-secondary"
+                    @click="removeRole(role)"
+                  >
                     Delete
                   </button>
                 </div>
               </div>
-              <div class="mt-4 flex flex-wrap gap-2">
-                <span v-for="action in [...role.actions].sort()" :key="`${role.id}-${action}`" class="ui-chip">
-                  {{ action }}
-                </span>
+
+              <div class="mt-4">
+                <p class="text-sm font-semibold text-[var(--color-brand-ink-strong)]">Permissions</p>
+                <div class="mt-2 flex flex-wrap gap-2">
+                  <span
+                    v-for="permission in role.permissions"
+                    :key="`${role.id}-${permission}`"
+                    class="ui-chip"
+                  >
+                    {{ permission }}
+                  </span>
+                </div>
+              </div>
+
+              <div class="mt-4">
+                <p class="text-sm font-semibold text-[var(--color-brand-ink-strong)]">Compatibility Actions</p>
+                <div class="mt-2 flex flex-wrap gap-2">
+                  <span
+                    v-for="action in roleActions(role)"
+                    :key="`${role.id}-action-${action}`"
+                    class="ui-chip"
+                  >
+                    {{ action }}
+                  </span>
+                  <span v-if="roleActions(role).length === 0" class="text-sm text-[var(--color-brand-muted)]">
+                    No legacy actions derived.
+                  </span>
+                </div>
               </div>
             </article>
           </div>
@@ -411,7 +542,7 @@ onMounted(async () => {
               <div>
                 <p class="ui-page-kicker">{{ roleForm.id === null ? 'Create Role' : 'Edit Role' }}</p>
                 <h3 class="text-base font-semibold text-[var(--color-brand-ink-strong)]">
-                  {{ roleForm.id === null ? 'New Custom Role' : `Editing ${roleForm.name}` }}
+                  {{ roleForm.id === null ? 'Permission Matrix' : `Editing ${roleForm.name}` }}
                 </h3>
               </div>
               <button
@@ -425,53 +556,147 @@ onMounted(async () => {
             </div>
 
             <InfoAlert v-if="!canManage" class="mt-4">
-              You can inspect roles on this cluster, but editing requires the `roles-manage` action.
+              You can inspect roles on this cluster, but editing requires `settings/access-control:edit:*`.
             </InfoAlert>
 
-            <form class="mt-5 space-y-4" @submit.prevent="submitRole">
-              <div>
-                <label class="mb-2 block text-sm font-semibold text-[var(--color-brand-ink-strong)]">
-                  Role Name
-                </label>
-                <input
-                  v-model="roleForm.name"
-                  :disabled="!canManage || rolesSubmitting"
-                  type="text"
-                  class="block w-full rounded-[18px] border border-[rgba(80,105,127,0.16)] bg-white px-4 py-3 text-sm text-[var(--color-brand-ink-strong)] shadow-[var(--shadow-soft)] outline-hidden focus:border-[rgba(182,232,44,0.65)] focus:ring-4 focus:ring-[rgba(182,232,44,0.18)]"
-                  placeholder="bio-admin"
-                />
-              </div>
-
-              <div>
-                <label class="mb-2 block text-sm font-semibold text-[var(--color-brand-ink-strong)]">
-                  Description
-                </label>
-                <textarea
-                  v-model="roleForm.description"
-                  :disabled="!canManage || rolesSubmitting"
-                  rows="3"
-                  class="block w-full rounded-[18px] border border-[rgba(80,105,127,0.16)] bg-white px-4 py-3 text-sm text-[var(--color-brand-ink-strong)] shadow-[var(--shadow-soft)] outline-hidden focus:border-[rgba(182,232,44,0.65)] focus:ring-4 focus:ring-[rgba(182,232,44,0.18)]"
-                  placeholder="Describe when this role should be assigned."
-                />
-              </div>
-
-              <div>
-                <p class="mb-3 text-sm font-semibold text-[var(--color-brand-ink-strong)]">Allowed Actions</p>
-                <div class="grid gap-3 sm:grid-cols-2">
-                  <label
-                    v-for="action in ACTION_OPTIONS"
-                    :key="action"
-                    class="flex items-center gap-3 rounded-[18px] border border-[rgba(80,105,127,0.12)] bg-white px-4 py-3 text-sm text-[var(--color-brand-ink-strong)]"
-                  >
-                    <input
-                      v-model="roleForm.actions"
-                      :disabled="!canManage || rolesSubmitting"
-                      :value="action"
-                      type="checkbox"
-                      class="h-4 w-4 rounded border-[rgba(80,105,127,0.24)] text-[var(--color-brand-deep)]"
-                    />
-                    <span>{{ action }}</span>
+            <form class="mt-5 space-y-5" @submit.prevent="submitRole">
+              <div class="grid gap-4 lg:grid-cols-2">
+                <div>
+                  <label class="mb-2 block text-sm font-semibold text-[var(--color-brand-ink-strong)]">
+                    Role Name
                   </label>
+                  <input
+                    v-model="roleForm.name"
+                    :disabled="!canManage || rolesSubmitting"
+                    type="text"
+                    class="block w-full rounded-[18px] border border-[rgba(80,105,127,0.16)] bg-white px-4 py-3 text-sm text-[var(--color-brand-ink-strong)] shadow-[var(--shadow-soft)] outline-hidden focus:border-[rgba(182,232,44,0.65)] focus:ring-4 focus:ring-[rgba(182,232,44,0.18)]"
+                    placeholder="ops-viewer"
+                  />
+                </div>
+
+                <div>
+                  <label class="mb-2 block text-sm font-semibold text-[var(--color-brand-ink-strong)]">
+                    Description
+                  </label>
+                  <input
+                    v-model="roleForm.description"
+                    :disabled="!canManage || rolesSubmitting"
+                    type="text"
+                    class="block w-full rounded-[18px] border border-[rgba(80,105,127,0.16)] bg-white px-4 py-3 text-sm text-[var(--color-brand-ink-strong)] shadow-[var(--shadow-soft)] outline-hidden focus:border-[rgba(182,232,44,0.65)] focus:ring-4 focus:ring-[rgba(182,232,44,0.18)]"
+                    placeholder="Read-only access to cluster routes."
+                  />
+                </div>
+              </div>
+
+              <div>
+                <div class="flex items-center justify-between gap-3">
+                  <div>
+                    <p class="text-sm font-semibold text-[var(--color-brand-ink-strong)]">Resource Matrix</p>
+                    <p class="mt-1 text-sm text-[var(--color-brand-muted)]">
+                      Grant exact rules, wildcard resources such as `settings/*`, or global admin access with `*:*:*`.
+                    </p>
+                  </div>
+                  <span class="ui-chip">{{ roleForm.permissions.length }} selected</span>
+                </div>
+
+                <div class="mt-4 space-y-4">
+                  <section
+                    v-for="group in sortedCatalogGroups"
+                    :key="group.group"
+                    class="rounded-[24px] border border-[rgba(80,105,127,0.1)] bg-white px-4 py-4"
+                  >
+                    <div class="mb-4">
+                      <p class="ui-page-kicker">{{ group.label }}</p>
+                      <h4 class="text-base font-semibold text-[var(--color-brand-ink-strong)]">
+                        {{ group.label }}
+                      </h4>
+                    </div>
+
+                    <div class="space-y-3">
+                      <div
+                        v-for="resource in group.resources"
+                        :key="resource.resource"
+                        class="rounded-[20px] border border-[rgba(80,105,127,0.1)] bg-[rgba(244,248,251,0.72)] px-4 py-4"
+                      >
+                        <div class="flex flex-wrap items-start justify-between gap-3">
+                          <div>
+                            <p class="font-semibold text-[var(--color-brand-ink-strong)]">
+                              {{ resource.label }}
+                            </p>
+                            <p class="mt-1 text-sm text-[var(--color-brand-muted)]">
+                              <code>{{ resource.resource }}</code>
+                            </p>
+                          </div>
+                          <div class="flex flex-wrap gap-2">
+                            <label
+                              v-for="scope in resource.scopes"
+                              :key="`${resource.resource}-scope-${scope}`"
+                              class="ui-chip"
+                            >
+                              {{ scope === 'self' ? 'owner-aware' : 'cluster-wide' }}
+                            </label>
+                          </div>
+                        </div>
+
+                        <div class="mt-4 flex flex-wrap gap-2">
+                          <label
+                            v-for="operation in resource.operations"
+                            :key="`${resource.resource}-${operation}`"
+                            class="flex flex-wrap gap-2"
+                          >
+                            <span
+                              v-for="scope in resource.scopes"
+                              :key="`${resource.resource}-${operation}-${scope}`"
+                              class="inline-flex items-center gap-2 rounded-full border border-[rgba(80,105,127,0.12)] bg-white px-3 py-2 text-sm text-[var(--color-brand-ink-strong)]"
+                            >
+                              <input
+                                :checked="hasSelectedRule(resource.resource, operation, scope)"
+                                :disabled="!canManage || rolesSubmitting"
+                                type="checkbox"
+                                class="h-4 w-4 rounded border-[rgba(80,105,127,0.24)] text-[var(--color-brand-deep)]"
+                                @change="togglePermission(resource.resource, operation, scope)"
+                              />
+                              <span>{{ operation }} / {{ scope }}</span>
+                            </span>
+                          </label>
+                        </div>
+                      </div>
+                    </div>
+                  </section>
+                </div>
+              </div>
+
+              <div class="rounded-[22px] border border-[rgba(80,105,127,0.1)] bg-white px-4 py-4">
+                <p class="text-sm font-semibold text-[var(--color-brand-ink-strong)]">Selected Rules</p>
+                <div class="mt-3 flex flex-wrap gap-2">
+                  <span
+                    v-for="permission in sortRules(roleForm.permissions)"
+                    :key="`selected-${permission}`"
+                    class="ui-chip"
+                  >
+                    {{ permission }}
+                  </span>
+                  <span v-if="roleForm.permissions.length === 0" class="text-sm text-[var(--color-brand-muted)]">
+                    No rules selected.
+                  </span>
+                </div>
+                <p class="mt-4 text-sm font-semibold text-[var(--color-brand-ink-strong)]">
+                  Derived legacy actions
+                </p>
+                <div class="mt-3 flex flex-wrap gap-2">
+                  <span
+                    v-for="action in permissionsToActions(roleForm.permissions)"
+                    :key="`derived-action-${action}`"
+                    class="ui-chip"
+                  >
+                    {{ action }}
+                  </span>
+                  <span
+                    v-if="permissionsToActions(roleForm.permissions).length === 0"
+                    class="text-sm text-[var(--color-brand-muted)]"
+                  >
+                    No compatibility actions derived.
+                  </span>
                 </div>
               </div>
 
@@ -502,7 +727,7 @@ onMounted(async () => {
               <p class="ui-page-kicker">User Assignment</p>
               <h2 class="ui-panel-title">User Role Bindings</h2>
               <p class="ui-panel-description mt-2">
-                Assign local custom roles to cached users for this cluster.
+                Bind cached users to custom roles. Policy roles remain read-only and come from the active RBAC file.
               </p>
             </div>
             <button type="button" class="ui-button-secondary" @click="loadUsers">
@@ -601,7 +826,7 @@ onMounted(async () => {
                   {{ selectedUsername || 'Select a user' }}
                 </h3>
                 <p class="mt-2 text-sm text-[var(--color-brand-muted)]">
-                  Override this user's effective permissions by attaching local custom roles.
+                  Attach custom roles to this cached user. Effective route permissions are the union of policy and custom rules.
                 </p>
               </div>
               <button
@@ -701,11 +926,11 @@ onMounted(async () => {
                       </p>
                       <div class="mt-2 flex flex-wrap gap-2">
                         <span
-                          v-for="action in [...role.actions].sort()"
-                          :key="`assign-${role.id}-${action}`"
+                          v-for="permission in role.permissions"
+                          :key="`assign-${role.id}-${permission}`"
                           class="ui-chip"
                         >
-                          {{ action }}
+                          {{ permission }}
                         </span>
                       </div>
                     </div>

@@ -1,154 +1,183 @@
-# 访问控制（自定义角色）需求说明
+# 访问控制需求说明
 
-本文描述“数据库驱动的自定义角色”能力，它叠加在既有 `policy.ini`（文件策略）RBAC 之上，并保持原行为在功能关闭时不受影响。
+## 1. 背景与目标
 
-## 1. 范围与目标
+现有基于 `actions[]` 的权限控制粒度不够，无法表达“只允许查看某个主路由”“允许编辑但仅限自己”“允许整个 settings 子树查看”这类规则。
 
-- `users` 表仍然是缓存 LDAP 用户的锚点表。
-- `roles` 存储自定义角色定义。
-- `user_roles` 存储用户与角色的绑定关系。
-- 前端 `Settings > Access Control` 页面只管理“当前集群”，不做跨集群聚合。
-- 有效权限模型（实现事实）：
-  - 文件策略动作（policy）
-  - 数据库自定义角色动作（custom）
-  - 最终有效权限（merged）为两者并集（UNION）
+本次改造目标：
 
-## 2. 数据模型（数据库）
+- 建立新的权限模型 `resource:operation:scope`
+- 保留旧权限名兼容层，避免已有角色立即失效
+- 在启用数据库支持后提供自定义角色与用户绑定
+- 页面上可配置所有主路由及子资源权限
 
-迁移脚本：`slurmweb/alembic/versions/20260424_0005_access_control_roles.py`。
+## 2. 功能范围
 
-### 2.1 `users`
+本次已实现：
 
-新增：
+- 新权限规则解析、匹配、排序与 owner-aware `self`
+- 旧权限到新规则的内置映射
+- `GET /access/catalog`
+- 角色表新增 `permissions`
+- 自定义角色新旧字段双读双写
+- Access Control 页面改为资源矩阵
+- 首次空角色表自动预置 `user`、`admin`、`super-admin`
 
-- `policy_roles JSONB NOT NULL DEFAULT []`
-- `policy_actions JSONB NOT NULL DEFAULT []`
-- `permission_synced_at TIMESTAMPTZ NULL`
+本次不做：
 
-### 2.2 `roles`
+- deny 规则
+- 用户直授权限
+- 详情页单独拆新的资源命名体系
 
-新增表字段：
+## 3. 启用条件
 
-- `id`
-- `name`（唯一）
-- `description`
-- `actions JSONB`
-- `created_at`
-- `updated_at`
+访问控制的运行条件已经收敛为：
 
-### 2.3 `user_roles`
+- `[database] enabled = yes`
 
-新增表字段：
+说明：
 
-- `user_id`
-- `role_id`
-- `created_at`
-- 主键 `(user_id, role_id)`
-- 外键 `ON DELETE CASCADE`
+- 数据库开启后，访问控制支持会自动装配。
+- 历史独立开关仅保留兼容占位定义，不再推荐继续使用。
+- 当数据库不可用或访问控制 store 初始化失败时，系统退回文件策略与旧 `actions[]` 行为。
 
-## 3. 配置与策略
+## 4. 权限模型
 
-配置开关（实现事实）：
+权限规则格式：
 
-- `[persistence] access_control_enabled = yes|no`（默认 `no`）
+```text
+resource:operation:scope
+```
 
-策略动作（实现事实）：
+当前支持：
 
-- `roles-view`
-- `roles-manage`
+- `resource`
+  - 精确资源，例如 `jobs`
+  - 子资源，例如 `settings/cache`
+  - 前缀资源，例如 `settings/*`
+  - 全局通配 `*`
+- `operation`
+  - `view`
+  - `edit`
+  - `delete`
+- `scope`
+  - `*`
+  - `self`
 
-约束：
+规则语义：
 
-- 功能关闭时保持既有 vendor/site `policy.ini` 行为不变。
-- 功能开启后，需要运维显式在策略中给对应用户/角色授权上述动作，否则前端页面应进入只读/不可用状态。
+- `edit` / `delete` 自动满足 `view`
+- `*:*:*` 表示最高权限
+- `self` 仅在 owner-aware 资源上生效
 
-## 4. 后端行为要求（对齐实现）
+当前资源目录包含：
 
-### 4.1 权限解析
+- 主路由：
+  - `dashboard`
+  - `analysis`
+  - `ai`
+  - `jobs`
+  - `jobs-history`
+  - `resources`
+  - `qos`
+  - `reservations`
+  - `accounts`
+- settings：
+  - `settings/general`
+  - `settings/errors`
+  - `settings/account`
+  - `settings/ai`
+  - `settings/access-control`
+  - `settings/cache`
+  - `settings/ldap-cache`
+- 用户空间：
+  - `user/profile`
+  - `user/analysis`
+- 共享过滤资源：
+  - `jobs/filter-accounts`
+  - `jobs/filter-partitions`
+  - `jobs/filter-qos`
+  - `resources/filter-partitions`
 
-- 文件策略是基础来源（policy）。
-- 当访问控制启用且数据库可用时：
-  - 从 `user_roles -> roles.actions` 加载 custom 动作
-  - 将 policy 与 custom 做集合并集（UNION）
-  - 对 roles/actions 去重并排序后返回
+## 5. 旧权限兼容映射
 
-### 4.2 `/permissions`
+系统内置至少包含以下映射：
 
-返回字段（实现事实）：
+| 旧权限 | 新规则 |
+|---|---|
+| `view-stats` | `dashboard:view:*` + `analysis:view:*` |
+| `view-jobs` | `jobs:view:*` + `user/analysis:view:self` |
+| `view-history-jobs` | `jobs-history:view:*` |
+| `view-nodes` | `resources:view:*` |
+| `view-qos` | `qos:view:*` + `jobs/filter-qos:view:*` |
+| `view-reservations` | `reservations:view:*` |
+| `associations-view` | `accounts:view:*` + `user/profile:view:*` |
+| `view-accounts` | `jobs/filter-accounts:view:*` |
+| `view-partitions` | `jobs/filter-partitions:view:*` + `resources/filter-partitions:view:*` |
+| `cache-view` | `settings/cache:view:*` |
+| `cache-reset` | `settings/cache:edit:*` |
+| `roles-view` | `settings/access-control:view:*` |
+| `roles-manage` | `settings/access-control:edit:*` + `settings/access-control:delete:*` |
+| `view-ai` | `ai:view:*` |
+| `manage-ai` | `settings/ai:edit:*` |
 
-- `roles`
-- `actions`
-- `sources.policy.roles`
-- `sources.policy.actions`
-- `sources.custom.roles`
-- `sources.custom.actions`
-- `sources.merged.*`（或由顶层 `roles/actions` 表示 merged）
+扩展方式：
 
-### 4.3 `/users/cache`（用户缓存写入）
+- 可通过 `policy.permission_map` 覆盖或补充映射
 
-当缓存认证用户时：
+## 6. 数据模型与接口
 
-- 刷新 LDAP 用户基础信息（username/fullname/groups）
-- 刷新 `policy_roles` / `policy_actions`
-- 刷新 `permission_synced_at`
+数据库变化：
 
-### 4.4 Agent 启动时的策略快照刷新
+- `roles.permissions JSONB`
 
-当 `[persistence] access_control_enabled = yes` 且数据库可用时：
+接口变化：
 
-- Agent 启动会对 `users` 中已有缓存用户刷新策略快照
-- 刷新仅使用缓存的 `username` / `fullname` / `groups`
-- 刷新会更新：
-  - `policy_roles`
-  - `policy_actions`
-  - `permission_synced_at`
-- 刷新不会：
-  - 新建用户
-  - 查询 LDAP
-  - 修改 `user_roles`
-- 单用户刷新失败只记录日志，不阻塞 Agent 启动
+- `GET /permissions`
+  - 返回 `roles`
+  - 返回 `actions`
+  - 返回 `rules`
+  - 返回 `sources.policy/custom/merged`
+- `GET /access/catalog`
+  - 返回资源目录、操作、scope、旧权限映射
+- `GET /access/roles`
+  - 返回 `actions` 与 `permissions`
+- `POST/PATCH /access/roles`
+  - 支持同时写入 `actions` 与 `permissions`
 
-## 5. 接口契约
+## 7. 前端行为
 
-### 5.1 Agent 接口
+前端当前的关键行为：
 
-- `GET /v{version}/access/roles`
-- `POST /v{version}/access/roles`
-- `PATCH /v{version}/access/roles/<id>`
-- `DELETE /v{version}/access/roles/<id>`
-- `GET /v{version}/access/users`
-- `GET /v{version}/access/users/<username>/roles`
-- `PUT /v{version}/access/users/<username>/roles`
+- `runtime.hasRoutePermission(...)` 作为新规则判定入口
+- 主菜单、路由守卫、Settings Tabs、AI/Cache/LDAP Cache/用户空间统一读取规则
+- `Settings > Access Control` 使用目录驱动矩阵编辑 `permissions`
+- 角色展示同时显示 `permissions` 与兼容 `actions`
 
-授权（实现事实）：
+## 8. 预置角色
 
-- 读接口要求 `roles-view`
-- 写接口要求 `roles-manage`
-- 功能关闭时返回 `501`
+数据库支持开启且 `roles` 表为空时，自动写入：
 
-### 5.2 Gateway 代理接口
+- `user`
+  - 全量可查看权限
+- `admin`
+  - 全量资源的 `view/edit/delete`
+- `super-admin`
+  - `*:*:*`
 
-- `GET /api/agents/<cluster>/permissions`
-- `GET/POST /api/agents/<cluster>/access/roles`
-- `PATCH/DELETE /api/agents/<cluster>/access/roles/<id>`
-- `GET /api/agents/<cluster>/access/users`
-- `GET/PUT /api/agents/<cluster>/access/users/<username>/roles`
+这些角色只在首次空表时自动写入一次。
 
-### 5.3 能力暴露
+## 9. 降级与边界
 
-必须在以下位置暴露 `access_control`（实现事实）：
+- 当访问控制不可用时：
+  - 继续按旧 `actions[]` 鉴权
+  - 不强制依赖新规则
+- 当前版本只做 allow，不做 deny
+- `self` 只在 owner-aware 资源中使用
+- 页面详情默认继承主页面资源，不额外拆权限
 
-- Agent `/info`
-- Gateway `/api/clusters`
-- 前端集群对象能力字段（用于 settings tab 门控）
+## 10. 相关验证入口
 
-## 6. 前端行为要求
-
-- 仅当集群支持访问控制（capability）时显示 `Access Control` tab。
-- 权限分级：
-  - 无 `roles-view`：提示无权限，不加载数据
-  - 有 `roles-view` 且无 `roles-manage`：只读模式
-  - 有 `roles-manage`：允许编辑角色与绑定
-- `SettingsAccount` 必须展示 `policy/custom/merged` 三个来源视图，便于排查“为什么有/没有某权限”。
-
-测试计划见：[`docs/features/access-control/test-plan.md`](./test-plan.md)。
+- 后端测试见 [`test-plan.md`](./test-plan.md)
+- 运行时目录见 `slurmweb/permission_rules.py`
+- 前端矩阵页面见 `frontend/src/views/settings/SettingsAccessControl.vue`

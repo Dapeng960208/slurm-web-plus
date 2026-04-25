@@ -1,101 +1,107 @@
-# 访问控制（自定义角色）测试计划
+# 访问控制测试计划
 
-目标：端到端验证“自定义角色 + 用户绑定”的访问控制能力，并确保功能关闭时既有 `policy.ini` 行为保持不变。
+## 1. 目标
 
-## 1. 后端覆盖点
+验证新的 `resource:operation:scope` 权限系统、旧权限兼容映射、预置角色种子和前端资源矩阵在数据库启用与关闭两种模式下都行为正确。
 
-### 1.1 `slurmweb/tests/views/test_agent_permissions.py`
+## 2. 后端测试
 
-- `/permissions` 返回 `roles`、`actions` 与 `sources`
-- 匿名/认证路径权限行为保持正确
-- policy 与 custom 的 roles/actions 合并与去重
+### 2.1 规则匹配
 
-### 1.2 `slurmweb/tests/views/test_agent.py`
+覆盖以下场景：
 
-- `/info` 包含 `access_control` 与相关 capability 字段
-- `/users/cache` 会刷新 `policy_roles` / `policy_actions`
-- 角色管理与用户绑定接口行为正确
-- 访问控制关闭时接口返回 `501`
+- 精确资源匹配
+- 前缀资源匹配
+- `*:*:*`
+- `self`
+- `edit` / `delete` 满足 `view`
+- 旧权限映射到新规则
 
-### 1.3 `slurmweb/tests/views/test_gateway.py`
+对应重点：
 
-- `/api/clusters` 包含扩展后的集群字段（含 `access_control`）
-- Gateway 正确代理 `/permissions`、`/access/roles`、`/access/users`
-- query string 转发正确（LDAP cache 与 access users filters）
+- `slurmweb/permission_rules.py`
+- `slurmweb/tests/views/test_agent_permissions.py`
 
-### 1.4 `slurmweb/tests/apps/test_agent.py`
+### 2.2 能力推导
 
-- 只有数据库可用时才会启用访问控制
-- 依赖缺失时能安全降级
-- 启用后，Agent 启动会刷新缓存用户的策略快照
-- 单用户刷新失败不会阻塞启动
+覆盖以下场景：
 
-## 2. 前端覆盖点
+- 数据库开启后自动启用：
+  - LDAP Cache
+  - Jobs History
+  - Access Control
+  - AI
+- Prometheus 开启后自动启用：
+  - metrics
+  - node metrics
+- 数据库 + Prometheus 开启后自动启用：
+  - user metrics
+  - user analytics
 
-### 2.1 `frontend/tests/composables/GatewayAPI.spec.ts`
+对应重点：
 
-- `permissions` 归一化为 `policy/custom/merged`
-- 集群 capability 归一化与 `access_control` 门控
-- 角色 CRUD 与用户绑定 API 路径
+- `slurmweb/tests/apps/test_agent.py`
 
-### 2.2 `frontend/tests/components/settings/SettingsTabs.spec.ts`
+### 2.3 数据库存储
 
-- 当前集群支持访问控制时才显示 `Access Control` tab
+覆盖以下场景：
 
-### 2.3 `frontend/tests/views/settings/SettingsAccount.spec.ts`
+- `roles.permissions` 迁移生效
+- 角色新旧字段双读双写
+- 旧角色只有 `actions[]` 时可推导出 `permissions[]`
+- 角色表为空时自动写入 `user`、`admin`、`super-admin`
 
-- `policy/custom/merged` 权限视图渲染正确
+## 3. 前端测试
 
-### 2.4 `frontend/tests/views/settings/SettingsAccessControl.spec.ts`
+### 3.1 运行时权限
 
-- 当前集群 role/user 数据加载正确
-- `roles-manage` 模式支持创建/编辑/删除与保存绑定
-- 只读模式限制正确
-- feature-disabled 状态覆盖
+覆盖以下场景：
 
-## 3. 手工验证场景
+- `hasRoutePermission(...)` 能正确匹配规则
+- 旧 `actions[]` 测试夹具仍能通过兼容回退参与判定
+- `self` 场景下 `/me` 与 `/users/:user` 行为正确
 
-### 3.1 功能关闭（Feature Flag Off）
+### 3.2 页面与导航
 
-1. 设置 `[persistence] access_control_enabled = no`
-2. 确认 policy-only 授权路径仍然可用
-3. 确认访问控制管理接口返回 `501`
+覆盖以下场景：
 
-### 3.2 功能开启（Feature Flag On）
+- 主菜单按新规则显示主路由
+- 路由守卫按新规则跳转 `/forbidden`
+- Settings Tabs 按新规则显示
+- `SettingsAI`、`SettingsCache`、`SettingsLdapCache`
+- `AssistantView`
+- `UserView`
 
-1. 数据库迁移升级到 head
-2. 设置 `[persistence] access_control_enabled = yes`
-3. 创建一个自定义角色并绑定到某个已缓存用户
-4. 修改 `policy.ini` 并重启 Agent
-5. 确认缓存用户的 `policy_roles/policy_actions` 在启动时被刷新
-6. 重新登录并确认 `merged` 权限包含 policy 与 custom 的并集
+### 3.3 Access Control 页面
 
-## 4. 验收用例（最小集）
+覆盖以下场景：
 
-- 仅 policy 授权：访问生效
-- 仅 custom 授权：访问生效
-- policy + custom 并存：merged 返回并集
-- 删除角色：绑定被级联删除
-- 更新用户绑定：下一次 `/permissions` 获取生效
+- `GET /access/catalog` 成功加载
+- 角色权限矩阵回填正确
+- 保存时提交 `permissions[]`
+- 兼容动作 `actions[]` 可回显
+- 只读模式不可编辑
+- 用户角色绑定保存正确
 
-## 5. 执行命令
+## 4. 端到端场景
 
-后端：
+最少验证以下组合：
 
-```powershell
-.venv\Scripts\python.exe -m pytest `
-  slurmweb/tests/views/test_agent_permissions.py `
-  slurmweb/tests/views/test_agent.py `
-  slurmweb/tests/views/test_gateway.py `
-  slurmweb/tests/apps/test_agent.py
-```
+1. 仅数据库开启
+2. 仅 Prometheus 开启
+3. 数据库 + Prometheus 同时开启
+4. 旧角色只有 `actions[]`，启用新权限后页面仍可访问
 
-前端：
+## 5. 已执行的定向验证
 
-```powershell
-npm --prefix frontend run test:unit -- `
-  tests/composables/GatewayAPI.spec.ts `
-  tests/components/settings/SettingsTabs.spec.ts `
-  tests/views/settings/SettingsAccount.spec.ts `
-  tests/views/settings/SettingsAccessControl.spec.ts --run
-```
+已通过：
+
+- `npm --prefix frontend run type-check`
+- `npx vitest run tests/stores/runtime.spec.ts tests/views/settings/SettingsAccessControl.spec.ts`
+- `.venv\Scripts\python.exe -m pytest slurmweb/tests/views/test_agent_permissions.py -q`
+- `.venv\Scripts\python.exe -m pytest slurmweb/tests/apps/test_agent.py -q`
+
+未在本次变更中完整重跑：
+
+- 全量前端 Vitest
+- 全量后端 pytest

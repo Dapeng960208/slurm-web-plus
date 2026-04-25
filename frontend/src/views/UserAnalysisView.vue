@@ -28,7 +28,7 @@ const clusterDetails = computed(() =>
 const userMetricsEnabled = computed(
   () =>
     Boolean(clusterDetails.value?.user_metrics) &&
-    runtimeStore.hasClusterPermission(cluster, 'view-jobs')
+    runtimeStore.hasRoutePermission(cluster, 'user/analysis', 'view')
 )
 </script>
 

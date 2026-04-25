@@ -1,6 +1,6 @@
 # 内部文档索引
 
-`docs/` 用于维护仓库内的开发、测试、部署和 AI 协作文档。根目录只保留本文件作为稳定入口，不在根目录散写新专题。
+`docs/` 用于维护本仓库的开发、配置、权限、数据库、测试与 AI 协作文档。
 
 ## 总览
 
@@ -47,16 +47,15 @@
 
 ## 本轮重点
 
-本轮前端改造重点集中在三个主题：
+本轮已落地的重点是两件事：
 
-- 用户入口统一为“用户工作台”，覆盖 `/:cluster/users/:user`、`/:cluster/me` 和旧的 `/:cluster/users/:user/analysis` 兼容入口。
-- 全站整页级权限不足统一跳转 `/forbidden`，并明确提示“请联系管理员申请权限”。
-- 高频百分比展示统一改为数字主值加百分比图标样式，避免不同页面各写一套。
+- 路由权限模型切换为 `resource:operation:scope`，支持精细资源、前缀资源、`self` 和 `*:*:*`。
+- Agent 能力开关收敛为自动推导：
+  - 数据库开启后自动提供 LDAP Cache、Jobs History、Access Control、AI。
+  - Prometheus 开启后自动提供 metrics、node metrics。
+  - 数据库和 Prometheus 同时开启后自动提供 user metrics / user analytics。
 
-## 建议阅读顺序
+补充说明：
 
-1. `docs/overview/project-overview.md`
-2. `docs/overview/architecture-overview.md`
-3. `docs/overview/latest-features.md`
-4. 对应 `docs/features/<feature>/` 专题
-5. `docs/tracking/current-release.md`
+- 旧权限名如 `cache-view`、`roles-manage`、`view-ai` 仍可通过内置映射自动转换为新规则。
+- 旧能力开关目前仅保留兼容占位定义，不再作为实际功能语义来源。

@@ -16,10 +16,12 @@ import LoadingSpinner from '@/components/LoadingSpinner.vue'
 import PercentMetric from '@/components/PercentMetric.vue'
 import { ArrowPathIcon } from '@heroicons/vue/20/solid'
 import { useGatewayAPI } from '@/composables/GatewayAPI'
+import { useRuntimeStore } from '@/stores/runtime'
 
 const { cluster } = defineProps<{ cluster: ClusterDescription }>()
 
 const gatewayAPI = useGatewayAPI()
+const runtimeStore = useRuntimeStore()
 
 const { data, unable, loaded } = useClusterDataPoller<CacheStatistics>(
   cluster.name,
@@ -144,7 +146,7 @@ function hitRateKey(key: string, value: number): number | null {
       </div>
 
       <div
-        v-if="cluster.permissions.actions.includes('cache-reset')"
+        v-if="runtimeStore.hasRoutePermission(cluster.name, 'settings/cache', 'edit')"
         class="border-t border-[rgba(80,105,127,0.08)] px-6 py-4"
       >
         <button type="button" class="ui-button-secondary" @click="resetCache(cluster.name)">

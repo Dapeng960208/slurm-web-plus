@@ -370,6 +370,11 @@ policy:
     default: /etc/slurm-web/policy.ini
     doc: |
       Path to site RBAC policy definition file with roles and permitted actions
+  permission_map:
+    type: path
+    doc: |
+      Optional YAML file used to extend or override legacy action to
+      `resource:operation:scope` permission mappings.
 
 jwt:
   key:
@@ -531,15 +536,20 @@ database:
 persistence:
   enabled:
     type: bool
-    default: false
+    deprecated:
+      section: database
+      parameter: enabled
     doc: |
-      Determine if job history persistence to PostgreSQL is enabled.
+      Deprecated. Job history persistence now follows database availability and
+      no longer requires a dedicated enable flag.
   access_control_enabled:
     type: bool
-    default: false
+    deprecated:
+      section: database
+      parameter: enabled
     doc: |
-      Determine if database-backed custom access control roles and user role
-      bindings are enabled.
+      Deprecated. Access control now follows database availability and no
+      longer requires a dedicated enable flag.
   retention_days:
     type: int
     default: 180
@@ -552,10 +562,12 @@ persistence:
 user_metrics:
   enabled:
     type: bool
-    default: false
+    deprecated:
+      section: database
+      parameter: enabled
     doc: |
-      Determine if per-user metrics collection and APIs are enabled.
-      This feature depends on both `[database]` and `[metrics]`.
+      Deprecated. User analytics now follow database and Prometheus
+      availability and no longer require a dedicated enable flag.
   aggregation_interval:
     type: int
     default: 3600
@@ -567,14 +579,17 @@ user_metrics:
 node_metrics:
   enabled:
     type: bool
-    default: false
+    deprecated:
+      section: node_metrics
+      parameter: prometheus_host
     doc: |
-      Determine if node real-time resource monitoring via Prometheus
-      node_exporter is enabled.
+      Deprecated. Node metrics now follow the presence of
+      `[node_metrics] prometheus_host`.
   prometheus_host:
     type: uri
-    default: http://localhost:9090
-    doc: URL of Prometheus server to query node_exporter metrics.
+    doc: |
+      URL of Prometheus server to query node_exporter metrics. When omitted,
+      node real-time metrics stay disabled.
   node_exporter_job:
     type: str
     default: node
@@ -589,11 +604,12 @@ node_metrics:
 ai:
   enabled:
     type: bool
-    default: false
+    deprecated:
+      section: database
+      parameter: enabled
     doc: |
-      Determine if AI assistant APIs are enabled for this cluster. This feature
-      depends on database support because both model configurations and
-      conversations are stored in PostgreSQL.
+      Deprecated. AI support now follows database availability and model
+      configuration state.
   max_rounds:
     type: int
     default: 4

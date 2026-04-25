@@ -145,6 +145,7 @@ class SlurmwebAppGateway(SlurmwebWebApp, RFLTokenizedWebApp):
         ),
         SlurmwebAppRoute("/api/agents/<cluster>/users/cache", views.ldap_cache_users),
         SlurmwebAppRoute("/api/agents/<cluster>/access/roles", views.access_roles),
+        SlurmwebAppRoute("/api/agents/<cluster>/access/catalog", views.access_catalog),
         SlurmwebAppRoute(
             "/api/agents/<cluster>/access/roles",
             views.create_access_role,

@@ -7,12 +7,22 @@
 from typing import Iterable, List, Tuple
 
 from ..models.db import psycopg_connect_kwargs
+from ..permission_rules import default_seed_roles, permission_rules_to_legacy_actions
 
 
 class AccessControlStore:
-    def __init__(self, settings):
+    def __init__(self, settings, legacy_permission_map=None):
         self._settings = settings
         self._pool = None
+        self._legacy_permission_map = legacy_permission_map or {}
+
+    def _derive_permissions(self, actions, permissions):
+        if permissions:
+            return permissions
+        mapped = []
+        for action in actions or []:
+            mapped.extend(self._legacy_permission_map.get(action, []))
+        return sorted(set(mapped))
 
     def _init_pool(self):
         import psycopg2.pool
@@ -59,7 +69,7 @@ class AccessControlStore:
             with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
                 cur.execute(
                     """
-                    SELECT id, name, description, actions, created_at, updated_at
+                    SELECT id, name, description, actions, permissions, created_at, updated_at
                     FROM roles
                     ORDER BY name ASC
                     """
@@ -74,13 +84,23 @@ class AccessControlStore:
                 "name": row["name"],
                 "description": row["description"],
                 "actions": row["actions"] or [],
+                "permissions": self._derive_permissions(
+                    row["actions"] or [],
+                    row.get("permissions") or [],
+                ),
                 "created_at": row["created_at"],
                 "updated_at": row["updated_at"],
             }
             for row in rows
         ]
 
-    def create_role(self, name: str, description: str, actions: List[str]):
+    def create_role(
+        self,
+        name: str,
+        description: str,
+        actions: List[str],
+        permissions: List[str],
+    ):
         import psycopg2.extras
 
         conn = self._get_conn()
@@ -90,11 +110,16 @@ class AccessControlStore:
                     raise ValueError(f"Role {name} already exists")
                 cur.execute(
                     """
-                    INSERT INTO roles (name, description, actions, created_at, updated_at)
-                    VALUES (%s, %s, %s::jsonb, NOW(), NOW())
-                    RETURNING id, name, description, actions, created_at, updated_at
+                    INSERT INTO roles (name, description, actions, permissions, created_at, updated_at)
+                    VALUES (%s, %s, %s::jsonb, %s::jsonb, NOW(), NOW())
+                    RETURNING id, name, description, actions, permissions, created_at, updated_at
                     """,
-                    (name, description, psycopg2.extras.Json(actions)),
+                    (
+                        name,
+                        description,
+                        psycopg2.extras.Json(actions),
+                        psycopg2.extras.Json(permissions),
+                    ),
                 )
                 row = cur.fetchone()
             conn.commit()
@@ -112,11 +137,22 @@ class AccessControlStore:
             "name": row["name"],
             "description": row["description"],
             "actions": row["actions"] or [],
+            "permissions": self._derive_permissions(
+                row["actions"] or [],
+                row.get("permissions") or [],
+            ),
             "created_at": row["created_at"],
             "updated_at": row["updated_at"],
         }
 
-    def update_role(self, role_id: int, name: str, description: str, actions: List[str]):
+    def update_role(
+        self,
+        role_id: int,
+        name: str,
+        description: str,
+        actions: List[str],
+        permissions: List[str],
+    ):
         import psycopg2.extras
 
         conn = self._get_conn()
@@ -130,14 +166,16 @@ class AccessControlStore:
                     SET name = %s,
                         description = %s,
                         actions = %s::jsonb,
+                        permissions = %s::jsonb,
                         updated_at = NOW()
                     WHERE id = %s
-                    RETURNING id, name, description, actions, created_at, updated_at
+                    RETURNING id, name, description, actions, permissions, created_at, updated_at
                     """,
                     (
                         name,
                         description,
                         psycopg2.extras.Json(actions),
+                        psycopg2.extras.Json(permissions),
                         role_id,
                     ),
                 )
@@ -157,6 +195,10 @@ class AccessControlStore:
             "name": row["name"],
             "description": row["description"],
             "actions": row["actions"] or [],
+            "permissions": self._derive_permissions(
+                row["actions"] or [],
+                row.get("permissions") or [],
+            ),
             "created_at": row["created_at"],
             "updated_at": row["updated_at"],
         }
@@ -178,7 +220,7 @@ class AccessControlStore:
             self._release_conn(conn)
         return bool(deleted)
 
-    def user_permissions(self, username: str) -> Tuple[set, set]:
+    def user_permissions(self, username: str) -> Tuple[set, set, set]:
         import psycopg2.extras
 
         conn = self._get_conn()
@@ -186,7 +228,7 @@ class AccessControlStore:
             with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
                 cur.execute(
                     """
-                    SELECT r.name, r.actions
+                    SELECT r.name, r.actions, r.permissions
                     FROM users u
                     JOIN user_roles ur ON ur.user_id = u.id
                     JOIN roles r ON r.id = ur.role_id
@@ -201,10 +243,17 @@ class AccessControlStore:
 
         role_names = set()
         actions = set()
+        permissions = set()
         for row in rows:
             role_names.add(row["name"])
             actions.update(row["actions"] or [])
-        return role_names, actions
+            permissions.update(
+                self._derive_permissions(
+                    row["actions"] or [],
+                    row.get("permissions") or [],
+                )
+            )
+        return role_names, actions, permissions
 
     def list_users(self, username=None, page=1, page_size=50):
         import psycopg2.extras
@@ -241,7 +290,13 @@ class AccessControlStore:
                         u.policy_actions,
                         COALESCE(
                             json_agg(
-                                json_build_object('id', r.id, 'name', r.name)
+                                json_build_object(
+                                    'id', r.id,
+                                    'name', r.name,
+                                    'description', r.description,
+                                    'actions', r.actions,
+                                    'permissions', r.permissions
+                                )
                                 ORDER BY r.name
                             ) FILTER (WHERE r.id IS NOT NULL),
                             '[]'::json
@@ -263,11 +318,16 @@ class AccessControlStore:
         items = []
         for row in rows:
             custom_roles = row["custom_roles"] or []
+            for role in custom_roles:
+                role["permissions"] = self._derive_permissions(
+                    role.get("actions") or [],
+                    role.get("permissions") or [],
+                )
             custom_actions = sorted(
                 {
                     action
-                    for role in self._user_roles_detail(row["username"]).get("custom_roles", [])
-                    for action in role.get("actions", [])
+                    for role in custom_roles
+                    for action in (role.get("actions") or [])
                 }
             )
             items.append(
@@ -332,7 +392,8 @@ class AccessControlStore:
                                     'id', r.id,
                                     'name', r.name,
                                     'description', r.description,
-                                    'actions', r.actions
+                                    'actions', r.actions,
+                                    'permissions', r.permissions
                                 )
                                 ORDER BY r.name
                             ) FILTER (WHERE r.id IS NOT NULL),
@@ -356,6 +417,11 @@ class AccessControlStore:
             return None
 
         custom_roles = row["custom_roles"] or []
+        for role in custom_roles:
+            role["permissions"] = self._derive_permissions(
+                role.get("actions") or [],
+                role.get("permissions") or [],
+            )
         custom_actions = sorted(
             {
                 action
@@ -403,3 +469,59 @@ class AccessControlStore:
             self._release_conn(conn)
 
         return self.get_user_roles(username)
+
+    def seed_default_roles(self):
+        import psycopg2.extras
+
+        conn = self._get_conn()
+        try:
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                cur.execute("SELECT COUNT(*) AS count FROM roles")
+                count = cur.fetchone()["count"]
+                if count:
+                    return []
+                rows = []
+                for role in default_seed_roles():
+                    actions = permission_rules_to_legacy_actions(
+                        role["permissions"],
+                        self._legacy_permission_map,
+                    )
+                    cur.execute(
+                        """
+                        INSERT INTO roles (name, description, actions, permissions, created_at, updated_at)
+                        VALUES (%s, %s, %s::jsonb, %s::jsonb, NOW(), NOW())
+                        RETURNING id, name, description, actions, permissions, created_at, updated_at
+                        """,
+                        (
+                            role["name"],
+                            role["description"],
+                            psycopg2.extras.Json(actions),
+                            psycopg2.extras.Json(role["permissions"]),
+                        ),
+                    )
+                    rows.append(cur.fetchone())
+            conn.commit()
+        except Exception:
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+            raise
+        finally:
+            self._release_conn(conn)
+
+        return [
+            {
+                "id": row["id"],
+                "name": row["name"],
+                "description": row["description"],
+                "actions": row["actions"] or [],
+                "permissions": self._derive_permissions(
+                    row["actions"] or [],
+                    row.get("permissions") or [],
+                ),
+                "created_at": row["created_at"],
+                "updated_at": row["updated_at"],
+            }
+            for row in rows
+        ]

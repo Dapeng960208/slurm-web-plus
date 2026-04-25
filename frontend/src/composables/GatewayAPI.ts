@@ -38,9 +38,30 @@ export interface ClusterDescription {
   user_metrics?: boolean
 }
 
+export type PermissionRule = string
+
+const LEGACY_PERMISSION_RULES: Record<string, PermissionRule[]> = {
+  'view-stats': ['dashboard:view:*', 'analysis:view:*'],
+  'view-jobs': ['jobs:view:*', 'user/analysis:view:self'],
+  'view-history-jobs': ['jobs-history:view:*'],
+  'view-nodes': ['resources:view:*'],
+  'view-qos': ['qos:view:*', 'jobs/filter-qos:view:*'],
+  'view-reservations': ['reservations:view:*'],
+  'associations-view': ['accounts:view:*', 'user/profile:view:*'],
+  'view-accounts': ['jobs/filter-accounts:view:*'],
+  'view-partitions': ['jobs/filter-partitions:view:*', 'resources/filter-partitions:view:*'],
+  'cache-view': ['settings/cache:view:*'],
+  'cache-reset': ['settings/cache:edit:*'],
+  'roles-view': ['settings/access-control:view:*'],
+  'roles-manage': ['settings/access-control:edit:*', 'settings/access-control:delete:*'],
+  'view-ai': ['ai:view:*'],
+  'manage-ai': ['settings/ai:edit:*']
+}
+
 export interface ClusterPermissionAssignment {
   roles: string[]
   actions: string[]
+  rules: PermissionRule[]
 }
 
 export interface ClusterPermissionsSources {
@@ -86,21 +107,30 @@ export interface ClusterAICapability {
 function normalizeClusterPermissionAssignment(
   assignment?: ClusterPermissionAssignment
 ): ClusterPermissionAssignment {
+  const rules = new Set<PermissionRule>(assignment?.rules ?? [])
+  for (const action of assignment?.actions ?? []) {
+    for (const rule of LEGACY_PERMISSION_RULES[action] ?? []) {
+      rules.add(rule)
+    }
+  }
   return {
     roles: [...(assignment?.roles ?? [])],
-    actions: [...(assignment?.actions ?? [])]
+    actions: [...(assignment?.actions ?? [])],
+    rules: [...rules].sort()
   }
 }
 
 export function normalizeClusterPermissions(permissions?: ClusterPermissions): ClusterPermissions {
   const merged = normalizeClusterPermissionAssignment({
     roles: permissions?.sources?.merged?.roles ?? permissions?.roles ?? [],
-    actions: permissions?.sources?.merged?.actions ?? permissions?.actions ?? []
+    actions: permissions?.sources?.merged?.actions ?? permissions?.actions ?? [],
+    rules: permissions?.sources?.merged?.rules ?? permissions?.rules ?? []
   })
 
   return {
     roles: merged.roles,
     actions: merged.actions,
+    rules: merged.rules,
     sources: {
       policy: normalizeClusterPermissionAssignment(permissions?.sources?.policy),
       custom: normalizeClusterPermissionAssignment(permissions?.sources?.custom),
@@ -333,6 +363,7 @@ export interface CustomRole {
   name: string
   description: string | null
   actions: string[]
+  permissions: PermissionRule[]
   created_at?: string | null
   updated_at?: string | null
 }
@@ -341,6 +372,7 @@ export interface CustomRolePayload {
   name: string
   description?: string | null
   actions: string[]
+  permissions: PermissionRule[]
 }
 
 export interface AccessControlRolesResponse {
@@ -352,6 +384,7 @@ export interface AccessControlUserRole {
   name: string
   description?: string | null
   actions?: string[]
+  permissions?: PermissionRule[]
 }
 
 export interface AccessControlUserRow {
@@ -376,6 +409,27 @@ export interface AccessControlUsersFilters {
   username?: string
   page?: number
   page_size?: number
+}
+
+export interface AccessControlCatalogResource {
+  resource: string
+  label: string
+  operations: string[]
+  scopes: string[]
+  owner_aware?: boolean
+}
+
+export interface AccessControlCatalogGroup {
+  group: string
+  label: string
+  resources: AccessControlCatalogResource[]
+}
+
+export interface AccessControlCatalog {
+  operations: string[]
+  scopes: string[]
+  groups: AccessControlCatalogGroup[]
+  legacy_map: Record<string, PermissionRule[]>
 }
 
 export interface UserDescription {
@@ -1567,7 +1621,10 @@ export function useGatewayAPI() {
 
   async function access_roles(cluster: string): Promise<CustomRole[]> {
     const result = await restAPI.get<AccessControlRolesResponse>(`/agents/${cluster}/access/roles`)
-    return result.items
+    return result.items.map((role) => ({
+      ...role,
+      permissions: [...(role.permissions ?? [])].sort()
+    }))
   }
 
   async function create_access_role(
@@ -1608,9 +1665,20 @@ export function useGatewayAPI() {
     username: string
   ): Promise<AccessControlUserAssignment> {
     const encodedUsername = encodeURIComponent(username)
-    return await restAPI.get<AccessControlUserAssignment>(
+    const result = await restAPI.get<AccessControlUserAssignment>(
       `/agents/${cluster}/access/users/${encodedUsername}/roles`
     )
+    return {
+      ...result,
+      custom_roles: (result.custom_roles ?? []).map((role) => ({
+        ...role,
+        permissions: [...(role.permissions ?? [])].sort()
+      }))
+    }
+  }
+
+  async function access_catalog(cluster: string): Promise<AccessControlCatalog> {
+    return await restAPI.get<AccessControlCatalog>(`/agents/${cluster}/access/catalog`)
   }
 
   async function update_access_user_roles(
@@ -2001,6 +2069,7 @@ export function useGatewayAPI() {
     associations,
     permissions,
     access_roles,
+    access_catalog,
     create_access_role,
     update_access_role,
     delete_access_role,

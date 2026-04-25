@@ -4,11 +4,13 @@
 #
 # SPDX-License-Identifier: MIT
 
-from typing import Any, Tuple
+from functools import wraps
+from typing import Any, Callable, Iterable, Tuple, Union
 import logging
 
 from flask import Response, current_app, jsonify, abort, request, stream_with_context
-from rfl.web.tokens import rbac_action, check_jwt
+from rfl.web.tokens import _get_token_user, check_jwt
+from rfl.authentication.user import AnonymousUser
 
 from ..ai.service import AIProviderValidationError, AIRequestError
 from ..version import get_version
@@ -22,6 +24,7 @@ from ..slurmrestd.errors import (
     SlurmrestdAuthenticationError,
     SlurmrestdInternalError,
 )
+from ..permission_rules import access_control_catalog, permission_rules_to_legacy_actions
 
 
 logger = logging.getLogger(__name__)
@@ -53,28 +56,43 @@ def _permission_payload(user) -> dict:
         merged = {
             "roles": set(roles),
             "actions": set(actions),
+            "rules": set(),
             "sources": {
                 "policy": {
                     "roles": set(roles),
                     "actions": set(actions),
+                    "rules": set(),
                 },
                 "custom": {
                     "roles": set(),
                     "actions": set(),
+                },
+                "merged": {
+                    "roles": set(roles),
+                    "actions": set(actions),
+                    "rules": set(),
                 },
             },
         }
     return {
         "roles": _sorted_strings(merged["roles"]),
         "actions": _sorted_strings(merged["actions"]),
+        "rules": _sorted_strings(merged.get("rules", [])),
         "sources": {
             "policy": {
                 "roles": _sorted_strings(merged["sources"]["policy"]["roles"]),
                 "actions": _sorted_strings(merged["sources"]["policy"]["actions"]),
+                "rules": _sorted_strings(merged["sources"]["policy"].get("rules", [])),
             },
             "custom": {
                 "roles": _sorted_strings(merged["sources"]["custom"]["roles"]),
                 "actions": _sorted_strings(merged["sources"]["custom"]["actions"]),
+                "rules": _sorted_strings(merged["sources"]["custom"].get("rules", [])),
+            },
+            "merged": {
+                "roles": _sorted_strings(merged["sources"]["merged"]["roles"]),
+                "actions": _sorted_strings(merged["sources"]["merged"]["actions"]),
+                "rules": _sorted_strings(merged["sources"]["merged"].get("rules", [])),
             },
         },
     }
@@ -99,17 +117,29 @@ def _role_payload():
     name = str(payload.get("name", "")).strip()
     if not name:
         abort(400, "Role name is required")
-    actions = payload.get("actions")
+    actions = payload.get("actions") or []
     if not isinstance(actions, list):
         abort(400, "Role actions must be a list")
     actions = _sorted_strings(actions)
+    permissions = payload.get("permissions") or []
+    if not isinstance(permissions, list):
+        abort(400, "Role permissions must be a list")
+    permissions = current_app.policy.normalize_rules(
+        list(permissions) + current_app.policy.action_rules(actions)
+    )
     invalid_actions = sorted(set(actions) - current_app.policy.definition_actions)
     if invalid_actions:
         abort(400, f"Unknown role actions: {', '.join(invalid_actions)}")
+    if not actions:
+        actions = permission_rules_to_legacy_actions(
+            permissions,
+            current_app.policy.legacy_permission_map,
+        )
     return {
         "name": name,
         "description": payload.get("description"),
         "actions": actions,
+        "permissions": permissions,
     }
 
 
@@ -126,6 +156,54 @@ def _ai_model_payload():
         return payload, current_app.ai_service
     except Exception:
         abort(500, "AI service is unavailable")
+
+
+def _resolved_scope(scope: Union[str, Callable[[], str]]) -> str:
+    if callable(scope):
+        return scope()
+    return scope
+
+
+def permission_required(*requirements: Tuple[str, str, str], legacy_action: str = None):
+    def decorator(func):
+        @wraps(func)
+        def wrapped(*args, **kwargs):
+            _get_token_user(request)
+            user = request.user
+            if user is None:
+                logger.warning("Unauthorized access without bearer token")
+                abort(403, "Not allowed to access endpoint without bearer token")
+            if user.is_anonymous() and current_app.policy.access_control_available:
+                logger.warning("Unauthorized anonymous access to %s", func.__name__)
+                abort(
+                    403,
+                    (
+                        f"Anonymous role is not allowed to perform action {legacy_action}"
+                        if legacy_action
+                        else "Access not permitted"
+                    ),
+                )
+            for resource, operation, scope in requirements:
+                if current_app.policy.allowed_user_permission(
+                    user,
+                    resource,
+                    operation,
+                    _resolved_scope(scope),
+                ):
+                    return func(*args, **kwargs)
+            logger.warning(
+                "Unauthorized access from user %s to %s (%s)",
+                user,
+                func.__name__,
+                requirements,
+            )
+            if user.is_anonymous() and legacy_action:
+                abort(403, f"Anonymous role is not allowed to perform action {legacy_action}")
+            abort(403, "Access not permitted")
+
+        return wrapped
+
+    return decorator
 
 
 def racksdb_get_version():
@@ -163,7 +241,7 @@ def info():
         "version": get_version(),
         "persistence": current_app.jobs_store is not None,
         "access_control": bool(getattr(current_app, "access_control_enabled", False)),
-        "node_metrics": current_app.settings.node_metrics.enabled,
+        "node_metrics": current_app.node_metrics_db is not None,
         "ai": (
             current_app.ai_service.capabilities()
             if getattr(current_app, "ai_enabled", False) and current_app.ai_service is not None
@@ -182,7 +260,7 @@ def info():
             "job_history": current_app.jobs_store is not None,
             "ldap_cache": current_app.users_store is not None,
             "access_control": bool(getattr(current_app, "access_control_enabled", False)),
-            "node_metrics": current_app.settings.node_metrics.enabled,
+            "node_metrics": current_app.node_metrics_db is not None,
             "ai": (
                 current_app.ai_service.capabilities()
                 if getattr(current_app, "ai_enabled", False) and current_app.ai_service is not None
@@ -275,7 +353,11 @@ def slurmrest(method: str, *args: Tuple[Any, ...]):
     return getattr(current_app.slurmrestd, method)(*args)
 
 
-@rbac_action("view-stats")
+@permission_required(
+    ("dashboard", "view", "*"),
+    ("analysis", "view", "*"),
+    legacy_action="view-stats",
+)
 def stats():
     total = 0
     running = 0
@@ -323,7 +405,7 @@ def stats():
     )
 
 
-@rbac_action("view-jobs")
+@permission_required(("jobs", "view", "*"), legacy_action="view-jobs")
 def jobs():
     node = request.args.get("node")
     if node:
@@ -333,47 +415,59 @@ def jobs():
     return jsonify(result)
 
 
-@rbac_action("view-jobs")
+@permission_required(("jobs", "view", "*"), legacy_action="view-jobs")
 def job(job: int):
     return jsonify(slurmrest("job", job))
 
 
-@rbac_action("view-nodes")
+@permission_required(("resources", "view", "*"), legacy_action="view-nodes")
 def nodes():
     return jsonify(slurmrest("nodes"))
 
 
-@rbac_action("view-nodes")
+@permission_required(("resources", "view", "*"), legacy_action="view-nodes")
 def node(name: str):
     return jsonify(slurmrest("node", name))
 
 
-@rbac_action("view-partitions")
+@permission_required(
+    ("jobs/filter-partitions", "view", "*"),
+    ("resources/filter-partitions", "view", "*"),
+    legacy_action="view-partitions",
+)
 def partitions():
     return jsonify(slurmrest("partitions"))
 
 
-@rbac_action("view-qos")
+@permission_required(
+    ("qos", "view", "*"),
+    ("jobs/filter-qos", "view", "*"),
+    legacy_action="view-qos",
+)
 def qos():
     return jsonify(slurmrest("qos"))
 
 
-@rbac_action("view-reservations")
+@permission_required(("reservations", "view", "*"), legacy_action="view-reservations")
 def reservations():
     return jsonify(slurmrest("reservations"))
 
 
-@rbac_action("view-accounts")
+@permission_required(("jobs/filter-accounts", "view", "*"), legacy_action="view-accounts")
 def accounts():
     return jsonify(slurmrest("accounts"))
 
 
-@rbac_action("associations-view")
+@permission_required(
+    ("accounts", "view", "*"),
+    ("user/profile", "view", "*"),
+    legacy_action="associations-view",
+)
 def associations():
     return jsonify(slurmrest("associations"))
 
 
-@rbac_action("cache-view")
+@permission_required(("settings/cache", "view", "*"), legacy_action="cache-view")
 def cache_stats():
     if current_app.cache is None:
         error = "Cache service is disabled, unable to query cache statistics"
@@ -388,7 +482,7 @@ def cache_stats():
     )
 
 
-@rbac_action("cache-reset")
+@permission_required(("settings/cache", "edit", "*"), legacy_action="cache-reset")
 def cache_reset():
     if current_app.cache is None:
         error = "Cache service is disabled, unable to reset cache"
@@ -416,18 +510,18 @@ def metrics(metric):
         abort(501, error)
 
     # Dictionnary of metrics and required policy actions associations
-    metrics_policy_actions = {
-        "nodes": "view-nodes",
-        "cores": "view-nodes",
-        "gpus": "view-nodes",
-        "memory": "view-nodes",
-        "jobs": "view-jobs",
-        "users": "view-jobs",
-        "cache": "cache-view",
+    metrics_permissions = {
+        "nodes": ("resources", "view", "*"),
+        "cores": ("resources", "view", "*"),
+        "gpus": ("resources", "view", "*"),
+        "memory": ("resources", "view", "*"),
+        "jobs": ("jobs", "view", "*"),
+        "users": ("jobs", "view", "*"),
+        "cache": ("settings/cache", "view", "*"),
     }
 
     # Check metric is supported or send HTTP/404
-    if metric not in metrics_policy_actions.keys():
+    if metric not in metrics_permissions.keys():
         abort(404, f"Metric {metric} not found")
 
     if metric == "users":
@@ -437,13 +531,20 @@ def metrics(metric):
             abort(501, error)
 
     # Check permission to request metric or send HTTP/403
-    action = metrics_policy_actions[metric]
-    if not current_app.policy.allowed_user_action(request.user, action):
+    resource, operation, scope = metrics_permissions[metric]
+    if not current_app.policy.allowed_user_permission(
+        request.user,
+        resource,
+        operation,
+        scope,
+    ):
         logger.warning(
-            "Unauthorized access from user %s to %s metric (missing permission on %s)",
+            "Unauthorized access from user %s to %s metric (missing permission on %s:%s:%s)",
             request.user,
             metric,
-            action,
+            resource,
+            operation,
+            scope,
         )
         abort(403, f"Access to {metric} metric not permitted")
 
@@ -458,7 +559,7 @@ def metrics(metric):
         abort(500, str(err))
 
 
-@rbac_action("view-history-jobs")
+@permission_required(("jobs-history", "view", "*"), legacy_action="view-history-jobs")
 def jobs_history():
     """Return paginated job history from PostgreSQL."""
     if current_app.jobs_store is None:
@@ -491,7 +592,7 @@ def jobs_history():
         abort(500, str(err))
 
 
-@rbac_action("view-history-jobs")
+@permission_required(("jobs-history", "view", "*"), legacy_action="view-history-jobs")
 def job_history_detail(record_id: int):
     """Return a single job history record by its DB primary key."""
     if current_app.jobs_store is None:
@@ -543,7 +644,7 @@ def cache_authenticated_user():
     return jsonify({"result": "User cache updated"})
 
 
-@rbac_action("cache-view")
+@permission_required(("settings/ldap-cache", "view", "*"), legacy_action="cache-view")
 def ldap_cache_users():
     """Return cached LDAP users stored in the local database."""
     if current_app.users_store is None:
@@ -568,7 +669,19 @@ def ldap_cache_users():
         abort(500, str(err))
 
 
-@rbac_action("roles-view")
+@permission_required(
+    ("settings/access-control", "view", "*"),
+    legacy_action="roles-view",
+)
+def access_catalog():
+    _require_access_control()
+    return jsonify(access_control_catalog())
+
+
+@permission_required(
+    ("settings/access-control", "view", "*"),
+    legacy_action="roles-view",
+)
 def access_roles():
     _require_access_control()
     try:
@@ -578,7 +691,10 @@ def access_roles():
         abort(500, str(err))
 
 
-@rbac_action("roles-manage")
+@permission_required(
+    ("settings/access-control", "edit", "*"),
+    legacy_action="roles-manage",
+)
 def create_access_role():
     _require_access_control()
     role = _role_payload()
@@ -587,6 +703,7 @@ def create_access_role():
             role["name"],
             role["description"],
             role["actions"],
+            role["permissions"],
         )
         return jsonify(created), 201
     except ValueError as err:
@@ -596,7 +713,10 @@ def create_access_role():
         abort(500, str(err))
 
 
-@rbac_action("roles-manage")
+@permission_required(
+    ("settings/access-control", "edit", "*"),
+    legacy_action="roles-manage",
+)
 def update_access_role(role_id: int):
     _require_access_control()
     role = _role_payload()
@@ -606,6 +726,7 @@ def update_access_role(role_id: int):
             role["name"],
             role["description"],
             role["actions"],
+            role["permissions"],
         )
     except ValueError as err:
         abort(400, str(err))
@@ -618,7 +739,10 @@ def update_access_role(role_id: int):
     return jsonify(updated)
 
 
-@rbac_action("roles-manage")
+@permission_required(
+    ("settings/access-control", "delete", "*"),
+    legacy_action="roles-manage",
+)
 def delete_access_role(role_id: int):
     _require_access_control()
     try:
@@ -631,7 +755,10 @@ def delete_access_role(role_id: int):
     return jsonify({"result": "Role deleted"})
 
 
-@rbac_action("roles-view")
+@permission_required(
+    ("settings/access-control", "view", "*"),
+    legacy_action="roles-view",
+)
 def access_users():
     _require_access_control()
     username, page, page_size = _access_page_args()
@@ -648,7 +775,10 @@ def access_users():
         abort(500, str(err))
 
 
-@rbac_action("roles-view")
+@permission_required(
+    ("settings/access-control", "view", "*"),
+    legacy_action="roles-view",
+)
 def access_user_roles(username: str):
     _require_access_control()
     try:
@@ -661,7 +791,10 @@ def access_user_roles(username: str):
     return jsonify(details)
 
 
-@rbac_action("roles-manage")
+@permission_required(
+    ("settings/access-control", "edit", "*"),
+    legacy_action="roles-manage",
+)
 def update_access_user_roles(username: str):
     _require_access_control()
     payload = request.get_json(silent=True) or {}
@@ -682,13 +815,13 @@ def update_access_user_roles(username: str):
     return jsonify(details)
 
 
-@rbac_action("view-ai")
+@permission_required(("settings/ai", "view", "*"), legacy_action="view-ai")
 def ai_configs():
     _require_ai()
     return jsonify({"items": current_app.ai_service.list_configs()})
 
 
-@rbac_action("manage-ai")
+@permission_required(("settings/ai", "edit", "*"), legacy_action="manage-ai")
 def create_ai_config():
     _require_ai()
     payload, _ = _ai_model_payload()
@@ -702,7 +835,7 @@ def create_ai_config():
         abort(500, str(err))
 
 
-@rbac_action("manage-ai")
+@permission_required(("settings/ai", "edit", "*"), legacy_action="manage-ai")
 def update_ai_config(config_id: int):
     _require_ai()
     payload, _ = _ai_model_payload()
@@ -718,7 +851,7 @@ def update_ai_config(config_id: int):
     return jsonify(updated)
 
 
-@rbac_action("manage-ai")
+@permission_required(("settings/ai", "delete", "*"), legacy_action="manage-ai")
 def delete_ai_config(config_id: int):
     _require_ai()
     try:
@@ -731,7 +864,7 @@ def delete_ai_config(config_id: int):
     return jsonify({"result": "AI model config deleted"})
 
 
-@rbac_action("manage-ai")
+@permission_required(("settings/ai", "edit", "*"), legacy_action="manage-ai")
 def validate_ai_config(config_id: int):
     _require_ai()
     try:
@@ -746,7 +879,7 @@ def validate_ai_config(config_id: int):
     return jsonify(result)
 
 
-@rbac_action("view-ai")
+@permission_required(("ai", "view", "*"), legacy_action="view-ai")
 def ai_chat_stream():
     _require_ai()
     payload = request.get_json(silent=True) or {}
@@ -767,7 +900,7 @@ def ai_chat_stream():
     )
 
 
-@rbac_action("view-ai")
+@permission_required(("ai", "view", "*"), legacy_action="view-ai")
 def ai_conversations():
     _require_ai()
     try:
@@ -777,7 +910,7 @@ def ai_conversations():
         abort(500, str(err))
 
 
-@rbac_action("view-ai")
+@permission_required(("ai", "view", "*"), legacy_action="view-ai")
 def ai_conversation_detail(conversation_id: int):
     _require_ai()
     try:
@@ -793,7 +926,15 @@ def ai_conversation_detail(conversation_id: int):
     return jsonify(details)
 
 
-@rbac_action("view-jobs")
+@permission_required(
+    (
+        "user/analysis",
+        "view",
+        lambda: "self" if getattr(request.user, "login", None) == username else "*",
+    ),
+    ("jobs", "view", "*"),
+    legacy_action="view-jobs",
+)
 def user_metrics_history(username: str):
     if not getattr(current_app, "user_metrics_enabled", False) or current_app.user_metrics_store is None:
         error = "User metrics is disabled"
@@ -813,7 +954,15 @@ def user_metrics_history(username: str):
         abort(500, str(err))
 
 
-@rbac_action("view-jobs")
+@permission_required(
+    (
+        "user/analysis",
+        "view",
+        lambda: "self" if getattr(request.user, "login", None) == username else "*",
+    ),
+    ("jobs", "view", "*"),
+    legacy_action="view-jobs",
+)
 def user_activity_summary(username: str):
     if not getattr(current_app, "user_metrics_enabled", False) or current_app.user_metrics_store is None:
         error = "User metrics is disabled"
@@ -826,7 +975,7 @@ def user_activity_summary(username: str):
         abort(500, str(err))
 
 
-@rbac_action("view-nodes")
+@permission_required(("resources", "view", "*"), legacy_action="view-nodes")
 def node_metrics(name: str):
     """Return real-time resource metrics for a node from Prometheus."""
     if current_app.node_metrics_db is None:
@@ -844,7 +993,7 @@ def node_metrics(name: str):
         abort(500, str(err))
 
 
-@rbac_action("view-nodes")
+@permission_required(("resources", "view", "*"), legacy_action="view-nodes")
 def node_metrics_history(name: str):
     """Return historical resource metrics for a node from Prometheus."""
     if current_app.node_metrics_db is None:

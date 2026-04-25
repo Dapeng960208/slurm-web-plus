@@ -78,10 +78,17 @@ const settingsCluster = computed(() => {
 const currentClusterName = computed(() => settingsCluster.value?.name ?? '')
 const aiAvailable = computed(() => hasClusterAIAssistant(settingsCluster.value))
 const canManage = computed(
-  () => !!currentClusterName.value && runtimeStore.hasClusterPermission(currentClusterName.value, 'manage-ai')
+  () =>
+    !!currentClusterName.value &&
+    runtimeStore.hasRoutePermission(currentClusterName.value, 'settings/ai', 'edit')
+)
+const canView = computed(
+  () =>
+    !!currentClusterName.value &&
+    runtimeStore.hasRoutePermission(currentClusterName.value, 'settings/ai', 'view')
 )
 const canViewChat = computed(
-  () => !!currentClusterName.value && runtimeStore.hasClusterPermission(currentClusterName.value, 'view-ai')
+  () => !!currentClusterName.value && runtimeStore.hasRoutePermission(currentClusterName.value, 'ai', 'view')
 )
 const providerOptions = computed(() => {
   const providers = settingsCluster.value?.ai?.providers ?? settingsCluster.value?.capabilities?.ai?.providers
@@ -247,7 +254,7 @@ function buildPayload(): AIModelConfigPayload {
 }
 
 async function loadConfigs() {
-  if (!aiAvailable.value || !canManage.value || !currentClusterName.value) {
+  if (!aiAvailable.value || !canView.value || !currentClusterName.value) {
     configs.value = []
     return
   }
@@ -400,8 +407,8 @@ onMounted(async () => {
     <InfoAlert v-else-if="!aiAvailable">
       AI capability is not enabled for the current cluster.
     </InfoAlert>
-    <InfoAlert v-else-if="!canManage">
-      The current user does not have the `manage-ai` permission on this cluster.
+    <InfoAlert v-else-if="!canView">
+      The current user does not have permission to view AI settings on this cluster.
     </InfoAlert>
 
     <template v-else>
@@ -413,6 +420,9 @@ onMounted(async () => {
       </ErrorAlert>
       <InfoAlert v-if="submitSuccess">
         {{ submitSuccess }}
+      </InfoAlert>
+      <InfoAlert v-if="!canManage">
+        The current user can inspect AI settings but cannot edit them on this cluster.
       </InfoAlert>
 
       <section class="ui-panel ui-section">
@@ -490,13 +500,18 @@ onMounted(async () => {
                 </p>
               </div>
               <div class="flex flex-wrap gap-2">
-                <button type="button" class="ui-button-secondary" @click="openEditModal(config)">
+                <button
+                  type="button"
+                  class="ui-button-secondary"
+                  :disabled="!canManage"
+                  @click="openEditModal(config)"
+                >
                   Edit
                 </button>
                 <button
                   type="button"
                   class="ui-button-secondary"
-                  :disabled="validatingId === config.id"
+                  :disabled="validatingId === config.id || !canManage"
                   @click="validateConfig(config)"
                 >
                   {{ validatingId === config.id ? 'Testing...' : 'Test connection' }}
@@ -535,18 +550,23 @@ onMounted(async () => {
               <button
                 type="button"
                 class="ui-button-secondary"
-                :disabled="config.is_default"
+                :disabled="config.is_default || !canManage"
                 @click="setDefault(config)"
               >
                 Set default
               </button>
-              <button type="button" class="ui-button-secondary" @click="toggleEnabled(config)">
+              <button
+                type="button"
+                class="ui-button-secondary"
+                :disabled="!canManage"
+                @click="toggleEnabled(config)"
+              >
                 {{ config.enabled ? 'Disable' : 'Enable' }}
               </button>
               <button
                 type="button"
                 class="ui-button-secondary"
-                :disabled="deletingId === config.id"
+                :disabled="deletingId === config.id || !canManage"
                 @click="deleteConfig(config)"
               >
                 {{ deletingId === config.id ? 'Deleting...' : 'Delete' }}

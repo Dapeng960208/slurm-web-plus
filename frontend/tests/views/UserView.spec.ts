@@ -84,7 +84,11 @@ describe('UserView.vue', () => {
     useRuntimeStore().availableClusters = [
       {
         ...useRuntimeStore().availableClusters[0],
-        permissions: { roles: [], actions: ['associations-view', 'view-jobs'] },
+        permissions: {
+          roles: [],
+          actions: ['associations-view', 'view-jobs'],
+          rules: ['accounts:view:*', 'jobs:view:*', 'user/analysis:view:*']
+        },
         user_metrics: true
       }
     ]

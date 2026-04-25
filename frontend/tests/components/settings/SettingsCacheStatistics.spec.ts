@@ -164,6 +164,7 @@ describe('SettingsCacheStatistics.vue', () => {
       metrics: true,
       cache: true
     }
+    useRuntimeStore().availableClusters = [clusterWithResetPermission as never]
 
     const wrapper = mount(SettingsCacheStatistics, {
       props: {
@@ -194,6 +195,7 @@ describe('SettingsCacheStatistics.vue', () => {
       metrics: true,
       cache: true
     }
+    useRuntimeStore().availableClusters = [clusterWithResetPermission as never]
 
     const wrapper = mount(SettingsCacheStatistics, {
       props: {

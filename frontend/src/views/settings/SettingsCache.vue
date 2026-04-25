@@ -36,7 +36,7 @@ const runtimeStore = useRuntimeStore()
         </h3>
       </div>
 
-      <InfoAlert v-if="!runtimeStore.hasClusterPermission(cluster.name, 'cache-view')">
+      <InfoAlert v-if="!runtimeStore.hasRoutePermission(cluster.name, 'settings/cache', 'view')">
         No permission to get cache information on this cluster.
       </InfoAlert>
       <InfoAlert v-else-if="!cluster.cache">Cache is disabled on this cluster.</InfoAlert>

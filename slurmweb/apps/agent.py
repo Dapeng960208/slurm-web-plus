@@ -61,6 +61,7 @@ class SlurmwebAppAgent(SlurmwebWebApp, RFLTokenizedRBACWebApp):
         SlurmwebAppRoute(f"/v{get_version()}/jobs/history/<int:record_id>", views.job_history_detail),
         SlurmwebAppRoute(f"/v{get_version()}/users/cache", views.ldap_cache_users),
         SlurmwebAppRoute(f"/v{get_version()}/access/roles", views.access_roles),
+        SlurmwebAppRoute(f"/v{get_version()}/access/catalog", views.access_catalog),
         SlurmwebAppRoute(
             f"/v{get_version()}/access/roles",
             views.create_access_role,
@@ -185,7 +186,10 @@ class SlurmwebAppAgent(SlurmwebWebApp, RFLTokenizedRBACWebApp):
             policy=self.settings.policy.definition,
             roles=selected_roles_policy_path,
         )
-        self.policy = AccessControlPolicyManager(self.policy)
+        self.policy = AccessControlPolicyManager(
+            self.policy,
+            permission_map_path=getattr(self.settings.policy, "permission_map", None),
+        )
         if self.settings.cache.enabled:
             self.cache = CachingService(
                 host=self.settings.cache.host,
@@ -296,25 +300,20 @@ class SlurmwebAppAgent(SlurmwebWebApp, RFLTokenizedRBACWebApp):
             database_error = RuntimeError("[database] enabled = no")
             logger.debug("Database support is disabled")
 
-        if getattr(self.settings.persistence, "access_control_enabled", False):
-            if database_ready:
-                try:
-                    from ..persistence.access_control_store import AccessControlStore
+        if database_ready:
+            try:
+                from ..persistence.access_control_store import AccessControlStore
 
-                    self.access_control_store = AccessControlStore(self.settings.database)
-                    self.access_control_store.validate_connection()
-                    self.access_control_enabled = True
-                    logger.info("Access control support enabled")
-                except Exception as err:
-                    logger.warning("Unable to initialize access control support: %s", err)
-            else:
-                reason = (
-                    str(database_error) if database_error is not None else "unknown reason"
+                self.access_control_store = AccessControlStore(
+                    self.settings.database,
+                    legacy_permission_map=self.policy.legacy_permission_map,
                 )
-                logger.warning(
-                    "Access control is enabled but database support is unavailable: %s",
-                    reason,
-                )
+                self.access_control_store.validate_connection()
+                self.access_control_store.seed_default_roles()
+                self.access_control_enabled = True
+                logger.info("Access control support enabled")
+            except Exception as err:
+                logger.warning("Unable to initialize access control support: %s", err)
         else:
             logger.debug("Access control is disabled")
 
@@ -322,62 +321,50 @@ class SlurmwebAppAgent(SlurmwebWebApp, RFLTokenizedRBACWebApp):
         self.policy.set_access_control_store(self.access_control_store)
         self._refresh_cached_policy_snapshots_on_startup()
 
-        if self.settings.persistence.enabled:
-            if database_ready:
-                try:
-                    from ..persistence.jobs_store import JobsStore
+        if database_ready:
+            try:
+                from ..persistence.jobs_store import JobsStore
 
-                    store_settings = SimpleNamespace(
-                        host=self.settings.database.host,
-                        port=self.settings.database.port,
-                        database=self.settings.database.database,
-                        user=self.settings.database.user,
-                        password=self.settings.database.password,
-                        snapshot_interval=self.settings.persistence.snapshot_interval,
-                        retention_days=self.settings.persistence.retention_days,
-                    )
-                    self.jobs_store = JobsStore(store_settings, self.slurmrestd)
-                    self.jobs_store.start()
-                    logger.info("Job history persistence enabled")
-                except Exception as err:
-                    logger.warning("Unable to initialize job history persistence: %s", err)
-            else:
-                reason = str(database_error) if database_error is not None else "unknown reason"
-                logger.warning(
-                    "Job history persistence is enabled but database support is unavailable: %s",
-                    reason,
+                store_settings = SimpleNamespace(
+                    host=self.settings.database.host,
+                    port=self.settings.database.port,
+                    database=self.settings.database.database,
+                    user=self.settings.database.user,
+                    password=self.settings.database.password,
+                    snapshot_interval=self.settings.persistence.snapshot_interval,
+                    retention_days=self.settings.persistence.retention_days,
                 )
+                self.jobs_store = JobsStore(store_settings, self.slurmrestd)
+                self.jobs_store.start()
+                logger.info("Job history persistence enabled")
+            except Exception as err:
+                logger.warning("Unable to initialize job history persistence: %s", err)
         else:
             logger.debug("Job history persistence is disabled")
 
         user_metrics_settings = getattr(self.settings, "user_metrics", None)
-        if user_metrics_settings and user_metrics_settings.enabled:
-            if database_ready and self.settings.metrics.enabled and self.jobs_store is not None:
-                try:
-                    from ..persistence.user_analytics_store import UserAnalyticsStore
+        if user_metrics_settings and database_ready and self.settings.metrics.enabled and self.jobs_store is not None:
+            try:
+                from ..persistence.user_analytics_store import UserAnalyticsStore
 
-                    store_settings = SimpleNamespace(
-                        host=self.settings.database.host,
-                        port=self.settings.database.port,
-                        database=self.settings.database.database,
-                        user=self.settings.database.user,
-                        password=self.settings.database.password,
-                        aggregation_interval=self.settings.user_metrics.aggregation_interval,
-                        tool_mapping_file=self.settings.user_metrics.tool_mapping_file,
-                    )
-                    self.user_analytics_store = UserAnalyticsStore(
-                        store_settings, users_store=self.users_store
-                    )
-                    self.user_analytics_store.start()
-                    self.user_metrics_store = self.user_analytics_store
-                    self.user_metrics_enabled = True
-                    logger.info("User metrics persistence enabled")
-                except Exception as err:
-                    logger.warning("Unable to initialize user metrics persistence: %s", err)
-            else:
-                logger.warning(
-                    "User metrics is enabled but required metrics/database support is unavailable"
+                store_settings = SimpleNamespace(
+                    host=self.settings.database.host,
+                    port=self.settings.database.port,
+                    database=self.settings.database.database,
+                    user=self.settings.database.user,
+                    password=self.settings.database.password,
+                    aggregation_interval=self.settings.user_metrics.aggregation_interval,
+                    tool_mapping_file=self.settings.user_metrics.tool_mapping_file,
                 )
+                self.user_analytics_store = UserAnalyticsStore(
+                    store_settings, users_store=self.users_store
+                )
+                self.user_analytics_store.start()
+                self.user_metrics_store = self.user_analytics_store
+                self.user_metrics_enabled = True
+                logger.info("User metrics persistence enabled")
+            except Exception as err:
+                logger.warning("Unable to initialize user metrics persistence: %s", err)
         else:
             logger.debug("User metrics is disabled")
 
@@ -390,51 +377,45 @@ class SlurmwebAppAgent(SlurmwebWebApp, RFLTokenizedRBACWebApp):
 
         # Initialize node real-time metrics (new, optional)
         self.node_metrics_db = None
-        if self.settings.node_metrics.enabled:
+        node_metrics_host = getattr(self.settings.node_metrics, "prometheus_host", None)
+        if node_metrics_host:
             from ..metrics.db import SlurmwebMetricsDB as _MetricsDB
 
             self.node_metrics_db = _MetricsDB(
-                self.settings.node_metrics.prometheus_host,
+                node_metrics_host,
                 self.settings.node_metrics.node_exporter_job,
             )
             logger.info("Node real-time metrics enabled")
         else:
             logger.debug("Node real-time metrics is disabled")
 
-        if getattr(self.settings, "ai", None) and self.settings.ai.enabled:
-            if database_ready:
-                try:
-                    from ..ai.crypto import AISecretCipher
-                    from ..ai.service import AIService
-                    from ..persistence.ai_conversation_store import AIConversationStore
-                    from ..persistence.ai_model_config_store import AIModelConfigStore
+        if database_ready:
+            try:
+                from ..ai.crypto import AISecretCipher
+                from ..ai.service import AIService
+                from ..persistence.ai_conversation_store import AIConversationStore
+                from ..persistence.ai_model_config_store import AIModelConfigStore
 
-                    secret_cipher = AISecretCipher.from_jwt_key_file(self.settings.jwt.key)
-                    self.ai_config_store = AIModelConfigStore(self.settings.database)
-                    self.ai_conversation_store = AIConversationStore(self.settings.database)
-                    self.ai_config_store.validate_connection()
-                    self.ai_conversation_store.validate_connection()
-                    self.ai_service = AIService(
-                        app=self,
-                        config_store=self.ai_config_store,
-                        conversation_store=self.ai_conversation_store,
-                        secret_cipher=secret_cipher,
-                    )
-                    self.ai_enabled = True
-                    logger.info("AI assistant support enabled")
-                except Exception as err:
-                    logger.warning("Unable to initialize AI assistant support: %s", err)
-            else:
-                reason = str(database_error) if database_error is not None else "unknown reason"
-                logger.warning(
-                    "AI assistant is enabled but database support is unavailable: %s",
-                    reason,
+                secret_cipher = AISecretCipher.from_jwt_key_file(self.settings.jwt.key)
+                self.ai_config_store = AIModelConfigStore(self.settings.database)
+                self.ai_conversation_store = AIConversationStore(self.settings.database)
+                self.ai_config_store.validate_connection()
+                self.ai_conversation_store.validate_connection()
+                self.ai_service = AIService(
+                    app=self,
+                    config_store=self.ai_config_store,
+                    conversation_store=self.ai_conversation_store,
+                    secret_cipher=secret_cipher,
                 )
+                self.ai_enabled = True
+                logger.info("AI assistant support enabled")
+            except Exception as err:
+                logger.warning("Unable to initialize AI assistant support: %s", err)
         else:
             logger.debug("AI assistant is disabled")
 
     def _refresh_cached_policy_snapshots_on_startup(self):
-        if not getattr(self.settings.persistence, "access_control_enabled", False):
+        if not self.access_control_enabled:
             return
         if self.users_store is None:
             return

@@ -28,17 +28,21 @@ class TestAgentPermissions(TestAgentBase):
         response = self.client.get(f"/v{get_version()}/permissions")
         self.assertEqual(response.status_code, 200)
         self.assertIsInstance(response.json, dict)
-        self.assertEqual(len(response.json.keys()), 3)
+        self.assertEqual(len(response.json.keys()), 4)
         self.assertIn("actions", response.json)
         self.assertIn("roles", response.json)
+        self.assertIn("rules", response.json)
         self.assertIn("sources", response.json)
         self.assertCountEqual(response.json["roles"], ["user"])
         self.assertCountEqual(
             response.json["actions"], self.app.policy.roles_actions(self.user)[1]
         )
+        self.assertCountEqual(
+            response.json["rules"], self.app.policy.roles_actions_rules(self.user)[2]
+        )
         self.assertEqual(
             response.json["sources"]["custom"],
-            {"roles": [], "actions": []},
+            {"roles": [], "actions": [], "rules": []},
         )
         self.assertCountEqual(
             response.json["sources"]["policy"]["roles"],
@@ -47,6 +51,10 @@ class TestAgentPermissions(TestAgentBase):
         self.assertCountEqual(
             response.json["sources"]["policy"]["actions"],
             self.app.policy.file_roles_actions(self.user)[1],
+        )
+        self.assertCountEqual(
+            response.json["sources"]["policy"]["rules"],
+            self.app.policy.file_rules(self.user),
         )
 
     def test_permissions_custom_roles_union_from_access_control_store(self):
@@ -79,6 +87,10 @@ class TestAgentPermissions(TestAgentBase):
             response.json["sources"]["custom"]["actions"],
             ["roles-view", "roles-manage"],
         )
+        self.assertCountEqual(
+            response.json["sources"]["custom"]["rules"],
+            self.app.policy.action_rules(["roles-view", "roles-manage"]),
+        )
 
     def test_permissions_anonymous(self):
         self.setup_client(anonymous_user=True)
@@ -86,15 +98,19 @@ class TestAgentPermissions(TestAgentBase):
         response = self.client.get(f"/v{get_version()}/permissions")
         self.assertEqual(response.status_code, 200)
         self.assertIsInstance(response.json, dict)
-        self.assertEqual(len(response.json.keys()), 3)
+        self.assertEqual(len(response.json.keys()), 4)
         self.assertIn("actions", response.json)
         self.assertIn("roles", response.json)
+        self.assertIn("rules", response.json)
         self.assertIn("sources", response.json)
         # anonymous user should get the anonymous role and corresponding set of actions
         # when anonymous mode is enabled in policy.
         self.assertCountEqual(response.json["roles"], ["anonymous"])
         self.assertCountEqual(
             response.json["actions"], self.app.policy.roles_actions(self.user)[1]
+        )
+        self.assertCountEqual(
+            response.json["rules"], self.app.policy.roles_actions_rules(self.user)[2]
         )
 
     def test_permissions_anonymous_disabled(self):
@@ -103,14 +119,16 @@ class TestAgentPermissions(TestAgentBase):
         response = self.client.get(f"/v{get_version()}/permissions")
         self.assertEqual(response.status_code, 200)
         self.assertIsInstance(response.json, dict)
-        self.assertEqual(len(response.json.keys()), 3)
+        self.assertEqual(len(response.json.keys()), 4)
         self.assertIn("actions", response.json)
         self.assertIn("roles", response.json)
+        self.assertIn("rules", response.json)
         self.assertIn("sources", response.json)
         # anonymous user should get no role or action when anonymous mode is disabled in
         # policy.
         self.assertCountEqual(response.json["roles"], [])
         self.assertCountEqual(response.json["actions"], [])
+        self.assertCountEqual(response.json["rules"], [])
 
     def test_permissions_no_token(self):
         # permissions endpoint is guarded by @check_jwt decorator that must reply 403
