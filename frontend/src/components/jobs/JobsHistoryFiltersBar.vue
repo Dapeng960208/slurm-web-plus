@@ -21,14 +21,21 @@ import {
 } from '@heroicons/vue/20/solid'
 
 const props = defineProps<{ filters: JobHistoryFilters }>()
-const emit = defineEmits<{ (e: 'search'): void }>()
+const emit = defineEmits<{
+  (e: 'search'): void
+  (e: 'update:filters', filters: JobHistoryFilters): void
+}>()
 
 function removeFilter(key: keyof JobHistoryFilters) {
-  if (key === 'job_id') {
-    props.filters.job_id = undefined
-  } else {
-    ;(props.filters as Record<string, unknown>)[key] = ''
+  const nextFilters: JobHistoryFilters = {
+    ...props.filters
   }
+  if (key === 'job_id') {
+    nextFilters.job_id = undefined
+  } else {
+    ;(nextFilters as Record<string, unknown>)[key] = ''
+  }
+  emit('update:filters', nextFilters)
   emit('search')
 }
 

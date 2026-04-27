@@ -39,6 +39,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'close'): void
   (e: 'search'): void
+  (e: 'update:filters', filters: JobHistoryFilters): void
 }>()
 
 const state_options = [
@@ -51,6 +52,32 @@ const state_options = [
   'NODE_FAIL',
   'OUT_OF_MEMORY'
 ]
+
+function updateFilters(patch: Partial<JobHistoryFilters>) {
+  emit('update:filters', {
+    ...props.filters,
+    ...patch
+  })
+}
+
+function updateTextFilter(key: keyof JobHistoryFilters, event: Event) {
+  const target = event.target as HTMLInputElement
+  updateFilters({ [key]: target.value } as Partial<JobHistoryFilters>)
+}
+
+function updateNumericFilter(key: keyof JobHistoryFilters, event: Event) {
+  const target = event.target as HTMLInputElement
+  const raw = target.value.trim()
+  updateFilters({
+    [key]: raw ? Number(raw) : undefined
+  } as Partial<JobHistoryFilters>)
+}
+
+function toggleState(state: string) {
+  updateFilters({
+    state: props.filters.state === state ? '' : state
+  })
+}
 </script>
 
 <template>
@@ -124,9 +151,10 @@ const state_options = [
                 </h3>
                 <DisclosurePanel class="pt-4">
                   <input
-                    v-model="props.filters.keyword"
+                    :value="props.filters.keyword"
                     placeholder="Search workdir / command"
                     class="w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-slurmweb dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+                    @input="updateTextFilter('keyword', $event)"
                   />
                 </DisclosurePanel>
               </Disclosure>
@@ -166,7 +194,7 @@ const state_options = [
                         :value="s"
                         :checked="props.filters.state === s"
                         class="text-slurmweb focus:ring-slurmweb h-4 w-4 rounded-sm border-gray-300"
-                        @change="props.filters.state = (props.filters.state === s ? '' : s)"
+                        @change="toggleState(s)"
                       />
                       <label
                         :for="`hist-state-${s}`"
@@ -202,9 +230,10 @@ const state_options = [
                 </h3>
                 <DisclosurePanel class="pt-4">
                   <input
-                    v-model="props.filters.user"
+                    :value="props.filters.user"
                     placeholder="Username"
                     class="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-1.5 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-slurmweb"
+                    @input="updateTextFilter('user', $event)"
                   />
                 </DisclosurePanel>
               </Disclosure>
@@ -233,9 +262,10 @@ const state_options = [
                 </h3>
                 <DisclosurePanel class="pt-4">
                   <input
-                    v-model="props.filters.account"
+                    :value="props.filters.account"
                     placeholder="Account name"
                     class="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-1.5 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-slurmweb"
+                    @input="updateTextFilter('account', $event)"
                   />
                 </DisclosurePanel>
               </Disclosure>
@@ -264,9 +294,10 @@ const state_options = [
                 </h3>
                 <DisclosurePanel class="pt-4">
                   <input
-                    v-model="props.filters.partition"
+                    :value="props.filters.partition"
                     placeholder="Partition name"
                     class="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-1.5 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-slurmweb"
+                    @input="updateTextFilter('partition', $event)"
                   />
                 </DisclosurePanel>
               </Disclosure>
@@ -295,9 +326,10 @@ const state_options = [
                 </h3>
                 <DisclosurePanel class="pt-4">
                   <input
-                    v-model="props.filters.qos"
+                    :value="props.filters.qos"
                     placeholder="QOS name"
                     class="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-1.5 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-slurmweb"
+                    @input="updateTextFilter('qos', $event)"
                   />
                 </DisclosurePanel>
               </Disclosure>
@@ -326,11 +358,12 @@ const state_options = [
                 </h3>
                 <DisclosurePanel class="pt-4">
                   <input
-                    v-model.number="props.filters.job_id"
+                    :value="props.filters.job_id ?? ''"
                     type="number"
                     min="1"
                     placeholder="Job ID"
                     class="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-1.5 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-slurmweb"
+                    @input="updateNumericFilter('job_id', $event)"
                   />
                 </DisclosurePanel>
               </Disclosure>
@@ -361,19 +394,21 @@ const state_options = [
                   <div>
                     <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1">From</label>
                     <input
-                      v-model="props.filters.start"
+                      :value="props.filters.start"
                       type="datetime-local"
                       step="1"
                       class="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-1.5 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-slurmweb"
+                      @input="updateTextFilter('start', $event)"
                     />
                   </div>
                   <div>
                     <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1">To</label>
                     <input
-                      v-model="props.filters.end"
+                      :value="props.filters.end"
                       type="datetime-local"
                       step="1"
                       class="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-1.5 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-slurmweb"
+                      @input="updateTextFilter('end', $event)"
                     />
                   </div>
                 </DisclosurePanel>

@@ -51,7 +51,7 @@ jobs:
           if [[ '${{ matrix.envs.container }}' == 'rockylinux/rockylinux:8' ]]; then
             COMMAND="${COMMAND} && cp -v /usr/lib/python3.6/site-packages/rfl/build/scripts/setup setup.py && sed -i 's/RFL\\./rfl-/' pyproject.toml"
           fi
-          COMMAND="${COMMAND} && pip3 install -e . && pytest-3 --junitxml=${RESULTS_DIR}/junit.xml"
+          COMMAND="${COMMAND} && pip3 install -e . && pytest-3 slurmweb/tests --junitxml=${RESULTS_DIR}/junit.xml"
           node .github/scripts/run-ci-command.mjs \
             --results-dir "$RESULTS_DIR" \
             --artifact-name "$ARTIFACT_NAME" \
@@ -66,7 +66,7 @@ jobs:
             --results-dir "$RESULTS_DIR" \
             --artifact-name "$ARTIFACT_NAME" \
             --label "backend-rpm-integration" \
-            --command "pytest-3 --junitxml=${RESULTS_DIR}/junit.xml"
+            --command "pytest-3 slurmweb/tests --junitxml=${RESULTS_DIR}/junit.xml"
 
       - name: Upload backend rpm integration artifact
         if: always()
@@ -108,7 +108,7 @@ jobs:
 
       - name: Run backend deb integration command
         run: |
-          COMMAND="apt update && apt install -y ca-certificates curl gpg && curl -sS https://pkgs.rackslab.io/keyring.asc | gpg --dearmor | tee /usr/share/keyrings/rackslab.gpg > /dev/null && printf '%s\n' 'Types: deb' 'URIs: https://pkgs.rackslab.io/deb' 'Suites: ${{ matrix.envs.rackslab-repo }}' 'Components: main' 'Architectures: amd64' 'Signed-By: /usr/share/keyrings/rackslab.gpg' > /etc/apt/sources.list.d/rackslab.sources && apt update && apt install -y python3-aiohttp python3-clustershell python3-flask python3-markdown python3-parameterized python3-pip python3-prometheus-client python3-pytest python3-yaml python3-racksdb-web python3-redis python3-requests python3-rfl-authentication python3-rfl-build python3-rfl-core python3-rfl-log python3-rfl-settings python3-rfl-web python3-venv && python3 -m venv --system-site-packages ~/venv && ~/venv/bin/pip install -e . && pytest --junitxml=${RESULTS_DIR}/junit.xml"
+          COMMAND="apt update && apt install -y ca-certificates curl gpg && curl -sS https://pkgs.rackslab.io/keyring.asc | gpg --dearmor | tee /usr/share/keyrings/rackslab.gpg > /dev/null && printf '%s\n' 'Types: deb' 'URIs: https://pkgs.rackslab.io/deb' 'Suites: ${{ matrix.envs.rackslab-repo }}' 'Components: main' 'Architectures: amd64' 'Signed-By: /usr/share/keyrings/rackslab.gpg' > /etc/apt/sources.list.d/rackslab.sources && apt update && apt install -y python3-aiohttp python3-clustershell python3-flask python3-markdown python3-parameterized python3-pip python3-prometheus-client python3-pytest python3-yaml python3-racksdb-web python3-redis python3-requests python3-rfl-authentication python3-rfl-build python3-rfl-core python3-rfl-log python3-rfl-settings python3-rfl-web python3-venv && python3 -m venv --system-site-packages ~/venv && ~/venv/bin/pip install -e . && pytest slurmweb/tests --junitxml=${RESULTS_DIR}/junit.xml"
           node .github/scripts/run-ci-command.mjs \
             --results-dir "$RESULTS_DIR" \
             --artifact-name "$ARTIFACT_NAME" \
@@ -123,7 +123,7 @@ jobs:
             --results-dir "$RESULTS_DIR" \
             --artifact-name "$ARTIFACT_NAME" \
             --label "backend-deb-integration" \
-            --command "pytest --junitxml=${RESULTS_DIR}/junit.xml"
+            --command "pytest slurmweb/tests --junitxml=${RESULTS_DIR}/junit.xml"
 
       - name: Upload backend deb integration artifact
         if: always()

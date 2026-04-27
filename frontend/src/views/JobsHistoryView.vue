@@ -82,6 +82,10 @@ function applyFilters() {
   updateQueryParameters()
 }
 
+function updateFilters(newFilters: JobHistoryFilters) {
+  filters.value = newFilters
+}
+
 function updateQueryParameters() {
   router.push({
     name: 'jobs-history',
@@ -160,6 +164,7 @@ watch(totalPages, (newLastPage) => {
         :total="total"
         @close="filtersOpen = false"
         @search="applyFilters"
+        @update:filters="updateFilters"
       />
 
       <PageHeader
@@ -185,7 +190,11 @@ watch(totalPages, (newLastPage) => {
             </button>
           </div>
         </div>
-        <JobsHistoryFiltersBar :filters="filters" @search="applyFilters" />
+        <JobsHistoryFiltersBar
+          :filters="filters"
+          @search="applyFilters"
+          @update:filters="updateFilters"
+        />
       </section>
 
       <div class="ui-section-stack">

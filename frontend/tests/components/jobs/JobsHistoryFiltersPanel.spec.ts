@@ -39,4 +39,42 @@ describe('JobsHistoryFiltersPanel.vue', () => {
     expect(inputs[1].attributes('step')).toBe('1')
     expect(wrapper.get('input[placeholder="Search workdir / command"]').exists()).toBe(true)
   })
+
+  test('emits filter updates instead of mutating props', async () => {
+    const wrapper = mount(JobsHistoryFiltersPanel, {
+      props: {
+        open: true,
+        total: 0,
+        filters: {
+          keyword: '',
+          user: '',
+          account: '',
+          partition: '',
+          qos: '',
+          state: '',
+          job_id: undefined,
+          start: '',
+          end: ''
+        }
+      },
+      global: {
+        stubs: {
+          TransitionRoot: { template: '<div><slot /></div>' },
+          TransitionChild: { template: '<div><slot /></div>' },
+          Dialog: { template: '<div><slot /></div>' },
+          DialogPanel: { template: '<div><slot /></div>' },
+          Disclosure: { template: '<div><slot :open="true" /></div>' },
+          DisclosureButton: { template: '<button><slot /></button>' },
+          DisclosurePanel: { template: '<div><slot /></div>' }
+        }
+      }
+    })
+
+    await wrapper.get('input[placeholder="Search workdir / command"]').setValue('sleep')
+
+    expect(wrapper.emitted('update:filters')).toHaveLength(1)
+    expect(wrapper.emitted('update:filters')?.[0]?.[0]).toMatchObject({
+      keyword: 'sleep'
+    })
+  })
 })

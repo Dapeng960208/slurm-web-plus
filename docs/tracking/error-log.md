@@ -182,3 +182,21 @@
 - 根因：YAML 把未加引号的 `:` 解释为映射分隔符，导致 job 名字符串被错误拆解。
 - 解决：把含 `:` 的 job 名改为带双引号的标量，例如 `name: "OS integration tests (rpm: ...)"`。
 - 预防：后续在 workflow 里凡是名称、说明、命令片段包含 `:`、`{}`、`${{ ... }}` 等复杂字符时，优先显式加引号，并在提交前跑一轮 YAML 语法校验。
+
+### 2026-04-27：后端 CI 使用裸 `pytest` 时会把历史 `slurmweb4.2/tests` 一起收集，导致主线 workflow 直接失败
+
+- 场景：GitHub `Backend Tests` workflow 执行 `pytest --junitxml=...` 作为主命令。
+- 现象：`backend-unit-tests` 在 CI 中以 `exit code 2` 失败；当前仓库根目录同时存在 `slurmweb/tests` 和历史 `slurmweb4.2/tests` 两套测试树。
+- 复现：在仓库根目录执行裸 `pytest`，让 pytest 按默认递归收集全仓 `test*.py`。
+- 根因：主线 CI 没有显式限制测试入口，pytest 会把历史兼容树 `slurmweb4.2/tests` 也一起收集；该树包含旧依赖和旧导入路径，不应进入当前主线 CI。
+- 解决：把 `python-ci.yml` 和 `python-os-ci.yml` 中的测试命令统一收敛到 `pytest slurmweb/tests` / `pytest-3 slurmweb/tests`。
+- 预防：后续仓库内如果长期保留兼容代码树或归档测试树，CI 必须显式指定测试根目录，不能依赖裸 `pytest` 默认收集规则。
+
+### 2026-04-27：Vue 组件直接写 `props.filters` 会被 ESLint `vue/no-mutating-props` 拦下
+
+- 场景：GitHub `Frontend ESLint` 检查扫描 `JobsHistoryFiltersPanel.vue` 和 `JobsHistoryFiltersBar.vue`。
+- 现象：`Unexpected mutation of "filters" prop` 连续报在 `v-model="props.filters.*"`、`props.filters.state = ...` 和筛选 chip 删除逻辑上。
+- 复现：在 `frontend/` 目录执行 `npx eslint src/components/jobs/JobsHistoryFiltersPanel.vue src/components/jobs/JobsHistoryFiltersBar.vue src/views/JobsHistoryView.vue`。
+- 根因：两个组件把父级传入的 `filters` 当成可变本地状态直接修改，违反 Vue 单向数据流和仓库 ESLint 规则。
+- 解决：改为通过 `update:filters` 事件向父级回传新对象，由 `JobsHistoryView` 统一更新 store 中的 `filters`。
+- 预防：后续凡是对象型筛选器、表单状态从父级传入时，都不要直接在子组件里写 prop；优先使用 `v-model:<prop>` 或显式 `update:*` 事件。

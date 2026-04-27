@@ -24,7 +24,10 @@ describe('JobsHistoryFiltersBar.vue', () => {
 
     await wrapper.get('button').trigger('click')
 
-    expect(filters.keyword).toBe('')
+    expect(wrapper.emitted('update:filters')).toHaveLength(1)
+    expect(wrapper.emitted('update:filters')?.[0]?.[0]).toMatchObject({
+      keyword: ''
+    })
     expect(wrapper.emitted('search')).toHaveLength(1)
   })
 })

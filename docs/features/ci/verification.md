@@ -22,6 +22,7 @@
 预期：
 
 - `Backend Tests` 固定使用 `Python 3.12`
+- `Backend Tests` 只收集 `slurmweb/tests`
 - `Frontend Tests` 固定使用 `Node 18`
 - `Frontend Static Analysis` 固定使用 `Node 18`
 - `Frontend Static Analysis` 包含：
@@ -59,7 +60,7 @@
 
 ### 3.2 后端失败验证
 
-可以临时制造一个后端 pytest 失败，确认同样行为成立。
+可以临时在 `slurmweb/tests` 下制造一个后端 pytest 失败，确认同样行为成立。
 
 ## 4. Triage workflow 验证
 

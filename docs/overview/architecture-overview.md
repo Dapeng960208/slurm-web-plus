@@ -189,6 +189,7 @@ GitHub push / pull_request(main)
 - `python-ci.yml`
   - 自动后端单元测试
   - 固定 `Python 3.12`
+  - 仅收集 `slurmweb/tests`
 - `frontend-ci.yml`
   - 自动前端单元测试
   - 固定 `Node 18`
@@ -197,6 +198,7 @@ GitHub push / pull_request(main)
   - 固定 `Node 18`
 - `python-os-ci.yml`
   - 手工 rpm/deb OS 集成矩阵
+  - 同样仅收集 `slurmweb/tests`
 - `ci-triage.yml`
   - 手工聚合结构化 CI artifact
 

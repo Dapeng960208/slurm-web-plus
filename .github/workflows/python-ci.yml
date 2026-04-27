@@ -26,7 +26,7 @@ jobs:
 
       - name: Run backend unit test command
         run: |
-          COMMAND="sudo apt-get update && sudo apt-get install -y build-essential python3-dev libldap2-dev libsasl2-dev libcairo2-dev libgirepository-1.0-dev libgirepository-2.0-dev libpango1.0-dev && python -m pip install --upgrade pip && pip install . '.[agent]' '.[gateway]' '.[tests]' && pytest --junitxml=${RESULTS_DIR}/junit.xml"
+          COMMAND="sudo apt-get update && sudo apt-get install -y build-essential python3-dev libldap2-dev libsasl2-dev libcairo2-dev libgirepository-1.0-dev libgirepository-2.0-dev libpango1.0-dev && python -m pip install --upgrade pip && pip install . '.[agent]' '.[gateway]' '.[tests]' && pytest slurmweb/tests --junitxml=${RESULTS_DIR}/junit.xml"
           node .github/scripts/run-ci-command.mjs \
             --results-dir "$RESULTS_DIR" \
             --artifact-name "$ARTIFACT_NAME" \
@@ -41,7 +41,7 @@ jobs:
             --results-dir "$RESULTS_DIR" \
             --artifact-name "$ARTIFACT_NAME" \
             --label "backend-unit-tests" \
-            --command "pytest --junitxml=${RESULTS_DIR}/junit.xml"
+            --command "pytest slurmweb/tests --junitxml=${RESULTS_DIR}/junit.xml"
 
       - name: Upload backend unit test artifact
         if: always()

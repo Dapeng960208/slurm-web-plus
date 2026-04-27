@@ -21,6 +21,8 @@
 - 前端 `TypeScript type-check`
 - 前端生产构建
 
+其中后端 CI 已显式收敛到 `pytest slurmweb/tests`，避免把仓库内历史 `slurmweb4.2/tests` 兼容测试树误收进当前主线 CI。
+
 同时补了统一的 CI 结果产物契约，每个 job 都会尝试上传：
 
 - `stdout.log`
@@ -42,6 +44,12 @@
 - 当前仓库内置 AI 还不能直接读取 GitHub Actions
 - 当前也不会自动修复失败测试或自动提 PR
 - 本轮只把“结果可查询、可聚合”的基础设施铺平
+
+发布后又补了一组前端 lint 修复：
+
+- `JobsHistoryFiltersPanel` 与 `JobsHistoryFiltersBar` 不再直接修改 `filters` prop
+- 改为通过 `update:filters` 事件回传新对象，由 `JobsHistoryView` 统一更新筛选状态
+- 已补对应 Vitest 断言，覆盖“发事件而不是改 prop”的行为
 
 ## 本轮：默认权限模型按 `jobs:*:self` 与全局 `admin view/edit` 修正
 

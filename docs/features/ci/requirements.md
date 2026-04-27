@@ -18,6 +18,7 @@
 - `.github/workflows/python-ci.yml`
   - 后端单元测试
   - 固定 `Python 3.12`
+  - 测试入口固定为 `pytest slurmweb/tests`
 - `.github/workflows/frontend-ci.yml`
   - 前端单元测试
   - 固定 `Node 18`
@@ -32,6 +33,7 @@
 - `.github/workflows/python-os-ci.yml`
   - rpm OS 集成矩阵
   - deb OS 集成矩阵
+  - 测试入口同样固定为 `slurmweb/tests`
 - `.github/workflows/ci-triage.yml`
   - 按指定 `run_id` 聚合结构化 CI artifact
 

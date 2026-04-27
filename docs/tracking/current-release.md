@@ -67,6 +67,7 @@
   - 前端 `ESLint`
   - 前端 `TypeScript type-check`
   - 前端生产构建
+- 后端自动/手工 CI 的 `pytest` 入口已统一收敛到 `slurmweb/tests`
 - 后端 rpm/deb OS 集成矩阵已拆到手工 `python-os-ci.yml`
 - 新增统一 CI 结果产物：
   - `stdout.log`
@@ -74,6 +75,7 @@
   - `failure-context.json`
   - `junit.xml`（测试类 job）
 - 新增手工 `CI Triage` workflow，可按 `run_id` 聚合 `backend` / `frontend` / `all` artifact
+- `JobsHistoryFiltersPanel` / `JobsHistoryFiltersBar` 已改为 `update:filters` 事件链，修复 `vue/no-mutating-props` 导致的前端 CI 失败
 
 ## 3. 进行中项
 
@@ -135,3 +137,5 @@
 - `Get-Content -Raw -Encoding UTF8 .github/workflows/frontend-ci.yml | npx --yes yaml valid`
 - `Get-Content -Raw -Encoding UTF8 .github/workflows/frontend-static.yml | npx --yes yaml valid`
 - `Get-Content -Raw -Encoding UTF8 .github/workflows/ci-triage.yml | npx --yes yaml valid`
+- `cd frontend && npx vitest run tests/components/jobs/JobsHistoryFiltersPanel.spec.ts tests/components/jobs/JobsHistoryFiltersBar.spec.ts`
+- `cd frontend && npx eslint src/components/jobs/JobsHistoryFiltersPanel.vue src/components/jobs/JobsHistoryFiltersBar.vue src/views/JobsHistoryView.vue tests/components/jobs/JobsHistoryFiltersPanel.spec.ts tests/components/jobs/JobsHistoryFiltersBar.spec.ts`
