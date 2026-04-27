@@ -98,7 +98,7 @@
 - `GET /api/clusters`：确认 `persistence`、`access_control`、`user_metrics`、`ai` 等能力字段
 - `GET /api/agents/<cluster>/jobs/history`：确认历史作业接口可用（当 `persistence = true`）
 - `GET /api/agents/<cluster>/access/roles`：确认访问控制接口可用（当 `access_control = true`）
-- `GET /api/agents/<cluster>/ai/configs`：确认 AI 配置列表可用（当 `ai.enabled = true`）
+- `GET /api/agents/<cluster>/ai/configs`：确认 AI 配置列表可用（当 `ai.enabled = true`，该能力现在由数据库与 AI stores 初始化结果自动推导）
 
 ## 5. 回滚边界与风险
 

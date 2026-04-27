@@ -190,9 +190,6 @@ PERMISSION_CATALOG = [
 DEFAULT_LEGACY_PERMISSION_MAP = {
     "view-stats": ["dashboard:view:*", "analysis:view:*"],
     "view-jobs": ["jobs:view:*"],
-    "view-own-jobs": ["jobs:view:self", "user/analysis:view:self"],
-    "edit-own-jobs": ["jobs:edit:self"],
-    "cancel-own-jobs": ["jobs:delete:self"],
     "view-history-jobs": ["jobs-history:view:*"],
     "view-nodes": ["resources:view:*"],
     "view-qos": ["qos:view:*", "jobs/filter-qos:view:*"],
@@ -205,28 +202,7 @@ DEFAULT_LEGACY_PERMISSION_MAP = {
     ],
     "cache-view": ["admin/cache:view:*", "admin/ldap-cache:view:*"],
     "cache-reset": ["admin/cache:edit:*"],
-    "roles-view": ["admin/access-control:view:*"],
-    "roles-manage": [
-        "admin/access-control:edit:*",
-        "admin/access-control:delete:*",
-    ],
-    "view-ai": ["ai:view:*", "admin/ai:view:*"],
-    "manage-ai": ["admin/ai:view:*", "admin/ai:edit:*", "admin/ai:delete:*"],
-    "admin-manage": [
-        "admin/system:view:*",
-        "admin/system:edit:*",
-        "admin/system:delete:*",
-        "admin/ai:view:*",
-        "admin/ai:edit:*",
-        "admin/ai:delete:*",
-        "admin/access-control:view:*",
-        "admin/access-control:edit:*",
-        "admin/access-control:delete:*",
-        "admin/cache:view:*",
-        "admin/cache:edit:*",
-        "admin/ldap-cache:view:*",
-        "admin/ldap-cache:edit:*",
-    ],
+    "admin-manage": ["*:*:*"],
 }
 
 
@@ -360,7 +336,6 @@ def default_seed_roles() -> List[Dict[str, object]]:
     user_rules = [
         "dashboard:view:*",
         "analysis:view:*",
-        "ai:view:*",
         "jobs:view:self",
         "jobs:edit:self",
         "jobs:delete:self",

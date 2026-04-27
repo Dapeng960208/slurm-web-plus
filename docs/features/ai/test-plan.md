@@ -14,13 +14,12 @@
 
 - Agent `/info` 暴露 `ai` 与 `capabilities.ai`
 - Agent 配置项对 AI 行为的影响边界：
-  - `ai.enabled`
   - `ai.max_rounds`
   - `ai.max_history_messages`
   - `ai.stream_chunk_size`
 - 模型配置 CRUD、默认模型切换、provider 校验、连接校验
 - 密钥掩码返回与 keep/replace/clear 的更新路径
-- `view-ai` / `manage-ai` 授权边界
+- `ai:view:*` 与 `admin/ai:view|edit|delete:*` 授权边界
 - SSE 事件契约与透传一致性
 - 会话/消息/工具调用审计的数据库持久化
 - 只读工具的权限映射与拒绝逻辑（不允许执行未授权或不在白名单的工具）
@@ -37,11 +36,11 @@ npm --prefix frontend run test:unit
 重点覆盖：
 
 - `GatewayAPI` 的 `/ai/*` 方法与 SSE 客户端
-- `MainMenu` 的 AI 导航门控（capability + `view-ai`）
-- `SettingsTabs` 的 AI tab 门控（capability + `manage-ai`）
+- `MainMenu` 的 AI 导航门控（capability + `ai:view:*`）
+- `SettingsTabs` 的 AI tab 门控（capability + `admin/ai:view:*` / `admin/ai:edit:*`）
 - `SettingsAI` 的配置管理流程
 - `AssistantView` 的模型选择、流式渲染与工具轨迹展示
-- 路由守卫对 `view-ai` / `manage-ai` 的约束
+- 路由守卫对 `ai:view:*` / `admin/ai:*` 的约束
 
 ## 3. 详细测试点（建议最小集）
 
@@ -65,12 +64,13 @@ npm --prefix frontend run test:unit
 
 ### 3.3 权限与门控
 
-- 无 `view-ai`：不能读取 configs、不能对话、不能读取会话
-- 无 `manage-ai`：不能创建/更新/删除 configs，不能 validate
-- 有 `view-ai` 但无底层权限时不能通过 AI 绕过：
+- 无 `ai:view:*`：不能对话、不能读取会话
+- 无 `admin/ai:view:*`：不能读取模型配置列表
+- 无 `admin/ai:edit:*` / `admin/ai:delete:*`：不能创建、更新、删除 configs，也不能 validate
+- 有 `ai:view:*` 但无底层权限时不能通过 AI 绕过：
   - 无 `view-jobs`：不能通过工具读 job detail
   - 无 `view-nodes`：不能通过工具读 node detail / node metrics
-- `ai.enabled = false` 时，AI 端点应返回不可用（即使 RBAC 允许）
+- 数据库不可用或 AI stores 初始化失败时，AI 端点应返回不可用（即使 RBAC 允许）
 
 ### 3.4 SSE 契约
 

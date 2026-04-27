@@ -534,22 +534,6 @@ database:
     ex: SECR3T
 
 persistence:
-  enabled:
-    type: bool
-    deprecated:
-      section: database
-      parameter: enabled
-    doc: |
-      Deprecated. Job history persistence now follows database availability and
-      no longer requires a dedicated enable flag.
-  access_control_enabled:
-    type: bool
-    deprecated:
-      section: database
-      parameter: enabled
-    doc: |
-      Deprecated. Access control now follows database availability and no
-      longer requires a dedicated enable flag.
   retention_days:
     type: int
     default: 180
@@ -560,14 +544,6 @@ persistence:
     doc: Interval in seconds between active job snapshots
 
 user_metrics:
-  enabled:
-    type: bool
-    deprecated:
-      section: database
-      parameter: enabled
-    doc: |
-      Deprecated. User analytics now follow database and Prometheus
-      availability and no longer require a dedicated enable flag.
   aggregation_interval:
     type: int
     default: 3600
@@ -577,14 +553,6 @@ user_metrics:
     doc: Optional YAML file with ordered `pattern` / `tool` rules for tool classification.
 
 node_metrics:
-  enabled:
-    type: bool
-    deprecated:
-      section: node_metrics
-      parameter: prometheus_host
-    doc: |
-      Deprecated. Node metrics now follow the presence of
-      `[node_metrics] prometheus_host`.
   prometheus_host:
     type: uri
     doc: |
@@ -602,14 +570,6 @@ node_metrics:
       Typically "hostname" or "instance".
 
 ai:
-  enabled:
-    type: bool
-    deprecated:
-      section: database
-      parameter: enabled
-    doc: |
-      Deprecated. AI support now follows database availability and model
-      configuration state.
   max_rounds:
     type: int
     default: 4

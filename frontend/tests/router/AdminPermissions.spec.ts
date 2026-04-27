@@ -22,7 +22,7 @@ describe('router admin permissions', () => {
     localStorage.clear()
   })
 
-  test('allows admin subroutes when access comes from admin-manage legacy action', async () => {
+  test('allows admin subroutes when access comes from admin-manage super-admin action', async () => {
     const [{ default: router }, { useAuthStore }, { useRuntimeStore }] = await Promise.all([
       import('@/router'),
       import('@/stores/auth'),

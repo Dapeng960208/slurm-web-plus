@@ -136,7 +136,7 @@ describe('MainMenu.vue', () => {
     expect(wrapper.text()).toContain('Jobs History')
   })
 
-  test('shows AI only when the cluster advertises AI capability and the user has view-ai', async () => {
+  test('shows AI only when the cluster advertises AI capability and the user has ai:view:*', async () => {
     const wrapper = shallowMount(MainMenu, {
       props: {
         entry: 'dashboard',
@@ -188,7 +188,7 @@ describe('MainMenu.vue', () => {
     runtimeStore.availableClusters = [
       {
         name: 'foo',
-        permissions: { roles: [], actions: ['view-stats', 'view-ai'] },
+        permissions: { roles: [], actions: ['view-stats'], rules: ['ai:view:*'] },
         racksdb: true,
         infrastructure: 'foo',
         metrics: true,
@@ -208,7 +208,7 @@ describe('MainMenu.vue', () => {
     runtimeStore.availableClusters = [
       {
         name: 'foo',
-        permissions: { roles: [], actions: ['view-stats'] },
+        permissions: { roles: [], actions: ['view-stats'], rules: [] },
         racksdb: true,
         infrastructure: 'foo',
         metrics: true,
@@ -293,7 +293,7 @@ describe('MainMenu.vue', () => {
     expect(wrapper.text()).toContain('Admin')
   })
 
-  test('shows Admin when permissions come from admin-manage legacy action', async () => {
+  test('shows Admin when permissions come from admin-manage super-admin action', async () => {
     const wrapper = shallowMount(MainMenu, {
       props: {
         entry: 'dashboard',
@@ -415,7 +415,8 @@ describe('MainMenu.vue', () => {
         name: 'foo',
         permissions: {
           roles: ['user'],
-          actions: ['view-own-jobs', 'edit-own-jobs', 'cancel-own-jobs']
+          actions: [],
+          rules: ['jobs:view:self', 'jobs:edit:self', 'jobs:delete:self']
         },
         racksdb: true,
         infrastructure: 'foo',

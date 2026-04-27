@@ -561,9 +561,17 @@ describe('gateway data APIs', () => {
       roles: ['ignored-role'],
       actions: ['ignored-action'],
       sources: {
-        policy: { roles: ['user'], actions: ['view-jobs'] },
-        custom: { roles: ['db-admin'], actions: ['roles-manage'] },
-        merged: { roles: ['user', 'db-admin'], actions: ['view-jobs', 'roles-manage'] }
+        policy: { roles: ['user'], actions: ['view-jobs'], rules: ['jobs:view:*'] },
+        custom: {
+          roles: ['db-admin'],
+          actions: [],
+          rules: ['admin/access-control:delete:*', 'admin/access-control:edit:*']
+        },
+        merged: {
+          roles: ['user', 'db-admin'],
+          actions: ['view-jobs'],
+          rules: ['jobs:view:*', 'admin/access-control:delete:*', 'admin/access-control:edit:*']
+        }
       }
     })
 
@@ -572,18 +580,15 @@ describe('gateway data APIs', () => {
 
     expect(mockRestAPI.get).toHaveBeenCalledWith('/agents/cluster/permissions')
     expect(result.roles).toStrictEqual(['user', 'db-admin'])
-    expect(result.actions).toStrictEqual(['view-jobs', 'roles-manage'])
+    expect(result.actions).toStrictEqual(['view-jobs'])
     expect(result.rules).toEqual(
       expect.arrayContaining([
         'jobs:view:*',
         'admin/access-control:delete:*',
-        'admin/access-control:edit:*',
-        'user/analysis:view:self'
+        'admin/access-control:edit:*'
       ])
     )
-    expect(result.sources?.policy.rules).toEqual(
-      expect.arrayContaining(['jobs:view:*', 'user/analysis:view:self'])
-    )
+    expect(result.sources?.policy.rules).toEqual(expect.arrayContaining(['jobs:view:*']))
     expect(result.sources?.custom.rules).toEqual(
       expect.arrayContaining(['admin/access-control:delete:*', 'admin/access-control:edit:*'])
     )
@@ -591,8 +596,7 @@ describe('gateway data APIs', () => {
       expect.arrayContaining([
         'jobs:view:*',
         'admin/access-control:delete:*',
-        'admin/access-control:edit:*',
-        'user/analysis:view:self'
+        'admin/access-control:edit:*'
       ])
     )
   })
@@ -608,17 +612,15 @@ describe('gateway data APIs', () => {
 
     expect(result.roles).toStrictEqual(['user'])
     expect(result.actions).toStrictEqual(['view-jobs'])
-    expect(result.rules).toEqual(expect.arrayContaining(['jobs:view:*', 'user/analysis:view:self']))
+    expect(result.rules).toEqual(expect.arrayContaining(['jobs:view:*']))
     expect(result.sources?.policy.rules).toStrictEqual([])
     expect(result.sources?.custom.rules).toStrictEqual([])
-    expect(result.sources?.merged.rules).toEqual(
-      expect.arrayContaining(['jobs:view:*', 'user/analysis:view:self'])
-    )
+    expect(result.sources?.merged.rules).toEqual(expect.arrayContaining(['jobs:view:*']))
   })
 
   test('requests access control roles list', async () => {
     mockRestAPI.get.mockResolvedValue({
-      items: [{ id: 1, name: 'db-admin', description: null, actions: ['roles-manage'] }]
+      items: [{ id: 1, name: 'db-admin', description: null, actions: ['admin-manage'] }]
     })
 
     const gateway = useGatewayAPI()
@@ -630,7 +632,7 @@ describe('gateway data APIs', () => {
         id: 1,
         name: 'db-admin',
         description: null,
-        actions: ['roles-manage'],
+        actions: ['admin-manage'],
         permissions: []
       }
     ])
@@ -641,28 +643,28 @@ describe('gateway data APIs', () => {
       id: 2,
       name: 'ops-viewer',
       description: 'Operations read-only',
-      actions: ['roles-view', 'view-jobs']
+      actions: ['view-jobs']
     })
 
     const gateway = useGatewayAPI()
     const result = await gateway.create_access_role('cluster', {
       name: 'ops-viewer',
       description: 'Operations read-only',
-      actions: ['roles-view', 'view-jobs']
+      actions: ['view-jobs']
     })
 
     expect(mockRestAPI.post).toHaveBeenCalledWith('/agents/cluster/access/roles', {
       name: 'ops-viewer',
       description: 'Operations read-only',
-      actions: ['roles-view', 'view-jobs']
+      actions: ['view-jobs']
     })
     expect(result.id).toBe(2)
   })
 
-  test('normalizes admin legacy actions for AI and cache pages', async () => {
+  test('normalizes remaining admin legacy actions and super-admin alias', async () => {
     mockRestAPI.get.mockResolvedValue({
       roles: ['admin'],
-      actions: ['cache-view', 'cache-reset', 'manage-ai', 'roles-view', 'admin-manage']
+      actions: ['cache-view', 'cache-reset', 'admin-manage']
     })
 
     const gateway = useGatewayAPI()
@@ -670,36 +672,13 @@ describe('gateway data APIs', () => {
 
     expect(result.rules).toEqual(
       expect.arrayContaining([
-        'admin/access-control:view:*',
-        'admin/access-control:edit:*',
-        'admin/access-control:delete:*',
-        'admin/ai:view:*',
-        'admin/ai:edit:*',
-        'admin/ai:delete:*',
-        'admin/system:view:*',
-        'admin/system:edit:*',
-        'admin/system:delete:*',
         'admin/cache:edit:*',
         'admin/cache:view:*',
         'admin/ldap-cache:view:*',
-        'admin/ldap-cache:edit:*'
+        '*:*:*'
       ])
     )
-    expect(result.rules).not.toEqual(expect.arrayContaining(['admin/cache:delete:*']))
-  })
-
-  test('normalizes legacy own-job actions to self-scoped rules', async () => {
-    mockRestAPI.get.mockResolvedValue({
-      roles: ['user'],
-      actions: ['view-own-jobs', 'edit-own-jobs', 'cancel-own-jobs']
-    })
-
-    const gateway = useGatewayAPI()
-    const result = await gateway.permissions('cluster')
-
-    expect(result.rules).toEqual(
-      expect.arrayContaining(['jobs:view:self', 'jobs:edit:self', 'jobs:delete:self'])
-    )
+    expect(result.rules).toEqual(expect.arrayContaining(['*:*:*']))
   })
 
   test('lists access control users with filters', async () => {
@@ -749,7 +728,7 @@ describe('gateway data APIs', () => {
       policy_roles: ['user'],
       policy_actions: ['view-jobs'],
       custom_roles: ['db-admin'],
-      custom_actions: ['roles-manage'],
+      custom_actions: ['admin-manage'],
       role_ids: [1]
     })
 

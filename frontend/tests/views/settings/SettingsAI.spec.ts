@@ -194,7 +194,7 @@ describe('views/settings/SettingsAI.vue', () => {
         name: 'foo',
         permissions: {
           roles: [],
-          actions: ['manage-ai'],
+          actions: [],
           rules: ['admin/ai:view:*', 'admin/ai:edit:*', 'settings/ai:view:*', 'settings/ai:edit:*', 'ai:view:*']
         },
         capabilities: {

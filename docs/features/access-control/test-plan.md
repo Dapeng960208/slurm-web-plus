@@ -17,8 +17,8 @@
 - `self`
 - `edit` / `delete` 满足 `view`
 - 旧权限映射到新规则
-- `edit-own-jobs` -> `jobs:edit:self`
-- `admin-manage` -> `admin/system|ai|access-control|cache|ldap-cache`
+- `cache-reset` -> `admin/cache:edit:*`
+- `admin-manage` -> `*:*:*`
 
 对应重点：
 
@@ -54,8 +54,10 @@
 - `roles.permissions` 迁移生效
 - 角色新旧字段双读双写
 - 旧角色只有 `actions[]` 时可推导出 `permissions[]`
+- 历史 `roles.actions` 中的 7 个已移除旧动作会在启动时迁入 `permissions[]` 后清理
+- 历史 `roles.actions` 中的 `admin-manage` 会在启动时补齐 `*:*:*`
 - 角色表为空时自动写入 `user`、`admin`、`super-admin`
-- `user` 默认值为“非 admin 页面只读 + jobs:view|edit|delete:self”
+- `user` 默认值为“非 admin 页面只读 + jobs:view|edit|delete:self + user/analysis:view:self”
 - `admin` 默认值为 `*:view:*` + `*:edit:*`
 
 ## 3. 前端测试
@@ -106,7 +108,8 @@
 - 普通用户默认权限不是 `jobs:view:*`，而是非 `admin/*` 页面只读 + `jobs:view|edit|delete:self`
 - `admin` 默认角色不是全量 delete，而是 `*:view:*` + `*:edit:*`
 - `admin` 子树不再使用 `settings/ai|cache|ldap-cache|access-control` 资源名，统一切到 `admin/*`
-- 兼容动作 `edit-own-jobs` 与 `admin-manage` 已纳入后端测试基线
+- 7 个已移除旧动作不会再出现在 `legacy_map`、`/permissions.actions` 和前端角色页
+- `admin-manage` 只在 `*:*:*` 场景下回显，`admin` 默认角色不会推出该动作
 
 仍待主线程继续补齐的缺口：
 
@@ -122,6 +125,7 @@
 - `npx vitest run tests/stores/runtime.spec.ts tests/views/settings/SettingsAccessControl.spec.ts`
 - `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/test_permission_rules.py`
 - `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/test_access_control_policy.py`
+- `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/test_access_control_store.py`
 - `.venv\Scripts\python.exe -m pytest slurmweb/tests/views/test_agent_permissions.py -q`
 - `.venv\Scripts\python.exe -m pytest slurmweb/tests/apps/test_agent.py -q`
 

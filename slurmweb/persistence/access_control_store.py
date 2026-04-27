@@ -10,6 +10,17 @@ from ..models.db import psycopg_connect_kwargs
 from ..permission_rules import default_seed_roles, permission_rules_to_legacy_actions
 
 
+REMOVED_ROLE_ACTIONS = {
+    "view-own-jobs",
+    "edit-own-jobs",
+    "cancel-own-jobs",
+    "roles-view",
+    "roles-manage",
+    "view-ai",
+    "manage-ai",
+}
+
+
 class AccessControlStore:
     def __init__(self, settings, legacy_permission_map=None):
         self._settings = settings
@@ -50,6 +61,59 @@ class AccessControlStore:
                 cur.fetchone()
         finally:
             self._release_conn(conn)
+
+    def _normalized_role_actions_permissions(self, actions, permissions):
+        normalized_actions = sorted(
+            {action for action in (actions or []) if action not in REMOVED_ROLE_ACTIONS}
+        )
+        normalized_permissions = set(permissions or [])
+        for action in actions or []:
+            if action in REMOVED_ROLE_ACTIONS or action == "admin-manage":
+                normalized_permissions.update(self._legacy_permission_map.get(action, []))
+        return normalized_actions, sorted(normalized_permissions)
+
+    def normalize_legacy_role_actions(self) -> int:
+        import psycopg2.extras
+
+        conn = self._get_conn()
+        updated = 0
+        try:
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                cur.execute("SELECT id, actions, permissions FROM roles ORDER BY id ASC")
+                rows = cur.fetchall()
+                for row in rows:
+                    actions = row["actions"] or []
+                    permissions = row["permissions"] or []
+                    normalized_actions, normalized_permissions = (
+                        self._normalized_role_actions_permissions(actions, permissions)
+                    )
+                    if actions == normalized_actions and permissions == normalized_permissions:
+                        continue
+                    cur.execute(
+                        """
+                        UPDATE roles
+                        SET actions = %s::jsonb,
+                            permissions = %s::jsonb,
+                            updated_at = NOW()
+                        WHERE id = %s
+                        """,
+                        (
+                            psycopg2.extras.Json(normalized_actions),
+                            psycopg2.extras.Json(normalized_permissions),
+                            row["id"],
+                        ),
+                    )
+                    updated += 1
+            conn.commit()
+        except Exception:
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+            raise
+        finally:
+            self._release_conn(conn)
+        return updated
 
     def _role_name_exists(self, cur, name: str, exclude_role_id=None) -> bool:
         if exclude_role_id is None:

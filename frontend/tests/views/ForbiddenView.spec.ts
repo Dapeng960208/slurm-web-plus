@@ -12,7 +12,7 @@ describe('ForbiddenView.vue', () => {
   })
 
   test('shows permission details and dashboard shortcut', async () => {
-    await router.setQuery({ cluster: 'foo', permission: 'view-ai' })
+    await router.setQuery({ cluster: 'foo', permission: 'ai:view:*' })
 
     const wrapper = mount(ForbiddenView, {
       global: {
@@ -23,7 +23,7 @@ describe('ForbiddenView.vue', () => {
     })
 
     expect(wrapper.text()).toContain('当前页面无访问权限')
-    expect(wrapper.text()).toContain('Missing required permission: view-ai')
+    expect(wrapper.text()).toContain('Missing required permission: ai:view:*')
     expect(wrapper.text()).toContain('请联系管理员申请权限。')
 
     const dashboardLink = wrapper.findComponent(RouterLinkStub)

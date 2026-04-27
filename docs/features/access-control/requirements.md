@@ -109,9 +109,6 @@ resource:operation:scope
 |---|---|
 | `view-stats` | `dashboard:view:*` + `analysis:view:*` |
 | `view-jobs` | `jobs:view:*` |
-| `view-own-jobs` | `jobs:view:self` + `user/analysis:view:self` |
-| `edit-own-jobs` | `jobs:edit:self` |
-| `cancel-own-jobs` | `jobs:delete:self` |
 | `view-history-jobs` | `jobs-history:view:*` |
 | `view-nodes` | `resources:view:*` |
 | `view-qos` | `qos:view:*` + `jobs/filter-qos:view:*` |
@@ -121,15 +118,17 @@ resource:operation:scope
 | `view-partitions` | `jobs/filter-partitions:view:*` + `resources/filter-partitions:view:*` |
 | `cache-view` | `admin/cache:view:*` + `admin/ldap-cache:view:*` |
 | `cache-reset` | `admin/cache:edit:*` |
-| `roles-view` | `admin/access-control:view:*` |
-| `roles-manage` | `admin/access-control:edit:*` + `admin/access-control:delete:*` |
-| `view-ai` | `ai:view:*` + `admin/ai:view:*` |
-| `manage-ai` | `admin/ai:view:*` + `admin/ai:edit:*` + `admin/ai:delete:*` |
-| `admin-manage` | `admin/system`、`admin/ai`、`admin/access-control`、`admin/cache`、`admin/ldap-cache` 的管理规则集合 |
+| `admin-manage` | `*:*:*` |
 
 扩展方式：
 
 - 可通过 `policy.permission_map` 覆盖或补充映射
+
+收口说明：
+
+- `view-own-jobs`、`edit-own-jobs`、`cancel-own-jobs`、`roles-view`、`roles-manage`、`view-ai`、`manage-ai` 已从 vendor policy、`/permissions.actions`、`/access/catalog.legacy_map` 与角色页兼容动作列表中移除。
+- `POST/PATCH /access/roles` 再提交这 7 个动作时，后端会按无效输入处理。
+- `admin-manage` 仍允许作为输入，但服务端会等价归一为 `*:*:*`。
 
 ## 6. 数据模型与接口
 
@@ -144,6 +143,12 @@ resource:operation:scope
   - 返回 `actions`
   - 返回 `rules`
   - 返回 `sources.policy/custom/merged`
+- `GET /permissions.actions`
+  - 不再返回上述 7 个已移除旧动作
+  - `admin-manage` 仅在实际权限包含 `*:*:*` 时回显
+- `GET /access/catalog`
+  - `legacy_map` 不再包含上述 7 个已移除旧动作
+  - `legacy_map.admin-manage = ["*:*:*"]`
 - `GET /access/catalog`
   - 返回资源目录、操作、scope、旧权限映射
 - `GET /access/roles`

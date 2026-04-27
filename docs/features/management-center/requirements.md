@@ -77,7 +77,7 @@
 - `settings` 页面只保留 `General`、`Errors`、`Account`
 - 主侧栏新增 `Admin`
 - `Admin` 入口由任一 `admin/*:view:*` 控制显示
-- `admin-manage` 作为旧动作兼容层，会展开为全部 `admin/*` 规则，因此也能直接显示 `Admin` 入口
+- `admin-manage` 现在只是 `*:*:*` 的兼容别名，因此只有 `super-admin` 语义的角色/用户会通过该别名显示 `Admin` 入口
 
 ## 4. 权限要求
 
@@ -172,18 +172,19 @@
 
 旧动作兼容补充：
 
-- `view-own-jobs` -> `jobs:view:self`
-- `edit-own-jobs` -> `jobs:edit:self`
-- `cancel-own-jobs` -> `jobs:delete:self`
-- `admin-manage` -> `admin/system|ai|cache|ldap-cache|access-control` 的管理规则集合
+- `admin-manage` -> `*:*:*`
 
-vendor policy 中普通 `user` 角色默认使用：
+已移除的旧动作入口：
 
 - `view-own-jobs`
 - `edit-own-jobs`
 - `cancel-own-jobs`
+- `roles-view`
+- `roles-manage`
+- `view-ai`
+- `manage-ai`
 
-这保证普通用户默认拥有 `jobs:*:self`，但不会自动获得 `Admin` 页面权限。
+普通用户默认拥有 `jobs:*:self` 与 `user/analysis:view:self`，现在来自数据库种子角色 `user`，不再来自 vendor policy 动作；无数据库模式下也不再提供这组旧动作兜底。
 
 ## 8. 前端行为
 

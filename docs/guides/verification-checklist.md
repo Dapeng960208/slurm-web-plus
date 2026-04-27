@@ -240,8 +240,8 @@ http://your-server:5012
 
 **检查步骤：**
 ```bash
-# 1. 确认配置文件中 persistence.enabled = true
-grep "enabled" /etc/slurm-web/agent.ini | grep -A 1 persistence
+# 1. 确认数据库已开启，且 persistence 配置段保留 retention/snapshot 参数
+grep -n "\\[database\\]\\|enabled\\|\\[persistence\\]\\|retention_days\\|snapshot_interval" /etc/slurm-web/agent.ini
 
 # 2. 确认服务已重启
 systemctl restart slurm-web-agent slurm-web-gateway

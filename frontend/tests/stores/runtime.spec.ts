@@ -192,7 +192,7 @@ describe('Runtime Store', () => {
     expect(runtime.hasRoutePermission('foo', 'settings/access-control', 'view')).toBe(false)
   })
 
-  test('legacy actions normalize admin-manage and edit-own-jobs without granting cache delete access', () => {
+  test('legacy admin-manage normalizes to super-admin access', () => {
     const runtime = useRuntimeStore()
     runtime.addCluster({
       name: 'foo',
@@ -202,7 +202,7 @@ describe('Runtime Store', () => {
       cache: true,
       permissions: {
         roles: ['admin'],
-        actions: ['admin-manage', 'edit-own-jobs'],
+        actions: ['admin-manage'],
         rules: []
       }
     })
@@ -212,7 +212,7 @@ describe('Runtime Store', () => {
     expect(runtime.hasRoutePermission('foo', 'admin/system', 'edit')).toBe(true)
     expect(runtime.hasRoutePermission('foo', 'admin/system', 'delete')).toBe(true)
     expect(runtime.hasRoutePermission('foo', 'admin/cache', 'edit')).toBe(true)
-    expect(runtime.hasRoutePermission('foo', 'admin/cache', 'delete')).toBe(false)
+    expect(runtime.hasRoutePermission('foo', 'admin/cache', 'delete')).toBe(true)
   })
 
   test('wildcard admin rules grant global view and edit without implying delete', () => {

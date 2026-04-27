@@ -62,7 +62,6 @@ enabled=yes
 
 {% if node_metrics %}
 [node_metrics]
-enabled=yes
 prometheus_host=http://localhost:9090
 {% endif %}
 
@@ -83,21 +82,13 @@ password=secret
 
 {% if persistence %}
 [persistence]
-enabled=yes
-{% if access_control_enabled %}
-access_control_enabled=yes
-{% endif %}
+retention_days=180
+snapshot_interval=60
 {% endif %}
 
 {% if user_metrics %}
 [user_metrics]
-enabled=yes
 aggregation_interval=3600
-{% endif %}
-
-{% if ai_enabled %}
-[ai]
-enabled=yes
 {% endif %}
 """
 

@@ -33,6 +33,33 @@ class SlurmwebAppShowConf:
         self.conf = seed.conf
         self.component = seed.component
 
+    def _settings_override_message(self, err: SettingsOverrideError) -> str:
+        message = str(err)
+        defs_name = str(self.conf_defs).lower()
+
+        if (
+            defs_name.endswith("gateway.yml")
+            and "Parameter cluster loaded in settings overrides" in message
+        ):
+            return (
+                f"{message}. This usually means the gateway settings definition "
+                f"{self.conf_defs} is being used with the agent configuration "
+                f"{self.conf}; check the selected subcommand and the "
+                "--conf-defs/--conf paths."
+            )
+        if (
+            defs_name.endswith("agent.yml")
+            and "loaded in settings overrides is not defined in section agents"
+            in message
+        ):
+            return (
+                f"{message}. This usually means the agent settings definition "
+                f"{self.conf_defs} is being used with the gateway configuration "
+                f"{self.conf}; check the selected subcommand and the "
+                "--conf-defs/--conf paths."
+            )
+        return message
+
     def run(self):
         logger.info("Dumping configuration of Slurm-web %s", self.component)
         logger.info("Loading configuration definition: %s", self.conf_defs)
@@ -45,7 +72,10 @@ class SlurmwebAppShowConf:
         try:
             self.settings.override_ini(self.conf)
         except (SettingsSiteLoaderError, SettingsOverrideError) as err:
-            logger.critical(err)
+            if isinstance(err, SettingsOverrideError):
+                logger.critical(self._settings_override_message(err))
+            else:
+                logger.critical(err)
             sys.exit(1)
 
         self.settings.dump()

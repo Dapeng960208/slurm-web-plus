@@ -181,68 +181,59 @@ class TestAgentViews(TestAgentBase):
         )
 
     def test_access_roles(self):
-        self.app.access_control_enabled = True
-        self.app.access_control_store = mock.Mock()
+        self._enable_rules("admin/access-control:view:*")
         self.app.access_control_store.list_roles.return_value = [
-            {"id": 1, "name": "db-admin", "actions": ["roles-manage"]},
+            {"id": 1, "name": "db-admin", "actions": ["admin-manage"]},
         ]
-
-        with mock.patch.object(self.app.policy, "allowed_user_action", return_value=True):
-            response = self.client.get(f"/v{get_version()}/access/roles")
+        response = self.client.get(f"/v{get_version()}/access/roles")
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(
             response.json,
             {
                 "items": [
-                    {"id": 1, "name": "db-admin", "actions": ["roles-manage"]},
+                    {"id": 1, "name": "db-admin", "actions": ["admin-manage"]},
                 ]
             },
         )
         self.app.access_control_store.list_roles.assert_called_once_with()
 
     def test_create_access_role(self):
-        self.app.access_control_enabled = True
-        self.app.access_control_store = mock.Mock()
+        self._enable_rules("admin/access-control:edit:*")
         self.app.access_control_store.create_role.return_value = {
             "id": 2,
             "name": "ops-viewer",
             "description": "Operations read-only role",
-            "actions": ["roles-view", "view-jobs"],
+            "actions": ["view-jobs"],
         }
-
-        with mock.patch.object(self.app.policy, "allowed_user_action", return_value=True):
-            response = self.client.post(
-                f"/v{get_version()}/access/roles",
-                json={
-                    "name": "ops-viewer",
-                    "description": "Operations read-only role",
-                    "actions": ["view-jobs", "roles-view"],
-                },
-            )
+        response = self.client.post(
+            f"/v{get_version()}/access/roles",
+            json={
+                "name": "ops-viewer",
+                "description": "Operations read-only role",
+                "actions": ["view-jobs"],
+            },
+        )
 
         self.assertEqual(response.status_code, 201)
         self.app.access_control_store.create_role.assert_called_once_with(
             "ops-viewer",
             "Operations read-only role",
-            ["roles-view", "view-jobs"],
-            ["admin/access-control:view:*", "jobs:view:*"],
+            ["view-jobs"],
+            ["jobs:view:*"],
         )
 
     def test_access_users_with_filters(self):
-        self.app.access_control_enabled = True
-        self.app.access_control_store = mock.Mock()
+        self._enable_rules("admin/access-control:view:*")
         self.app.access_control_store.list_users.return_value = {
             "items": [{"username": "alice"}],
             "total": 1,
             "page": 2,
             "page_size": 200,
         }
-
-        with mock.patch.object(self.app.policy, "allowed_user_action", return_value=True):
-            response = self.client.get(
-                f"/v{get_version()}/access/users?username=ali&page=2&page_size=250"
-            )
+        response = self.client.get(
+            f"/v{get_version()}/access/users?username=ali&page=2&page_size=250"
+        )
 
         self.assertEqual(response.status_code, 200)
         self.app.access_control_store.list_users.assert_called_once_with(
@@ -252,18 +243,15 @@ class TestAgentViews(TestAgentBase):
         )
 
     def test_update_access_user_roles(self):
-        self.app.access_control_enabled = True
-        self.app.access_control_store = mock.Mock()
+        self._enable_rules("admin/access-control:edit:*")
         self.app.access_control_store.set_user_roles.return_value = {
             "username": "alice",
             "role_ids": [1, 2],
         }
-
-        with mock.patch.object(self.app.policy, "allowed_user_action", return_value=True):
-            response = self.client.put(
-                f"/v{get_version()}/access/users/alice/roles",
-                json={"role_ids": [1, 2]},
-            )
+        response = self.client.put(
+            f"/v{get_version()}/access/users/alice/roles",
+            json={"role_ids": [1, 2]},
+        )
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json["role_ids"], [1, 2])
@@ -418,6 +406,7 @@ class TestAgentViews(TestAgentBase):
     #
 
     def test_request_slurmrestd_connection_error(self):
+        self._enable_job_view_all_rules()
         self.app.slurmrestd._request = mock.Mock(
             side_effect=SlurmrestConnectionError("connection error")
         )
@@ -433,6 +422,7 @@ class TestAgentViews(TestAgentBase):
         )
 
     def test_request_slurmrestd_invalid_type(self):
+        self._enable_job_view_all_rules()
         self.app.slurmrestd._request = mock.Mock(
             side_effect=SlurmrestdInvalidResponseError("invalid type")
         )
@@ -450,6 +440,7 @@ class TestAgentViews(TestAgentBase):
     @all_slurm_api_versions
     def test_request_slurmrestd_not_found(self, slurm_version, api_version):
         self.setup_slurmrestd(slurm_version, api_version)
+        self._enable_job_view_all_rules()
         [slurm_not_found_asset] = self.mock_slurmrestd_responses(
             slurm_version,
             api_version,
@@ -470,6 +461,7 @@ class TestAgentViews(TestAgentBase):
     @all_slurm_api_versions
     def test_request_slurmrestd_authentication_error(self, slurm_version, api_version):
         self.setup_slurmrestd(slurm_version, api_version)
+        self._enable_job_view_all_rules()
         [slurm_not_found_asset] = self.mock_slurmrestd_responses(
             slurm_version,
             api_version,

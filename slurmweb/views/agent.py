@@ -1079,19 +1079,13 @@ def ldap_cache_users():
         abort(500, str(err))
 
 
-@permission_required(
-    ("admin/access-control", "view", "*"),
-    legacy_action="roles-view",
-)
+@permission_required(("admin/access-control", "view", "*"))
 def access_catalog():
     _require_access_control()
     return jsonify(access_control_catalog())
 
 
-@permission_required(
-    ("admin/access-control", "view", "*"),
-    legacy_action="roles-view",
-)
+@permission_required(("admin/access-control", "view", "*"))
 def access_roles():
     _require_access_control()
     try:
@@ -1101,10 +1095,7 @@ def access_roles():
         abort(500, str(err))
 
 
-@permission_required(
-    ("admin/access-control", "edit", "*"),
-    legacy_action="roles-manage",
-)
+@permission_required(("admin/access-control", "edit", "*"))
 def create_access_role():
     _require_access_control()
     role = _role_payload()
@@ -1123,10 +1114,7 @@ def create_access_role():
         abort(500, str(err))
 
 
-@permission_required(
-    ("admin/access-control", "edit", "*"),
-    legacy_action="roles-manage",
-)
+@permission_required(("admin/access-control", "edit", "*"))
 def update_access_role(role_id: int):
     _require_access_control()
     role = _role_payload()
@@ -1149,10 +1137,7 @@ def update_access_role(role_id: int):
     return jsonify(updated)
 
 
-@permission_required(
-    ("admin/access-control", "delete", "*"),
-    legacy_action="roles-manage",
-)
+@permission_required(("admin/access-control", "delete", "*"))
 def delete_access_role(role_id: int):
     _require_access_control()
     try:
@@ -1165,10 +1150,7 @@ def delete_access_role(role_id: int):
     return jsonify({"result": "Role deleted"})
 
 
-@permission_required(
-    ("admin/access-control", "view", "*"),
-    legacy_action="roles-view",
-)
+@permission_required(("admin/access-control", "view", "*"))
 def access_users():
     _require_access_control()
     username, page, page_size = _access_page_args()
@@ -1185,10 +1167,7 @@ def access_users():
         abort(500, str(err))
 
 
-@permission_required(
-    ("admin/access-control", "view", "*"),
-    legacy_action="roles-view",
-)
+@permission_required(("admin/access-control", "view", "*"))
 def access_user_roles(username: str):
     _require_access_control()
     try:
@@ -1201,10 +1180,7 @@ def access_user_roles(username: str):
     return jsonify(details)
 
 
-@permission_required(
-    ("admin/access-control", "edit", "*"),
-    legacy_action="roles-manage",
-)
+@permission_required(("admin/access-control", "edit", "*"))
 def update_access_user_roles(username: str):
     _require_access_control()
     payload = request.get_json(silent=True) or {}
@@ -1225,13 +1201,13 @@ def update_access_user_roles(username: str):
     return jsonify(details)
 
 
-@permission_required(("admin/ai", "view", "*"), legacy_action="view-ai")
+@permission_required(("admin/ai", "view", "*"))
 def ai_configs():
     _require_ai()
     return jsonify({"items": current_app.ai_service.list_configs()})
 
 
-@permission_required(("admin/ai", "edit", "*"), legacy_action="manage-ai")
+@permission_required(("admin/ai", "edit", "*"))
 def create_ai_config():
     _require_ai()
     payload, _ = _ai_model_payload()
@@ -1245,7 +1221,7 @@ def create_ai_config():
         abort(500, str(err))
 
 
-@permission_required(("admin/ai", "edit", "*"), legacy_action="manage-ai")
+@permission_required(("admin/ai", "edit", "*"))
 def update_ai_config(config_id: int):
     _require_ai()
     payload, _ = _ai_model_payload()
@@ -1261,7 +1237,7 @@ def update_ai_config(config_id: int):
     return jsonify(updated)
 
 
-@permission_required(("admin/ai", "delete", "*"), legacy_action="manage-ai")
+@permission_required(("admin/ai", "delete", "*"))
 def delete_ai_config(config_id: int):
     _require_ai()
     try:
@@ -1274,7 +1250,7 @@ def delete_ai_config(config_id: int):
     return jsonify({"result": "AI model config deleted"})
 
 
-@permission_required(("admin/ai", "edit", "*"), legacy_action="manage-ai")
+@permission_required(("admin/ai", "edit", "*"))
 def validate_ai_config(config_id: int):
     _require_ai()
     try:
@@ -1289,7 +1265,7 @@ def validate_ai_config(config_id: int):
     return jsonify(result)
 
 
-@permission_required(("ai", "view", "*"), legacy_action="view-ai")
+@permission_required(("ai", "view", "*"))
 def ai_chat_stream():
     _require_ai()
     payload = request.get_json(silent=True) or {}
@@ -1310,7 +1286,7 @@ def ai_chat_stream():
     )
 
 
-@permission_required(("ai", "view", "*"), legacy_action="view-ai")
+@permission_required(("ai", "view", "*"))
 def ai_conversations():
     _require_ai()
     try:
@@ -1320,7 +1296,7 @@ def ai_conversations():
         abort(500, str(err))
 
 
-@permission_required(("ai", "view", "*"), legacy_action="view-ai")
+@permission_required(("ai", "view", "*"))
 def ai_conversation_detail(conversation_id: int):
     _require_ai()
     try:

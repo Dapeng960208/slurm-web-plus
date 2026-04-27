@@ -26,9 +26,9 @@ AI 当前按数据库能力自动启用：
 
 说明：
 
-- 旧 `ai.enabled` 仅保留兼容占位定义，不再作为实际业务语义来源。
+- `ai.enabled` 已从 Agent 配置契约中删除。
 - 数据库不可用时，AI 不会对外暴露能力。
-- 如果站点配置里显式写了 `[ai] enabled = yes`，但数据库初始化失败，Agent 会额外输出 “AI assistant is enabled but database support is unavailable” 告警，便于排障。
+- AI 能否启用只取决于数据库、模型配置存储和会话存储是否成功初始化。
 
 ## 3. 权限要求
 
@@ -40,11 +40,12 @@ AI 当前按数据库能力自动启用：
 | `/:cluster/admin/ai` 查看 | `admin/ai:view:*` |
 | `/:cluster/admin/ai` 新增/修改 | `admin/ai:edit:*` |
 | `/:cluster/admin/ai` 删除 | `admin/ai:delete:*` |
+| 拥有 `*:*:*` 的 super-admin | 自动满足以上全部权限 |
 
-旧权限兼容：
+收口说明：
 
-- `view-ai` -> `ai:view:*` + `admin/ai:view:*`
-- `manage-ai` -> `admin/ai:view:*` + `admin/ai:edit:*` + `admin/ai:delete:*`
+- `view-ai` 与 `manage-ai` 已不再作为可配置动作入口，也不会再出现在 `/permissions.actions` 或角色页兼容动作列表中。
+- `admin-manage` 只是 `*:*:*` 的兼容别名，不是 AI 专属权限。
 
 由于 `edit` 自动满足 `view`，只有编辑权限的用户仍可打开设置页。
 

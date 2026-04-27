@@ -55,7 +55,7 @@ type PermissionScope = '*' | 'self'
 
 const LEGACY_PERMISSION_RULES: Record<string, string[]> = {
   'view-stats': ['dashboard:view:*', 'analysis:view:*'],
-  'view-jobs': ['jobs:view:*', 'jobs:view:self', 'user/analysis:view:self'],
+  'view-jobs': ['jobs:view:*'],
   'view-history-jobs': ['jobs-history:view:*'],
   'view-nodes': ['resources:view:*'],
   'view-qos': ['qos:view:*', 'jobs/filter-qos:view:*'],
@@ -63,30 +63,9 @@ const LEGACY_PERMISSION_RULES: Record<string, string[]> = {
   'associations-view': ['accounts:view:*', 'user/profile:view:*'],
   'view-accounts': ['jobs/filter-accounts:view:*'],
   'view-partitions': ['jobs/filter-partitions:view:*', 'resources/filter-partitions:view:*'],
-  'view-own-jobs': ['jobs:view:self', 'user/analysis:view:self'],
-  'edit-own-jobs': ['jobs:edit:self'],
-  'cancel-own-jobs': ['jobs:delete:self'],
   'cache-view': ['admin/cache:view:*', 'admin/ldap-cache:view:*'],
   'cache-reset': ['admin/cache:edit:*'],
-  'roles-view': ['admin/access-control:view:*'],
-  'roles-manage': ['admin/access-control:edit:*', 'admin/access-control:delete:*'],
-  'view-ai': ['ai:view:*', 'admin/ai:view:*'],
-  'manage-ai': ['admin/ai:view:*', 'admin/ai:edit:*', 'admin/ai:delete:*'],
-  'admin-manage': [
-    'admin/system:view:*',
-    'admin/system:edit:*',
-    'admin/system:delete:*',
-    'admin/ai:view:*',
-    'admin/ai:edit:*',
-    'admin/ai:delete:*',
-    'admin/access-control:view:*',
-    'admin/access-control:edit:*',
-    'admin/access-control:delete:*',
-    'admin/cache:view:*',
-    'admin/cache:edit:*',
-    'admin/ldap-cache:view:*',
-    'admin/ldap-cache:edit:*'
-  ]
+  'admin-manage': ['*:*:*']
 }
 
 function operationAllows(granted: PermissionOperation, requested: PermissionOperation): boolean {

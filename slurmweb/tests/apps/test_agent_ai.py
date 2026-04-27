@@ -35,18 +35,6 @@ class TestAgentAIApp(TestAgentBase):
         mock_ai_service.assert_called_once()
         self.assertTrue(self.app.ai_enabled)
 
-    @mock.patch("slurmweb.persistence.users_store.UsersStore")
-    def test_app_warns_when_ai_database_support_missing(self, mock_users_store):
-        mock_users_store.return_value.validate_connection.side_effect = RuntimeError("boom")
-
-        with self.assertLogs("slurmweb", level="WARNING") as cm:
-            self.setup_client(database=True, ai_enabled=True)
-
-        self.assertIn(
-            "WARNING:slurmweb.apps.agent:AI assistant is enabled but database support is unavailable: boom",
-            cm.output,
-        )
-
     def test_ai_encryption_key_derivation_is_stable_and_usable(self):
         derived = derive_ai_encryption_key(b"jwt-signing-key")
         self.assertEqual(derived, derive_ai_encryption_key(b"jwt-signing-key"))

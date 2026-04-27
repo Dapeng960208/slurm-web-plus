@@ -26,7 +26,7 @@ describe('views/AssistantView.vue', () => {
     useRuntimeStore().availableClusters = [
       {
         name: 'foo',
-        permissions: { roles: [], actions: ['view-ai', 'manage-ai'] },
+        permissions: { roles: [], actions: [], rules: ['ai:view:*', 'admin/ai:view:*', 'admin/ai:edit:*'] },
         capabilities: {
           ai: {
             enabled: true,

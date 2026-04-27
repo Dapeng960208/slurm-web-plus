@@ -17,7 +17,7 @@
 - `default_seed_roles()` 中 `user` 不包含 `admin/*`
 - `default_seed_roles()` 中 `admin` 只包含 `*:view:*` 与 `*:edit:*`
 - `default_seed_roles()` 中 `admin` 不包含 `*:delete:*`
-- `admin-manage` 放行全部 `admin/*`，但不自动放行独立 `ai:view:*`
+- `admin-manage` 等价于 `*:*:*`，仅作为 `super-admin` 兼容别名保留
 
 对应重点：
 
@@ -70,7 +70,8 @@
 - `admin-ldap-cache`
 - 旧 `settings/*` 管理路由重定向到 `admin/*`
 - 主菜单 `Admin` 入口只在具备任一 `admin/*:view:*` 时显示
-- 主菜单 `Admin` 入口在仅拥有 `admin-manage` 时也显示
+- 主菜单 `Admin` 入口在拥有 `admin-manage`（即 `*:*:*`）时也显示
+- 角色页不再展示 `view-own-jobs`、`edit-own-jobs`、`cancel-own-jobs`、`roles-view`、`roles-manage`、`view-ai`、`manage-ai`
 
 对应重点：
 

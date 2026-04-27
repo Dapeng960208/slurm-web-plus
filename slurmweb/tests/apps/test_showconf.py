@@ -5,6 +5,7 @@
 # SPDX-License-Identifier: MIT
 
 import io
+import os
 import tempfile
 from unittest import mock
 from pathlib import Path
@@ -119,4 +120,33 @@ class TestShowConfApp(TestGatewayConfBase, TestAgentConfBase):
                 "CRITICAL:slurmweb.apps.showconf:Parameter [agents]>url is missing "
                 "but required in settings overrides"
             ],
+        )
+
+    def test_setup_gateway_defs_with_agent_conf_reports_mismatch_hint(self):
+        self.setup_agent_conf()
+        app = SlurmwebAppShowConf(
+            SlurmwebAppSeed.with_parameters(
+                debug=False,
+                log_flags=["ALL"],
+                log_component=None,
+                debug_flags=[],
+                conf_defs=os.path.join(
+                    os.path.dirname(self.conf_defs),
+                    "gateway.yml",
+                ),
+                conf=self.conf.name,
+                component="gateway",
+            )
+        )
+        with self.assertRaisesRegex(SystemExit, "1"):
+            with self.assertLogs("slurmweb", level="CRITICAL") as cm:
+                app.run()
+        self.assertEqual(len(cm.output), 1)
+        self.assertIn(
+            "Parameter cluster loaded in settings overrides is not defined in section service of settings definition",
+            cm.output[0],
+        )
+        self.assertIn(
+            "This usually means the gateway settings definition",
+            cm.output[0],
         )

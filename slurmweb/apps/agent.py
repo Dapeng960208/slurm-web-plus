@@ -7,7 +7,6 @@
 import sys
 import urllib
 import logging
-import configparser
 from types import SimpleNamespace
 from datetime import datetime, timezone
 
@@ -251,28 +250,6 @@ class SlurmwebAppAgent(SlurmwebWebApp, RFLTokenizedRBACWebApp):
         ),
     }
 
-    def _raw_site_config_requests_ai(self) -> bool:
-        parser = configparser.ConfigParser()
-        try:
-            parser.read(self.site_configuration_path, encoding="utf-8")
-        except OSError as err:
-            logger.debug(
-                "Unable to inspect site configuration %s for AI flag: %s",
-                self.site_configuration_path,
-                err,
-            )
-            return False
-
-        if not parser.has_option("ai", "enabled"):
-            return False
-
-        return parser.get("ai", "enabled").strip().lower() in {
-            "1",
-            "true",
-            "yes",
-            "on",
-        }
-
     def __init__(self, seed):
         SlurmwebWebApp.__init__(self, seed)
 
@@ -444,6 +421,7 @@ class SlurmwebAppAgent(SlurmwebWebApp, RFLTokenizedRBACWebApp):
                     legacy_permission_map=self.policy.legacy_permission_map,
                 )
                 self.access_control_store.validate_connection()
+                self.access_control_store.normalize_legacy_role_actions()
                 self.access_control_store.seed_default_roles()
                 self.access_control_enabled = True
                 logger.info("Access control support enabled")
@@ -547,13 +525,7 @@ class SlurmwebAppAgent(SlurmwebWebApp, RFLTokenizedRBACWebApp):
             except Exception as err:
                 logger.warning("Unable to initialize AI assistant support: %s", err)
         else:
-            if self._raw_site_config_requests_ai() and database_error is not None:
-                logger.warning(
-                    "AI assistant is enabled but database support is unavailable: %s",
-                    database_error,
-                )
-            else:
-                logger.debug("AI assistant is disabled")
+            logger.debug("AI assistant is disabled")
 
     def _refresh_cached_policy_snapshots_on_startup(self):
         if not self.access_control_enabled:

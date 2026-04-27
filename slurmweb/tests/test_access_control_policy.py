@@ -17,9 +17,7 @@ class _FakeFilePolicy:
     def __init__(self):
         self.allow_anonymous = False
         self.loader = SimpleNamespace(
-            definition=SimpleNamespace(
-                actions={"view-jobs", "roles-view", "admin-manage", "edit-own-jobs"}
-            )
+            definition=SimpleNamespace(actions={"view-jobs", "admin-manage"})
         )
 
     def roles_actions(self, user):
@@ -33,17 +31,6 @@ class _FakeFilePolicy:
 
 
 class TestAccessControlPolicy(unittest.TestCase):
-    def test_allowed_user_permission_supports_edit_own_jobs_legacy_action(self):
-        file_policy = _FakeFilePolicy()
-        file_policy.roles_actions = mock.Mock(return_value=({"user"}, {"edit-own-jobs"}))
-        manager = AccessControlPolicyManager(file_policy)
-        user = AuthenticatedUser(login="alice", fullname="Alice Doe", groups=["users"])
-
-        self.assertTrue(manager.allowed_user_permission(user, "jobs", "edit", "self"))
-        self.assertTrue(manager.allowed_user_permission(user, "jobs", "view", "self"))
-        self.assertFalse(manager.allowed_user_permission(user, "jobs", "delete", "self"))
-        self.assertFalse(manager.allowed_user_permission(user, "jobs", "edit", "*"))
-
     def test_allowed_user_permission_honors_jobs_self_scope(self):
         file_policy = _FakeFilePolicy()
         access_control_store = mock.Mock()
@@ -91,9 +78,9 @@ class TestAccessControlPolicy(unittest.TestCase):
             manager.allowed_user_permission(user, "admin/access-control", "delete", "*")
         )
         self.assertTrue(manager.allowed_user_permission(user, "admin/system", "delete", "*"))
-        self.assertFalse(manager.allowed_user_permission(user, "admin/cache", "delete", "*"))
-        self.assertFalse(manager.allowed_user_permission(user, "settings/cache", "view", "*"))
-        self.assertFalse(manager.allowed_user_permission(user, "jobs", "view", "*"))
+        self.assertTrue(manager.allowed_user_permission(user, "admin/cache", "delete", "*"))
+        self.assertTrue(manager.allowed_user_permission(user, "settings/cache", "view", "*"))
+        self.assertTrue(manager.allowed_user_permission(user, "jobs", "view", "*"))
 
     def test_allowed_user_permission_supports_global_admin_view_and_edit_without_delete(self):
         file_policy = _FakeFilePolicy()

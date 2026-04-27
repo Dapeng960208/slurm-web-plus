@@ -280,7 +280,7 @@ class TestGatewayViews(TestGatewayBase):
         self.app_set_agents({"foo": fake_slurmweb_agent("foo")})
         mock_proxy_agent.return_value = (
             self.app.response_class(
-                response='{"items":[{"id":1,"name":"db-admin","actions":["roles-manage"]}]}',
+                response='{"items":[{"id":1,"name":"db-admin","actions":["admin-manage"]}]}',
                 status=200,
                 mimetype="application/json",
             ),

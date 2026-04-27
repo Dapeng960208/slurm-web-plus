@@ -71,5 +71,6 @@
 
 补充说明：
 
-- 旧权限名如 `cache-view`、`roles-manage`、`admin-manage`、`edit-own-jobs`、`view-ai` 仍可通过内置映射自动转换为新规则。
-- 旧能力开关目前仅保留兼容占位定义，不再作为实际功能语义来源。
+- 旧动作兼容目前只保留 `cache-view`、`cache-reset` 与 `admin-manage`；其中 `admin-manage` 仅是 `*:*:*` 的兼容别名。
+- `view-own-jobs`、`edit-own-jobs`、`cancel-own-jobs`、`roles-view`、`roles-manage`、`view-ai`、`manage-ai` 已不再作为可配置权限入口。
+- Agent 配置中已移除 `persistence.enabled`、`persistence.access_control_enabled`、`user_metrics.enabled`、`node_metrics.enabled`、`ai.enabled`，能力只按基础依赖自动推导。

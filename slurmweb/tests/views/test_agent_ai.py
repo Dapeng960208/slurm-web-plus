@@ -20,6 +20,13 @@ class TestAgentAIViews(TestAgentBase):
         self.app.ai_enabled = True
         self.app.ai_service = mock.Mock()
 
+    def _enable_rules(self, *rules):
+        self.app.access_control_enabled = True
+        self.app.access_control_store = mock.Mock()
+        self.app.access_control_store.user_permissions.return_value = ([], [], list(rules))
+        self.app.policy._access_control_enabled = True
+        self.app.policy.set_access_control_store(self.app.access_control_store)
+
     def test_info_reports_ai_capabilities_when_disabled(self):
         response = self.client.get("/info")
 
@@ -60,6 +67,7 @@ class TestAgentAIViews(TestAgentBase):
 
     def test_ai_configs(self):
         self._enable_ai()
+        self._enable_rules("admin/ai:view:*")
         self.app.ai_service.list_configs.return_value = [
             {
                 "id": 3,
@@ -74,8 +82,7 @@ class TestAgentAIViews(TestAgentBase):
             }
         ]
 
-        with mock.patch.object(self.app.policy, "allowed_user_action", return_value=True):
-            response = self.client.get(f"/v{get_version()}/ai/configs")
+        response = self.client.get(f"/v{get_version()}/ai/configs")
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json["items"][0]["name"], "qwen-prod")
@@ -83,29 +90,28 @@ class TestAgentAIViews(TestAgentBase):
 
     def test_ai_configs_require_view_ai_permission(self):
         self._enable_ai()
-
-        with mock.patch.object(self.app.policy, "allowed_user_action", return_value=False):
-            response = self.client.get(f"/v{get_version()}/ai/configs")
+        self._enable_rules()
+        response = self.client.get(f"/v{get_version()}/ai/configs")
 
         self.assertEqual(response.status_code, 403)
 
     def test_create_ai_config_validation_error(self):
         self._enable_ai()
+        self._enable_rules("admin/ai:edit:*")
         self.app.ai_service.create_model_config.side_effect = AIProviderValidationError(
             "api_key is required"
         )
-
-        with mock.patch.object(self.app.policy, "allowed_user_action", return_value=True):
-            response = self.client.post(
-                f"/v{get_version()}/ai/configs",
-                json={"name": "qwen-prod", "provider": "qwen"},
-            )
+        response = self.client.post(
+            f"/v{get_version()}/ai/configs",
+            json={"name": "qwen-prod", "provider": "qwen"},
+        )
 
         self.assertEqual(response.status_code, 400)
         self.assertIn("api_key is required", response.get_data(as_text=True))
 
     def test_validate_ai_config(self):
         self._enable_ai()
+        self._enable_rules("admin/ai:edit:*")
         self.app.ai_service.validate_model_config.return_value = {
             "result": "ok",
             "provider": "qwen",
@@ -114,8 +120,7 @@ class TestAgentAIViews(TestAgentBase):
             "last_validated_at": "2026-04-24T00:00:00+00:00",
         }
 
-        with mock.patch.object(self.app.policy, "allowed_user_action", return_value=True):
-            response = self.client.post(f"/v{get_version()}/ai/configs/7/validate", json={})
+        response = self.client.post(f"/v{get_version()}/ai/configs/7/validate", json={})
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json["sample"], "PONG")
@@ -123,6 +128,7 @@ class TestAgentAIViews(TestAgentBase):
 
     def test_ai_chat_stream(self):
         self._enable_ai()
+        self._enable_rules("ai:view:*")
 
         def _generator():
             yield 'event: conversation\ndata: {"conversation_id": 11}\n\n'
@@ -131,11 +137,10 @@ class TestAgentAIViews(TestAgentBase):
 
         self.app.ai_service.stream_chat.return_value = _generator
 
-        with mock.patch.object(self.app.policy, "allowed_user_action", return_value=True):
-            response = self.client.post(
-                f"/v{get_version()}/ai/chat/stream",
-                json={"message": "hello"},
-            )
+        response = self.client.post(
+            f"/v{get_version()}/ai/chat/stream",
+            json={"message": "hello"},
+        )
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.mimetype, "text/event-stream")
@@ -148,10 +153,9 @@ class TestAgentAIViews(TestAgentBase):
 
     def test_ai_conversation_detail_not_found(self):
         self._enable_ai()
+        self._enable_rules("ai:view:*")
         self.app.ai_service.get_conversation_detail.return_value = None
-
-        with mock.patch.object(self.app.policy, "allowed_user_action", return_value=True):
-            response = self.client.get(f"/v{get_version()}/ai/conversations/42")
+        response = self.client.get(f"/v{get_version()}/ai/conversations/42")
 
         self.assertEqual(response.status_code, 404)
         self.assertEqual(response.json["description"], "AI conversation 42 not found")
@@ -159,9 +163,8 @@ class TestAgentAIViews(TestAgentBase):
     def test_ai_configs_fail_when_ai_disabled(self):
         self.app.ai_enabled = False
         self.app.ai_service = None
-
-        with mock.patch.object(self.app.policy, "allowed_user_action", return_value=True):
-            response = self.client.get(f"/v{get_version()}/ai/configs")
+        self._enable_rules("admin/ai:view:*")
+        response = self.client.get(f"/v{get_version()}/ai/configs")
 
         self.assertEqual(response.status_code, 501)
         self.assertEqual(response.json["description"], "AI assistant is disabled")

@@ -54,48 +54,17 @@ class TestPermissionRules(unittest.TestCase):
             DEFAULT_LEGACY_PERMISSION_MAP["cache-reset"],
             ["admin/cache:edit:*"],
         )
-        self.assertCountEqual(
-            DEFAULT_LEGACY_PERMISSION_MAP["roles-view"],
-            ["admin/access-control:view:*"],
-        )
-        self.assertCountEqual(
-            DEFAULT_LEGACY_PERMISSION_MAP["roles-manage"],
-            ["admin/access-control:edit:*", "admin/access-control:delete:*"],
-        )
-        self.assertCountEqual(
-            DEFAULT_LEGACY_PERMISSION_MAP["view-own-jobs"],
-            ["jobs:view:self", "user/analysis:view:self"],
-        )
-        self.assertCountEqual(
-            DEFAULT_LEGACY_PERMISSION_MAP["edit-own-jobs"],
-            ["jobs:edit:self"],
-        )
-        self.assertCountEqual(
-            DEFAULT_LEGACY_PERMISSION_MAP["cancel-own-jobs"],
-            ["jobs:delete:self"],
-        )
-        self.assertCountEqual(
-            DEFAULT_LEGACY_PERMISSION_MAP["manage-ai"],
-            ["admin/ai:view:*", "admin/ai:edit:*", "admin/ai:delete:*"],
-        )
-        self.assertCountEqual(
-            DEFAULT_LEGACY_PERMISSION_MAP["admin-manage"],
-            [
-                "admin/system:view:*",
-                "admin/system:edit:*",
-                "admin/system:delete:*",
-                "admin/ai:view:*",
-                "admin/ai:edit:*",
-                "admin/ai:delete:*",
-                "admin/access-control:view:*",
-                "admin/access-control:edit:*",
-                "admin/access-control:delete:*",
-                "admin/cache:view:*",
-                "admin/cache:edit:*",
-                "admin/ldap-cache:view:*",
-                "admin/ldap-cache:edit:*",
-            ],
-        )
+        for action in [
+            "view-own-jobs",
+            "edit-own-jobs",
+            "cancel-own-jobs",
+            "roles-view",
+            "roles-manage",
+            "view-ai",
+            "manage-ai",
+        ]:
+            self.assertNotIn(action, DEFAULT_LEGACY_PERMISSION_MAP)
+        self.assertCountEqual(DEFAULT_LEGACY_PERMISSION_MAP["admin-manage"], ["*:*:*"])
 
     def test_default_seed_roles_grant_jobs_self_to_user_and_global_read_edit_to_admin(self):
         roles = {role["name"]: set(role["permissions"]) for role in default_seed_roles()}
@@ -103,7 +72,9 @@ class TestPermissionRules(unittest.TestCase):
         self.assertIn("jobs:view:self", roles["user"])
         self.assertIn("jobs:edit:self", roles["user"])
         self.assertIn("jobs:delete:self", roles["user"])
+        self.assertIn("user/analysis:view:self", roles["user"])
         self.assertNotIn("jobs:view:*", roles["user"])
+        self.assertNotIn("ai:view:*", roles["user"])
         self.assertNotIn("resources:edit:*", roles["user"])
         self.assertNotIn("accounts:delete:*", roles["user"])
         self.assertNotIn("admin/system:view:*", roles["user"])
@@ -113,13 +84,19 @@ class TestPermissionRules(unittest.TestCase):
         self.assertEqual(roles["admin"], {"*:view:*", "*:edit:*"})
         self.assertNotIn("*:delete:*", roles["admin"])
 
-    def test_permission_rules_to_legacy_actions_exposes_admin_manage_for_admin_rules(self):
+    def test_permission_rules_to_legacy_actions_exposes_admin_manage_only_for_super_admin_rules(self):
         actions = permission_rules_to_legacy_actions(
             ["*:view:*", "*:edit:*"],
             DEFAULT_LEGACY_PERMISSION_MAP,
         )
 
-        self.assertIn("admin-manage", actions)
+        self.assertNotIn("admin-manage", actions)
+
+        super_admin_actions = permission_rules_to_legacy_actions(
+            ["*:*:*"],
+            DEFAULT_LEGACY_PERMISSION_MAP,
+        )
+        self.assertIn("admin-manage", super_admin_actions)
 
     def test_permission_rules_allow_self_scope_only_for_matching_scope(self):
         self.assertTrue(permission_rules_allow(["jobs:view:self"], "jobs", "view", "self"))

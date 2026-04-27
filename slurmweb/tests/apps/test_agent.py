@@ -113,6 +113,7 @@ class TestAgentApp(TestAgentBase):
         mock_users_store.assert_called_once()
         mock_access_control_store.assert_called_once()
         mock_access_control_store.return_value.validate_connection.assert_called_once()
+        mock_access_control_store.return_value.normalize_legacy_role_actions.assert_called_once()
         mock_users_store.return_value.list_cached_users_for_policy_refresh.assert_called_once_with()
         self.assertTrue(self.app.access_control_enabled)
 
@@ -157,6 +158,7 @@ class TestAgentApp(TestAgentBase):
         self.setup_client(database=True, persistence=True, access_control_enabled=False)
 
         mock_access_control_store.assert_called_once()
+        mock_access_control_store.return_value.normalize_legacy_role_actions.assert_called_once()
         mock_access_control_store.return_value.seed_default_roles.assert_called_once()
         mock_users_store.return_value.list_cached_users_for_policy_refresh.assert_called_once_with()
 

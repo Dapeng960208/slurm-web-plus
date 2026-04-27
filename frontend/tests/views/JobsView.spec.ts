@@ -136,14 +136,14 @@ describe('JobsView.vue', () => {
     expect(wrapper.findAll('[data-testid="table-skeleton-row"]').length).toBeGreaterThan(0)
   })
 
-  test('shows edit and cancel only for own jobs when a regular user has self-scoped job actions', () => {
+  test('shows edit and cancel only for own jobs when a regular user has self-scoped job rules', () => {
     useRuntimeStore().availableClusters = [
       {
         name: 'foo',
         permissions: {
           roles: [],
-          actions: ['view-own-jobs', 'edit-own-jobs', 'cancel-own-jobs'],
-          rules: []
+          actions: [],
+          rules: ['jobs:view:self', 'jobs:edit:self', 'jobs:delete:self']
         },
         racksdb: true,
         infrastructure: 'foo',

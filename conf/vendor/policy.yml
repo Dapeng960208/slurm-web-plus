@@ -5,13 +5,6 @@ actions:
   view-jobs: |
     Get _Jobs_ entry in main menu and permission to view all users jobs in
     queue and all jobs details.
-  view-own-jobs: |
-    Get _Jobs_ entry in main menu and permission to view only the current
-    authenticated user's jobs and self-scoped job analytics.
-  edit-own-jobs: |
-    Permission to update only the current authenticated user's jobs.
-  cancel-own-jobs: |
-    Permission to cancel only the current authenticated user's jobs.
   view-nodes: |
     Get _Resources_ entry in main menu and permission to view the list of
     compute nodes in cluster with their status in Slurm.
@@ -34,16 +27,6 @@ actions:
   view-history-jobs: |
     Get _Jobs History_ entry in main menu and permission to view persisted
     historical jobs and their details.
-  roles-view: |
-    Access to view access control roles, assignments and permission sources.
-  roles-manage: |
-    Create, update and delete access control roles and user role assignments.
-  view-ai: |
-    Get _AI_ entry in main menu and permission to use the cluster AI assistant,
-    browse available models and read own AI conversations.
-  manage-ai: |
-    Access cluster admin AI settings to view, manage and delete model
-    configurations for the current cluster.
   admin-manage: |
-    Access all cluster-scoped admin routes under `/:cluster/admin`, including
-    system, AI, cache, LDAP cache and access control management surfaces.
+    Compatibility alias for `*:*:*` super-admin access across all routes,
+    settings and cluster-scoped resources.

@@ -12,7 +12,7 @@
 - `user_metrics`
 - `user_analytics`
 
-旧 `persistence.enabled` 与 `user_metrics.enabled` 不再作为新的业务语义来源。
+`persistence.enabled` 与 `user_metrics.enabled` 已从 Agent 配置契约中删除，用户分析能力只按数据库 + metrics 自动推导。
 
 ## 2. 数据来源
 

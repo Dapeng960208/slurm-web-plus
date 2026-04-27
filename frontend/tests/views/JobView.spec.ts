@@ -126,14 +126,14 @@ describe('JobView.vue', () => {
     expect(wrapper.findComponent(PanelSkeleton).exists()).toBe(true)
   })
 
-  test('shows edit and cancel for the owner with self-scoped job actions', () => {
+  test('shows edit and cancel for the owner with self-scoped job rules', () => {
     useRuntimeStore().availableClusters = [
       {
         name: 'foo',
         permissions: {
           roles: [],
-          actions: ['view-own-jobs', 'edit-own-jobs', 'cancel-own-jobs'],
-          rules: []
+          actions: [],
+          rules: ['jobs:view:self', 'jobs:edit:self', 'jobs:delete:self']
         },
         racksdb: true,
         infrastructure: 'foo',
@@ -164,8 +164,8 @@ describe('JobView.vue', () => {
         name: 'foo',
         permissions: {
           roles: [],
-          actions: ['view-own-jobs', 'edit-own-jobs', 'cancel-own-jobs'],
-          rules: []
+          actions: [],
+          rules: ['jobs:view:self', 'jobs:edit:self', 'jobs:delete:self']
         },
         racksdb: true,
         infrastructure: 'foo',

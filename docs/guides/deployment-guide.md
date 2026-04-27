@@ -73,10 +73,7 @@ retention_days = 180
 
 ### 3.3 访问控制（自定义角色）
 
-```ini
-[persistence]
-access_control_enabled = yes
-```
+访问控制不再有独立 feature flag；数据库可用后会自动启用。
 
 依赖：
 
@@ -91,7 +88,6 @@ access_control_enabled = yes
 
 ```ini
 [user_metrics]
-enabled = yes
 aggregation_interval = 3600
 # tool_mapping_file = /etc/slurm-web/user-tools.yml
 ```
@@ -111,7 +107,9 @@ aggregation_interval = 3600
 
 ```ini
 [ai]
-enabled = yes
+max_rounds = 4
+max_history_messages = 24
+stream_chunk_size = 32
 ```
 
 依赖（当前实现事实）：
@@ -123,14 +121,13 @@ enabled = yes
 
 - Agent `/info` 中 `ai.enabled = true` 且 `capabilities.ai.enabled = true`
 - 前端 AI 菜单/设置页受 capability + 权限门控：
-  - `view-ai`：进入 `/:cluster/ai`
-  - `manage-ai`：进入 `/:cluster/admin/ai`
+  - `ai:view:*`：进入 `/:cluster/ai`
+  - `admin/ai:view:*` / `admin/ai:edit:*`：进入 `/:cluster/admin/ai`
 
 ### 3.6 节点指标（node_metrics）
 
 ```ini
 [node_metrics]
-enabled = yes
 prometheus_host = http://prometheus:9090
 node_exporter_job = node-exporter
 node_hostname_label = instance
@@ -173,11 +170,9 @@ node_hostname_label = instance
 
 只回滚开关（最推荐的“快速止血”）：
 
-- 历史作业：`[persistence] enabled = no`
-- 访问控制：`[persistence] access_control_enabled = no`
-- 用户分析：`[user_metrics] enabled = no`
-- AI：`[ai] enabled = no`
-- 节点指标：`[node_metrics] enabled = no`
+- 历史作业 / 访问控制 / AI：`[database] enabled = no`
+- 用户分析：去掉 `[user_metrics]` 段或停用 `[metrics] enabled`
+- 节点指标：去掉 `node_metrics.prometheus_host`
 
 回滚数据库 schema（高风险）：
 
