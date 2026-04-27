@@ -101,7 +101,7 @@ aggregation_interval = 3600
 验证点：
 
 - Agent `/info` 中 `user_metrics` 为 `true`
-- `GET /api/agents/<cluster>/user/<username>/activity/summary` 可用
+- `GET /api/agents/<cluster>/user/<username>/tools/analysis?start=<iso>&end=<iso>` 可用
 
 ### 3.5 AI 集群助手（ai）
 

@@ -155,6 +155,11 @@ class TestAgentMetricsRequest(TestAgentBase):
         self.app.user_metrics_store = mock.Mock()
         self._enable_custom_rules("user/analysis:view:self")
         self.app.user_metrics_store.user_metrics_history.return_value = {
+            "window": {
+                "start": "2026-04-24T00:00:00+00:00",
+                "end": "2026-04-24T01:00:00+00:00",
+            },
+            "totals": {"submitted_jobs": 2, "completed_jobs": 1},
             "submissions": [[1713956400000, 2]],
             "completions": [[1713956400000, 1]],
         }
@@ -167,33 +172,60 @@ class TestAgentMetricsRequest(TestAgentBase):
         self.assertEqual(
             response.json,
             {
+                "window": {
+                    "start": "2026-04-24T00:00:00+00:00",
+                    "end": "2026-04-24T01:00:00+00:00",
+                },
+                "totals": {"submitted_jobs": 2, "completed_jobs": 1},
                 "submissions": [[1713956400000, 2]],
                 "completions": [[1713956400000, 1]],
             },
         )
         self.app.user_metrics_store.user_metrics_history.assert_called_once_with(
-            self.user.login, "hour"
+            self.user.login,
+            "hour",
+            start_time=None,
+            end_time=None,
         )
 
-    def test_request_user_activity_summary(self):
+    def test_request_user_tools_analysis(self):
         self.app.user_metrics_enabled = True
         self.app.user_metrics_store = mock.Mock()
         self._enable_custom_rules("user/analysis:view:self")
-        self.app.user_metrics_store.user_activity_summary.return_value = {
+        self.app.user_metrics_store.user_tool_analysis.return_value = {
             "username": "alice",
             "profile": {"fullname": "Alice Doe", "groups": [], "ldap_synced_at": None, "ldap_found": True},
             "generated_at": "2026-04-24T00:00:00+00:00",
-            "totals": {"submitted_jobs_today": 3},
+            "window": {
+                "start": "2026-04-24T00:00:00+00:00",
+                "end": "2026-04-24T12:00:00+00:00",
+            },
+            "totals": {"completed_jobs": 3, "active_tools": 1, "avg_max_memory_mb": None, "avg_cpu_cores": None, "avg_runtime_seconds": None, "busiest_tool": None, "busiest_tool_jobs": 0},
             "tool_breakdown": [],
         }
 
         response = self.client.get(
-            f"/v{get_version()}/user/{self.user.login}/activity/summary"
+            f"/v{get_version()}/user/{self.user.login}/tools/analysis?start=2026-04-24T00:00:00Z&end=2026-04-24T12:00:00Z"
         )
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json["username"], "alice")
-        self.assertEqual(response.json["totals"]["submitted_jobs_today"], 3)
+        self.assertEqual(response.json["totals"]["completed_jobs"], 3)
+
+    def test_request_user_tools_analysis_missing_window(self):
+        self.app.user_metrics_enabled = True
+        self.app.user_metrics_store = mock.Mock()
+        self._enable_custom_rules("user/analysis:view:self")
+
+        response = self.client.get(
+            f"/v{get_version()}/user/{self.user.login}/tools/analysis"
+        )
+
+        self.assertEqual(response.status_code, 400)
+        if response.json is not None:
+            self.assertEqual(response.json["description"], "start and end must both be provided")
+        else:
+            self.assertIn("start and end must both be provided", response.text)
 
     def test_request_metrics_nodes_denied(self):
         with RemoveActionInPolicy(self.app.policy, "user", "view-nodes"):
@@ -424,6 +456,11 @@ class TestAgentUserMetricsRequests(TestAgentBase):
         self.app.user_metrics_store = mock.Mock()
         self._enable_custom_rules("user/analysis:view:self")
         self.app.user_metrics_store.user_metrics_history.return_value = {
+            "window": {
+                "start": "2026-04-24T00:00:00+00:00",
+                "end": "2026-04-24T01:00:00+00:00",
+            },
+            "totals": {"submitted_jobs": 2, "completed_jobs": 1},
             "submissions": [[1713956400000, 2]],
             "completions": [[1713956400000, 1]],
         }
@@ -436,13 +473,44 @@ class TestAgentUserMetricsRequests(TestAgentBase):
         self.assertEqual(
             response.json,
             {
+                "window": {
+                    "start": "2026-04-24T00:00:00+00:00",
+                    "end": "2026-04-24T01:00:00+00:00",
+                },
+                "totals": {"submitted_jobs": 2, "completed_jobs": 1},
                 "submissions": [[1713956400000, 2]],
                 "completions": [[1713956400000, 1]],
             },
         )
         self.app.user_metrics_store.user_metrics_history.assert_called_once_with(
-            self.user.login, "hour"
+            self.user.login,
+            "hour",
+            start_time=None,
+            end_time=None,
         )
+
+    def test_request_user_metrics_history_with_start_end(self):
+        self.app.user_metrics_enabled = True
+        self.app.user_metrics_store = mock.Mock()
+        self._enable_custom_rules("user/analysis:view:self")
+        self.app.user_metrics_store.user_metrics_history.return_value = {
+            "window": {
+                "start": "2026-04-24T00:00:00+00:00",
+                "end": "2026-04-24T12:00:00+00:00",
+            },
+            "totals": {"submitted_jobs": 3, "completed_jobs": 2},
+            "submissions": [[1713956400000, 3]],
+            "completions": [[1713956400000, 2]],
+        }
+
+        response = self.client.get(
+            f"/v{get_version()}/user/{self.user.login}/metrics/history?start=2026-04-24T00:00:00Z&end=2026-04-24T12:00:00Z"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        _, kwargs = self.app.user_metrics_store.user_metrics_history.call_args
+        self.assertEqual(kwargs["start_time"].isoformat(), "2026-04-24T00:00:00+00:00")
+        self.assertEqual(kwargs["end_time"].isoformat(), "2026-04-24T12:00:00+00:00")
 
     def test_request_user_metrics_history_invalid_range(self):
         self.app.user_metrics_enabled = True
@@ -472,14 +540,14 @@ class TestAgentUserMetricsRequests(TestAgentBase):
         self.assertEqual(
             cm.output,
             [
-                f"WARNING:slurmweb.views.agent:Unsupported user metrics history range for {self.user.login}: Unsupported metric range month"
+                f"WARNING:slurmweb.views.agent:Invalid user metrics history query for {self.user.login}: Unsupported metric range month"
             ],
         )
 
-    def test_request_user_activity_summary_disabled(self):
+    def test_request_user_tools_analysis_disabled(self):
         self._enable_custom_rules("user/analysis:view:self")
         response = self.client.get(
-            f"/v{get_version()}/user/{self.user.login}/activity/summary"
+            f"/v{get_version()}/user/{self.user.login}/tools/analysis"
         )
         self.assertEqual(response.status_code, 501)
         self.assertEqual(
@@ -491,11 +559,11 @@ class TestAgentUserMetricsRequests(TestAgentBase):
             },
         )
 
-    def test_request_user_activity_summary(self):
+    def test_request_user_tools_analysis(self):
         self.app.user_metrics_enabled = True
         self.app.user_metrics_store = mock.Mock()
         self._enable_custom_rules("user/analysis:view:self")
-        self.app.user_metrics_store.user_activity_summary.return_value = {
+        self.app.user_metrics_store.user_tool_analysis.return_value = {
             "username": "alice",
             "profile": {
                 "fullname": "Alice Doe",
@@ -504,11 +572,13 @@ class TestAgentUserMetricsRequests(TestAgentBase):
                 "ldap_found": True,
             },
             "generated_at": "2026-04-24T10:00:00+00:00",
+            "window": {
+                "start": "2026-04-24T00:00:00+00:00",
+                "end": "2026-04-24T12:00:00+00:00",
+            },
             "totals": {
-                "submitted_jobs_today": 3,
-                "completed_jobs_today": 2,
+                "completed_jobs": 2,
                 "active_tools": 1,
-                "latest_submissions_per_minute": 1,
                 "avg_max_memory_mb": 2048,
                 "avg_cpu_cores": 4,
                 "avg_runtime_seconds": 600,
@@ -519,27 +589,49 @@ class TestAgentUserMetricsRequests(TestAgentBase):
         }
 
         response = self.client.get(
-            f"/v{get_version()}/user/{self.user.login}/activity/summary"
+            f"/v{get_version()}/user/{self.user.login}/tools/analysis?start=2026-04-24T00:00:00Z&end=2026-04-24T12:00:00Z"
         )
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json["username"], "alice")
-        self.assertEqual(response.json["totals"]["submitted_jobs_today"], 3)
-        self.app.user_metrics_store.user_activity_summary.assert_called_once_with(
-            self.user.login
-        )
+        self.assertEqual(response.json["totals"]["completed_jobs"], 2)
+        _, kwargs = self.app.user_metrics_store.user_tool_analysis.call_args
+        self.assertEqual(kwargs["start_time"].isoformat(), "2026-04-24T00:00:00+00:00")
+        self.assertEqual(kwargs["end_time"].isoformat(), "2026-04-24T12:00:00+00:00")
 
-    def test_request_user_activity_summary_error(self):
+    def test_request_user_tools_analysis_invalid_window(self):
         self.app.user_metrics_enabled = True
         self.app.user_metrics_store = mock.Mock()
         self._enable_custom_rules("user/analysis:view:self")
-        self.app.user_metrics_store.user_activity_summary.side_effect = RuntimeError(
+
+        with self.assertLogs("slurmweb", level="WARNING") as cm:
+            response = self.client.get(
+                f"/v{get_version()}/user/{self.user.login}/tools/analysis?start=2026-04-24T12:00:00Z&end=2026-04-24T00:00:00Z"
+            )
+
+        self.assertEqual(response.status_code, 400)
+        if response.json is not None:
+            self.assertEqual(response.json["description"], "start must be earlier than end")
+        else:
+            self.assertIn("start must be earlier than end", response.text)
+        self.assertEqual(
+            cm.output,
+            [
+                f"WARNING:slurmweb.views.agent:Invalid user tools analysis query for {self.user.login}: start must be earlier than end"
+            ],
+        )
+
+    def test_request_user_tools_analysis_error(self):
+        self.app.user_metrics_enabled = True
+        self.app.user_metrics_store = mock.Mock()
+        self._enable_custom_rules("user/analysis:view:self")
+        self.app.user_metrics_store.user_tool_analysis.side_effect = RuntimeError(
             "boom"
         )
 
         with self.assertLogs("slurmweb", level="WARNING") as cm:
             response = self.client.get(
-                f"/v{get_version()}/user/{self.user.login}/activity/summary"
+                f"/v{get_version()}/user/{self.user.login}/tools/analysis?start=2026-04-24T00:00:00Z&end=2026-04-24T12:00:00Z"
             )
 
         self.assertEqual(response.status_code, 500)
@@ -554,6 +646,6 @@ class TestAgentUserMetricsRequests(TestAgentBase):
         self.assertEqual(
             cm.output,
             [
-                f"WARNING:slurmweb.views.agent:Unable to query user activity summary for {self.user.login}: boom"
+                f"WARNING:slurmweb.views.agent:Unable to query user tools analysis for {self.user.login}: boom"
             ],
         )

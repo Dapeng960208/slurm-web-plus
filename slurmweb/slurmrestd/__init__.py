@@ -557,24 +557,6 @@ class Slurmrestd:
     def qos_delete(self, qos_name: str):
         return self.request_json("DELETE", "slurmdb", f"qos/{qos_name}")
 
-    def wckeys(self):
-        return self._request("slurmdb", "wckeys", "wckeys")
-
-    def wckeys_update(self, payload: t.Dict[str, t.Any]):
-        return self.request_json("POST", "slurmdb", "wckeys", payload=payload)
-
-    def wckey_delete(self, wckey_id: str):
-        return self.request_json("DELETE", "slurmdb", f"wckey/{wckey_id}")
-
-    def clusters(self):
-        return self._request("slurmdb", "clusters", "clusters")
-
-    def clusters_update(self, payload: t.Dict[str, t.Any]):
-        return self.request_json("POST", "slurmdb", "clusters", payload=payload)
-
-    def cluster_delete(self, cluster_name: str):
-        return self.request_json("DELETE", "slurmdb", f"cluster/{cluster_name}")
-
     def licenses(self):
         return self._request("slurm", "licenses", "licenses")
 

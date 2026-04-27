@@ -139,11 +139,6 @@ class SlurmwebAppGateway(SlurmwebWebApp, RFLTokenizedWebApp):
         SlurmwebAppRoute("/api/agents/<cluster>/stats", views.stats),
         SlurmwebAppRoute("/api/agents/<cluster>/analysis/ping", views.analysis_ping),
         SlurmwebAppRoute("/api/agents/<cluster>/analysis/diag", views.analysis_diag),
-        SlurmwebAppRoute(
-            "/api/agents/<cluster>/admin/system/<path:query>",
-            views.admin_system_query,
-            methods=["GET", "POST"],
-        ),
         SlurmwebAppRoute("/api/agents/<cluster>/permissions", views.permissions),
         SlurmwebAppRoute("/api/agents/<cluster>/metrics/<metric>", views.metrics),
         SlurmwebAppRoute("/api/agents/<cluster>/cache/stats", views.cache_stats),
@@ -217,8 +212,8 @@ class SlurmwebAppGateway(SlurmwebWebApp, RFLTokenizedWebApp):
             views.user_metrics_history,
         ),
         SlurmwebAppRoute(
-            "/api/agents/<cluster>/user/<username>/activity/summary",
-            views.user_activity_summary,
+            "/api/agents/<cluster>/user/<username>/tools/analysis",
+            views.user_tools_analysis,
         ),
         SlurmwebAppRoute("/api/agents/<cluster>/jobs", views.jobs),
         SlurmwebAppRoute("/api/agents/<cluster>/job/<int:job>", views.job),
@@ -310,28 +305,6 @@ class SlurmwebAppGateway(SlurmwebWebApp, RFLTokenizedWebApp):
         SlurmwebAppRoute(
             "/api/agents/<cluster>/user/<name>/delete",
             views.user_delete,
-            methods=["DELETE"],
-        ),
-        SlurmwebAppRoute("/api/agents/<cluster>/wckeys", views.wckeys),
-        SlurmwebAppRoute(
-            "/api/agents/<cluster>/wckeys",
-            views.wckeys_update,
-            methods=["POST"],
-        ),
-        SlurmwebAppRoute(
-            "/api/agents/<cluster>/wckey/<wckey_id>/delete",
-            views.wckey_delete,
-            methods=["DELETE"],
-        ),
-        SlurmwebAppRoute("/api/agents/<cluster>/clusters", views.clusters_admin),
-        SlurmwebAppRoute(
-            "/api/agents/<cluster>/clusters",
-            views.clusters_update,
-            methods=["POST"],
-        ),
-        SlurmwebAppRoute(
-            "/api/agents/<cluster>/cluster/<name>/delete",
-            views.cluster_delete,
             methods=["DELETE"],
         ),
         SlurmwebAppRoute(

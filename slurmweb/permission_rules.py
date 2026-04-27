@@ -126,12 +126,6 @@ PERMISSION_CATALOG = [
                 "operations": ["view", "edit"],
                 "scopes": ["*"],
             },
-            {
-                "resource": "admin/system",
-                "label": "Admin / System",
-                "operations": ["view", "edit", "delete"],
-                "scopes": ["*"],
-            },
         ],
     },
     {

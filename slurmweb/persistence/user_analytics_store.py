@@ -223,7 +223,7 @@ def _aggregate_rows(rows, mapper=None):
 
     return {
         "totals": {
-            "completed_jobs_today": summary["jobs"],
+            "completed_jobs": summary["jobs"],
             "active_tools": len(tool_breakdown),
             "avg_max_memory_mb": _memory_mb(
                 _avg(summary["memory_total"], summary["memory_samples"])
@@ -301,17 +301,46 @@ class UserAnalyticsStore:
         finally:
             self._release_conn(conn)
 
-    def submission_timeline(self, username, range_name):
+    def _default_analysis_window(self):
+        now = _now_utc()
+        return now.replace(hour=0, minute=0, second=0, microsecond=0), now
+
+    def _resolve_history_window_and_bucket(
+        self, range_name=None, start_time=None, end_time=None
+    ):
+        if start_time is not None or end_time is not None:
+            if start_time is None or end_time is None:
+                raise ValueError("start and end must both be provided")
+            if start_time >= end_time:
+                raise ValueError("start must be earlier than end")
+            duration = end_time - start_time
+            if duration <= timedelta(hours=48):
+                return start_time, end_time, "hour", timedelta(hours=1)
+            if duration <= timedelta(days=62):
+                return start_time, end_time, "day", timedelta(days=1)
+            return start_time, end_time, "week", timedelta(days=7)
+
         bucket_map = {
             "hour": ("minute", timedelta(minutes=1)),
             "day": ("hour", timedelta(hours=1)),
             "week": ("day", timedelta(days=1)),
         }
+        range_name = range_name or "hour"
         if range_name not in bucket_map:
             raise ValueError(f"Unsupported metric range {range_name}")
         bucket_name, resolution = bucket_map[range_name]
         start_time = _now_utc() - _SUMMARY_RANGE_WINDOWS[range_name]
         end_time = _now_utc()
+        return start_time, end_time, bucket_name, resolution
+
+    def submission_timeline(self, username, range_name=None, start_time=None, end_time=None):
+        start_time, end_time, bucket_name, resolution = (
+            self._resolve_history_window_and_bucket(
+                range_name=range_name,
+                start_time=start_time,
+                end_time=end_time,
+            )
+        )
 
         conn = self._get_conn()
         try:
@@ -328,12 +357,13 @@ class UserAnalyticsStore:
                         INNER JOIN users u ON u.id = js.user_id
                         WHERE u.username = %s
                           AND js.submit_time >= %s
+                          AND js.submit_time <= %s
                         ORDER BY js.job_id, js.submit_time, js.last_seen DESC
                     ) submitted_jobs
                     GROUP BY bucket
                     ORDER BY bucket ASC
                     """,
-                    (bucket_name, username, start_time),
+                    (bucket_name, username, start_time, end_time),
                 )
                 rows = cur.fetchall()
         finally:
@@ -347,17 +377,14 @@ class UserAnalyticsStore:
             cursor += resolution
         return {"submissions": series}
 
-    def completion_timeline(self, username, range_name):
-        bucket_map = {
-            "hour": ("minute", timedelta(minutes=1)),
-            "day": ("hour", timedelta(hours=1)),
-            "week": ("day", timedelta(days=1)),
-        }
-        if range_name not in bucket_map:
-            raise ValueError(f"Unsupported metric range {range_name}")
-        bucket_name, resolution = bucket_map[range_name]
-        start_time = _now_utc() - _SUMMARY_RANGE_WINDOWS[range_name]
-        end_time = _now_utc()
+    def completion_timeline(self, username, range_name=None, start_time=None, end_time=None):
+        start_time, end_time, bucket_name, resolution = (
+            self._resolve_history_window_and_bucket(
+                range_name=range_name,
+                start_time=start_time,
+                end_time=end_time,
+            )
+        )
         terminal_params = [f"%{state}%" for state in TERMINAL_STATES]
         where_terminal = " OR ".join(["js.job_state LIKE %s"] * len(TERMINAL_STATES))
 
@@ -376,6 +403,7 @@ class UserAnalyticsStore:
                         INNER JOIN users u ON u.id = js.user_id
                         WHERE u.username = %s
                           AND COALESCE(js.end_time, js.last_seen) >= %s
+                          AND COALESCE(js.end_time, js.last_seen) <= %s
                           AND (
                     """
                     + where_terminal
@@ -386,7 +414,7 @@ class UserAnalyticsStore:
                     GROUP BY bucket
                     ORDER BY bucket ASC
                     """,
-                    [bucket_name, username, start_time] + terminal_params,
+                    [bucket_name, username, start_time, end_time] + terminal_params,
                 )
                 rows = cur.fetchall()
         finally:
@@ -400,24 +428,50 @@ class UserAnalyticsStore:
             cursor += resolution
         return {"completions": series}
 
-    def user_metrics_history(self, username, range_name):
+    def user_metrics_history(self, username, range_name=None, start_time=None, end_time=None):
+        start_time, end_time, _, _ = self._resolve_history_window_and_bucket(
+            range_name=range_name,
+            start_time=start_time,
+            end_time=end_time,
+        )
+        submissions = self.submission_timeline(
+            username,
+            range_name=range_name,
+            start_time=start_time,
+            end_time=end_time,
+        )["submissions"]
+        completions = self.completion_timeline(
+            username,
+            range_name=range_name,
+            start_time=start_time,
+            end_time=end_time,
+        )["completions"]
         return {
-            **self.submission_timeline(username, range_name),
-            **self.completion_timeline(username, range_name),
+            "window": {
+                "start": start_time.isoformat(),
+                "end": end_time.isoformat(),
+            },
+            "totals": {
+                "submitted_jobs": sum(count for _, count in submissions),
+                "completed_jobs": sum(count for _, count in completions),
+            },
+            "submissions": submissions,
+            "completions": completions,
         }
 
     def latest_submission_count(self, username, window_seconds=60):
         return self.recent_submission_counts(window_seconds).get(username, 0)
 
-    def user_activity_summary(self, username):
+    def user_tool_analysis(self, username, start_time=None, end_time=None):
+        if start_time is None or end_time is None:
+            start_time, end_time = self._default_analysis_window()
+        if start_time >= end_time:
+            raise ValueError("start must be earlier than end")
         profile = (
             self._users_store.get_ldap_user(username) if self._users_store is not None else None
         )
-        today_rows = self._completed_jobs_rows(username, _now_utc().date())
-        aggregated = _aggregate_rows(today_rows, mapper=self._tool_mapper)
-        totals = aggregated["totals"]
-        totals["submitted_jobs_today"] = self._submitted_jobs_today(username)
-        totals["latest_submissions_per_minute"] = self.latest_submission_count(username)
+        rows = self._completed_jobs_rows_window(username, start_time, end_time)
+        aggregated = _aggregate_rows(rows, mapper=self._tool_mapper)
         return {
             "username": username,
             "profile": {
@@ -431,12 +485,17 @@ class UserAnalyticsStore:
                 "ldap_found": bool(profile),
             },
             "generated_at": _now_utc().isoformat(),
-            "totals": totals,
+            "window": {
+                "start": start_time.isoformat(),
+                "end": end_time.isoformat(),
+            },
+            "totals": aggregated["totals"],
             "tool_breakdown": aggregated["tool_breakdown"],
         }
 
     def user_activity(self, username, last):
-        summary = self.user_activity_summary(username)
+        start_time, end_time = self._default_analysis_window()
+        summary = self.user_tool_analysis(username, start_time=start_time, end_time=end_time)
         history = self.user_metrics_history(username, last)
         return {
             "username": username,
@@ -450,7 +509,7 @@ class UserAnalyticsStore:
                 for ts, count in history["submissions"]
             ],
             "summary": {
-                "job_count": summary["totals"]["completed_jobs_today"],
+                "job_count": summary["totals"]["completed_jobs"],
                 "tool_count": summary["totals"]["active_tools"],
                 "avg_max_memory_gb": (
                     summary["totals"]["avg_max_memory_mb"] / 1024.0
@@ -633,6 +692,43 @@ class UserAnalyticsStore:
         finally:
             self._release_conn(conn)
 
+    def _completed_jobs_rows_window(self, username, start_time, end_time):
+        import psycopg2.extras
+
+        terminal_params = [f"%{state}%" for state in TERMINAL_STATES]
+        where_terminal = " OR ".join(["js.job_state LIKE %s"] * len(TERMINAL_STATES))
+        conn = self._get_conn()
+        try:
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                cur.execute(
+                    """
+                    SELECT DISTINCT ON (js.job_id, js.submit_time)
+                        js.job_name,
+                        js.command,
+                        js.used_memory_gb,
+                        js.used_cpu_cores_avg,
+                        js.start_time,
+                        js.end_time,
+                        js.last_seen,
+                        js.usage_stats
+                    FROM job_snapshots js
+                    INNER JOIN users u ON u.id = js.user_id
+                    WHERE u.username = %s
+                      AND COALESCE(js.end_time, js.last_seen) >= %s
+                      AND COALESCE(js.end_time, js.last_seen) <= %s
+                      AND (
+                    """
+                    + where_terminal
+                    + """
+                      )
+                    ORDER BY js.job_id, js.submit_time, js.last_seen DESC
+                    """,
+                    [username, start_time, end_time] + terminal_params,
+                )
+                return list(cur.fetchall())
+        finally:
+            self._release_conn(conn)
+
     def _current_day_completed_rows(self):
         import psycopg2.extras
 
@@ -722,4 +818,7 @@ class UserAnalyticsStore:
             return timestamp.replace(minute=0, second=0, microsecond=0)
         if resolution == timedelta(days=1):
             return timestamp.replace(hour=0, minute=0, second=0, microsecond=0)
+        if resolution == timedelta(days=7):
+            aligned = timestamp.replace(hour=0, minute=0, second=0, microsecond=0)
+            return aligned - timedelta(days=aligned.weekday())
         return timestamp

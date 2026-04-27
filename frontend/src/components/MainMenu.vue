@@ -41,12 +41,11 @@ const sidebarOpen = defineModel<boolean>()
 
 const runtimeStore = useRuntimeStore()
 const runtimeConfiguration = useRuntimeConfiguration()
-const ADMIN_RESOURCES = [
-  'admin/system',
-  'admin/ai',
-  'admin/access-control',
-  'admin/cache',
-  'admin/ldap-cache'
+const ADMIN_NAVIGATION = [
+  { route: 'admin-ai', resource: 'admin/ai' },
+  { route: 'admin-cache', resource: 'admin/cache' },
+  { route: 'admin-ldap-cache', resource: 'admin/ldap-cache' },
+  { route: 'admin-access-control', resource: 'admin/access-control' }
 ] as const
 const navigation: Array<{
   name: string
@@ -130,9 +129,9 @@ const navigation: Array<{
   },
   {
     name: 'Admin',
-    route: 'admin-system',
+    route: 'admin',
     icon: ShieldCheckIcon,
-    resource: 'admin/system',
+    resource: 'admin',
     operation: 'view',
     feature: undefined
   }
@@ -151,6 +150,13 @@ function isFeatureEnabled(feature: string | undefined): boolean {
   return !!(cluster as unknown as Record<string, unknown>)[feature]
 }
 
+function isAdminNavigationAvailable(clusterName: string, resource: (typeof ADMIN_NAVIGATION)[number]['resource']): boolean {
+  if (resource === 'admin/ldap-cache' && !runtimeConfiguration.authentication) {
+    return false
+  }
+  return runtimeStore.hasRoutePermission(clusterName, 'admin/*', 'view') || runtimeStore.hasRoutePermission(clusterName, resource, 'view')
+}
+
 function hasNavigationPermission(resource?: string, operation: 'view' | 'edit' | 'delete' = 'view'): boolean {
   if (!resource) return true
   const cluster = navigationCluster.value
@@ -158,13 +164,8 @@ function hasNavigationPermission(resource?: string, operation: 'view' | 'edit' |
     if (resource === 'jobs' && operation === 'view') {
       return runtimeStore.hasRoutePermissionAnyScope(cluster.name, resource, operation)
     }
-    if (resource === 'admin/system' && operation === 'view') {
-      return (
-        runtimeStore.hasRoutePermission(cluster.name, 'admin/*', 'view') ||
-        ADMIN_RESOURCES.some((adminResource) =>
-          runtimeStore.hasRoutePermission(cluster.name, adminResource, 'view')
-        )
-      )
+    if (resource === 'admin' && operation === 'view') {
+      return ADMIN_NAVIGATION.some((adminRoute) => isAdminNavigationAvailable(cluster.name, adminRoute.resource))
     }
     return runtimeStore.hasRoutePermission(cluster.name, resource, operation)
   }
@@ -180,6 +181,12 @@ const navigationCluster = computed(() => {
 
 function navigationTarget(route: string): RouteLocationRaw {
   const cluster = navigationCluster.value
+  if (cluster && route === 'admin') {
+    const adminTarget = ADMIN_NAVIGATION.find(
+      (adminRoute) => isAdminNavigationAvailable(cluster.name, adminRoute.resource)
+    )
+    return { name: adminTarget?.route ?? 'analysis', params: { cluster: cluster.name } }
+  }
   return cluster ? { name: route, params: { cluster: cluster.name } } : { name: route }
 }
 </script>

@@ -27,7 +27,6 @@ const SettingsAccessControlView = () => import('@/views/settings/SettingsAccessC
 const SettingsCacheView = () => import('@/views/settings/SettingsCache.vue')
 const SettingsLdapCacheView = () => import('@/views/settings/SettingsLdapCache.vue')
 const AdminLayoutView = () => import('@/views/AdminLayoutView.vue')
-const AdminSystemView = () => import('@/views/AdminSystemView.vue')
 const ClustersView = () => import('@/views/ClustersView.vue')
 const JobsView = () => import('@/views/JobsView.vue')
 const JobView = () => import('@/views/JobView.vue')
@@ -161,15 +160,16 @@ const router = createRouter({
         },
         {
           path: 'admin',
-          name: 'admin',
           component: AdminLayoutView,
           props: true,
           children: [
             {
               path: '',
-              name: 'admin-system',
-              component: AdminSystemView,
-              props: true
+              name: 'admin',
+              redirect: (to: RouteLocation) => ({
+                name: 'analysis',
+                params: { cluster: to.params.cluster }
+              })
             },
             {
               path: 'ai',
@@ -386,8 +386,6 @@ function clusterRoutePermission(
     case 'accounts':
     case 'account':
       return { resource: 'accounts', operation: 'view' }
-    case 'admin-system':
-      return { resource: 'admin/system', operation: 'view' }
     case 'admin-ai':
       return { resource: 'admin/ai', operation: 'view' }
     case 'admin-access-control':
@@ -408,7 +406,6 @@ function clusterHasAdminAccess(
   return (
     runtime.hasRoutePermission(clusterName, 'admin/*', 'view') ||
     [
-      'admin/system',
       'admin/ai',
       'admin/access-control',
       'admin/cache',

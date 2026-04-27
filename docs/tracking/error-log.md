@@ -17,6 +17,24 @@
 
 ## 条目
 
+### 2026-04-27：用户分析图表升级为双曲线后，旧 Vitest 仍按单数据集断言
+
+- 场景：执行 `cd frontend && npx vitest run` 做前端全量回归。
+- 现象：`frontend/tests/components/user/UserSubmissionHistoryChart.spec.ts` 失败，报 `expected ... datasets to have a length of 1 but got 2`。
+- 复现：在当前分支运行前端全量 Vitest；`UserSubmissionHistoryChart.vue` 已同时渲染 `Submissions` 和 `Completions` 两条曲线，但旧测试仍只断言一条数据集。
+- 根因：用户分析页已经把提交/完成双指标统一到同一张趋势图，测试基线没有跟着组件契约同步更新。
+- 解决：把该单测改为同时断言两条数据集的标签和点位，并在清空场景补齐 `completions` 输入夹具。
+- 预防：后续图表从单指标扩展到多指标时，必须同步检查 dataset 数量、顺序和图例标签断言，不能只沿用旧的“首条曲线存在”测试。
+
+### 2026-04-27：Flask 400 响应测试不能假设 `response.json` 一定存在
+
+- 场景：为 `user/tools/analysis` 的缺失时间窗和非法时间窗补 Agent 视图回归测试。
+- 现象：执行 `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/views/test_agent_metrics_requests.py` 时，两个 `400` 用例 `response.status_code` 正确，但 `response.json` 为 `None`，直接按 JSON 结构断言会失败。
+- 复现：访问 `GET /v<version>/user/<username>/tools/analysis` 或传入 `start >= end`，然后在测试里直接读取 `response.json["description"]`。
+- 根因：当前错误响应链路在部分 `abort(400, ...)` 场景下不会稳定返回 JSON；测试把“HTTP 状态正确”和“响应一定有 JSON body”错误地绑定在一起。
+- 解决：测试改为优先断言 `status_code`，再按 `response.json is not None` 分支分别校验 JSON 或 `response.text`。
+- 预防：后续在本仓库补 Flask 视图错误路径测试时，不要默认所有 `4xx` 都会产出 JSON；先核对当前 app 的错误处理链路，再决定断言方式。
+
 ### 2026-04-27：当前 Windows PowerShell 不支持把 Bash 风格 `&&` 当作命令分隔符
 
 - 场景：在仓库根目录想串行执行 `git add ... && git commit ...` 完成本地跟踪提交。

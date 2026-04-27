@@ -1,5 +1,44 @@
 ﻿# 最新功能
 
+## 本轮：AI 对话、用户工具分析时间窗与接口命名统一修复
+
+本轮继续在已上线 AI 助手和用户分析页面上做行为收口，没有新增独立页面：
+
+- AI 对话服务已修复“工具调用成功后把内部 `tool_request` envelope 当作最终消息回显”的严重 bug
+- 当模型错误输出内部 `tool_request` / `interface_key` / `arguments` JSON 时：
+  - 服务端不会把它透传到消息区
+  - 也不会把它持久化成最终 assistant 消息
+  - 会继续追加纠正提示，要求模型输出合法 `final`
+- AI 面向用户工具推荐问题时，接口说明与提示词已收敛到优先使用 `user/tools/analysis`
+- 用户分析聚合接口已正式改名：
+  - `user/activity/summary` -> `user/tools/analysis`
+  - 不保留旧路径兼容
+- 用户分析页整页已统一改为共享 `start/end` 时间窗：
+  - `Submission Activity`
+  - `Usage Profile`
+  - `Tool Analysis`
+  - `Top Tools`
+  - 全部跟随同一组 `datetime-local` 选择器
+- 用户分析页首次进入时，若 URL query 缺失或非法，会自动回填“当天 00:00 -> 当前时间”
+- 趋势图与统计卡现在按所选窗口展示：
+  - `Submitted in Range`
+  - `Completed in Range`
+  - `Active Tools`
+  - `Average Runtime`
+- `user/metrics/history` 现在支持 `start/end` 窗口查询，并在响应中补：
+  - `window`
+  - `totals`
+- 自定义时间窗下，历史曲线 bucket 已自动按窗口长度切换：
+  - `<= 48h` 按小时
+  - `> 48h 且 <= 62d` 按天
+  - `> 62d` 按周
+
+本轮新增验证：
+
+- `cd frontend && npx vitest run tests/views/UserAnalysisView.spec.ts tests/composables/GatewayAPI.spec.ts tests/views/AssistantView.spec.ts tests/views/AssistantViewAIContract.spec.ts`
+- `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/apps/test_ai_service.py slurmweb/tests/apps/test_user_analytics_store.py slurmweb/tests/views/test_agent_metrics_requests.py slurmweb/tests/views/test_gateway.py`
+- `npm --prefix frontend run type-check`
+
 ## 本轮：AI 助手改为按 Agent 接口编排查询，并统一接口权限与执行轨迹
 
 本轮 AI 助手没有新增独立页面，但对对话执行链路做了收口：
@@ -11,8 +50,9 @@
 - 典型场景下，AI 可按需串联：
   - `job`
   - `jobs/history`
-  - `user/activity/summary`
+  - `user/tools/analysis`
   - `user/metrics/history`
+- 对“用户某工具推荐多少内存/CPU/运行时”这类问题，提示词与接口目录现在会优先把 `user/tools/analysis` 暴露为直接证据源，再视情况补查原始 history
 - 查询权限继续复用现有 `resource:operation:scope` 规则
 - 通过 AI 触发 create / update / delete 现在直接复用 Agent 接口权限：
   - `admin` 默认 `*:edit:*` 可执行对应 `edit` 类写接口
@@ -28,9 +68,15 @@
   - 状态码
   - 耗时
 - 参数、摘要、错误详情改为点击 trace 后展开查看
+- AI 对话消息现在支持安全 Markdown 渲染：
+  - `assistant` 与 `user` 消息都会按 Markdown 展示
+  - 原始 HTML 不会作为真实 DOM 节点渲染
+  - 外链默认新标签打开并带 `rel="noopener noreferrer"`
 
 本轮新增验证：
 
+- `cd frontend && npx vitest run tests/views/AssistantView.spec.ts tests/views/AssistantViewAIContract.spec.ts`
+- `npm --prefix frontend run type-check`
 - `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/apps/test_ai_service.py slurmweb/tests/views/test_agent_ai.py`
 - `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/apps/test_agent_ai.py slurmweb/tests/views/test_gateway_ai.py`
 - `cd frontend && npx vitest run tests/views/AssistantView.spec.ts tests/views/AssistantViewAIContract.spec.ts tests/composables/GatewayAPI.spec.ts`

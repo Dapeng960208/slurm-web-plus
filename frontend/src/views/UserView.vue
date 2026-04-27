@@ -521,7 +521,7 @@ async function removeUser() {
                 <p class="ui-page-kicker">User Analysis</p>
                 <h2 class="ui-panel-title">Submission and tool analytics</h2>
                 <p class="ui-panel-description mt-2">
-                  Submission trends, dual-metric tool analysis and daily execution summaries for this user.
+                  Submission trends, dual-metric tool analysis and execution summaries for this user.
                 </p>
               </div>
               <span class="ui-chip">

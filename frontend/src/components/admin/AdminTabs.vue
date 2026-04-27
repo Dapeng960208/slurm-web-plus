@@ -22,9 +22,6 @@ const runtimeConfiguration = useRuntimeConfiguration()
 
 const tabs = computed(() => {
   const result = []
-  if (runtimeStore.hasRoutePermission(cluster, 'admin/system', 'view')) {
-    result.push({ name: 'System', href: 'admin-system' })
-  }
   if (runtimeStore.hasRoutePermission(cluster, 'admin/ai', 'view')) {
     result.push({ name: 'AI', href: 'admin-ai' })
   }

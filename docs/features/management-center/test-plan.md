@@ -31,7 +31,7 @@
 
 - `analysis/ping`
 - `analysis/diag`
-- `admin/system/licenses`
+- 旧 `admin/system/*` 路由返回 404
 - `job/<id>/update`
 - `job/<id>/cancel`
 - `node/<name>/update`
@@ -63,7 +63,7 @@
 覆盖以下场景：
 
 - `/:cluster/admin`
-- `admin-system`
+- `/:cluster/admin` 默认跳转 `analysis`
 - `admin-ai`
 - `admin-access-control`
 - `admin-cache`
@@ -102,7 +102,7 @@
 
 - `analysis/ping`
 - `analysis/diag`
-- `admin/system/*`
+- 不再暴露 `admin/system/*`
 - 新写接口路径与方法
 - `RESTAPI.delete()` 支持 body
 

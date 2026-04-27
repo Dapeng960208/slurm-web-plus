@@ -6,13 +6,16 @@ const sourcePath = resolve(process.cwd(), 'src/router/index.ts')
 const source = readFileSync(sourcePath, 'utf8')
 
 describe('Admin router contract', () => {
-  test('registers a cluster-scoped admin route', () => {
+  test('registers a cluster-scoped admin route without a system landing page', () => {
     expect(source).toContain("path: 'admin'")
-    expect(source).toContain("name: 'admin-system'")
+    expect(source).toContain("name: 'admin'")
+    expect(source).toContain("name: 'analysis'")
+    expect(source).not.toContain("name: 'admin-system'")
     expect(source).toContain("name: 'admin-ai'")
     expect(source).toContain("name: 'admin-access-control'")
     expect(source).toContain("name: 'admin-cache'")
     expect(source).toContain("name: 'admin-ldap-cache'")
+    expect(source).toContain("redirect: (to: RouteLocation) => ({")
   })
 
   test('uses admin permission resources instead of legacy settings resources for managed pages', () => {

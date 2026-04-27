@@ -7,6 +7,7 @@
 from functools import wraps
 from typing import Any, Callable, Iterable, Tuple, Union
 import logging
+from datetime import datetime, timezone
 
 from flask import Response, current_app, jsonify, abort, request, stream_with_context
 from rfl.web.tokens import _get_token_user, check_jwt
@@ -36,6 +37,31 @@ def _positive_int_query_arg(name: str, default: int) -> int:
         return max(int(value), 1)
     except (TypeError, ValueError):
         return default
+
+
+def _parse_iso_datetime_query_arg(name: str):
+    value = request.args.get(name)
+    if value in (None, ""):
+        return None
+    try:
+        parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError as err:
+        raise ValueError(f"{name} must be a valid ISO 8601 datetime") from err
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def _parse_metrics_window_query_args():
+    start_time = _parse_iso_datetime_query_arg("start")
+    end_time = _parse_iso_datetime_query_arg("end")
+    if start_time is None and end_time is None:
+        return None, None
+    if start_time is None or end_time is None:
+        raise ValueError("start and end must both be provided")
+    if start_time >= end_time:
+        raise ValueError("start must be earlier than end")
+    return start_time, end_time
 
 
 def _normalize_job_history_record(record: dict) -> dict:
@@ -260,21 +286,6 @@ def _authorize_job_owner(job_id: int, operation: str) -> dict:
     return job_data
 
 
-def _system_query_mapping(query: str):
-    mapping = {
-        "licenses": ("licenses", "view", "licenses"),
-        "shares": ("shares", "view", "shares"),
-        "reconfigure": ("reconfigure", "edit", None),
-        "slurmdb/diag": ("slurmdb_diag", "view", "statistics"),
-        "slurmdb/config": ("slurmdb_config", "view", None),
-        "slurmdb/instances": ("instances", "view", "instances"),
-        "slurmdb/tres": ("tres", "view", None),
-        "slurmdb/clusters": ("clusters", "view", "clusters"),
-        "slurmdb/wckeys": ("wckeys", "view", "wckeys"),
-    }
-    return mapping.get(query)
-
-
 def permission_required(*requirements: Tuple[str, str, str], legacy_action: str = None):
     def decorator(func):
         @wraps(func)
@@ -471,29 +482,9 @@ def analysis_ping():
 def analysis_diag():
     return jsonify({"statistics": current_app.slurmrestd.diag()})
 
-
 @handle_slurmrestd_errors
 def slurmrest(method: str, *args: Tuple[Any, ...]):
     return getattr(current_app.slurmrestd, method)(*args)
-
-
-@handle_slurmrestd_errors
-@permission_required(
-    ("admin/system", "edit", "*"),
-    ("admin/system", "view", "*"),
-    legacy_action="view-stats",
-)
-def admin_system_query(query: str):
-    mapped = _system_query_mapping(query)
-    if mapped is None:
-        abort(404, f"Unknown admin system query {query}")
-    method_name, required_operation, result_key = mapped
-    if required_operation == "edit" and not _allowed_permission("admin/system", "edit", "*"):
-        abort(403, "Access not permitted")
-    response = getattr(current_app.slurmrestd, method_name)()
-    if isinstance(response, dict) and "errors" in response:
-        return _operation_response(f"admin.system.{query.replace('/', '.')}", query, response)
-    return jsonify({result_key or "result": response})
 
 
 @permission_required(
@@ -803,58 +794,6 @@ def qos_delete(name: str):
         return supported
     response = current_app.slurmrestd.qos_delete(name)
     return _operation_response("qos.delete", {"qos": name}, response)
-
-
-@handle_slurmrestd_errors
-@permission_required(("admin/system", "view", "*"), legacy_action="view-stats")
-def wckeys():
-    return jsonify(current_app.slurmrestd.wckeys())
-
-
-@handle_slurmrestd_errors
-@permission_required(("admin/system", "edit", "*"), legacy_action="view-stats")
-def wckeys_update():
-    supported = _ensure_write_supported("admin.system.wckeys.update")
-    if not isinstance(supported, str):
-        return supported
-    response = current_app.slurmrestd.wckeys_update(_job_payload())
-    return _operation_response("admin.system.wckeys.update", None, response)
-
-
-@handle_slurmrestd_errors
-@permission_required(("admin/system", "delete", "*"), legacy_action="view-stats")
-def wckey_delete(wckey_id: str):
-    supported = _ensure_write_supported("admin.system.wckeys.delete")
-    if not isinstance(supported, str):
-        return supported
-    response = current_app.slurmrestd.wckey_delete(wckey_id)
-    return _operation_response("admin.system.wckeys.delete", {"wckey": wckey_id}, response)
-
-
-@handle_slurmrestd_errors
-@permission_required(("admin/system", "view", "*"), legacy_action="view-stats")
-def clusters_admin():
-    return jsonify(current_app.slurmrestd.clusters())
-
-
-@handle_slurmrestd_errors
-@permission_required(("admin/system", "edit", "*"), legacy_action="view-stats")
-def clusters_update():
-    supported = _ensure_write_supported("admin.system.clusters.update")
-    if not isinstance(supported, str):
-        return supported
-    response = current_app.slurmrestd.clusters_update(_job_payload())
-    return _operation_response("admin.system.clusters.update", None, response)
-
-
-@handle_slurmrestd_errors
-@permission_required(("admin/system", "delete", "*"), legacy_action="view-stats")
-def cluster_delete(name: str):
-    supported = _ensure_write_supported("admin.system.clusters.delete")
-    if not isinstance(supported, str):
-        return supported
-    response = current_app.slurmrestd.cluster_delete(name)
-    return _operation_response("admin.system.clusters.delete", {"cluster": name}, response)
 
 
 @handle_slurmrestd_errors
@@ -1327,13 +1266,17 @@ def user_metrics_history(username: str):
         logger.warning(error)
         abort(501, error)
     try:
+        start_time, end_time = _parse_metrics_window_query_args()
         return jsonify(
             current_app.user_metrics_store.user_metrics_history(
-                username, request.args.get("range", "hour")
+                username,
+                request.args.get("range", "hour"),
+                start_time=start_time,
+                end_time=end_time,
             )
         )
     except ValueError as err:
-        logger.warning("Unsupported user metrics history range for %s: %s", username, err)
+        logger.warning("Invalid user metrics history query for %s: %s", username, err)
         abort(400, str(err))
     except Exception as err:
         logger.warning("Unable to query user metrics history for %s: %s", username, err)
@@ -1349,15 +1292,27 @@ def user_metrics_history(username: str):
     ("jobs", "view", "*"),
     legacy_action="view-jobs",
 )
-def user_activity_summary(username: str):
+def user_tools_analysis(username: str):
     if not getattr(current_app, "user_metrics_enabled", False) or current_app.user_metrics_store is None:
         error = "User metrics is disabled"
         logger.warning(error)
         abort(501, error)
     try:
-        return jsonify(current_app.user_metrics_store.user_activity_summary(username))
+        start_time, end_time = _parse_metrics_window_query_args()
+        if start_time is None or end_time is None:
+            raise ValueError("start and end must both be provided")
+        return jsonify(
+            current_app.user_metrics_store.user_tool_analysis(
+                username,
+                start_time=start_time,
+                end_time=end_time,
+            )
+        )
+    except ValueError as err:
+        logger.warning("Invalid user tools analysis query for %s: %s", username, err)
+        abort(400, str(err))
     except Exception as err:
-        logger.warning("Unable to query user activity summary for %s: %s", username, err)
+        logger.warning("Unable to query user tools analysis for %s: %s", username, err)
         abort(500, str(err))
 
 

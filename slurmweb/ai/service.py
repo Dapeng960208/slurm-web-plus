@@ -36,8 +36,12 @@ You can answer only with information available from agent interfaces and previou
 Never invent cluster data.
 You may call multiple tools across the same user request when one interface is not enough.
 Only call another interface when the current information is insufficient.
+Prefer direct aggregate interfaces over raw history when they already answer the question.
+For user or tool resource recommendation questions such as memory, CPU, or runtime sizing, start with user/tools/analysis or other summary-style interfaces that already provide aggregated evidence before expanding to raw history.
 Before giving the final answer, consolidate, deduplicate, and explain the facts you gathered.
 If a write-capable interface is needed, the current user's interface permission still applies and denied calls will return tool errors.
+Never expose internal tool-call metadata, tool request envelopes, interface metadata, or planning scratchpad content to the user.
+Your final answer must always be natural language inside {"type":"final","content":"..."}.
 When requesting a tool, reply with strict JSON only:
 {"type":"tool_call","tool":"TOOL_NAME","arguments":{"interface_key":"INTERFACE_KEY","arguments":{"key":"value"}}}
 When you have enough information, reply with strict JSON only:
@@ -175,6 +179,14 @@ def _extract_json_object(value: str):
             return json.loads(match.group(0))
         except json.JSONDecodeError:
             return None
+
+
+def _looks_like_internal_tool_envelope(parsed) -> bool:
+    if not isinstance(parsed, dict):
+        return False
+    if parsed.get("type") in {"tool_call", "final"}:
+        return False
+    return any(key in parsed for key in ("tool_request", "interface_key", "arguments"))
 
 
 class AIService:
@@ -447,6 +459,8 @@ class AIService:
         parsed = _extract_json_object(output)
         if not isinstance(parsed, dict):
             return {"type": "final", "content": output.strip()}
+        if _looks_like_internal_tool_envelope(parsed):
+            return {"type": "invalid_internal", "content": output.strip()}
         if parsed.get("type") == "tool_call":
             return {
                 "type": "tool_call",
@@ -513,6 +527,18 @@ class AIService:
                         planner_messages,
                     )
                     action = self._action_from_model_output(raw_output)
+                    if action["type"] == "invalid_internal":
+                        working_messages.append(
+                            {
+                                "role": "user",
+                                "content": (
+                                    "Invalid internal tool metadata was returned. "
+                                    "Do not expose tool request envelopes, interface metadata, or planning scratchpad. "
+                                    "Either call another tool with strict tool_call JSON or answer with strict final JSON."
+                                ),
+                            }
+                        )
+                        continue
                     if action["type"] == "tool_call":
                         tool_name = str(action.get("tool") or "").strip()
                         arguments = action.get("arguments") or {}
@@ -545,21 +571,16 @@ class AIService:
                             )
                             working_messages.append(
                                 {
-                                    "role": "assistant",
-                                    "content": _serialize_json(
-                                        {
-                                            "tool_request": tool_name,
-                                            "interface_key": tool_result["interface_key"],
-                                            "arguments": tool_result["arguments"],
-                                        }
-                                    ),
-                                }
-                            )
-                            working_messages.append(
-                                {
                                     "role": "user",
-                                    "content": "Tool result: "
-                                    + _serialize_json(tool_result["result"]),
+                                    "content": (
+                                        "Internal tool result for planning only. "
+                                        f"Tool {tool_name} called interface {tool_result['interface_key']} "
+                                        f"with arguments {_serialize_json(tool_result['arguments'])}. "
+                                        f"Result: {_serialize_json(tool_result['result'])}. "
+                                        "Do not repeat internal tool metadata to the user. "
+                                        "If more information is needed, emit another tool_call JSON. "
+                                        "Otherwise emit final JSON with a natural-language answer."
+                                    ),
                                 }
                             )
                             continue

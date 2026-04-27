@@ -45,11 +45,6 @@ class SlurmwebAppAgent(SlurmwebWebApp, RFLTokenizedRBACWebApp):
         SlurmwebAppRoute(f"/v{get_version()}/stats", views.stats),
         SlurmwebAppRoute(f"/v{get_version()}/analysis/ping", views.analysis_ping),
         SlurmwebAppRoute(f"/v{get_version()}/analysis/diag", views.analysis_diag),
-        SlurmwebAppRoute(
-            f"/v{get_version()}/admin/system/<path:query>",
-            views.admin_system_query,
-            methods=["GET", "POST"],
-        ),
         SlurmwebAppRoute(f"/v{get_version()}/jobs", views.jobs),
         SlurmwebAppRoute(f"/v{get_version()}/job/<int:job>", views.job),
         SlurmwebAppRoute(
@@ -142,28 +137,6 @@ class SlurmwebAppAgent(SlurmwebWebApp, RFLTokenizedRBACWebApp):
             views.user_delete,
             methods=["DELETE"],
         ),
-        SlurmwebAppRoute(f"/v{get_version()}/wckeys", views.wckeys),
-        SlurmwebAppRoute(
-            f"/v{get_version()}/wckeys",
-            views.wckeys_update,
-            methods=["POST"],
-        ),
-        SlurmwebAppRoute(
-            f"/v{get_version()}/wckey/<wckey_id>/delete",
-            views.wckey_delete,
-            methods=["DELETE"],
-        ),
-        SlurmwebAppRoute(f"/v{get_version()}/clusters", views.clusters_admin),
-        SlurmwebAppRoute(
-            f"/v{get_version()}/clusters",
-            views.clusters_update,
-            methods=["POST"],
-        ),
-        SlurmwebAppRoute(
-            f"/v{get_version()}/cluster/<name>/delete",
-            views.cluster_delete,
-            methods=["DELETE"],
-        ),
         SlurmwebAppRoute(f"/v{get_version()}/cache/stats", views.cache_stats),
         SlurmwebAppRoute(
             f"/v{get_version()}/cache/reset", views.cache_reset, methods=["POST"]
@@ -238,8 +211,8 @@ class SlurmwebAppAgent(SlurmwebWebApp, RFLTokenizedRBACWebApp):
             views.user_metrics_history,
         ),
         SlurmwebAppRoute(
-            f"/v{get_version()}/user/<username>/activity/summary",
-            views.user_activity_summary,
+            f"/v{get_version()}/user/<username>/tools/analysis",
+            views.user_tools_analysis,
         ),
         SlurmwebAppRoute(
             f"/v{get_version()}/users/cache", views.cache_authenticated_user, methods=["POST"]

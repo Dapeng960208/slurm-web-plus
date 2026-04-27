@@ -156,11 +156,13 @@ describe('user metrics requests', () => {
         ldap_found: true
       },
       generated_at: null,
+      window: {
+        start: '2026-04-24T00:00:00Z',
+        end: '2026-04-24T12:00:00Z'
+      },
       totals: {
-        submitted_jobs_today: 0,
-        completed_jobs_today: 0,
+        completed_jobs: 0,
         active_tools: 0,
-        latest_submissions_per_minute: null,
         avg_max_memory_mb: null,
         avg_cpu_cores: null,
         avg_runtime_seconds: null,
@@ -171,9 +173,14 @@ describe('user metrics requests', () => {
     })
 
     const gateway = useGatewayAPI()
-    await gateway.user_activity_summary('cluster-a', 'alice')
+    await gateway.user_tools_analysis('cluster-a', 'alice', {
+      start: '2026-04-24T00:00:00Z',
+      end: '2026-04-24T12:00:00Z'
+    })
 
-    expect(mockRestAPI.get).toHaveBeenCalledWith('/agents/cluster-a/user/alice/activity/summary')
+    expect(mockRestAPI.get).toHaveBeenCalledWith(
+      '/agents/cluster-a/user/alice/tools/analysis?start=2026-04-24T00%3A00%3A00Z&end=2026-04-24T12%3A00%3A00Z'
+    )
   })
 
   test('encodes usernames in user metrics requests', async () => {
@@ -192,11 +199,13 @@ describe('user metrics requests', () => {
       username: 'alice doe',
       profile: null,
       generated_at: null,
+      window: {
+        start: '2026-04-24T00:00:00Z',
+        end: '2026-04-24T12:00:00Z'
+      },
       totals: {
-        submitted_jobs_today: 0,
-        completed_jobs_today: 0,
+        completed_jobs: 0,
         active_tools: 0,
-        latest_submissions_per_minute: null,
         avg_max_memory_mb: null,
         avg_cpu_cores: null,
         avg_runtime_seconds: null,
@@ -207,10 +216,13 @@ describe('user metrics requests', () => {
     })
 
     const gateway = useGatewayAPI()
-    await gateway.user_activity_summary('cluster-a', 'alice doe')
+    await gateway.user_tools_analysis('cluster-a', 'alice doe', {
+      start: '2026-04-24T00:00:00Z',
+      end: '2026-04-24T12:00:00Z'
+    })
 
     expect(mockRestAPI.get).toHaveBeenCalledWith(
-      '/agents/cluster-a/user/alice%20doe/activity/summary'
+      '/agents/cluster-a/user/alice%20doe/tools/analysis?start=2026-04-24T00%3A00%3A00Z&end=2026-04-24T12%3A00%3A00Z'
     )
   })
 })
@@ -222,6 +234,14 @@ describe('user activity gateway methods', () => {
 
   test('requests user submission history with the provided range', async () => {
     mockRestAPI.get.mockResolvedValue({
+      window: {
+        start: '2026-04-24T00:00:00Z',
+        end: '2026-04-24T12:00:00Z'
+      },
+      totals: {
+        submitted_jobs: 3,
+        completed_jobs: 1
+      },
       submissions: [[1748004750000, 3]],
       completions: [[1748004750000, 1]]
     })
@@ -233,6 +253,14 @@ describe('user activity gateway methods', () => {
       '/agents/cluster/user/alice/metrics/history?range=day'
     )
     expect(result).toStrictEqual({
+      window: {
+        start: '2026-04-24T00:00:00Z',
+        end: '2026-04-24T12:00:00Z'
+      },
+      totals: {
+        submitted_jobs: 3,
+        completed_jobs: 1
+      },
       submissions: [[1748004750000, 3]],
       completions: [[1748004750000, 1]]
     })
@@ -240,6 +268,10 @@ describe('user activity gateway methods', () => {
 
   test('defaults user submission history requests to the hour range', async () => {
     mockRestAPI.get.mockResolvedValue({
+      totals: {
+        submitted_jobs: 1,
+        completed_jobs: 0
+      },
       submissions: [[1748004750000, 1]],
       completions: [[1748004750000, 0]]
     })
@@ -262,11 +294,13 @@ describe('user activity gateway methods', () => {
         ldap_found: true
       },
       generated_at: '2026-04-24T08:00:00Z',
+      window: {
+        start: '2026-04-24T00:00:00Z',
+        end: '2026-04-24T12:00:00Z'
+      },
       totals: {
-        submitted_jobs_today: 5,
-        completed_jobs_today: 4,
+        completed_jobs: 4,
         active_tools: 2,
-        latest_submissions_per_minute: 1,
         avg_max_memory_mb: 2048,
         avg_cpu_cores: 8,
         avg_runtime_seconds: 600,
@@ -277,9 +311,14 @@ describe('user activity gateway methods', () => {
     })
 
     const gateway = useGatewayAPI()
-    const result = await gateway.user_activity_summary('cluster', 'alice')
+    const result = await gateway.user_tools_analysis('cluster', 'alice', {
+      start: '2026-04-24T00:00:00Z',
+      end: '2026-04-24T12:00:00Z'
+    })
 
-    expect(mockRestAPI.get).toHaveBeenCalledWith('/agents/cluster/user/alice/activity/summary')
+    expect(mockRestAPI.get).toHaveBeenCalledWith(
+      '/agents/cluster/user/alice/tools/analysis?start=2026-04-24T00%3A00%3A00Z&end=2026-04-24T12%3A00%3A00Z'
+    )
     expect(result.username).toBe('alice')
     expect(result.profile?.fullname).toBe('Alice Doe')
     expect(result.totals.busiest_tool).toBe('blastn')

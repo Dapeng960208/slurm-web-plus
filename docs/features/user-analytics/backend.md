@@ -18,25 +18,61 @@
 
 当前仍复用既有接口与聚合数据：
 
-- `GET /api/agents/<cluster>/user/<username>/activity/summary`
+- `GET /api/agents/<cluster>/user/<username>/tools/analysis`
 - `GET /api/agents/<cluster>/user/<username>/metrics/history`
 - `GET /api/agents/<cluster>/associations`
 
+`tools/analysis` 当前固定要求：
+
+- `start`
+- `end`
+
+两者都必须是 ISO 8601 时间；缺失、非法或 `start >= end` 时返回 `400`。
+
+`tools/analysis` 当前返回：
+
+- `username`
+- `profile`
+- `generated_at`
+- `window`
+  - `start`
+  - `end`
+- `totals`
+  - `completed_jobs`
+  - `active_tools`
+  - `avg_max_memory_mb`
+  - `avg_cpu_cores`
+  - `avg_runtime_seconds`
+  - `busiest_tool`
+  - `busiest_tool_jobs`
+- `tool_breakdown`
+
 `metrics/history` 当前返回：
 
+- `window`
+  - `start`
+  - `end`
+- `totals`
+  - `submitted_jobs`
+  - `completed_jobs`
 - `submissions`
   - 按所选时间范围聚合的提交作业数序列
 - `completions`
   - 按所选时间范围聚合的完成作业数序列
 
-时间范围固定为：
+`metrics/history` 同时支持两种时间输入：
 
-- `hour`
-  - 按分钟 bucket
-- `day`
+- 旧 `range=hour|day|week`
+- 新 `start` / `end`
+
+当显式传 `start` / `end` 时，bucket 规则固定为：
+
+- `<= 48h`
   - 按小时 bucket
-- `week`
+- `> 48h 且 <= 62d`
   - 按天 bucket
+- `> 62d`
+  - 按周 bucket
 
 ## 3. 权限要求
 
@@ -78,5 +114,11 @@
 - 用户分析页实时曲线同时展示：
   - 提交作业数
   - 完成作业数
-- 时间范围使用 `range` query 参数与页面状态同步
-- 切换范围后仅刷新用户分析区块，不影响用户资料区
+- 用户分析页顶部统一使用共享时间窗：
+  - `start`
+  - `end`
+- 页面输入控件为 `datetime-local`
+- 页面首次进入时若 query 缺失或非法，会自动回填“当天 00:00 -> 当前时间”
+- 前端发送请求前会把本地 `datetime-local` 转成带时区的 UTC ISO 8601
+- `Tool Analysis`、`Top Tools`、`Usage Profile` 与趋势图共用同一时间窗
+- `start >= end` 时前端直接 inline 报错且不发请求

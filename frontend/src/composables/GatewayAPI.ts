@@ -1364,6 +1364,14 @@ export interface NodeMetricsHistory {
 }
 
 export interface UserMetricsHistory {
+  window?: {
+    start: string
+    end: string
+  }
+  totals?: {
+    submitted_jobs: number
+    completed_jobs: number
+  }
   submissions: MetricValue[]
   completions: MetricValue[]
 }
@@ -1383,15 +1391,17 @@ export interface UserActivityProfile {
   ldap_found: boolean
 }
 
-export interface UserActivitySummary {
+export interface UserToolAnalysisSummary {
   username: string
   profile?: UserActivityProfile | null
   generated_at: string | null
+  window?: {
+    start: string
+    end: string
+  }
   totals: {
-    submitted_jobs_today: number
-    completed_jobs_today: number
+    completed_jobs: number
     active_tools: number
-    latest_submissions_per_minute: number | null
     avg_max_memory_mb: number | null
     avg_cpu_cores: number | null
     avg_runtime_seconds: number | null
@@ -1415,6 +1425,10 @@ export interface CacheStatistics {
 export type MetricValue = [number, number]
 const MetricRanges = ['week', 'day', 'hour'] as const
 export type MetricRange = (typeof MetricRanges)[number]
+export interface DateTimeWindowQuery {
+  start: string
+  end: string
+}
 export type MetricResourceState =
   | 'idle'
   | 'mixed'
@@ -1934,34 +1948,6 @@ export function useGatewayAPI() {
     return await restAPI.post<CacheStatistics>(`/agents/${cluster}/cache/reset`, {})
   }
 
-  async function admin_licenses(cluster: string): Promise<unknown> {
-    return await restAPI.get<unknown>(`/agents/${cluster}/admin/system/licenses`)
-  }
-
-  async function admin_shares(cluster: string): Promise<unknown> {
-    return await restAPI.get<unknown>(`/agents/${cluster}/admin/system/shares`)
-  }
-
-  async function admin_reconfigure(cluster: string): Promise<ClusterOperationResult> {
-    return await restAPI.post<ClusterOperationResult>(`/agents/${cluster}/admin/system/reconfigure`, {})
-  }
-
-  async function admin_slurmdb_diag(cluster: string): Promise<unknown> {
-    return await restAPI.get<unknown>(`/agents/${cluster}/admin/system/slurmdb/diag`)
-  }
-
-  async function admin_slurmdb_config(cluster: string): Promise<unknown> {
-    return await restAPI.get<unknown>(`/agents/${cluster}/admin/system/slurmdb/config`)
-  }
-
-  async function admin_slurmdb_instances(cluster: string): Promise<unknown> {
-    return await restAPI.get<unknown>(`/agents/${cluster}/admin/system/slurmdb/instances`)
-  }
-
-  async function admin_slurmdb_tres(cluster: string): Promise<unknown> {
-    return await restAPI.get<unknown>(`/agents/${cluster}/admin/system/slurmdb/tres`)
-  }
-
   async function ai_configs(cluster: string): Promise<AIModelConfig[]> {
     const result = await restAPI.get<AIModelConfigListResponse>(`/agents/${cluster}/ai/configs`)
     return (result.items ?? []).map((config) => normalizeAIModelConfig(config))
@@ -2196,25 +2182,29 @@ export function useGatewayAPI() {
   async function user_metrics_history(
     cluster: string,
     username: string,
-    range: MetricRange = 'hour'
+    query: MetricRange | DateTimeWindowQuery = 'hour'
   ): Promise<UserMetricsHistory> {
     const encodedUsername = encodeURIComponent(username)
-    const url = `/agents/${cluster}/user/${encodedUsername}/metrics/history?range=${range}`
+    const url =
+      typeof query === 'string'
+        ? `/agents/${cluster}/user/${encodedUsername}/metrics/history?range=${query}`
+        : `/agents/${cluster}/user/${encodedUsername}/metrics/history?start=${encodeURIComponent(query.start)}&end=${encodeURIComponent(query.end)}`
     console.log('[GatewayAPI] user_metrics_history request URL:', url)
     const result = await restAPI.get<UserMetricsHistory>(url)
     console.log('[GatewayAPI] user_metrics_history response:', result)
     return result
   }
 
-  async function user_activity_summary(
+  async function user_tools_analysis(
     cluster: string,
-    username: string
-  ): Promise<UserActivitySummary> {
+    username: string,
+    query: DateTimeWindowQuery
+  ): Promise<UserToolAnalysisSummary> {
     const encodedUsername = encodeURIComponent(username)
-    const url = `/agents/${cluster}/user/${encodedUsername}/activity/summary`
-    console.log('[GatewayAPI] user_activity_summary request URL:', url)
-    const result = await restAPI.get<UserActivitySummary>(url)
-    console.log('[GatewayAPI] user_activity_summary response:', result)
+    const url = `/agents/${cluster}/user/${encodedUsername}/tools/analysis?start=${encodeURIComponent(query.start)}&end=${encodeURIComponent(query.end)}`
+    console.log('[GatewayAPI] user_tools_analysis request URL:', url)
+    const result = await restAPI.get<UserToolAnalysisSummary>(url)
+    console.log('[GatewayAPI] user_tools_analysis response:', result)
     return result
   }
 
@@ -2335,13 +2325,6 @@ export function useGatewayAPI() {
     cache_stats,
     ldap_cache_users,
     cache_reset,
-    admin_licenses,
-    admin_shares,
-    admin_reconfigure,
-    admin_slurmdb_diag,
-    admin_slurmdb_config,
-    admin_slurmdb_instances,
-    admin_slurmdb_tres,
     ai_configs,
     create_ai_config,
     update_ai_config,
@@ -2361,7 +2344,7 @@ export function useGatewayAPI() {
     node_metrics,
     node_metrics_history,
     user_metrics_history,
-    user_activity_summary,
+    user_tools_analysis,
     infrastructureImagePng,
     abort,
     isValidGatewayGenericAPIKey,

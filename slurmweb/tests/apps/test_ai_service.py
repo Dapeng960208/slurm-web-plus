@@ -522,6 +522,39 @@ class TestAIService(TestCase):
             ["job", "jobs/history"],
         )
 
+    def test_planner_prompt_prefers_summary_interfaces_for_resource_recommendations(self):
+        self._create_model()
+
+        planner_messages = self.service._build_planner_messages(
+            self.user,
+            {"system_prompt": None},
+            [{"role": "user", "content": "How much memory should tool blast use for user alice?"}],
+        )
+
+        system_prompt = planner_messages[0]["content"]
+        self.assertIn("Prefer direct aggregate interfaces over raw history", system_prompt)
+        self.assertIn("user/tools/analysis", system_prompt)
+        self.assertIn("best direct source for a user's usual resource profile by tool", system_prompt)
+        self.assertIn("avg_max_memory_mb", system_prompt)
+        self.assertIn("Never expose internal tool-call metadata", system_prompt)
+
+    def test_stream_chat_ignores_internal_tool_request_envelope_in_final_output(self):
+        self._create_model()
+        provider = mock.Mock()
+        provider.complete.side_effect = [
+            '{"type":"tool_call","tool":"query_agent_interface","arguments":{"interface_key":"job","arguments":{"job_id":"123"}}}',
+            '{"tool_request":"query_agent_interface","interface_key":"job","arguments":{"job_id":"123"}}',
+            '{"type":"final","content":"Job 123 is running."}',
+        ]
+
+        with mock.patch("slurmweb.ai.service.get_provider_client", return_value=provider):
+            generator = self.service.stream_chat(self.user, {"message": "job 123?"})
+            output = "".join(list(generator()))
+
+        self.assertIn("Job 123 is running.", output)
+        self.assertNotIn('"tool_request":"query_agent_interface"', output)
+        self.assertEqual(self.conversation_store.messages[-1]["content"], "Job 123 is running.")
+
     def test_tool_registry_enforces_permission_mapping(self):
         self._create_model()
         self.app.policy = DummyPolicy({"dashboard:view:*"})

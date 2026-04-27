@@ -4,13 +4,17 @@ import { Chart } from 'chart.js/auto'
 import UserSubmissionHistoryChart from '@/components/user/UserSubmissionHistoryChart.vue'
 
 describe('UserSubmissionHistoryChart.vue', () => {
-  test('renders submissions dataset from history values', async () => {
+  test('renders submissions and completions datasets from history values', async () => {
     const wrapper = mount(UserSubmissionHistoryChart, {
       props: {
         history: {
           submissions: [
             [1748004750000, 3],
             [1748004810000, 5]
+          ],
+          completions: [
+            [1748004750000, 1],
+            [1748004810000, 4]
           ]
         }
       }
@@ -22,11 +26,16 @@ describe('UserSubmissionHistoryChart.vue', () => {
     const chart = Chart.getChart(canvas)
 
     expect(chart).toBeDefined()
-    expect(chart?.data.datasets).toHaveLength(1)
+    expect(chart?.data.datasets).toHaveLength(2)
     expect(chart?.data.datasets[0].label).toBe('Submissions')
     expect(chart?.data.datasets[0].data).toEqual([
       { x: 1748004750000, y: 3 },
       { x: 1748004810000, y: 5 }
+    ])
+    expect(chart?.data.datasets[1].label).toBe('Completions')
+    expect(chart?.data.datasets[1].data).toEqual([
+      { x: 1748004750000, y: 1 },
+      { x: 1748004810000, y: 4 }
     ])
   })
 
@@ -34,7 +43,8 @@ describe('UserSubmissionHistoryChart.vue', () => {
     const wrapper = mount(UserSubmissionHistoryChart, {
       props: {
         history: {
-          submissions: [[1748004750000, 3]]
+          submissions: [[1748004750000, 3]],
+          completions: [[1748004750000, 1]]
         }
       }
     })

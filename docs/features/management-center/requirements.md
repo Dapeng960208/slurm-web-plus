@@ -9,7 +9,7 @@
 - 在现有 `Jobs`、`Resources`、`Reservations`、`Accounts`、`User`、`QOS` 页面补创建、编辑、删除、取消等单对象能力
 - 将 `AI`、`LDAP Cache`、`Cache`、`Access Control` 从 `/settings/*` 迁移到 `/:cluster/admin`
 - 在 `analysis` 页面补 `Slurm diag` 与 `ping`
-- 将 `analysis/ping`、`analysis/diag` 与 `admin/system/licenses` 从原始 JSON 文本收口为结构化字段展示
+- 将 `analysis/ping`、`analysis/diag` 从原始 JSON 文本收口为结构化字段展示
 - 用 `resource:operation:scope` 做严格权限控制
 - 为 `jobs` 资源落地后端 owner-aware `self` 校验
 - 兼容 `slurmrestd` `0.39` 到 `0.44`
@@ -45,7 +45,6 @@
   - `Slurm diag`
   - `hour/day/week` 时间范围切换
 - `/:cluster/admin`
-  - `System`
   - `AI`
   - `LDAP Cache`
   - `Cache`
@@ -79,6 +78,7 @@
 - `settings` 页面只保留 `General`、`Errors`、`Account`
 - 主侧栏新增 `Admin`
 - 主侧栏顺序调整为 `AI` 在上、`Admin` 在最下
+- `/:cluster/admin` 直接访问时会跳转到 `/:cluster/analysis`
 - `Admin` 入口由任一 `admin/*:view:*` 控制显示
 - `admin-manage` 现在只是 `*:*:*` 的兼容别名，因此只有 `super-admin` 语义的角色/用户会通过该别名显示 `Admin` 入口
 
@@ -100,7 +100,6 @@
 - `admin/ldap-cache:view|edit:*`
 - `admin/cache:view|edit:*`
 - `admin/access-control:view|edit|delete:*`
-- `admin/system:view|edit|delete:*`
 
 控制规则：
 
@@ -132,7 +131,6 @@
 
 - `analysis/ping`
 - `analysis/diag`
-- `admin/system/<query>`
 - `jobs/submit`
 - `job/<id>/update`
 - `job/<id>/cancel`
@@ -211,7 +209,6 @@
 
 - `admin/ldap-cache:edit:*` 已在权限模型中预留，但当前未提供实质写接口
 - `accounts/users/qos/reservation` 当前前端使用轻量结构化表单，不覆盖全部官方 JSON 细节
-- `admin/system` 当前仅先把 `licenses` 收口为结构化摘要；`shares` 与部分 `slurmdb` 面板仍保留原始 JSON 输出
 - 全量后端回归仍需 Linux 环境补充
 
 ## 10. 相关实现与验证入口
@@ -219,7 +216,6 @@
 - 前端：
   - `frontend/src/router/index.ts`
   - `frontend/src/views/AdminLayoutView.vue`
-  - `frontend/src/views/AdminSystemView.vue`
   - `frontend/src/views/JobsView.vue`
   - `frontend/src/views/JobView.vue`
   - `frontend/src/views/resources/ResourcesView.vue`

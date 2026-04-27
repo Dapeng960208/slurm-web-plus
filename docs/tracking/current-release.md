@@ -27,8 +27,10 @@
   - `associations`
   - `users` / `user`
   - `user/metrics/history`
-  - `user/activity/summary`
+  - `user/tools/analysis`
 - AI 在单个问题处理中已允许多接口串联，例如先查 `job` 再查 `jobs/history`
+- AI 对“用户某工具推荐多少内存”这类资源推荐题已补提示收敛，优先使用 `user/tools/analysis` 作为聚合证据接口
+- AI 对话已修复内部工具 envelope 泄漏问题，不再把 `tool_request` / `interface_key` / `arguments` JSON 回显到消息区
 - AI 查询权限已切到复用 Agent 现有 `resource:operation:scope` 规则
 - 通过 AI 触发 create / update / delete 已改为复用 Agent 接口层权限校验：
   - `admin` 默认 `*:edit:*` 可执行对应 `edit` 类 AI 写接口
@@ -42,12 +44,22 @@
 - `AssistantView` 的 `Execution trace` 已改为默认简版：
   - 仅显示工具名 / 接口名 / 状态码 / 耗时
   - 参数 / 摘要 / 错误需点击展开
+- `AssistantView` 的聊天消息已支持安全 Markdown 渲染：
+  - `assistant` 与 `user` 消息统一按 Markdown 展示
+  - 原始 HTML 不会作为真实 DOM 节点渲染
+  - 外链默认新标签打开并带 `rel="noopener noreferrer"`
 - `analysis` 页的 `ping` / `diag` 已从原始 JSON 文本改为结构化字段展示
-- `Admin > System > Licenses` 已改为核心字段卡片展示，不再直接暴露原始 JSON 文本
-- `Admin > System > SlurmDB Instances` 已兼容“warning-only 且无 `instances` key”的空结果响应，避免页面直接 500
 - 用户分析历史接口与前端图表已扩展为：
   - 每时间桶提交作业数
   - 每时间桶完成作业数
+- 用户分析聚合接口已改名为 `user/tools/analysis`，旧 `user/activity/summary` 不再保留兼容路径
+- 用户分析页已改为整页共享 `start/end` 时间窗：
+  - `Submission Activity`
+  - `Usage Profile`
+  - `Tool Analysis`
+  - `Top Tools`
+- 用户分析页默认窗口已固定为“当天 00:00 -> 当前时间”，并通过 URL query `start` / `end` 持久化
+- `user/metrics/history` 响应已补 `window` 与 `totals`，自定义窗口下按小时/天/周自动选 bucket
 - 用户分析、Dashboard、Cluster Analysis 与 Node 详情页的时间范围切换已统一为 `hour/day/week`
 - `NodeView` 的指标时间范围已同步到 URL query，刷新后保持当前窗口
 - 左侧主菜单顺序已调整为：
@@ -65,7 +77,6 @@
 - 新增集群级 `/:cluster/admin` 路由与 `Admin` 菜单入口
 - 旧 `/settings/ai|access-control|cache|ldap-cache` 已重定向到 `admin/*`
 - `Admin` 页面已统一承载：
-  - `System`
   - `AI`
   - `LDAP Cache`
   - `Cache`
@@ -83,7 +94,6 @@
   - 列表优先注入 `user=<login>`
   - 详情、更新、取消先查 owner 再校验
 - 权限资源已切换到：
-  - `admin/system`
   - `admin/ai`
   - `admin/cache`
   - `admin/ldap-cache`
@@ -138,11 +148,8 @@
 
 ## 3. 进行中项
 
-- 评估是否继续扩大 AI 可调用的只读 Agent 接口目录，例如 `admin/system` 只读查询
 - 评估是否需要为 AI 写接口补更细的接口级 allowlist，作为现有接口权限校验之外的额外约束
 - 对齐 `accounts/users/qos/reservation` 的轻量前端表单字段与官方 JSON 结构边界
-- 评估是否继续把 `shares`、`slurmdb config`、`instances`、`tres` 等系统只读面板也收口为结构化摘要，而不是保留 JSON 输出
-- 继续评估是否需要为 `admin/system` 补更多官方只读面板
 - 视 Linux/CI 环境情况补全更大范围后端回归
 - 评估后续是否需要把 `CI Triage` 结果继续接给外部 AI agent 做只读诊断
 - 评估是否需要为结构化 CI 结果补 GitHub issue / PR comment 自动摘要

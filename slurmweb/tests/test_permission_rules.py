@@ -33,9 +33,9 @@ class TestPermissionRules(unittest.TestCase):
             "admin/ldap-cache",
             "admin/cache",
             "admin/access-control",
-            "admin/system",
         ]:
             self.assertIn(resource, resources)
+        self.assertNotIn("admin/system", resources)
 
         for resource in [
             "settings/ai",
@@ -102,8 +102,8 @@ class TestPermissionRules(unittest.TestCase):
         self.assertTrue(permission_rules_allow(["jobs:view:self"], "jobs", "view", "self"))
         self.assertFalse(permission_rules_allow(["jobs:view:self"], "jobs", "view", "*"))
         self.assertTrue(
-            permission_rules_allow(["admin/system:edit:*"], "admin/system", "view", "*")
+            permission_rules_allow(["admin/ai:edit:*"], "admin/ai", "view", "*")
         )
-        self.assertTrue(permission_rules_allow(["*:view:*"], "admin/system", "view", "*"))
+        self.assertTrue(permission_rules_allow(["*:view:*"], "admin/ai", "view", "*"))
         self.assertTrue(permission_rules_allow(["*:edit:*"], "jobs", "edit", "self"))
         self.assertFalse(permission_rules_allow(["*:edit:*"], "jobs", "delete", "self"))

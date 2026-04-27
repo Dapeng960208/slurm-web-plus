@@ -567,8 +567,8 @@ def user_metrics_history(cluster: str, username: str):
 
 @check_jwt
 @validate_cluster
-def user_activity_summary(cluster: str, username: str):
-    return proxy_agent(cluster, f"user/{username}/activity/summary", request.token)
+def user_tools_analysis(cluster: str, username: str):
+    return proxy_agent(cluster, f"user/{username}/tools/analysis", request.token)
 
 
 @check_jwt
@@ -593,12 +593,6 @@ def analysis_ping(cluster: str):
 @validate_cluster
 def analysis_diag(cluster: str):
     return proxy_agent(cluster, "analysis/diag", request.token)
-
-
-@check_jwt
-@validate_cluster
-def admin_system_query(cluster: str, query: str):
-    return proxy_agent(cluster, f"admin/system/{query}", request.token)
 
 
 @check_jwt
@@ -755,43 +749,6 @@ def users_update(cluster: str):
 @validate_cluster
 def user_delete(cluster: str, name: str):
     return proxy_agent(cluster, f"user/{name}/delete", request.token)
-
-
-@check_jwt
-@validate_cluster
-def wckeys(cluster: str):
-    return proxy_agent(cluster, "wckeys", request.token)
-
-
-@check_jwt
-@validate_cluster
-def wckeys_update(cluster: str):
-    return proxy_agent(cluster, "wckeys", request.token)
-
-
-@check_jwt
-@validate_cluster
-def wckey_delete(cluster: str, wckey_id: str):
-    return proxy_agent(cluster, f"wckey/{wckey_id}/delete", request.token)
-
-
-@check_jwt
-@validate_cluster
-def clusters_admin(cluster: str):
-    return proxy_agent(cluster, "clusters", request.token)
-
-
-@check_jwt
-@validate_cluster
-def clusters_update(cluster: str):
-    return proxy_agent(cluster, "clusters", request.token)
-
-
-@check_jwt
-@validate_cluster
-def cluster_delete(cluster: str, name: str):
-    return proxy_agent(cluster, f"cluster/{name}/delete", request.token)
-
 
 @check_jwt
 @validate_cluster

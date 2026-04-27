@@ -25,6 +25,7 @@ import PageHeader from '@/components/PageHeader.vue'
 import InfoAlert from '@/components/InfoAlert.vue'
 import ErrorAlert from '@/components/ErrorAlert.vue'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
+import MarkdownMessage from '@/components/MarkdownMessage.vue'
 
 type ToolRun = {
   id: number | string
@@ -157,6 +158,10 @@ function toolStatusLabel(tool: ToolRun): string {
 
 function toolHeadline(tool: ToolRun): string {
   return tool.interface_key || tool.tool_name
+}
+
+function toolDetailLabel(tool: ToolRun): string {
+  return isToolRunExpanded(tool) ? 'Hide details' : 'View details'
 }
 
 function normalizeToolRunFromHistory(toolCall: AIToolCallRecord): ToolRun {
@@ -654,9 +659,12 @@ watch(
                       >
                         Generating response...
                       </p>
-                      <p v-else class="mt-3 text-sm leading-6 whitespace-pre-wrap">
-                        {{ message.content }}
-                      </p>
+                      <MarkdownMessage
+                        v-else
+                        class="mt-3 text-sm leading-6"
+                        :content="message.content"
+                        :role="message.role"
+                      />
                     </div>
                   </article>
                 </div>
@@ -687,21 +695,30 @@ watch(
                             <p class="text-sm font-semibold text-[var(--color-brand-ink-strong)]">
                               {{ toolHeadline(tool) }}
                             </p>
-                            <p class="mt-1 text-xs text-[var(--color-brand-muted)]">
-                              {{ tool.tool_name }}
-                            </p>
                           </div>
                           <div class="flex items-center gap-2">
                             <span class="ui-chip">
                               {{ toolStatusLabel(tool) }}
                             </span>
-                            <span class="ui-chip">
-                              {{ tool.status === 'running' ? 'pending' : `${tool.duration_ms ?? 0} ms` }}
+                            <span class="text-xs font-medium text-[var(--color-brand-muted)]">
+                              {{ toolDetailLabel(tool) }}
                             </span>
                           </div>
                         </div>
                       </button>
                       <div v-if="isToolRunExpanded(tool)" class="mt-3 space-y-2">
+                        <p class="text-xs text-[var(--color-brand-muted)]">
+                          Tool: {{ tool.tool_name }}
+                        </p>
+                        <p v-if="tool.interface_key" class="text-xs text-[var(--color-brand-muted)]">
+                          Interface: {{ tool.interface_key }}
+                        </p>
+                        <p class="text-xs text-[var(--color-brand-muted)]">
+                          Status: {{ toolStatusLabel(tool) }}
+                        </p>
+                        <p class="text-xs text-[var(--color-brand-muted)]">
+                          Duration: {{ tool.status === 'running' ? 'pending' : `${tool.duration_ms ?? 0} ms` }}
+                        </p>
                         <p class="text-xs text-[var(--color-brand-muted)]">
                           {{ formatTimestamp(tool.created_at) }}
                         </p>

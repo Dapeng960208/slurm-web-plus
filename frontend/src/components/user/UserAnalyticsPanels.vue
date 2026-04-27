@@ -9,18 +9,17 @@
 <script setup lang="ts">
 import { computed, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { getMBHumanUnit, isMetricRange, useGatewayAPI } from '@/composables/GatewayAPI'
+import { getMBHumanUnit, useGatewayAPI } from '@/composables/GatewayAPI'
 import type {
-  MetricRange,
-  UserActivitySummary,
+  DateTimeWindowQuery,
   UserMetricsHistory,
-  UserToolActivityRecord
+  UserToolActivityRecord,
+  UserToolAnalysisSummary
 } from '@/composables/GatewayAPI'
 import ErrorAlert from '@/components/ErrorAlert.vue'
 import InfoAlert from '@/components/InfoAlert.vue'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
 import StatCardSkeleton from '@/components/StatCardSkeleton.vue'
-import MetricRangeSelector from '@/components/MetricRangeSelector.vue'
 import UserSubmissionHistoryChart from '@/components/user/UserSubmissionHistoryChart.vue'
 import UserToolAnalysisChart from '@/components/user/UserToolAnalysisChart.vue'
 
@@ -33,23 +32,26 @@ const { cluster, user, enabled } = defineProps<{
 const gateway = useGatewayAPI()
 const route = useRoute()
 const router = useRouter()
-const userMetricsRange = ref<MetricRange>('hour')
+const draftStart = ref('')
+const draftEnd = ref('')
+const appliedWindow = ref<DateTimeWindowQuery | null>(null)
+const timeWindowError = ref<string | null>(null)
 const userMetricsHistory = ref<UserMetricsHistory | null>(null)
-const userMetricsSummary = ref<UserActivitySummary | null>(null)
-const userMetricsLoading = ref(false)
+const userToolAnalysis = ref<UserToolAnalysisSummary | null>(null)
+const userToolAnalysisLoading = ref(false)
 const userMetricsHistoryLoading = ref(false)
-const userMetricsUnavailable = ref(false)
+const userToolAnalysisUnavailable = ref(false)
 const userMetricsHistoryUnavailable = ref(false)
 let summaryTimer: ReturnType<typeof setInterval> | null = null
 let historyTimer: ReturnType<typeof setInterval> | null = null
 
 const userGroupsLabel = computed(() => {
-  const groups = userMetricsSummary.value?.profile?.groups ?? []
+  const groups = userToolAnalysis.value?.profile?.groups ?? []
   return groups.length ? groups.join(', ') : null
 })
 
 const userMetricsGeneratedAtLabel = computed(() => {
-  const value = userMetricsSummary.value?.generated_at
+  const value = userToolAnalysis.value?.generated_at
   if (!value) return null
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return value
@@ -63,33 +65,42 @@ const userMetricsHistoryHasData = computed(() => {
 })
 
 const topTools = computed<UserToolActivityRecord[]>(() => {
-  return (userMetricsSummary.value?.tool_breakdown ?? [])
+  return (userToolAnalysis.value?.tool_breakdown ?? [])
     .slice()
     .sort((a, b) => (b.avg_max_memory_mb ?? 0) - (a.avg_max_memory_mb ?? 0) || b.jobs - a.jobs)
     .slice(0, 6)
 })
 
-const latestSubmissions = computed(
-  () => userMetricsSummary.value?.totals.latest_submissions_per_minute ?? null
+const submittedJobsInRange = computed(
+  () => userMetricsHistory.value?.totals?.submitted_jobs ?? 0
+)
+
+const completedJobsInRange = computed(
+  () => userMetricsHistory.value?.totals?.completed_jobs ?? 0
 )
 
 const averageMemoryLabel = computed(() => {
-  const value = userMetricsSummary.value?.totals.avg_max_memory_mb
+  const value = userToolAnalysis.value?.totals.avg_max_memory_mb
   return value != null ? getMBHumanUnit(value) : '--'
 })
 
 const averageCpuLabel = computed(() => {
-  const value = userMetricsSummary.value?.totals.avg_cpu_cores
+  const value = userToolAnalysis.value?.totals.avg_cpu_cores
   return value != null ? `${value.toFixed(1)} cores` : '--'
 })
 
 const averageRuntimeLabel = computed(() => {
-  return formatDuration(userMetricsSummary.value?.totals.avg_runtime_seconds)
+  return formatDuration(userToolAnalysis.value?.totals.avg_runtime_seconds)
 })
 
 const userMetricsReady = computed(
-  () => userMetricsSummary.value !== null && !userMetricsUnavailable.value
+  () => userToolAnalysis.value !== null && !userToolAnalysisUnavailable.value
 )
+
+const shouldPoll = computed(() => {
+  if (!enabled || !appliedWindow.value) return false
+  return new Date(appliedWindow.value.end).getTime() >= Date.now() - 5 * 60 * 1000
+})
 
 function formatDuration(value: number | null | undefined): string {
   if (value == null || Number.isNaN(value)) return '--'
@@ -100,40 +111,88 @@ function formatDuration(value: number | null | undefined): string {
   return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`
 }
 
+function pad2(value: number): string {
+  return value.toString().padStart(2, '0')
+}
+
+function formatDateTimeLocal(date: Date): string {
+  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}T${pad2(date.getHours())}:${pad2(date.getMinutes())}`
+}
+
+function parseDateTimeLocal(value: string): Date | null {
+  if (!value) return null
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return null
+  return parsed
+}
+
+function defaultWindowLocal(): { start: string; end: string } {
+  const end = new Date()
+  const start = new Date(end)
+  start.setHours(0, 0, 0, 0)
+  return {
+    start: formatDateTimeLocal(start),
+    end: formatDateTimeLocal(end)
+  }
+}
+
+function resolveWindowQuery(
+  startQuery: unknown,
+  endQuery: unknown
+): { startLocal: string; endLocal: string; startUtc: string; endUtc: string } {
+  const fallback = defaultWindowLocal()
+  const startLocal = typeof startQuery === 'string' ? startQuery : fallback.start
+  const endLocal = typeof endQuery === 'string' ? endQuery : fallback.end
+  const startDate = parseDateTimeLocal(startLocal)
+  const endDate = parseDateTimeLocal(endLocal)
+  if (!startDate || !endDate || startDate >= endDate) {
+    const fallbackStartDate = parseDateTimeLocal(fallback.start) as Date
+    const fallbackEndDate = parseDateTimeLocal(fallback.end) as Date
+    return {
+      startLocal: fallback.start,
+      endLocal: fallback.end,
+      startUtc: fallbackStartDate.toISOString(),
+      endUtc: fallbackEndDate.toISOString()
+    }
+  }
+  return {
+    startLocal,
+    endLocal,
+    startUtc: startDate.toISOString(),
+    endUtc: endDate.toISOString()
+  }
+}
+
 function resetUserMetricsState() {
   userMetricsHistory.value = null
-  userMetricsSummary.value = null
-  userMetricsLoading.value = false
+  userToolAnalysis.value = null
+  userToolAnalysisLoading.value = false
   userMetricsHistoryLoading.value = false
-  userMetricsUnavailable.value = false
+  userToolAnalysisUnavailable.value = false
   userMetricsHistoryUnavailable.value = false
 }
 
-async function fetchUserMetricsSummary() {
-  if (!enabled) return
+async function fetchUserToolAnalysis() {
+  if (!enabled || !appliedWindow.value) return
 
-  userMetricsLoading.value = true
+  userToolAnalysisLoading.value = true
   try {
-    userMetricsSummary.value = await gateway.user_activity_summary(cluster, user)
-    userMetricsUnavailable.value = false
+    userToolAnalysis.value = await gateway.user_tools_analysis(cluster, user, appliedWindow.value)
+    userToolAnalysisUnavailable.value = false
   } catch {
-    userMetricsUnavailable.value = true
-    userMetricsSummary.value = null
+    userToolAnalysisUnavailable.value = true
+    userToolAnalysis.value = null
   } finally {
-    userMetricsLoading.value = false
+    userToolAnalysisLoading.value = false
   }
 }
 
 async function fetchUserMetricsHistory() {
-  if (!enabled) return
+  if (!enabled || !appliedWindow.value) return
 
   userMetricsHistoryLoading.value = true
   try {
-    userMetricsHistory.value = await gateway.user_metrics_history(
-      cluster,
-      user,
-      userMetricsRange.value
-    )
+    userMetricsHistory.value = await gateway.user_metrics_history(cluster, user, appliedWindow.value)
     userMetricsHistoryUnavailable.value = false
   } catch {
     userMetricsHistoryUnavailable.value = true
@@ -144,14 +203,14 @@ async function fetchUserMetricsHistory() {
 }
 
 async function refreshUserMetrics() {
-  await Promise.all([fetchUserMetricsSummary(), fetchUserMetricsHistory()])
+  await Promise.all([fetchUserToolAnalysis(), fetchUserMetricsHistory()])
 }
 
 function startUserMetricsPolling() {
-  if (!enabled) return
+  if (!shouldPoll.value) return
   if (summaryTimer) clearInterval(summaryTimer)
   if (historyTimer) clearInterval(historyTimer)
-  summaryTimer = setInterval(fetchUserMetricsSummary, 60000)
+  summaryTimer = setInterval(fetchUserToolAnalysis, 60000)
   historyTimer = setInterval(fetchUserMetricsHistory, 120000)
 }
 
@@ -166,54 +225,84 @@ function stopUserMetricsPolling() {
   }
 }
 
-function setUserMetricsRange(range: MetricRange) {
-  if (userMetricsRange.value === range && route.query.range === range) return
+function applyTimeWindow() {
+  timeWindowError.value = null
+  const startDate = parseDateTimeLocal(draftStart.value)
+  const endDate = parseDateTimeLocal(draftEnd.value)
+  if (!startDate || !endDate) {
+    timeWindowError.value = 'Start and end time must both be valid datetimes.'
+    return
+  }
+  if (startDate >= endDate) {
+    timeWindowError.value = 'Start time must be earlier than end time.'
+    return
+  }
   void router.replace({
     query: {
       ...route.query,
-      range
+      start: draftStart.value,
+      end: draftEnd.value
+    }
+  })
+}
+
+function resetTimeWindow() {
+  const fallback = defaultWindowLocal()
+  draftStart.value = fallback.start
+  draftEnd.value = fallback.end
+  timeWindowError.value = null
+  void router.replace({
+    query: {
+      ...route.query,
+      start: fallback.start,
+      end: fallback.end
     }
   })
 }
 
 watch(
-  () => route.query.range,
-  (range) => {
-    userMetricsRange.value = isMetricRange(range) ? range : 'hour'
+  () => [route.query.start, route.query.end],
+  ([startQuery, endQuery]) => {
+    const resolved = resolveWindowQuery(startQuery, endQuery)
+    draftStart.value = resolved.startLocal
+    draftEnd.value = resolved.endLocal
+    appliedWindow.value = {
+      start: resolved.startUtc,
+      end: resolved.endUtc
+    }
+    if (route.query.start !== resolved.startLocal || route.query.end !== resolved.endLocal) {
+      void router.replace({
+        query: {
+          ...route.query,
+          start: resolved.startLocal,
+          end: resolved.endLocal
+        }
+      })
+    }
   },
   { immediate: true }
 )
 
 watch(
-  () => enabled,
-  (available) => {
-    stopUserMetricsPolling()
-    if (available) {
-      void refreshUserMetrics()
-      startUserMetricsPolling()
+  () => [enabled, appliedWindow.value?.start, appliedWindow.value?.end, cluster, user],
+  () => {
+    if (!enabled || !appliedWindow.value) {
+      stopUserMetricsPolling()
+      resetUserMetricsState()
       return
     }
-    resetUserMetricsState()
-  },
-  { immediate: true }
-)
-
-watch(
-  () => userMetricsRange.value,
-  () => {
-    if (!enabled) return
-    userMetricsHistory.value = null
-    userMetricsHistoryUnavailable.value = false
-    void fetchUserMetricsHistory()
+    timeWindowError.value = null
+    stopUserMetricsPolling()
+    void refreshUserMetrics()
+    startUserMetricsPolling()
   }
 )
 
 watch(
-  () => `${cluster}/${user}`,
-  () => {
-    if (!enabled) return
-    resetUserMetricsState()
-    void refreshUserMetrics()
+  () => shouldPoll.value,
+  (polling) => {
+    stopUserMetricsPolling()
+    if (polling) startUserMetricsPolling()
   }
 )
 
@@ -240,7 +329,7 @@ onUnmounted(() => {
         <div class="mt-1.5 text-sm text-[var(--color-brand-muted)]">
           LDAP
           {{
-            userMetricsSummary?.profile?.ldap_found ? 'profile available' : 'profile unavailable'
+            userToolAnalysis?.profile?.ldap_found ? 'profile available' : 'profile unavailable'
           }}
         </div>
       </div>
@@ -258,41 +347,77 @@ onUnmounted(() => {
       </div>
     </div>
 
-    <StatCardSkeleton v-if="userMetricsLoading && !userMetricsSummary" :cards="4" />
+    <div class="ui-panel-soft px-4 py-4">
+      <div class="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <div class="ui-stat-label">Selected Time Range</div>
+          <div class="mt-2 text-sm text-[var(--color-brand-muted)]">
+            Use one shared window for submissions, usage profile, tool analysis and top tools.
+          </div>
+        </div>
+        <div class="flex flex-wrap gap-2">
+          <button type="button" class="ui-button-secondary" @click="resetTimeWindow">
+            Reset to today
+          </button>
+          <button type="button" class="ui-button-primary" @click="applyTimeWindow">
+            Apply
+          </button>
+        </div>
+      </div>
+      <div class="mt-4 grid gap-3 md:grid-cols-2">
+        <label class="block text-sm font-semibold text-[var(--color-brand-ink-strong)]">
+          Start time
+          <input
+            v-model="draftStart"
+            type="datetime-local"
+            class="mt-2 block w-full rounded-[18px] border border-[rgba(80,105,127,0.14)] bg-white px-3 py-2.5 text-sm text-[var(--color-brand-ink-strong)] outline-hidden focus:border-[rgba(182,232,44,0.65)] focus:ring-4 focus:ring-[rgba(182,232,44,0.18)]"
+          />
+        </label>
+        <label class="block text-sm font-semibold text-[var(--color-brand-ink-strong)]">
+          End time
+          <input
+            v-model="draftEnd"
+            type="datetime-local"
+            class="mt-2 block w-full rounded-[18px] border border-[rgba(80,105,127,0.14)] bg-white px-3 py-2.5 text-sm text-[var(--color-brand-ink-strong)] outline-hidden focus:border-[rgba(182,232,44,0.65)] focus:ring-4 focus:ring-[rgba(182,232,44,0.18)]"
+          />
+        </label>
+      </div>
+      <p v-if="timeWindowError" class="mt-3 text-sm text-red-600">
+        {{ timeWindowError }}
+      </p>
+    </div>
+
+    <StatCardSkeleton v-if="userToolAnalysisLoading && !userToolAnalysis" :cards="4" />
 
     <div v-else-if="userMetricsReady" class="ui-stat-grid">
       <div class="ui-stat-card">
-        <div class="ui-stat-label">Submitted Today</div>
-        <div class="ui-stat-value">
-          {{ userMetricsSummary?.totals.submitted_jobs_today ?? 0 }}
-        </div>
-        <div class="ui-stat-subtle">
-          Completed: {{ userMetricsSummary?.totals.completed_jobs_today ?? 0 }}
-        </div>
+        <div class="ui-stat-label">Submitted in Range</div>
+        <div class="ui-stat-value">{{ submittedJobsInRange }}</div>
+        <div class="ui-stat-subtle">Submission events captured in the selected window</div>
       </div>
       <div class="ui-stat-card">
-        <div class="ui-stat-label">Live Submit Rate</div>
-        <div class="ui-stat-value">{{ latestSubmissions ?? '--' }}</div>
-        <div class="ui-stat-subtle">Jobs per minute in the latest bucket</div>
+        <div class="ui-stat-label">Completed in Range</div>
+        <div class="ui-stat-value">{{ completedJobsInRange }}</div>
+        <div class="ui-stat-subtle">Completed jobs captured in the selected window</div>
       </div>
       <div class="ui-stat-card">
         <div class="ui-stat-label">Active Tools</div>
-        <div class="ui-stat-value">{{ userMetricsSummary?.totals.active_tools ?? 0 }}</div>
+        <div class="ui-stat-value">{{ userToolAnalysis?.totals.active_tools ?? 0 }}</div>
         <div class="ui-stat-subtle">
           Top tool:
-          {{ userMetricsSummary?.totals.busiest_tool ?? '--' }}
+          {{ userToolAnalysis?.totals.busiest_tool ?? '--' }}
         </div>
       </div>
       <div class="ui-stat-card">
         <div class="ui-stat-label">Average Runtime</div>
         <div class="ui-stat-value">{{ averageRuntimeLabel }}</div>
-        <div class="ui-stat-subtle">Across completed jobs captured today</div>
+        <div class="ui-stat-subtle">Across completed jobs captured in the selected window</div>
       </div>
     </div>
 
-    <InfoAlert v-else-if="userMetricsUnavailable">
-      User activity statistics are not available for this cluster. LDAP and association details
-      remain available.
+    <InfoAlert v-else-if="userToolAnalysisUnavailable">
+      User tool analysis is not available for this cluster. LDAP and association details remain
+      available.
     </InfoAlert>
 
     <div
@@ -304,16 +429,9 @@ onUnmounted(() => {
           <div>
             <h2 class="ui-panel-title">Submission Activity</h2>
             <p class="ui-panel-description mt-2">
-              Near-realtime job submission and completion trends for this user across hour, day
-              and week windows.
+              Submission and completion trends for this user within the selected time range.
             </p>
           </div>
-
-          <MetricRangeSelector
-            :model-value="userMetricsRange"
-            aria-label="Select user activity range"
-            @update:model-value="setUserMetricsRange"
-          />
         </div>
 
         <ErrorAlert v-if="userMetricsHistoryUnavailable">
@@ -333,7 +451,7 @@ onUnmounted(() => {
         <div class="mb-3">
           <h2 class="ui-panel-title">Usage Profile</h2>
           <p class="ui-panel-description mt-2">
-            Aggregate behaviour across completed jobs collected for today.
+            Aggregate behaviour across completed jobs in the selected time range.
           </p>
         </div>
 
@@ -344,7 +462,7 @@ onUnmounted(() => {
               {{ averageMemoryLabel }}
             </div>
             <div class="mt-1.5 text-sm text-[var(--color-brand-muted)]">
-              Per completed job across recorded tools
+              Per completed job across recorded tools in the selected window
             </div>
           </div>
 
@@ -354,17 +472,17 @@ onUnmounted(() => {
               {{ averageCpuLabel }}
             </div>
             <div class="mt-1.5 text-sm text-[var(--color-brand-muted)]">
-              Core allocation requested by this user's tool runs
+              Core allocation requested by this user's tool runs in the selected window
             </div>
           </div>
 
           <div class="ui-panel-soft px-4 py-3">
             <div class="ui-stat-label">Busiest Tool</div>
             <div class="mt-2 text-2xl font-bold text-[var(--color-brand-ink-strong)]">
-              {{ userMetricsSummary?.totals.busiest_tool ?? '--' }}
+              {{ userToolAnalysis?.totals.busiest_tool ?? '--' }}
             </div>
             <div class="mt-1.5 text-sm text-[var(--color-brand-muted)]">
-              {{ userMetricsSummary?.totals.busiest_tool_jobs ?? 0 }} completed job(s)
+              {{ userToolAnalysis?.totals.busiest_tool_jobs ?? 0 }} completed job(s)
             </div>
           </div>
         </div>
@@ -380,7 +498,7 @@ onUnmounted(() => {
           <h2 class="ui-panel-title">Tool Analysis</h2>
           <p class="ui-panel-description mt-2">
             Dual horizontal bars compare average memory footprint and completed job volume for the
-            most active tools recorded today.
+            most active tools recorded in the selected time range.
           </p>
         </div>
 
@@ -397,7 +515,7 @@ onUnmounted(() => {
         <div class="mb-3">
           <h2 class="ui-panel-title">Top Tools</h2>
           <p class="ui-panel-description mt-2">
-            Daily roll-up for memory, CPU, runtime and completed jobs associated with this user.
+            Tool roll-up for memory, CPU, runtime and completed jobs in the selected time range.
           </p>
         </div>
 

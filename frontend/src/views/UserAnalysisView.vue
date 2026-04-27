@@ -56,7 +56,7 @@ const userMetricsEnabled = computed(
         <PageHeader
           kicker="User Analysis"
           :title="user"
-          description="Submission trends, tool usage analysis and daily execution summaries for this user."
+          description="Submission trends, tool usage analysis and execution summaries for this user."
         >
           <template #actions>
             <div class="flex flex-wrap gap-3">

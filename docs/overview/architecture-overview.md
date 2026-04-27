@@ -44,7 +44,6 @@ Browser (Vue SPA)
 
 与本轮管理扩展直接相关的资源已经迁移为：
 
-- `admin/system`
 - `admin/ai`
 - `admin/cache`
 - `admin/ldap-cache`
@@ -101,9 +100,11 @@ AI model
 
 - 模型看到的是“接口能力目录”，而不是底层实现细节
 - 单个问题可连续调用多个接口后再回答，例如 `job` + `jobs/history`
+- 对用户工具资源推荐类问题，优先使用 `user/tools/analysis` 聚合证据，再视情况补查 `jobs/history`
 - 查询接口继续复用 Agent 已有资源规则和 owner-aware 逻辑
 - AI 写接口不再额外走 `super-admin` 总闸，而是复用 Agent 接口层现有权限校验
 - 当接口层拒绝访问时，工具执行会把权限错误与状态码回传给模型和执行轨迹
+- 若模型错误回显内部 `tool_request` / `interface_key` / `arguments` envelope，AIService 不会把它透传为最终消息，而是继续要求模型输出合法 `final`
 
 执行轨迹链路同步变为：
 
@@ -128,7 +129,7 @@ Vue 页面
 - Gateway 现在支持把 `DELETE` body 继续代理给 Agent
 - Agent 为 `jobs self` 先查 owner，再按 `self` 校验
 - `slurmweb.slurmrestd` 扩展为通用 `GET/POST/DELETE` 请求层
-- `analysis/ping`、`analysis/diag` 与 `admin/system/*` 走集群级系统接口
+- `analysis/ping`、`analysis/diag` 走集群级系统接口
 
 典型写路径包括：
 
@@ -187,7 +188,7 @@ Vue 页面
 - 主菜单 `MainMenu.vue`
 - 路由守卫 `router/index.ts`
 - Settings tabs
-- `AdminLayoutView.vue` / `AdminSystemView.vue`
+- `AdminLayoutView.vue`
 - `SettingsAccessControl.vue` 权限矩阵
 - `SettingsAI.vue`
 - `SettingsCache.vue`

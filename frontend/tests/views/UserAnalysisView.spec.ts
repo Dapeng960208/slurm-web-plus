@@ -7,7 +7,7 @@ import * as GatewayAPI from '@/composables/GatewayAPI'
 
 const mockGatewayAPI = {
   user_metrics_history: vi.fn(),
-  user_activity_summary: vi.fn()
+  user_tools_analysis: vi.fn()
 }
 
 describe('UserAnalysisView.vue', () => {
@@ -32,7 +32,7 @@ describe('UserAnalysisView.vue', () => {
         user_metrics: true
       }
     ]
-    mockGatewayAPI.user_activity_summary.mockResolvedValue({
+    mockGatewayAPI.user_tools_analysis.mockResolvedValue({
       username: 'root',
       profile: {
         fullname: 'Root User',
@@ -41,11 +41,13 @@ describe('UserAnalysisView.vue', () => {
         ldap_found: true
       },
       generated_at: '2026-04-24T12:00:00Z',
+      window: {
+        start: '2026-04-24T00:00:00Z',
+        end: '2026-04-24T12:00:00Z'
+      },
       totals: {
-        submitted_jobs_today: 17,
-        completed_jobs_today: 12,
+        completed_jobs: 12,
         active_tools: 3,
-        latest_submissions_per_minute: 2,
         avg_max_memory_mb: 8192,
         avg_cpu_cores: 7.5,
         avg_runtime_seconds: 5400,
@@ -63,6 +65,14 @@ describe('UserAnalysisView.vue', () => {
       ]
     })
     mockGatewayAPI.user_metrics_history.mockResolvedValue({
+      window: {
+        start: '2026-04-24T00:00:00Z',
+        end: '2026-04-24T12:00:00Z'
+      },
+      totals: {
+        submitted_jobs: 17,
+        completed_jobs: 12
+      },
       submissions: [[1745488800000, 2]],
       completions: [[1745488800000, 1]]
     })
@@ -87,8 +97,22 @@ describe('UserAnalysisView.vue', () => {
     expect(wrapper.text()).toContain('User Analysis')
     expect(wrapper.text()).toContain('Submission Activity')
     expect(wrapper.text()).toContain('Tool Analysis')
-    expect(mockGatewayAPI.user_activity_summary).toHaveBeenCalledWith('foo', 'root')
-    expect(mockGatewayAPI.user_metrics_history).toHaveBeenCalledWith('foo', 'root', 'hour')
+    expect(mockGatewayAPI.user_tools_analysis).toHaveBeenCalledWith(
+      'foo',
+      'root',
+      expect.objectContaining({
+        start: expect.stringMatching(/T/),
+        end: expect.stringMatching(/T/)
+      })
+    )
+    expect(mockGatewayAPI.user_metrics_history).toHaveBeenCalledWith(
+      'foo',
+      'root',
+      expect.objectContaining({
+        start: expect.stringMatching(/T/),
+        end: expect.stringMatching(/T/)
+      })
+    )
   })
 
   test('shows disabled message when analytics is unavailable', async () => {

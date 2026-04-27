@@ -91,7 +91,6 @@ resource:operation:scope
   - `admin/access-control`
   - `admin/cache`
   - `admin/ldap-cache`
-  - `admin/system`
 - 用户空间：
   - `user/profile`
   - `user/analysis`

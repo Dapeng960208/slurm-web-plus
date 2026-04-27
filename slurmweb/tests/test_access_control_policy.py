@@ -72,12 +72,12 @@ class TestAccessControlPolicy(unittest.TestCase):
         manager = AccessControlPolicyManager(file_policy)
         user = AuthenticatedUser(login="alice", fullname="Alice Doe", groups=["users"])
 
-        self.assertTrue(manager.allowed_user_permission(user, "admin/system", "view", "*"))
+        self.assertTrue(manager.allowed_user_permission(user, "admin/ai", "view", "*"))
         self.assertTrue(manager.allowed_user_permission(user, "admin/cache", "edit", "*"))
         self.assertTrue(
             manager.allowed_user_permission(user, "admin/access-control", "delete", "*")
         )
-        self.assertTrue(manager.allowed_user_permission(user, "admin/system", "delete", "*"))
+        self.assertTrue(manager.allowed_user_permission(user, "admin/ai", "delete", "*"))
         self.assertTrue(manager.allowed_user_permission(user, "admin/cache", "delete", "*"))
         self.assertTrue(manager.allowed_user_permission(user, "settings/cache", "view", "*"))
         self.assertTrue(manager.allowed_user_permission(user, "jobs", "view", "*"))
@@ -97,6 +97,6 @@ class TestAccessControlPolicy(unittest.TestCase):
         )
         user = AuthenticatedUser(login="alice", fullname="Alice Doe", groups=["users"])
 
-        self.assertTrue(manager.allowed_user_permission(user, "admin/system", "view", "*"))
+        self.assertTrue(manager.allowed_user_permission(user, "admin/ai", "view", "*"))
         self.assertTrue(manager.allowed_user_permission(user, "jobs", "edit", "self"))
         self.assertFalse(manager.allowed_user_permission(user, "jobs", "delete", "*"))

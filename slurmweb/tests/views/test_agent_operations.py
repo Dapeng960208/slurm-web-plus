@@ -44,15 +44,12 @@ class TestAgentOperations(TestAgentBase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json["statistics"]["parts_packed"], 1)
 
-    def test_admin_system_instances_returns_empty_list_when_slurmdb_has_no_instances(self):
+    def test_admin_system_route_removed(self):
         self.setup_client()
-        self._enable_self_rules("admin/system:view:*")
-        self.app.slurmrestd.instances = mock.Mock(return_value=[])
 
         response = self.client.get(f"/v{get_version()}/admin/system/slurmdb/instances")
 
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json, {"instances": []})
+        self.assertEqual(response.status_code, 404)
 
     def test_job_cancel_self_allows_owner(self):
         self.setup_client()

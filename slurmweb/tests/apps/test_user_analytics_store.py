@@ -94,7 +94,7 @@ class TestUserMetricsAggregation(unittest.TestCase):
 
         result = _aggregate_rows(rows)
 
-        self.assertEqual(result["totals"]["completed_jobs_today"], 3)
+        self.assertEqual(result["totals"]["completed_jobs"], 3)
         self.assertEqual(result["totals"]["active_tools"], 2)
         self.assertEqual(result["totals"]["busiest_tool"], "rna-seq")
         self.assertEqual(result["totals"]["busiest_tool_jobs"], 2)
@@ -125,7 +125,7 @@ class TestUserMetricsTimeline(unittest.TestCase):
             datetime(2026, 4, 24, 0, 0, tzinfo=timezone.utc),
         )
 
-    def test_user_activity_summary_includes_profile(self):
+    def test_user_tool_analysis_includes_profile(self):
         settings = SimpleNamespace(aggregation_interval=3600, tool_mapping_file=None)
         users_store = mock.Mock()
         users_store.get_ldap_user.return_value = {
@@ -135,7 +135,7 @@ class TestUserMetricsTimeline(unittest.TestCase):
             "ldap_synced_at": datetime(2026, 4, 24, 9, 0, tzinfo=timezone.utc),
         }
         store = UserAnalyticsStore(settings=settings, users_store=users_store)
-        store._completed_jobs_rows = mock.Mock(
+        store._completed_jobs_rows_window = mock.Mock(
             return_value=[
                 {
                     "job_name": "blast",
@@ -149,17 +149,19 @@ class TestUserMetricsTimeline(unittest.TestCase):
                 }
             ]
         )
-        store._submitted_jobs_today = mock.Mock(return_value=3)
-        store.latest_submission_count = mock.Mock(return_value=1)
 
-        result = store.user_activity_summary("alice")
+        result = store.user_tool_analysis(
+            "alice",
+            start_time=datetime(2026, 4, 24, 0, 0, tzinfo=timezone.utc),
+            end_time=datetime(2026, 4, 24, 12, 0, tzinfo=timezone.utc),
+        )
 
         self.assertEqual(result["profile"]["fullname"], "Alice Doe")
         self.assertEqual(result["profile"]["groups"], ["users"])
         self.assertTrue(result["profile"]["ldap_found"])
-        self.assertEqual(result["totals"]["submitted_jobs_today"], 3)
-        self.assertEqual(result["totals"]["completed_jobs_today"], 1)
+        self.assertEqual(result["totals"]["completed_jobs"], 1)
         self.assertEqual(result["tool_breakdown"][0]["tool"], "blast")
+        self.assertEqual(result["window"]["start"], "2026-04-24T00:00:00+00:00")
 
 
 class TestUserMetricsQueries(unittest.TestCase):
@@ -226,3 +228,17 @@ class TestUserMetricsQueries(unittest.TestCase):
         self.assertEqual(len(payload), 1)
         self.assertEqual(payload[0]["tool"], "blastp")
         self.assertEqual(payload[0]["jobs_count"], 1)
+
+    def test_completed_jobs_window_query_filters_by_time_range(self):
+        start_time = datetime(2026, 4, 24, 0, 0, tzinfo=timezone.utc)
+        end_time = datetime(2026, 4, 24, 12, 0, tzinfo=timezone.utc)
+
+        self.store._completed_jobs_rows_window("alice", start_time, end_time)
+
+        sql = self.cursor.execute.call_args.args[0]
+        params = self.cursor.execute.call_args.args[1]
+        self.assertIn("COALESCE(js.end_time, js.last_seen) >= %s", sql)
+        self.assertIn("COALESCE(js.end_time, js.last_seen) <= %s", sql)
+        self.assertEqual(params[0], "alice")
+        self.assertEqual(params[1], start_time)
+        self.assertEqual(params[2], end_time)

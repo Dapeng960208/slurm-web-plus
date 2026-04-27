@@ -279,7 +279,7 @@ describe('MainMenu.vue', () => {
         permissions: {
           roles: ['admin'],
           actions: [],
-          rules: ['admin/system:view:*']
+          rules: ['admin/cache:view:*']
         },
         racksdb: true,
         infrastructure: 'foo',
@@ -291,6 +291,80 @@ describe('MainMenu.vue', () => {
     await nextTick()
 
     expect(wrapper.text()).toContain('Admin')
+  })
+
+  test('links Admin to the first accessible admin page by priority', async () => {
+    const wrapper = shallowMount(MainMenu, {
+      props: {
+        entry: 'dashboard',
+        clusterContext: 'foo',
+        modelValue: true
+      },
+      global: {
+        plugins: [
+          [
+            runtimeConfiguration,
+            {
+              api_server: 'http://localhost',
+              authentication: true,
+              racksdb_rows_labels: false,
+              racksdb_racks_labels: false,
+              version: 'test-version'
+            }
+          ],
+          createTestingPinia({
+            stubActions: false
+          })
+        ],
+        stubs: {
+          RouterLink: {
+            props: ['to'],
+            template: '<a :data-to="JSON.stringify(to)"><slot /></a>'
+          },
+          TransitionRoot: {
+            template: '<div><slot /></div>'
+          },
+          TransitionChild: {
+            template: '<div><slot /></div>'
+          },
+          Dialog: {
+            template: '<div><slot /></div>'
+          },
+          DialogPanel: {
+            template: '<div><slot /></div>'
+          },
+          BrandLogo: {
+            props: ['framed', 'size'],
+            template:
+              '<div class="brand-logo-stub" :data-framed="String(framed)" :data-size="size" />'
+          }
+        }
+      }
+    })
+
+    const runtimeStore = useRuntimeStore()
+    runtimeStore.availableClusters = [
+      {
+        name: 'foo',
+        permissions: {
+          roles: ['admin'],
+          actions: [],
+          rules: ['admin/ldap-cache:view:*', 'admin/cache:view:*']
+        },
+        racksdb: true,
+        infrastructure: 'foo',
+        metrics: true,
+        cache: true
+      }
+    ]
+    runtimeStore.currentCluster = runtimeStore.availableClusters[0]
+    await nextTick()
+
+    const adminLink = wrapper
+      .findAll('a')
+      .find((link) => link.text().trim() === 'Admin')
+
+    expect(adminLink?.attributes('data-to')).toContain('"name":"admin-cache"')
   })
 
   test('shows Admin when permissions come from admin-manage super-admin action', async () => {

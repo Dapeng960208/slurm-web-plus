@@ -181,11 +181,11 @@ describe('Runtime Store', () => {
       permissions: {
         roles: ['admin'],
         actions: [],
-        rules: ['admin/system:view:*', 'admin/cache:edit:*', 'admin/access-control:delete:*']
+        rules: ['admin/ai:view:*', 'admin/cache:edit:*', 'admin/access-control:delete:*']
       }
     })
 
-    expect(runtime.hasRoutePermission('foo', 'admin/system', 'view')).toBe(true)
+    expect(runtime.hasRoutePermission('foo', 'admin/ai', 'view')).toBe(true)
     expect(runtime.hasRoutePermission('foo', 'admin/cache', 'edit')).toBe(true)
     expect(runtime.hasRoutePermission('foo', 'admin/access-control', 'delete')).toBe(true)
     expect(runtime.hasRoutePermission('foo', 'settings/cache', 'view')).toBe(false)
@@ -208,9 +208,9 @@ describe('Runtime Store', () => {
     })
 
     expect(runtime.hasRoutePermission('foo', 'jobs', 'edit', 'self')).toBe(true)
-    expect(runtime.hasRoutePermission('foo', 'admin/system', 'view')).toBe(true)
-    expect(runtime.hasRoutePermission('foo', 'admin/system', 'edit')).toBe(true)
-    expect(runtime.hasRoutePermission('foo', 'admin/system', 'delete')).toBe(true)
+    expect(runtime.hasRoutePermission('foo', 'admin/ai', 'view')).toBe(true)
+    expect(runtime.hasRoutePermission('foo', 'admin/ai', 'edit')).toBe(true)
+    expect(runtime.hasRoutePermission('foo', 'admin/ai', 'delete')).toBe(true)
     expect(runtime.hasRoutePermission('foo', 'admin/cache', 'edit')).toBe(true)
     expect(runtime.hasRoutePermission('foo', 'admin/cache', 'delete')).toBe(true)
   })

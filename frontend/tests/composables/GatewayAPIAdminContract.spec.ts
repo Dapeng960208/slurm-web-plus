@@ -26,8 +26,9 @@ describe('GatewayAPI admin contract', () => {
   test('declares analysis diag and ping endpoints and avoids bulk operation helpers', () => {
     expect(source).toContain('/agents/${cluster}/analysis/diag')
     expect(source).toContain('/agents/${cluster}/analysis/ping')
-    expect(source).toContain('function admin_licenses')
-    expect(source).toContain('function admin_reconfigure')
+    expect(source).not.toContain('/agents/${cluster}/admin/system/')
+    expect(source).not.toContain('function admin_licenses')
+    expect(source).not.toContain('function admin_reconfigure')
     expect(source).toContain('/agents/${cluster}/job/${jobId}/update')
     expect(source).toContain('/agents/${cluster}/job/${jobId}/cancel')
     expect(source).toContain('/agents/${cluster}/node/${encodedNodeName}/update')

@@ -420,25 +420,27 @@ class TestGatewayViews(TestGatewayBase):
         )
 
     @mock.patch("slurmweb.views.gateway.proxy_agent")
-    def test_user_activity_summary(self, mock_proxy_agent):
+    def test_user_tools_analysis(self, mock_proxy_agent):
         self.app_set_agents({"foo": fake_slurmweb_agent("foo")})
         mock_proxy_agent.return_value = (
             self.app.response_class(
-                response='{"username":"alice","totals":{"submitted_jobs_today":3},"tool_breakdown":[]}',
+                response='{"username":"alice","totals":{"completed_jobs":3},"tool_breakdown":[]}',
                 status=200,
                 mimetype="application/json",
             ),
             200,
         )
-        response = self.client.get("/api/agents/foo/user/alice/activity/summary")
+        response = self.client.get(
+            "/api/agents/foo/user/alice/tools/analysis?start=2026-04-24T00:00:00Z&end=2026-04-24T12:00:00Z"
+        )
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json["totals"]["submitted_jobs_today"], 3)
+        self.assertEqual(response.json["totals"]["completed_jobs"], 3)
         self.assertEqual(
-            mock_proxy_agent.call_args.args[:2], ("foo", "user/alice/activity/summary")
+            mock_proxy_agent.call_args.args[:2], ("foo", "user/alice/tools/analysis")
         )
 
     @mock.patch("slurmweb.views.gateway.aiohttp.ClientSession.get")
-    def test_user_activity_summary_requests_agent_url(self, mock_get):
+    def test_user_tools_analysis_requests_agent_url(self, mock_get):
         foo = fake_slurmweb_agent("foo")
         self.app_set_agents({"foo": foo})
         _, mock_get.return_value = mock_agent_aio_response(
@@ -446,16 +448,18 @@ class TestGatewayViews(TestGatewayBase):
                 "username": "alice",
                 "profile": None,
                 "generated_at": None,
-                "totals": {"submitted_jobs_today": 0},
+                "totals": {"completed_jobs": 0},
                 "tool_breakdown": [],
             }
         )
 
-        response = self.client.get("/api/agents/foo/user/alice/activity/summary")
+        response = self.client.get(
+            "/api/agents/foo/user/alice/tools/analysis?start=2026-04-24T00:00:00Z&end=2026-04-24T12:00:00Z"
+        )
 
         self.assertEqual(response.status_code, 200)
         mock_get.assert_called_once_with(
-            f"http://foo/v{foo.version}/user/alice/activity/summary",
+            f"http://foo/v{foo.version}/user/alice/tools/analysis?start=2026-04-24T00:00:00Z&end=2026-04-24T12:00:00Z",
             headers=mock.ANY,
         )
 
@@ -546,26 +550,12 @@ class TestGatewayViews(TestGatewayBase):
         self.assertEqual(response.json, {"ok": True})
         self.assertEqual(mock_proxy_agent.call_args.args[:2], ("foo", "analysis/ping"))
 
-    @mock.patch("slurmweb.views.gateway.proxy_agent")
-    def test_admin_system_query(self, mock_proxy_agent):
+    def test_admin_system_query_removed(self):
         self.app_set_agents({"foo": fake_slurmweb_agent("foo")})
-        mock_proxy_agent.return_value = (
-            self.app.response_class(
-                response='{"licenses":[]}',
-                status=200,
-                mimetype="application/json",
-            ),
-            200,
-        )
 
         response = self.client.get("/api/agents/foo/admin/system/licenses")
 
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json, {"licenses": []})
-        self.assertEqual(
-            mock_proxy_agent.call_args.args[:2],
-            ("foo", "admin/system/licenses"),
-        )
+        self.assertEqual(response.status_code, 404)
 
     @mock.patch("slurmweb.views.gateway.proxy_agent")
     def test_update_job(self, mock_proxy_agent):

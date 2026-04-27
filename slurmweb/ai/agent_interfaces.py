@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
 from dataclasses import dataclass
 from typing import Callable, Dict, Iterable, Optional
 
@@ -219,17 +220,17 @@ class AIAgentInterfaceRegistry:
                 key="user/metrics/history",
                 method="GET",
                 description="Get submission and completion history for one user.",
-                arguments_description="Required: username. Optional: range=hour|day|week.",
+                arguments_description="Required: username. Optional: range=hour|day|week or start/end ISO 8601 datetimes.",
                 write=False,
                 handler=self._user_metrics_history,
             ),
             AIAgentInterfaceDefinition(
-                key="user/activity/summary",
+                key="user/tools/analysis",
                 method="GET",
-                description="Get aggregated user activity summary, including tool usage and recent behavior.",
-                arguments_description="Required: username.",
+                description="Get aggregated user tool analysis, including per-tool usage counts and average memory, CPU, and runtime. This is the best direct source for a user's usual resource profile by tool.",
+                arguments_description="Required: username. Optional: start, end ISO 8601 datetimes. Returns window, totals plus tool_breakdown entries such as tool, jobs, avg_max_memory_mb, avg_cpu_cores, and avg_runtime_seconds.",
                 write=False,
-                handler=self._user_activity_summary,
+                handler=self._user_tools_analysis,
             ),
             AIAgentInterfaceDefinition(
                 key="job/submit",
@@ -460,6 +461,19 @@ class AIAgentInterfaceRegistry:
         if not isinstance(payload, dict):
             raise AIAgentInterfaceError(400, "payload must be an object")
         return payload
+
+    @staticmethod
+    def _datetime_argument(arguments: dict, key: str):
+        value = arguments.get(key)
+        if value in (None, ""):
+            return None
+        try:
+            parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        except ValueError as err:
+            raise AIAgentInterfaceError(400, f"{key} must be a valid ISO 8601 datetime") from err
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        return parsed.astimezone(timezone.utc)
 
     def _normalize_operation_result(self, operation: str, target, response: dict, status_code: int = 200):
         api_version = self.app.slurmrestd.api_version or self.app.slurmrestd.discover()[2]
@@ -692,23 +706,33 @@ class AIAgentInterfaceRegistry:
             raise AIAgentInterfaceError(403, "Access not permitted")
         if not getattr(self.app, "user_metrics_enabled", False) or self.app.user_metrics_store is None:
             raise AIAgentInterfaceError(501, "User metrics is disabled")
+        start_time = self._datetime_argument(arguments, "start")
+        end_time = self._datetime_argument(arguments, "end")
         return self._result(
             "user/metrics/history",
             self.app.user_metrics_store.user_metrics_history(
                 username,
                 arguments.get("range", "hour"),
+                start_time=start_time,
+                end_time=end_time,
             ),
         )
 
-    def _user_activity_summary(self, user, arguments: dict):
+    def _user_tools_analysis(self, user, arguments: dict):
         username = self._string_argument(arguments, "username")
         if not self._user_analysis_allowed(user, username):
             raise AIAgentInterfaceError(403, "Access not permitted")
         if not getattr(self.app, "user_metrics_enabled", False) or self.app.user_metrics_store is None:
             raise AIAgentInterfaceError(501, "User metrics is disabled")
+        start_time = self._datetime_argument(arguments, "start")
+        end_time = self._datetime_argument(arguments, "end")
         return self._result(
-            "user/activity/summary",
-            self.app.user_metrics_store.user_activity_summary(username),
+            "user/tools/analysis",
+            self.app.user_metrics_store.user_tool_analysis(
+                username,
+                start_time=start_time,
+                end_time=end_time,
+            ),
         )
 
     def _authorize_job_write(self, user, job_id: int, operation: str):

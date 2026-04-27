@@ -41,7 +41,7 @@ npm --prefix frontend run test:unit
 - `MainMenu` 的 AI 导航门控（capability + `ai:view:*`）
 - `SettingsTabs` 的 AI tab 门控（capability + `admin/ai:view:*` / `admin/ai:edit:*`）
 - `SettingsAI` 的配置管理流程
-- `AssistantView` 的模型选择、流式渲染、历史 trace 回放与折叠式工具轨迹展示
+- `AssistantView` 的模型选择、流式渲染、安全 Markdown 消息展示、历史 trace 回放与折叠式工具轨迹展示
 - 路由守卫对 `ai:view:*` / `admin/ai:*` 的约束
 
 ## 3. 详细测试点（建议最小集）
@@ -98,9 +98,20 @@ npm --prefix frontend run test:unit
   - 先调 `job`
   - 再调 `jobs/history`
   - 最后汇总 live + history 信息
+- 资源推荐问题优先使用 `user/tools/analysis`
+- 仅当 `user/tools/analysis` 聚合证据不足时，才继续补查 `jobs/history`
 - 若第二个接口仍不足，允许继续追加，但总轮次仍受 `ai.max_rounds` 控制
 
-### 3.6 持久化
+### 3.6 内部工具 envelope 防泄漏
+
+- 正常 `tool_call -> final` 流程通过
+- 若模型输出仅包含 `tool_request` / `interface_key` / `arguments` 等内部字段，但没有合法 `type`
+  - 该输出不能透传给前端
+  - 该输出不能持久化为最终 assistant 消息
+  - 服务端应继续追加纠正提示并等待下一轮合法 `final`
+- 连续无效回显时，应由现有 `ai.max_rounds` 兜底，而不是把内部 JSON 展示给用户
+
+### 3.7 持久化
 
 - 创建新会话会写入 `ai_conversations`
 - 写入 user/assistant 消息到 `ai_messages`
@@ -110,6 +121,20 @@ npm --prefix frontend run test:unit
 - 会话详情返回历史 `tool_calls`
 - 其他用户会话详情不可读取
 
+### 3.8 Markdown 消息渲染
+
+- `assistant` 消息支持常见 Markdown：
+  - 标题、段落、加粗、列表、引用、代码块、表格、链接
+- `user` 消息与 `assistant` 使用同一安全 Markdown 渲染链路
+- Markdown 链接默认新标签打开，并带 `rel="noopener noreferrer"`
+- 流式 SSE 分段追加时，消息正文会按当前累计内容实时重渲染
+- 原始 HTML 片段不会作为 DOM 节点插入页面：
+  - `<script>` 不执行
+  - 带事件属性的 `<img>` 不渲染为真实元素
+- 代码块需要保持可读性：
+  - 保留换行
+  - 支持横向滚动
+
 ## 4. 手工验证场景（建议）
 
 - 配置 Qwen/DeepSeek/Kimi（兼容路径）、Ollama、本地 OpenAI-compatible 服务
@@ -117,6 +142,7 @@ npm --prefix frontend run test:unit
 - 提问作业 ID / 节点指标 / 历史作业，确认 AI 仅通过 Agent 接口返回事实数据
 - 提问单个作业详情时，确认 AI 可以按需串联 `job` + `jobs/history`
 - 检查执行轨迹默认仅展示接口名 / 状态码 / 耗时，点击后才显示参数和摘要
+- 让模型返回 Markdown 列表、引用、代码块和链接，确认页面按安全 Markdown 正常显示
 
 ## 5. 相关测试文件（已存在）
 

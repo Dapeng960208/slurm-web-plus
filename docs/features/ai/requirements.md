@@ -88,7 +88,18 @@ AI 当前按数据库能力自动启用：
 - `associations`
 - `users` / `user`
 - `user/metrics/history`
-- `user/activity/summary`
+- `user/tools/analysis`
+
+其中 `user/tools/analysis` 现在明确用于承载用户维度的聚合资源证据，例如：
+
+- `totals.avg_max_memory_mb`
+- `totals.avg_cpu_cores`
+- `totals.avg_runtime_seconds`
+- `tool_breakdown[].avg_max_memory_mb`
+- `tool_breakdown[].avg_cpu_cores`
+- `tool_breakdown[].avg_runtime_seconds`
+
+因此当问题是“某个用户常用工具推荐多少内存/CPU/运行时”这类推荐题时，AI 应优先把它视为直接证据源；只有聚合证据不足时，才继续补查 `jobs/history` 等原始历史接口。
 
 边界：
 
@@ -108,6 +119,18 @@ AI 当前按数据库能力自动启用：
 - AI 工具编排：`slurmweb/ai/tools.py`
 - 前端设置页：`frontend/src/views/settings/SettingsAI.vue`
 - 前端对话页：`frontend/src/views/AssistantView.vue`
+
+当前 `AssistantView` 的消息展示规则为：
+
+- `assistant` 消息按安全 Markdown 渲染
+- `user` 消息也按安全 Markdown 渲染
+- 渲染链路固定为“Markdown 解析 -> HTML 清洗 -> 前端渲染”
+- 工具成功后只会把“工具结果提示”写回模型上下文，不会把内部 `tool_request` / `interface_key` / `arguments` envelope 直接当作最终回答透传给用户
+- 最终用户可见回答必须是 `{"type":"final","content":"..."}` 语义；若模型错误回显内部 envelope，服务端会继续纠正并要求其输出合法 `final`
+- 原始 HTML 片段不是受支持输入：
+  - 不会作为真实 HTML 节点插入页面
+  - 不允许通过消息内容注入脚本或事件属性
+- Markdown 链接默认新标签打开，并带 `rel="noopener noreferrer"`
 
 ## 7. 执行轨迹
 
