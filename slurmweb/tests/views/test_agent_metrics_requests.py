@@ -143,6 +143,7 @@ class TestAgentMetricsRequest(TestAgentBase):
         self.assertCountEqual(response.json.keys(), ["alice", "bob"])
 
     def test_request_user_metrics_history_disabled(self):
+        self._enable_custom_rules("user/analysis:view:self")
         response = self.client.get(
             f"/v{get_version()}/user/{self.user.login}/metrics/history?range=hour"
         )
@@ -152,6 +153,7 @@ class TestAgentMetricsRequest(TestAgentBase):
     def test_request_user_metrics_history(self):
         self.app.user_metrics_enabled = True
         self.app.user_metrics_store = mock.Mock()
+        self._enable_custom_rules("user/analysis:view:self")
         self.app.user_metrics_store.user_metrics_history.return_value = {
             "submissions": [[1713956400000, 2]]
         }
@@ -169,6 +171,7 @@ class TestAgentMetricsRequest(TestAgentBase):
     def test_request_user_activity_summary(self):
         self.app.user_metrics_enabled = True
         self.app.user_metrics_store = mock.Mock()
+        self._enable_custom_rules("user/analysis:view:self")
         self.app.user_metrics_store.user_activity_summary.return_value = {
             "username": "alice",
             "profile": {"fullname": "Alice Doe", "groups": [], "ldap_synced_at": None, "ldap_found": True},
@@ -387,7 +390,15 @@ class TestAgentUserMetricsRequests(TestAgentBase):
     def tearDown(self):
         self.app.metrics_collector.unregister()
 
+    def _enable_custom_rules(self, *rules):
+        self.app.access_control_enabled = True
+        self.app.access_control_store = mock.Mock()
+        self.app.access_control_store.user_permissions.return_value = ([], [], list(rules))
+        self.app.policy._access_control_enabled = True
+        self.app.policy.set_access_control_store(self.app.access_control_store)
+
     def test_request_user_metrics_history_disabled(self):
+        self._enable_custom_rules("user/analysis:view:self")
         response = self.client.get(
             f"/v{get_version()}/user/{self.user.login}/metrics/history?range=hour"
         )
@@ -404,6 +415,7 @@ class TestAgentUserMetricsRequests(TestAgentBase):
     def test_request_user_metrics_history(self):
         self.app.user_metrics_enabled = True
         self.app.user_metrics_store = mock.Mock()
+        self._enable_custom_rules("user/analysis:view:self")
         self.app.user_metrics_store.user_metrics_history.return_value = {
             "submissions": [[1713956400000, 2]]
         }
@@ -421,6 +433,7 @@ class TestAgentUserMetricsRequests(TestAgentBase):
     def test_request_user_metrics_history_invalid_range(self):
         self.app.user_metrics_enabled = True
         self.app.user_metrics_store = mock.Mock()
+        self._enable_custom_rules("user/analysis:view:self")
         self.app.user_metrics_store.user_metrics_history.side_effect = ValueError(
             "Unsupported metric range month"
         )
@@ -450,6 +463,7 @@ class TestAgentUserMetricsRequests(TestAgentBase):
         )
 
     def test_request_user_activity_summary_disabled(self):
+        self._enable_custom_rules("user/analysis:view:self")
         response = self.client.get(
             f"/v{get_version()}/user/{self.user.login}/activity/summary"
         )
@@ -466,6 +480,7 @@ class TestAgentUserMetricsRequests(TestAgentBase):
     def test_request_user_activity_summary(self):
         self.app.user_metrics_enabled = True
         self.app.user_metrics_store = mock.Mock()
+        self._enable_custom_rules("user/analysis:view:self")
         self.app.user_metrics_store.user_activity_summary.return_value = {
             "username": "alice",
             "profile": {
@@ -503,6 +518,7 @@ class TestAgentUserMetricsRequests(TestAgentBase):
     def test_request_user_activity_summary_error(self):
         self.app.user_metrics_enabled = True
         self.app.user_metrics_store = mock.Mock()
+        self._enable_custom_rules("user/analysis:view:self")
         self.app.user_metrics_store.user_activity_summary.side_effect = RuntimeError(
             "boom"
         )
