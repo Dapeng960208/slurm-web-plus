@@ -230,3 +230,12 @@
 - 根因：`.[agent]` 依赖里的 `RacksDB[web]` 会继续拉起 `PyGObject`，其 Windows 安装需要本地 C/GTK 编译环境；当前机器没有对应工具链。
 - 解决：本轮不把该本地失败当成 CI 结论，改用定向 AI pytest 验证 `cryptography` 导入链；完整 agent extra 仍以 Ubuntu GitHub runner 为准。
 - 预防：后续在 Windows 上验证 Linux-oriented Python extras 时，要先区分“依赖声明是否正确”和“本机是否具备原生编译环境”，避免把平台编译问题误记为 workflow 回归。
+
+### 2026-04-27：`Frontend ESLint` 会被未使用符号和空接口类型直接拦下
+
+- 场景：GitHub `Frontend Static Analysis` 在 `Node 18` 环境执行 `npm run lint`。
+- 现象：`JobHistoryView.vue`、`ClusterAnalysis.ts`、`SettingsTabs.vue` 与 `GatewayAPI.ts` 因未使用导入/变量，以及 `interface extends X {}` 空接口类型，被 `@typescript-eslint/no-unused-vars` 和 `@typescript-eslint/no-empty-object-type` 拦下。
+- 复现：在 `frontend/` 目录执行 `npx eslint src/views/JobHistoryView.vue src/composables/GatewayAPI.ts src/composables/ClusterAnalysis.ts src/components/settings/SettingsTabs.vue`。
+- 根因：页面和类型层重构后残留了未被模板或运行时代码使用的符号，且若干仅做别名用途的接口仍保留 `interface extends` 空壳写法。
+- 解决：删除未使用符号，并把仅做类型别名的空接口改成 `type`。
+- 预防：后续前端重构后，提交前至少对改动链路相关文件跑一轮定向 ESLint；若只是做类型别名，不要再保留 `interface extends Foo {}` 这种空接口写法。

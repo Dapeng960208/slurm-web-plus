@@ -22,7 +22,6 @@ import {
 const activeJobStates = ['RUNNING', 'COMPLETING'] as const
 const pendingJobStates = ['PENDING'] as const
 const busyResourceStates = ['allocated', 'mixed'] as const
-const schedulableResourceStates = ['allocated', 'mixed', 'idle'] as const
 
 export interface AnalysisRecommendation {
   id: string

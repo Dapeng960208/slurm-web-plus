@@ -56,6 +56,7 @@
 - `JobsHistoryFiltersPanel` 与 `JobsHistoryFiltersBar` 不再直接修改 `filters` prop
 - 改为通过 `update:filters` 事件回传新对象，由 `JobsHistoryView` 统一更新筛选状态
 - 已补对应 Vitest 断言，覆盖“发事件而不是改 prop”的行为
+- 同时清理了 `JobHistoryView`、`ClusterAnalysis`、`SettingsTabs` 与 `GatewayAPI` 中阻塞 `Frontend ESLint` 的未使用符号和空接口类型
 
 ## 本轮：旧动作配置收口、`admin-manage` 改为超级管理员别名并删除失效 agent 字段
 

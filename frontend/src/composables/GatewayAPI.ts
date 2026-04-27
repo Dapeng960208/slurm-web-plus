@@ -157,9 +157,9 @@ export function normalizeClusterPermissions(permissions?: ClusterPermissions): C
   }
 }
 
-interface ClusterPermissionsResponse extends ClusterPermissions {}
+type ClusterPermissionsResponse = ClusterPermissions
 
-interface ClusterPermissionsLegacyResponse extends ClusterPermissionAssignment {}
+type ClusterPermissionsLegacyResponse = ClusterPermissionAssignment
 
 function clusterSupportsAccessControl(cluster?: ClusterDescription): boolean {
   return cluster?.access_control === true || cluster?.capabilities?.access_control === true
@@ -421,7 +421,7 @@ export interface AccessControlUsersResponse {
   page_size: number
 }
 
-export interface AccessControlUserAssignment extends AccessControlUserRow {}
+export type AccessControlUserAssignment = AccessControlUserRow
 
 export interface AccessControlUsersFilters {
   username?: string
@@ -1147,17 +1147,14 @@ export interface JobHistoryRecord {
 
 export type JobHistoryExitCode = string | ClusterJobExitCode | null
 
-const JobHistorySortCriteria = [
-  'submit_time',
-  'id',
-  'user',
-  'state',
-  'priority',
-  'resources'
-] as const
-export type JobHistorySortCriterion = (typeof JobHistorySortCriteria)[number]
-const JobHistorySortOrders = ['asc', 'desc'] as const
-export type JobHistorySortOrder = (typeof JobHistorySortOrders)[number]
+export type JobHistorySortCriterion =
+  | 'submit_time'
+  | 'id'
+  | 'user'
+  | 'state'
+  | 'priority'
+  | 'resources'
+export type JobHistorySortOrder = 'asc' | 'desc'
 
 export interface CachedLdapUser {
   username: string

@@ -9,10 +9,8 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
-import { useRuntimeStore } from '@/stores/runtime'
 
 const { entry } = defineProps<{ entry: string }>()
-const runtimeStore = useRuntimeStore()
 
 const tabs = computed(() => {
   return [

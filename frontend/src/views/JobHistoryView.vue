@@ -22,7 +22,7 @@ import PageHeader from '@/components/PageHeader.vue'
 import DetailSkeletonList from '@/components/DetailSkeletonList.vue'
 import PanelSkeleton from '@/components/PanelSkeleton.vue'
 import { HashtagIcon } from '@heroicons/vue/24/outline'
-import { CheckIcon, InformationCircleIcon } from '@heroicons/vue/20/solid'
+import { CheckIcon } from '@heroicons/vue/20/solid'
 import DetailSummaryStrip from '@/components/details/DetailSummaryStrip.vue'
 
 const props = defineProps<{ cluster: string; id: number }>()
@@ -143,7 +143,6 @@ const displayTags = ref<Record<HistoryField, { show: boolean; highlight: boolean
     { show: boolean; highlight: boolean }
   >
 )
-const helpOpenField = ref<HistoryField | null>(null)
 
 function highlightField(field: HistoryField) {
   displayTags.value[field].highlight = true
@@ -194,12 +193,6 @@ function fmtCpuCoresAvg(value: number | null | undefined) {
 
 function hasValue(value: number | null | undefined) {
   return value !== null && value !== undefined
-}
-
-function closeHelp(field: HistoryField) {
-  if (helpOpenField.value === field) {
-    helpOpenField.value = null
-  }
 }
 
 function countGPUTRESRequest(tresRequest: string): number {
@@ -307,9 +300,6 @@ const fields = (record: JobHistoryRecord): HistoryFieldRow[] => [
 ]
 
 const timeline = computed(() => (job.value ? timelineSteps(job.value) : []))
-const compactFields = computed(() =>
-  job.value ? fields(job.value).filter((field) => field.layout === 'compact') : []
-)
 const fullFields = computed(() =>
   job.value ? fields(job.value).filter((field) => field.layout === 'full') : []
 )

@@ -86,6 +86,7 @@
   - `junit.xml`（测试类 job）
 - 新增手工 `CI Triage` workflow，可按 `run_id` 聚合 `backend` / `frontend` / `all` artifact
 - `JobsHistoryFiltersPanel` / `JobsHistoryFiltersBar` 已改为 `update:filters` 事件链，修复 `vue/no-mutating-props` 导致的前端 CI 失败
+- `JobHistoryView`、`ClusterAnalysis`、`SettingsTabs` 与 `GatewayAPI` 已清理剩余 ESLint 阻塞项，修复未使用符号和空接口类型告警
 
 ## 3. 进行中项
 
@@ -154,6 +155,7 @@
 - `Get-Content -Raw -Encoding UTF8 .github/workflows/ci-triage.yml | npx --yes yaml valid`
 - `cd frontend && npx vitest run tests/components/jobs/JobsHistoryFiltersPanel.spec.ts tests/components/jobs/JobsHistoryFiltersBar.spec.ts`
 - `cd frontend && npx eslint src/components/jobs/JobsHistoryFiltersPanel.vue src/components/jobs/JobsHistoryFiltersBar.vue src/views/JobsHistoryView.vue tests/components/jobs/JobsHistoryFiltersPanel.spec.ts tests/components/jobs/JobsHistoryFiltersBar.spec.ts`
+- `cd frontend && npx eslint src/views/JobHistoryView.vue src/composables/GatewayAPI.ts src/composables/ClusterAnalysis.ts src/components/settings/SettingsTabs.vue`
 - `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/test_permission_rules.py slurmweb/tests/test_access_control_policy.py slurmweb/tests/test_access_control_store.py slurmweb/tests/apps/test_agent.py slurmweb/tests/apps/test_agent_ai.py slurmweb/tests/views/test_agent_permissions.py slurmweb/tests/views/test_agent_ai.py slurmweb/tests/views/test_agent.py slurmweb/tests/views/test_gateway.py`
 - `cd frontend && npx vitest run tests/stores/runtime.spec.ts tests/components/MainMenu.spec.ts tests/views/JobsView.spec.ts tests/views/JobView.spec.ts tests/views/AssistantView.spec.ts tests/views/settings/SettingsAI.spec.ts tests/views/settings/SettingsAccessControl.spec.ts tests/composables/GatewayAPIAdminContract.spec.ts tests/composables/GatewayAPI.spec.ts tests/router/AdminPermissions.spec.ts tests/views/ForbiddenView.spec.ts`
 - `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/apps/test_ai_service.py slurmweb/tests/apps/test_agent_ai.py slurmweb/tests/views/test_agent_ai.py`
