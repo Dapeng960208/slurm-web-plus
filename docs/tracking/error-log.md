@@ -239,3 +239,12 @@
 - 根因：页面和类型层重构后残留了未被模板或运行时代码使用的符号，且若干仅做别名用途的接口仍保留 `interface extends` 空壳写法。
 - 解决：删除未使用符号，并把仅做类型别名的空接口改成 `type`。
 - 预防：后续前端重构后，提交前至少对改动链路相关文件跑一轮定向 ESLint；若只是做类型别名，不要再保留 `interface extends Foo {}` 这种空接口写法。
+
+### 2026-04-27：本地已提交前端 ESLint 修复，但 push 到 GitHub 时再次被网络阻断
+
+- 场景：完成 `fix(frontend): clear remaining eslint blockers` 本地 commit 后执行 `git push origin main`。
+- 现象：连续两次 push 分别报 `Recv failure: Connection was reset` 和 `Failed to connect to github.com port 443`，导致 commit `024bde9` 仍停留在本地。
+- 复现：在当前网络不可达或访问 GitHub 不稳定的环境执行 `git push origin main`。
+- 根因：外部网络连通性问题，不是本次 ESLint 修复内容导致的仓库错误。
+- 解决：保留本地 commit，并在 `docs/tracking/current-release.md` 记录待 push 状态；待网络恢复后重试 push。
+- 预防：当远端 workflow 依赖最新修复时，push 前后都要预留网络失败回退路径；若 push 失败，必须先把本地 commit hash 和记账状态写入跟踪文档。
