@@ -200,3 +200,33 @@
 - 根因：两个组件把父级传入的 `filters` 当成可变本地状态直接修改，违反 Vue 单向数据流和仓库 ESLint 规则。
 - 解决：改为通过 `update:filters` 事件向父级回传新对象，由 `JobsHistoryView` 统一更新 store 中的 `filters`。
 - 预防：后续凡是对象型筛选器、表单状态从父级传入时，都不要直接在子组件里写 prop；优先使用 `v-model:<prop>` 或显式 `update:*` 事件。
+
+### 2026-04-27：移除 Jobs/AI/Access-Control 旧动作后，未同步的视图测试会先被 403 权限门控拦截
+
+- 场景：收紧 `view-own-jobs` / `edit-own-jobs` / `cancel-own-jobs` / `roles-view` / `roles-manage` / `view-ai` / `manage-ai` 后，执行权限与视图相关回归测试。
+- 现象：`slurmweb/tests/views/test_agent.py` 中原本验证 `slurmrestd` 错误透传的 `/jobs` 用例提前返回 403；AI 与 access-control 视图测试里 patch `allowed_user_action` 也不再生效。
+- 复现：在仓库根目录执行 `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/views/test_agent.py slurmweb/tests/views/test_agent_ai.py slurmweb/tests/views/test_agent_permissions.py`。
+- 根因：默认无数据库模式下，普通用户不再有自有 Jobs 的旧动作兜底；同时新装饰器统一基于 `allowed_user_permission(...)` 和 `rules[]` 判定，而旧测试仍按 `allowed_user_action` 或旧动作夹具构造授权。
+- 解决：
+  - 为需要穿透到业务逻辑的视图测试显式注入 `jobs:view:*`、`admin/access-control:*`、`admin/ai:*`、`ai:view:*` 等规则
+  - 把 `user_permissions()` 的 mock 统一补成 `(roles, actions, permissions)` 三元组
+  - 新增 `test_access_control_store.py` 覆盖废弃动作迁移
+- 预防：后续只要调整默认动作、compatibility map 或权限装饰器实现，必须同轮检查“测试是验证权限门控本身，还是验证被门控后的业务逻辑”，避免断言点被更早的 403 掩盖。
+
+### 2026-04-27：后端 CI 安装 `.[agent]` / `.[tests]` 后仍缺 `cryptography`，AI 相关测试在 collection 阶段中断
+
+- 场景：GitHub `Backend Tests` workflow 在 `Python 3.12` 环境执行 `pip install . '.[agent]' '.[gateway]' '.[tests]' && pytest slurmweb/tests`。
+- 现象：pytest 收集 `slurmweb/tests/apps/test_ai_service.py`、`slurmweb/tests/views/test_agent_ai.py` 等用例时抛 `ModuleNotFoundError: No module named 'cryptography'`，最终以 `21 errors during collection` 和 `exit code 2` 失败。
+- 复现：在一个干净虚拟环境中执行 `pip install -e ".[agent,tests,gateway]"` 后运行 `pytest slurmweb/tests`，会在导入 `slurmweb.ai.crypto` 或直接导入 `cryptography.fernet` 的测试时失败。
+- 根因：`slurmweb.ai.crypto` 依赖 `cryptography`，但 `pyproject.toml` 没有把它声明到 `agent` 或 `tests` extras；CI 虽然安装了这些 extras，实际仍拿不到该依赖。
+- 解决：把 `cryptography` 同步加入 `.[agent]` 与 `.[tests]`，使后端 AI 运行链路和对应测试在自动 CI 中都能获得完整依赖。
+- 预防：后续新增 Python 可选模块时，要同时检查“运行时导入链”和“测试直接导入链”是否都覆盖到 extras；不要只看本地已有环境是否碰巧装过依赖。
+
+### 2026-04-27：Windows 本地验证 `.[agent]` 时会被 `RacksDB[web]` 的 `PyGObject` 编译链拦下
+
+- 场景：在当前 Windows 开发环境为复查 CI 依赖，执行 `.venv\Scripts\python.exe -m pip install -e ".[agent,tests,gateway]"`。
+- 现象：`cryptography` 已被识别为 `slurm-web-plus` 依赖，但安装继续解析 `RacksDB[web]` 时，`PyGObject` 元数据构建因本机缺少 `cl/gcc/clang` 等编译器失败。
+- 复现：在无 Visual Studio Build Tools 或等价 C 编译链的 Windows PowerShell 环境执行上述命令。
+- 根因：`.[agent]` 依赖里的 `RacksDB[web]` 会继续拉起 `PyGObject`，其 Windows 安装需要本地 C/GTK 编译环境；当前机器没有对应工具链。
+- 解决：本轮不把该本地失败当成 CI 结论，改用定向 AI pytest 验证 `cryptography` 导入链；完整 agent extra 仍以 Ubuntu GitHub runner 为准。
+- 预防：后续在 Windows 上验证 Linux-oriented Python extras 时，要先区分“依赖声明是否正确”和“本机是否具备原生编译环境”，避免把平台编译问题误记为 workflow 回归。

@@ -34,6 +34,7 @@ dev = [
 ]
 agent = [
     "ClusterShell",
+    "cryptography",
     "prometheus-client",
     "RacksDB[web]",
     "redis",
@@ -44,6 +45,7 @@ gateway = [
 ]
 tests = [
     "coverage",
+    "cryptography",
     "Jinja2",
     "parameterized",
     "pytest",

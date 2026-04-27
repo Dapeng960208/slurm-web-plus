@@ -23,6 +23,12 @@
 
 其中后端 CI 已显式收敛到 `pytest slurmweb/tests`，避免把仓库内历史 `slurmweb4.2/tests` 兼容测试树误收进当前主线 CI。
 
+随后又补了一次后端依赖声明修复：
+
+- `cryptography` 已加入 `.[agent]` 与 `.[tests]`
+- 避免 `slurmweb.ai.crypto` 在 GitHub `Backend Tests` 中导入失败
+- AI 相关后端测试不再因为缺包在 collection 阶段整体中断
+
 同时补了统一的 CI 结果产物契约，每个 job 都会尝试上传：
 
 - `stdout.log`
@@ -51,6 +57,38 @@
 - 改为通过 `update:filters` 事件回传新对象，由 `JobsHistoryView` 统一更新筛选状态
 - 已补对应 Vitest 断言，覆盖“发事件而不是改 prop”的行为
 
+## 本轮：旧动作配置收口、`admin-manage` 改为超级管理员别名并删除失效 agent 字段
+
+本轮继续收紧权限与配置契约：
+
+- `policy.yml` / `policy.ini` 已移除 7 个旧动作配置入口：
+  - `view-own-jobs`
+  - `edit-own-jobs`
+  - `cancel-own-jobs`
+  - `roles-view`
+  - `roles-manage`
+  - `view-ai`
+  - `manage-ai`
+- `GET /permissions.actions` 与 `GET /access/catalog.legacy_map` 不再暴露这 7 个动作
+- 管理端角色页不再派生或展示这 7 个 compatibility actions
+- `admin-manage` 现在只等价于 `*:*:*`
+- 只有 `super-admin` 或其他实际拥有 `*:*:*` 的角色/用户才会回显 `admin-manage`
+- `default_seed_roles().user` 继续保留：
+  - `jobs:view:self`
+  - `jobs:edit:self`
+  - `jobs:delete:self`
+  - `user/analysis:view:self`
+- 上述默认自有 Jobs / 自有分析能力现在只来自数据库种子角色，不再来自 vendor policy 动作
+- `default_seed_roles().admin` 继续是 `*:view:*` + `*:edit:*`
+- `default_seed_roles().super-admin` 继续是 `*:*:*`
+- Agent 配置中已物理删除：
+  - `persistence.enabled`
+  - `persistence.access_control_enabled`
+  - `user_metrics.enabled`
+  - `node_metrics.enabled`
+  - `ai.enabled`
+- AI 现在完全按数据库与模型配置可用性启用，不再读取显式 `ai.enabled`
+
 ## 本轮：默认权限模型按 `jobs:*:self` 与全局 `admin view/edit` 修正
 
 本轮对权限基线做了审查修正，当前默认行为固定为：
@@ -62,10 +100,11 @@
 - 默认 `admin` 角色拥有 `*:view:*` 与 `*:edit:*`
 - 默认 `admin` 角色不拥有 `*:delete:*`
 
-同时新增两个旧动作兼容映射：
+当前保留的旧动作兼容只剩：
 
-- `edit-own-jobs` -> `jobs:edit:self`
-- `admin-manage` -> `/:cluster/admin` 下全部 `admin/*` 管理规则
+- `cache-view` -> `admin/cache:view:*` + `admin/ldap-cache:view:*`
+- `cache-reset` -> `admin/cache:edit:*`
+- `admin-manage` -> `*:*:*`
 
 这次修正不会改变资源级鉴权框架；最终判定仍然只依赖 `resource:operation:scope` 规则。
 
@@ -145,13 +184,12 @@
 - 如果用户只有 `self`，只能查看、编辑、取消自己的作业
 - 前端只做辅助隐藏/禁用，不作为最终安全边界
 
-为兼容旧动作，新增：
+默认普通用户的自有 Jobs / 自有分析能力现在来自数据库种子角色 `user`，不再依赖 vendor policy 里的旧动作配置。
 
-- `view-own-jobs`
-- `edit-own-jobs`
-- `cancel-own-jobs`
+行为边界：
 
-vendor policy 中普通 `user` 已从全量 `view-jobs` 切到 `view-own-jobs` / `edit-own-jobs` / `cancel-own-jobs`，且不再默认带 cache/admin 管理动作。
+- 数据库启用时，普通用户继续拥有 `jobs:view|edit|delete:self` 与 `user/analysis:view:self`
+- 数据库未启用时，普通用户不再有自有 Jobs 的旧动作兜底
 
 ## 本轮：slurmrestd 写路径补齐并加入版本降级
 
@@ -192,7 +230,7 @@ vendor policy 中普通 `user` 已从全量 `view-jobs` 切到 `view-own-jobs` /
 - 支持 `self` 场景，例如 `user/profile:view:self`
 - 支持全局最高权限 `*:*:*`
 
-同时保留旧权限名兼容层，`view-ai`、`roles-manage`、`admin-manage`、`edit-own-jobs`、`cache-reset` 等历史动作会自动映射到新规则。
+当前兼容层只保留少量仍在使用的动作映射；`view-own-jobs`、`edit-own-jobs`、`cancel-own-jobs`、`roles-view`、`roles-manage`、`view-ai`、`manage-ai` 已不再作为正式配置入口或 API 回显动作。
 
 ## 2. Access Control 页面改为资源矩阵
 
@@ -219,7 +257,7 @@ vendor policy 中普通 `user` 已从全量 `view-jobs` 切到 `view-own-jobs` /
   - user metrics
   - user analytics
 
-旧 feature flag 仅保留兼容占位定义，不再作为实际产品语义来源。
+旧 feature flag 中 `persistence.enabled`、`persistence.access_control_enabled`、`user_metrics.enabled`、`node_metrics.enabled`、`ai.enabled` 已从 Agent 配置定义中删除。
 
 ## 4. AI、Cache、用户空间全部接入新权限
 

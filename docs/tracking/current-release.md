@@ -43,17 +43,26 @@
   - `admin/ldap-cache`
   - `admin/access-control`
 - `default_seed_roles()` 已收紧，普通 `user` 不再默认带 `admin/*`
-- vendor policy 已切到：
+- `policy.yml` / `policy.ini` 已移除 7 个旧动作配置入口：
   - `view-own-jobs`
   - `edit-own-jobs`
   - `cancel-own-jobs`
+  - `roles-view`
+  - `roles-manage`
+  - `view-ai`
+  - `manage-ai`
 - 默认角色已进一步修正为：
-  - `user`：非 `Admin` 页面默认只读 + `jobs:view|edit|delete:self`
+  - `user`：非 `Admin` 页面默认只读 + `jobs:view|edit|delete:self` + `user/analysis:view:self`
   - `admin`：`*:view:*` + `*:edit:*`
   - `admin`：默认不含 `*:delete:*`
-- 新增旧动作兼容：
-  - `admin-manage`
-  - `edit-own-jobs`
+- `admin-manage` 已改为 `*:*:*` 兼容别名，仅对应 `super-admin`
+- AccessControlStore 启动时会把历史 `roles.actions` 中的废弃动作迁入 `roles.permissions`
+- `agent.yml` 已删除：
+  - `persistence.enabled`
+  - `persistence.access_control_enabled`
+  - `user_metrics.enabled`
+  - `node_metrics.enabled`
+  - `ai.enabled`
 - 新增/更新了与本任务相关的前后端测试基线
 - GitHub Actions 已补自动触发：
   - `pull_request` 到 `main`
@@ -68,6 +77,7 @@
   - 前端 `TypeScript type-check`
   - 前端生产构建
 - 后端自动/手工 CI 的 `pytest` 入口已统一收敛到 `slurmweb/tests`
+- 后端 `.[agent]` / `.[tests]` extras 已补 `cryptography`，修复 AI 测试在 GitHub Actions 的导入失败
 - 后端 rpm/deb OS 集成矩阵已拆到手工 `python-os-ci.yml`
 - 新增统一 CI 结果产物：
   - `stdout.log`
@@ -84,15 +94,15 @@
 - 视 Linux/CI 环境情况补全更大范围后端回归
 - 评估后续是否需要把 `CI Triage` 结果继续接给外部 AI agent 做只读诊断
 - 评估是否需要为结构化 CI 结果补 GitHub issue / PR comment 自动摘要
-- `ci(workflows): automate main branch checks` 已完成本地提交 `5733012`，当前待网络恢复后 push 到 `origin/main`
 
 ## 4. 风险与阻塞
 
 - 当前前端对 `accounts/users/qos/reservation` 使用的是高频结构化字段，不覆盖全部官方 JSON 细节
 - `admin/ldap-cache:edit:*` 已在权限模型中预留，但当前没有对应实质写接口
 - `.venv\Scripts\python.exe -m pytest -q slurmweb/tests` 在当前 Windows 环境下仍不适合作为本轮唯一验收结论
+- Windows 本地执行 `pip install -e ".[agent,tests,gateway]"` 会继续卡在 `RacksDB[web] -> PyGObject` 编译；后端依赖修复已通过定向 AI pytest 验证，但完整 agent extra 仍更适合以 Ubuntu CI 为准
 - 部分前端测试夹具仍以旧 `actions[]` 为主，若继续扩大回归范围，需继续向 `rules[]` 夹具收敛
-- `admin-manage` 只覆盖 `/:cluster/admin` 下资源，不会自动授予独立 AI 工作台 `ai:view:*`
+- 无数据库部署下，普通用户不再有自有 Jobs 的旧动作兜底；该差异需要部署文档显式说明
 - 当前仓库内置 AI 仍不能直接读取 GitHub Actions run；本轮只打通“结构化结果可查询”，未实现自动修复
 
 ## 5. 已同步文档
@@ -104,13 +114,18 @@
 - `docs/features/access-control/requirements.md`
 - `docs/features/access-control/test-plan.md`
 - `docs/features/ai/requirements.md`
+- `docs/features/ai/test-plan.md`
 - `docs/features/cache/requirements.md`
 - `docs/features/ci/requirements.md`
 - `docs/features/ci/verification.md`
 - `docs/features/management-center/requirements.md`
 - `docs/features/management-center/test-plan.md`
+- `docs/guides/database-migrations.md`
 - `docs/guides/deployment-guide.md`
+- `docs/guides/verification-checklist.md`
+- `docs/features/user-analytics/backend.md`
 - `docs/tracking/current-release.md`
+- `docs/tracking/error-log.md`
 
 ## 6. 验证状态
 
@@ -139,3 +154,6 @@
 - `Get-Content -Raw -Encoding UTF8 .github/workflows/ci-triage.yml | npx --yes yaml valid`
 - `cd frontend && npx vitest run tests/components/jobs/JobsHistoryFiltersPanel.spec.ts tests/components/jobs/JobsHistoryFiltersBar.spec.ts`
 - `cd frontend && npx eslint src/components/jobs/JobsHistoryFiltersPanel.vue src/components/jobs/JobsHistoryFiltersBar.vue src/views/JobsHistoryView.vue tests/components/jobs/JobsHistoryFiltersPanel.spec.ts tests/components/jobs/JobsHistoryFiltersBar.spec.ts`
+- `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/test_permission_rules.py slurmweb/tests/test_access_control_policy.py slurmweb/tests/test_access_control_store.py slurmweb/tests/apps/test_agent.py slurmweb/tests/apps/test_agent_ai.py slurmweb/tests/views/test_agent_permissions.py slurmweb/tests/views/test_agent_ai.py slurmweb/tests/views/test_agent.py slurmweb/tests/views/test_gateway.py`
+- `cd frontend && npx vitest run tests/stores/runtime.spec.ts tests/components/MainMenu.spec.ts tests/views/JobsView.spec.ts tests/views/JobView.spec.ts tests/views/AssistantView.spec.ts tests/views/settings/SettingsAI.spec.ts tests/views/settings/SettingsAccessControl.spec.ts tests/composables/GatewayAPIAdminContract.spec.ts tests/composables/GatewayAPI.spec.ts tests/router/AdminPermissions.spec.ts tests/views/ForbiddenView.spec.ts`
+- `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/apps/test_ai_service.py slurmweb/tests/apps/test_agent_ai.py slurmweb/tests/views/test_agent_ai.py`

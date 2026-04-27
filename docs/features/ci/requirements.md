@@ -19,6 +19,7 @@
   - 后端单元测试
   - 固定 `Python 3.12`
   - 测试入口固定为 `pytest slurmweb/tests`
+  - 依赖安装固定包含 `.[agent]`、`.[gateway]`、`.[tests]`，其中 `cryptography` 由 `agent/tests` extras 提供
 - `.github/workflows/frontend-ci.yml`
   - 前端单元测试
   - 固定 `Node 18`
@@ -119,3 +120,4 @@
 - 若 job 在主命令前失败，`ensure-ci-result` 会补最小失败结果，避免 artifact 缺失
 - 若 triage 指定的 run 没有结构化 artifact，`triage-context.json` 仍会生成空结果摘要
 - OS 集成矩阵不再参与日常 PR / push 自动反馈，避免拉长主线 CI
+- 后端主线测试依赖 AI 加密模块导入链，`cryptography` 属于自动 CI 的必需 Python 依赖
