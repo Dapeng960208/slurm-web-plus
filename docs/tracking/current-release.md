@@ -219,3 +219,9 @@
 - `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/apps/test_agent_ai.py slurmweb/tests/views/test_gateway_ai.py`
 - `cd frontend && npx vitest run tests/views/AssistantView.spec.ts tests/views/AssistantViewAIContract.spec.ts tests/composables/GatewayAPI.spec.ts`
 - `npm --prefix frontend run type-check`
+
+待同步：
+
+- 2026-04-27：本轮改动已完成本地提交 `282d032 feat(ai): route assistant tools through agent interfaces`
+- 同日执行 `git push origin main` 失败，远端返回 `Failed to connect to github.com port 443`
+- 当前状态：本地 `main` 相对 `origin/main` ahead 1，待网络恢复后重新 push

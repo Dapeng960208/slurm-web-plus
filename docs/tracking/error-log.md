@@ -17,6 +17,15 @@
 
 ## 条目
 
+### 2026-04-27：当前 Windows PowerShell 不支持把 Bash 风格 `&&` 当作命令分隔符
+
+- 场景：在仓库根目录想串行执行 `git add ... && git commit ...` 完成本地跟踪提交。
+- 现象：PowerShell 直接报 `The token '&&' is not a valid statement separator in this version.`，命令未执行。
+- 复现：在当前终端执行任意包含 `&&` 的 PowerShell 命令串。
+- 根因：当前环境不是支持该语法的现代 shell，上下文是 Windows PowerShell 旧版本，不能把 Bash 风格 `&&` 当成默认命令分隔方式。
+- 解决：改为分两条命令执行，或在 PowerShell 中使用分号/显式流程控制。
+- 预防：后续在本仓库的 Windows PowerShell 环境下执行串行命令时，不要默认使用 `&&`；优先拆成独立命令，避免提交或验证步骤被 shell 语法直接拦截。
+
 ### 2026-04-27：AI 服务写接口测试在 dummy slurmrestd 缺少 `api_version` 时会因结果归一化直接报 `AttributeError`
 
 - 场景：把 AI 写接口权限从 `super-admin` 总闸改为复用接口层实时权限校验后，补 `slurmweb/tests/apps/test_ai_service.py` 的写权限回归。
