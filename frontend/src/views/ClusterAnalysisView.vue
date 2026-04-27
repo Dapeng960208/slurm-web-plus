@@ -16,6 +16,7 @@ import InfoAlert from '@/components/InfoAlert.vue'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import PercentMetric from '@/components/PercentMetric.vue'
+import MetricRangeSelector from '@/components/MetricRangeSelector.vue'
 import { analyzeCluster } from '@/composables/ClusterAnalysis'
 import { formatPercentValue } from '@/composables/percentages'
 import {
@@ -31,6 +32,7 @@ import {
   type MetricValue,
   useGatewayAPI
 } from '@/composables/GatewayAPI'
+import { extractSummaryCards, extractSummaryFields } from '@/composables/structuredDisplay'
 import { useRuntimeStore } from '@/stores/runtime'
 
 const { cluster } = defineProps<{ cluster: string }>()
@@ -92,6 +94,47 @@ const analysis = computed(() =>
 const updatedAtLabel = computed(() => {
   if (!updatedAt.value) return null
   return new Date(updatedAt.value).toLocaleString()
+})
+const pingCards = computed(() =>
+  extractSummaryCards(pingDetails.value, {
+    listKeys: ['pings'],
+    titleKeys: ['hostname', 'host', 'name'],
+    badgeKeys: ['mode'],
+    preferredOrder: ['hostname', 'mode', 'latency_ms', 'status'],
+    labelMap: {
+      latency_ms: 'Latency (ms)'
+    },
+    fallbackTitle: 'Controller'
+  })
+)
+const diagFields = computed(() => {
+  const statistics =
+    diagDetails.value &&
+    typeof diagDetails.value === 'object' &&
+    !Array.isArray(diagDetails.value) &&
+    'statistics' in diagDetails.value
+      ? (diagDetails.value as Record<string, unknown>).statistics
+      : diagDetails.value
+  return extractSummaryFields(statistics, {
+    preferredOrder: [
+      'jobs_submitted',
+      'jobs_started',
+      'jobs_completed',
+      'jobs_canceled',
+      'schedule_cycle_last',
+      'schedule_cycle_max',
+      'schedule_cycle_mean'
+    ],
+    labelMap: {
+      jobs_submitted: 'Jobs Submitted',
+      jobs_started: 'Jobs Started',
+      jobs_completed: 'Jobs Completed',
+      jobs_canceled: 'Jobs Canceled',
+      schedule_cycle_last: 'Schedule Cycle Last',
+      schedule_cycle_max: 'Schedule Cycle Max',
+      schedule_cycle_mean: 'Schedule Cycle Mean'
+    }
+  })
 })
 
 const historicalCards = computed(() => {
@@ -399,44 +442,11 @@ onUnmounted(() => {
             <span v-if="refreshing" class="ui-chip">Refreshing</span>
           </div>
 
-          <span class="isolate inline-flex rounded-full shadow-[var(--shadow-soft)]">
-            <button
-              type="button"
-              :class="[
-                selectedRange == 'week'
-                  ? 'bg-[linear-gradient(135deg,rgba(182,232,44,0.95),rgba(152,201,31,0.95))] text-[var(--color-brand-deep)]'
-                  : 'bg-white/90 text-[var(--color-brand-muted)] hover:bg-white',
-                'relative inline-flex items-center rounded-l-full px-4 py-2 text-xs font-semibold ring-1 ring-[rgba(80,105,127,0.16)] ring-inset focus:z-10'
-              ]"
-              @click="renderRange('week')"
-            >
-              week
-            </button>
-            <button
-              type="button"
-              :class="[
-                selectedRange == 'day'
-                  ? 'bg-[linear-gradient(135deg,rgba(182,232,44,0.95),rgba(152,201,31,0.95))] text-[var(--color-brand-deep)]'
-                  : 'bg-white/90 text-[var(--color-brand-muted)] hover:bg-white',
-                'relative inline-flex items-center px-4 py-2 text-xs font-semibold ring-1 ring-[rgba(80,105,127,0.16)] ring-inset focus:z-10'
-              ]"
-              @click="renderRange('day')"
-            >
-              day
-            </button>
-            <button
-              type="button"
-              :class="[
-                selectedRange == 'hour'
-                  ? 'bg-[linear-gradient(135deg,rgba(182,232,44,0.95),rgba(152,201,31,0.95))] text-[var(--color-brand-deep)]'
-                  : 'bg-white/90 text-[var(--color-brand-muted)] hover:bg-white',
-                'relative inline-flex items-center rounded-r-full px-4 py-2 text-xs font-semibold ring-1 ring-[rgba(80,105,127,0.16)] ring-inset focus:z-10'
-              ]"
-              @click="renderRange('hour')"
-            >
-              hour
-            </button>
-          </span>
+          <MetricRangeSelector
+            :model-value="selectedRange"
+            aria-label="Select cluster analysis range"
+            @update:model-value="renderRange"
+          />
         </div>
 
         <div class="ui-summary-strip">
@@ -692,7 +702,31 @@ onUnmounted(() => {
               <InfoAlert v-if="pingUnavailable" class="mt-4">
                 Ping data is currently unavailable for this cluster.
               </InfoAlert>
-              <pre v-else class="mt-4 overflow-x-auto text-xs text-[var(--color-brand-ink-strong)]">{{ JSON.stringify(pingDetails, null, 2) }}</pre>
+              <div v-else-if="pingCards.length" class="mt-4 grid gap-3">
+                <div
+                  v-for="card in pingCards"
+                  :key="card.title"
+                  class="rounded-[20px] border border-[rgba(80,105,127,0.12)] bg-white/84 px-4 py-3"
+                >
+                  <div class="flex items-center justify-between gap-3">
+                    <div class="font-semibold text-[var(--color-brand-ink-strong)]">
+                      {{ card.title }}
+                    </div>
+                    <span v-if="card.badge" class="ui-chip">{{ card.badge }}</span>
+                  </div>
+                  <div class="ui-detail-list mt-3">
+                    <dl>
+                      <div v-for="field in card.fields" :key="field.key" class="ui-detail-row">
+                        <dt class="ui-detail-term">{{ field.label }}</dt>
+                        <dd class="ui-detail-value">{{ field.value }}</dd>
+                      </div>
+                    </dl>
+                  </div>
+                </div>
+              </div>
+              <p v-else class="ui-panel-description mt-4">
+                No controller ping fields are available in the current response.
+              </p>
             </article>
 
             <article class="ui-panel-soft px-4 py-4">
@@ -703,7 +737,17 @@ onUnmounted(() => {
               <InfoAlert v-if="diagUnavailable" class="mt-4">
                 Diagnostic data is currently unavailable for this cluster.
               </InfoAlert>
-              <pre v-else class="mt-4 overflow-x-auto text-xs text-[var(--color-brand-ink-strong)]">{{ JSON.stringify(diagDetails, null, 2) }}</pre>
+              <div v-else-if="diagFields.length" class="ui-detail-list mt-4">
+                <dl>
+                  <div v-for="field in diagFields" :key="field.key" class="ui-detail-row">
+                    <dt class="ui-detail-term">{{ field.label }}</dt>
+                    <dd class="ui-detail-value">{{ field.value }}</dd>
+                  </div>
+                </dl>
+              </div>
+              <p v-else class="ui-panel-description mt-4">
+                No diagnostic summary fields are available in the current response.
+              </p>
             </article>
           </div>
         </section>

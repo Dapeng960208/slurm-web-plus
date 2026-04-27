@@ -1,5 +1,31 @@
 ﻿# 最新功能
 
+## 本轮：分析与管理页改为结构化展示，并补统一时间范围与表单语义
+
+本轮继续围绕现有 `analysis`、`admin`、`dashboard`、`node` 与用户分析页面做交互增强，没有新增独立功能模块：
+
+- `analysis` 页的 `ping` / `diag` 不再直接输出原始 JSON
+- `Admin > System` 页的 `licenses` 改为结构化字段卡片，优先展示许可证名称、总量、已用、可用、保留等核心字段
+- `Admin > System` 页的 `slurmdb/instances` 已兼容 SlurmDB “found nothing” 的 warning-only 响应，空结果返回列表而不是 500
+- 用户分析历史曲线从“仅提交作业”扩展为“提交 + 完成”双曲线
+- 用户分析、节点详情、Dashboard/Analysis 的时间范围切换统一为 `hour / day / week`
+- 节点详情的时间范围已同步到 URL query，刷新后保留当前窗口
+- 左侧主菜单顺序已调整为：
+  - `AI` 在 `Admin` 上方
+  - `Admin` 固定落在主业务导航末尾
+- 共享操作表单已补统一语义：
+  - 字段显示 `Required` / `Optional`
+  - 编辑类提交按钮使用橙色语义
+  - 删除类提交按钮使用红色警示语义
+  - 关键按钮与字段补充 tooltip / hint 解释行为
+- `Settings > AI` 与 `Node` 编辑/删除入口已接入上述表单语义
+
+本轮新增验证：
+
+- `npm --prefix frontend run type-check`
+- `cd frontend && npx vitest run tests/components/operations/ActionDialog.spec.ts tests/composables/GatewayAPI.spec.ts tests/views/UserAnalysisView.spec.ts tests/views/ClusterAnalysisView.spec.ts tests/views/NodeView.spec.ts tests/views/settings/SettingsAI.spec.ts tests/components/MainMenu.spec.ts`
+- `.venv\Scripts\python.exe -m pytest slurmweb/tests/views/test_agent_metrics_requests.py slurmweb/tests/views/test_gateway.py slurmweb/tests/apps/test_user_analytics_store.py`
+
 ## 本轮：GitHub Actions 已切到 `main` 分支自动测试，并补结构化结果 artifact
 
 本轮把仓库 CI 从“以手工触发为主”收敛到“提交即自动验证”：
@@ -58,6 +84,7 @@
 - 已补对应 Vitest 断言，覆盖“发事件而不是改 prop”的行为
 - 同时清理了 `JobHistoryView`、`ClusterAnalysis`、`SettingsTabs` 与 `GatewayAPI` 中阻塞 `Frontend ESLint` 的未使用符号和空接口类型
 - 继续清理了 `JobView`、`JobsView` 与 `SettingsAccessControl` 中剩余的未使用符号，补齐主线前端静态检查
+- 同时把前端源码里的 `@typescript-eslint/no-unused-vars` 与 `@typescript-eslint/no-empty-object-type` 降级为 warning，避免这类历史清理项继续阻塞主线 CI
 
 ## 本轮：旧动作配置收口、`admin-manage` 改为超级管理员别名并删除失效 agent 字段
 

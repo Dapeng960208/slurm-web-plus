@@ -347,8 +347,64 @@ class UserAnalyticsStore:
             cursor += resolution
         return {"submissions": series}
 
+    def completion_timeline(self, username, range_name):
+        bucket_map = {
+            "hour": ("minute", timedelta(minutes=1)),
+            "day": ("hour", timedelta(hours=1)),
+            "week": ("day", timedelta(days=1)),
+        }
+        if range_name not in bucket_map:
+            raise ValueError(f"Unsupported metric range {range_name}")
+        bucket_name, resolution = bucket_map[range_name]
+        start_time = _now_utc() - _SUMMARY_RANGE_WINDOWS[range_name]
+        end_time = _now_utc()
+        terminal_params = [f"%{state}%" for state in TERMINAL_STATES]
+        where_terminal = " OR ".join(["js.job_state LIKE %s"] * len(TERMINAL_STATES))
+
+        conn = self._get_conn()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT bucket, COUNT(*)::int AS job_count
+                    FROM (
+                        SELECT DISTINCT ON (js.job_id, js.submit_time)
+                            date_trunc(%s, COALESCE(js.end_time, js.last_seen)) AS bucket,
+                            js.job_id,
+                            js.submit_time
+                        FROM job_snapshots js
+                        INNER JOIN users u ON u.id = js.user_id
+                        WHERE u.username = %s
+                          AND COALESCE(js.end_time, js.last_seen) >= %s
+                          AND (
+                    """
+                    + where_terminal
+                    + """
+                          )
+                        ORDER BY js.job_id, js.submit_time, js.last_seen DESC
+                    ) completed_jobs
+                    GROUP BY bucket
+                    ORDER BY bucket ASC
+                    """,
+                    [bucket_name, username, start_time] + terminal_params,
+                )
+                rows = cur.fetchall()
+        finally:
+            self._release_conn(conn)
+
+        values = {bucket_time: count for bucket_time, count in rows}
+        cursor = self._align_bucket(start_time, resolution)
+        series = []
+        while cursor <= end_time:
+            series.append([int(cursor.timestamp() * 1000), values.get(cursor, 0)])
+            cursor += resolution
+        return {"completions": series}
+
     def user_metrics_history(self, username, range_name):
-        return self.submission_timeline(username, range_name)
+        return {
+            **self.submission_timeline(username, range_name),
+            **self.completion_timeline(username, range_name),
+        }
 
     def latest_submission_count(self, username, window_seconds=60):
         return self.recent_submission_counts(window_seconds).get(username, 0)

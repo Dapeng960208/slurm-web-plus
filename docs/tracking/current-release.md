@@ -13,6 +13,23 @@
 
 ## 2. 已完成项
 
+- `analysis` 页的 `ping` / `diag` 已从原始 JSON 文本改为结构化字段展示
+- `Admin > System > Licenses` 已改为核心字段卡片展示，不再直接暴露原始 JSON 文本
+- `Admin > System > SlurmDB Instances` 已兼容“warning-only 且无 `instances` key”的空结果响应，避免页面直接 500
+- 用户分析历史接口与前端图表已扩展为：
+  - 每时间桶提交作业数
+  - 每时间桶完成作业数
+- 用户分析、Dashboard、Cluster Analysis 与 Node 详情页的时间范围切换已统一为 `hour/day/week`
+- `NodeView` 的指标时间范围已同步到 URL query，刷新后保持当前窗口
+- 左侧主菜单顺序已调整为：
+  - `AI` 在 `Admin` 上方
+  - `Admin` 位于主业务导航最下方
+- 共享 `ActionDialog` 已补：
+  - `Required` / `Optional` 字段标识
+  - 编辑默认橙色提交语义
+  - 删除/取消默认红色警示语义
+  - 提交按钮自动 tooltip 说明
+- `SettingsAI` 与 `NodeView` 已补字段 hint / tooltip、橙色编辑按钮与红色删除按钮
 - 发布后代码审查已补共享写操作对话框回归修复：
   - `ActionDialog` 复用时会先清空旧表单键，避免编辑/提交残留字段泄漏到后续删除/取消请求体
   - 已补对应前端组件回归测试
@@ -88,16 +105,16 @@
 - `JobsHistoryFiltersPanel` / `JobsHistoryFiltersBar` 已改为 `update:filters` 事件链，修复 `vue/no-mutating-props` 导致的前端 CI 失败
 - `JobHistoryView`、`ClusterAnalysis`、`SettingsTabs` 与 `GatewayAPI` 已清理剩余 ESLint 阻塞项，修复未使用符号和空接口类型告警
 - `JobView`、`JobsView` 与 `SettingsAccessControl` 已清理新增 ESLint 阻塞项，修复未使用符号告警
+- 前端源码中的 `@typescript-eslint/no-unused-vars` 与 `@typescript-eslint/no-empty-object-type` 已降级为 warning，不再单独阻塞 `Frontend ESLint`
 
 ## 3. 进行中项
 
 - 对齐 `accounts/users/qos/reservation` 的轻量前端表单字段与官方 JSON 结构边界
+- 评估是否继续把 `shares`、`slurmdb config`、`instances`、`tres` 等系统只读面板也收口为结构化摘要，而不是保留 JSON 输出
 - 继续评估是否需要为 `admin/system` 补更多官方只读面板
 - 视 Linux/CI 环境情况补全更大范围后端回归
 - 评估后续是否需要把 `CI Triage` 结果继续接给外部 AI agent 做只读诊断
 - 评估是否需要为结构化 CI 结果补 GitHub issue / PR comment 自动摘要
-- `fix(frontend): clear remaining eslint blockers` 已完成本地提交 `024bde9`，当前因网络不可达待 push 到 `origin/main`
-- `fix(frontend): remove remaining eslint dead code` 已完成本地提交 `f90d428`，当前因网络不可达待 push 到 `origin/main`
 
 ## 4. 风险与阻塞
 
@@ -136,7 +153,9 @@
 已通过：
 
 - `cd frontend && npx vitest run tests/components/operations/ActionDialog.spec.ts`
+- `cd frontend && npx vitest run tests/components/operations/ActionDialog.spec.ts tests/composables/GatewayAPI.spec.ts tests/views/UserAnalysisView.spec.ts tests/views/ClusterAnalysisView.spec.ts tests/views/NodeView.spec.ts tests/views/settings/SettingsAI.spec.ts tests/components/MainMenu.spec.ts`
 - `npm --prefix frontend run type-check`
+- `.venv\Scripts\python.exe -m pytest slurmweb/tests/views/test_agent_metrics_requests.py slurmweb/tests/views/test_gateway.py slurmweb/tests/apps/test_user_analytics_store.py`
 - `npm --prefix frontend run build`
 - `cd frontend && npx vitest run`
 - `.venv\Scripts\python.exe -m pytest -q slurmweb/tests`
@@ -160,6 +179,7 @@
 - `cd frontend && npx eslint src/components/jobs/JobsHistoryFiltersPanel.vue src/components/jobs/JobsHistoryFiltersBar.vue src/views/JobsHistoryView.vue tests/components/jobs/JobsHistoryFiltersPanel.spec.ts tests/components/jobs/JobsHistoryFiltersBar.spec.ts`
 - `cd frontend && npx eslint src/views/JobHistoryView.vue src/composables/GatewayAPI.ts src/composables/ClusterAnalysis.ts src/components/settings/SettingsTabs.vue`
 - `cd frontend && npx eslint src/views/JobHistoryView.vue src/views/JobView.vue src/views/JobsView.vue src/views/settings/SettingsAccessControl.vue src/composables/GatewayAPI.ts src/composables/ClusterAnalysis.ts src/components/settings/SettingsTabs.vue`
+- `cd frontend && npx eslint src/views/JobHistoryView.vue src/views/JobView.vue src/views/JobsView.vue src/views/settings/SettingsAccessControl.vue src/composables/GatewayAPI.ts src/composables/ClusterAnalysis.ts src/components/settings/SettingsTabs.vue`（仅 warning，退出码 0）
 - `npm --prefix frontend run type-check`
 - `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/test_permission_rules.py slurmweb/tests/test_access_control_policy.py slurmweb/tests/test_access_control_store.py slurmweb/tests/apps/test_agent.py slurmweb/tests/apps/test_agent_ai.py slurmweb/tests/views/test_agent_permissions.py slurmweb/tests/views/test_agent_ai.py slurmweb/tests/views/test_agent.py slurmweb/tests/views/test_gateway.py`
 - `cd frontend && npx vitest run tests/stores/runtime.spec.ts tests/components/MainMenu.spec.ts tests/views/JobsView.spec.ts tests/views/JobView.spec.ts tests/views/AssistantView.spec.ts tests/views/settings/SettingsAI.spec.ts tests/views/settings/SettingsAccessControl.spec.ts tests/composables/GatewayAPIAdminContract.spec.ts tests/composables/GatewayAPI.spec.ts tests/router/AdminPermissions.spec.ts tests/views/ForbiddenView.spec.ts`

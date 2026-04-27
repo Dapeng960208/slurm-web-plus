@@ -136,7 +136,7 @@ describe('user metrics requests', () => {
   })
 
   test('requests user metrics history with range query', async () => {
-    mockRestAPI.get.mockResolvedValueOnce({ submissions: [] })
+    mockRestAPI.get.mockResolvedValueOnce({ submissions: [], completions: [] })
 
     const gateway = useGatewayAPI()
     await gateway.user_metrics_history('cluster-a', 'alice', 'day')
@@ -177,7 +177,7 @@ describe('user metrics requests', () => {
   })
 
   test('encodes usernames in user metrics requests', async () => {
-    mockRestAPI.get.mockResolvedValueOnce({ submissions: [] })
+    mockRestAPI.get.mockResolvedValueOnce({ submissions: [], completions: [] })
 
     const gateway = useGatewayAPI()
     await gateway.user_metrics_history('cluster-a', 'alice doe', 'week')
@@ -222,7 +222,8 @@ describe('user activity gateway methods', () => {
 
   test('requests user submission history with the provided range', async () => {
     mockRestAPI.get.mockResolvedValue({
-      submissions: [[1748004750000, 3]]
+      submissions: [[1748004750000, 3]],
+      completions: [[1748004750000, 1]]
     })
 
     const gateway = useGatewayAPI()
@@ -232,13 +233,15 @@ describe('user activity gateway methods', () => {
       '/agents/cluster/user/alice/metrics/history?range=day'
     )
     expect(result).toStrictEqual({
-      submissions: [[1748004750000, 3]]
+      submissions: [[1748004750000, 3]],
+      completions: [[1748004750000, 1]]
     })
   })
 
   test('defaults user submission history requests to the hour range', async () => {
     mockRestAPI.get.mockResolvedValue({
-      submissions: [[1748004750000, 1]]
+      submissions: [[1748004750000, 1]],
+      completions: [[1748004750000, 0]]
     })
 
     const gateway = useGatewayAPI()

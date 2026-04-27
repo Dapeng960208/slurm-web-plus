@@ -9,6 +9,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { useGatewayAPI } from '@/composables/GatewayAPI'
+import { extractSummaryCards, extractSummaryFields } from '@/composables/structuredDisplay'
 import { useRuntimeStore } from '@/stores/runtime'
 import AdminTabs from '@/components/admin/AdminTabs.vue'
 import AdminHeader from '@/components/admin/AdminHeader.vue'
@@ -31,6 +32,42 @@ const instances = ref<unknown>(null)
 const tres = ref<unknown>(null)
 
 const canEditSystem = computed(() => runtimeStore.hasRoutePermission(cluster, 'admin/system', 'edit'))
+const licenseMetaFields = computed(() =>
+  extractSummaryFields(licenses.value, {
+    omitKeys: ['licenses'],
+    preferredOrder: ['last_update', 'last_changed'],
+    labelMap: {
+      last_update: 'Last Update',
+      last_changed: 'Last Changed'
+    }
+  })
+)
+const licenseCards = computed(() =>
+  extractSummaryCards(licenses.value, {
+    listKeys: ['licenses'],
+    titleKeys: ['LicenseName', 'name'],
+    preferredOrder: [
+      'LicenseName',
+      'total',
+      'used',
+      'available',
+      'reserved',
+      'remote',
+      'last_consumed',
+      'last_update'
+    ],
+    labelMap: {
+      total: 'Total',
+      used: 'Used',
+      available: 'Available',
+      reserved: 'Reserved',
+      remote: 'Remote Count',
+      last_consumed: 'Last Consumed',
+      last_update: 'Last Update'
+    },
+    fallbackTitle: 'License'
+  })
+)
 
 async function loadSystemPanels() {
   if (!runtimeStore.hasRoutePermission(cluster, 'admin/system', 'view')) return
@@ -130,7 +167,41 @@ onMounted(async () => {
         <div class="grid gap-4 lg:grid-cols-2">
           <article class="ui-panel-soft px-4 py-4">
             <div class="ui-stat-label">Licenses</div>
-            <pre class="mt-3 overflow-x-auto text-xs text-[var(--color-brand-ink-strong)]">{{ JSON.stringify(licenses, null, 2) }}</pre>
+            <div class="mt-3 space-y-3">
+              <div v-if="licenseMetaFields.length" class="ui-detail-list">
+                <dl>
+                  <div v-for="field in licenseMetaFields" :key="field.key" class="ui-detail-row">
+                    <dt class="ui-detail-term">{{ field.label }}</dt>
+                    <dd class="ui-detail-value">{{ field.value }}</dd>
+                  </div>
+                </dl>
+              </div>
+              <div
+                v-if="licenseCards.length"
+                class="grid gap-3 xl:grid-cols-2"
+              >
+                <div
+                  v-for="card in licenseCards"
+                  :key="card.title"
+                  class="rounded-[20px] border border-[rgba(80,105,127,0.12)] bg-white/80 px-4 py-3"
+                >
+                  <div class="font-semibold text-[var(--color-brand-ink-strong)]">
+                    {{ card.title }}
+                  </div>
+                  <div class="ui-detail-list mt-3">
+                    <dl>
+                      <div v-for="field in card.fields" :key="field.key" class="ui-detail-row">
+                        <dt class="ui-detail-term">{{ field.label }}</dt>
+                        <dd class="ui-detail-value">{{ field.value }}</dd>
+                      </div>
+                    </dl>
+                  </div>
+                </div>
+              </div>
+              <p v-else class="ui-panel-description">
+                No license summary is available for this cluster.
+              </p>
+            </div>
           </article>
           <article class="ui-panel-soft px-4 py-4">
             <div class="ui-stat-label">Shares</div>

@@ -155,7 +155,8 @@ class TestAgentMetricsRequest(TestAgentBase):
         self.app.user_metrics_store = mock.Mock()
         self._enable_custom_rules("user/analysis:view:self")
         self.app.user_metrics_store.user_metrics_history.return_value = {
-            "submissions": [[1713956400000, 2]]
+            "submissions": [[1713956400000, 2]],
+            "completions": [[1713956400000, 1]],
         }
 
         response = self.client.get(
@@ -163,7 +164,13 @@ class TestAgentMetricsRequest(TestAgentBase):
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json, {"submissions": [[1713956400000, 2]]})
+        self.assertEqual(
+            response.json,
+            {
+                "submissions": [[1713956400000, 2]],
+                "completions": [[1713956400000, 1]],
+            },
+        )
         self.app.user_metrics_store.user_metrics_history.assert_called_once_with(
             self.user.login, "hour"
         )
@@ -417,7 +424,8 @@ class TestAgentUserMetricsRequests(TestAgentBase):
         self.app.user_metrics_store = mock.Mock()
         self._enable_custom_rules("user/analysis:view:self")
         self.app.user_metrics_store.user_metrics_history.return_value = {
-            "submissions": [[1713956400000, 2]]
+            "submissions": [[1713956400000, 2]],
+            "completions": [[1713956400000, 1]],
         }
 
         response = self.client.get(
@@ -425,7 +433,13 @@ class TestAgentUserMetricsRequests(TestAgentBase):
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json, {"submissions": [[1713956400000, 2]]})
+        self.assertEqual(
+            response.json,
+            {
+                "submissions": [[1713956400000, 2]],
+                "completions": [[1713956400000, 1]],
+            },
+        )
         self.app.user_metrics_store.user_metrics_history.assert_called_once_with(
             self.user.login, "hour"
         )

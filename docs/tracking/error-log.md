@@ -17,6 +17,15 @@
 
 ## 条目
 
+### 2026-04-27：`admin/system/slurmdb/instances` 在无实例时会因缺少 `instances` key 直接 500
+
+- 场景：访问 `Admin > System` 页面，前端请求 `GET /v6.0.0/admin/system/slurmdb/instances`。
+- 现象：Agent 日志先记录 `slurmdb_instances_get() found nothing` warning，随后在 `slurmweb.slurmrestd.instances()` 里抛 `KeyError: 'instances'`，接口返回 500。
+- 复现：当 SlurmDB `instances` 查询返回仅包含 `warnings` / `errors`、但没有 `instances` 字段时访问上述接口。
+- 根因：`slurmweb/slurmrestd/__init__.py` 里的 `instances()` 直接调用 `_request(..., "instances")`，默认把 `instances` 当成必有 key；但“查到 0 条实例”的 slurmdb 返回是 warning-only 响应，不带空数组字段。
+- 解决：`instances()` 改为先取完整响应；若存在 `instances` 则正常返回，若 warning 描述包含 `found nothing` 则兼容返回空列表 `[]`，并补 `slurmweb/tests/slurmrestd/test_slurmrestd.py` 与 `slurmweb/tests/views/test_agent_operations.py` 回归测试。
+- 预防：后续对接 SlurmDB 只读列表端点时，不要假设“空结果一定返回空数组 key”；对 warning-only / empty-result 响应要先核对真实协议，再决定是否做窄范围兼容。
+
 ### 2026-04-25：共享操作对话框复用时会把上一次表单字段带入后续删除/取消请求
 
 - 场景：Slurm 管理扩展上线后，多个业务页复用 `frontend/src/components/operations/ActionDialog.vue` 承载提交、编辑、删除、取消等单对象操作。
@@ -239,6 +248,10 @@
 - 根因：页面和类型层重构后残留了未被模板或运行时代码使用的符号，且若干仅做别名用途的接口仍保留 `interface extends` 空壳写法。
 - 解决：删除未使用符号，并把仅做类型别名的空接口改成 `type`。
 - 预防：后续前端重构后，提交前至少对改动链路相关文件跑一轮定向 ESLint；若只是做类型别名，不要再保留 `interface extends Foo {}` 这种空接口写法。
+
+补充：
+
+- 当前仓库已把前端源码里的这两条规则降级为 warning，GitHub `Frontend ESLint` 仍会显示告警，但不再因这两类历史清理项单独失败。
 
 ### 2026-04-27：本地已提交前端 ESLint 修复，但 push 到 GitHub 时再次被网络阻断
 

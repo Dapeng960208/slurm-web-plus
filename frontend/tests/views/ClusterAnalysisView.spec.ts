@@ -221,7 +221,7 @@ describe('ClusterAnalysisView.vue', () => {
     expect(wrapper.text()).toContain('Controller Health')
     expect(wrapper.text()).toContain('Ping')
     expect(wrapper.text()).toContain('Diag')
-    expect(wrapper.text()).toContain('jobs_submitted')
+    expect(wrapper.text()).toContain('Jobs Submitted')
     expect(mockGatewayAPI.jobs_history).toHaveBeenCalledWith(
       'foo',
       expect.objectContaining({

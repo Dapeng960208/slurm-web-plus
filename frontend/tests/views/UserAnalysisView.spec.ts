@@ -63,7 +63,8 @@ describe('UserAnalysisView.vue', () => {
       ]
     })
     mockGatewayAPI.user_metrics_history.mockResolvedValue({
-      submissions: [[1745488800000, 2]]
+      submissions: [[1745488800000, 2]],
+      completions: [[1745488800000, 1]]
     })
   })
 

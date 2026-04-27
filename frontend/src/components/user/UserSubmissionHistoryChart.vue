@@ -42,6 +42,16 @@ function updateChart() {
       pointRadius: 0,
       tension: 0.28,
       fill: true
+    },
+    {
+      label: 'Completions',
+      data: toPoints(history.completions ?? []),
+      borderColor: '#ef9b28',
+      backgroundColor: 'rgba(239, 155, 40, 0.1)',
+      borderWidth: 2.2,
+      pointRadius: 0,
+      tension: 0.24,
+      fill: false
     }
   ]
   chart.update()
@@ -62,7 +72,12 @@ onMounted(() => {
       },
       plugins: {
         legend: {
-          display: false
+          display: true,
+          labels: {
+            color: '#6c7a80',
+            usePointStyle: true,
+            boxWidth: 8
+          }
         },
         tooltip: {
           backgroundColor: 'rgba(32, 42, 53, 0.94)',
@@ -72,7 +87,7 @@ onMounted(() => {
           borderWidth: 1,
           padding: 12,
           callbacks: {
-            label: (context) => `${context.parsed.y.toFixed(0)} jobs`
+            label: (context) => `${context.dataset.label}: ${context.parsed.y.toFixed(0)} jobs`
           }
         }
       },

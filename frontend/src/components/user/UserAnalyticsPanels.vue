@@ -8,7 +8,8 @@
 
 <script setup lang="ts">
 import { computed, onUnmounted, ref, watch } from 'vue'
-import { getMBHumanUnit, useGatewayAPI } from '@/composables/GatewayAPI'
+import { useRoute, useRouter } from 'vue-router'
+import { getMBHumanUnit, isMetricRange, useGatewayAPI } from '@/composables/GatewayAPI'
 import type {
   MetricRange,
   UserActivitySummary,
@@ -19,6 +20,7 @@ import ErrorAlert from '@/components/ErrorAlert.vue'
 import InfoAlert from '@/components/InfoAlert.vue'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
 import StatCardSkeleton from '@/components/StatCardSkeleton.vue'
+import MetricRangeSelector from '@/components/MetricRangeSelector.vue'
 import UserSubmissionHistoryChart from '@/components/user/UserSubmissionHistoryChart.vue'
 import UserToolAnalysisChart from '@/components/user/UserToolAnalysisChart.vue'
 
@@ -29,6 +31,8 @@ const { cluster, user, enabled } = defineProps<{
 }>()
 
 const gateway = useGatewayAPI()
+const route = useRoute()
+const router = useRouter()
 const userMetricsRange = ref<MetricRange>('hour')
 const userMetricsHistory = ref<UserMetricsHistory | null>(null)
 const userMetricsSummary = ref<UserActivitySummary | null>(null)
@@ -53,7 +57,9 @@ const userMetricsGeneratedAtLabel = computed(() => {
 })
 
 const userMetricsHistoryHasData = computed(() => {
-  return Boolean(userMetricsHistory.value?.submissions.length)
+  return Boolean(
+    userMetricsHistory.value?.submissions?.length || userMetricsHistory.value?.completions?.length
+  )
 })
 
 const topTools = computed<UserToolActivityRecord[]>(() => {
@@ -161,8 +167,22 @@ function stopUserMetricsPolling() {
 }
 
 function setUserMetricsRange(range: MetricRange) {
-  userMetricsRange.value = range
+  if (userMetricsRange.value === range && route.query.range === range) return
+  void router.replace({
+    query: {
+      ...route.query,
+      range
+    }
+  })
 }
+
+watch(
+  () => route.query.range,
+  (range) => {
+    userMetricsRange.value = isMetricRange(range) ? range : 'hour'
+  },
+  { immediate: true }
+)
 
 watch(
   () => enabled,
@@ -284,60 +304,27 @@ onUnmounted(() => {
           <div>
             <h2 class="ui-panel-title">Submission Activity</h2>
             <p class="ui-panel-description mt-2">
-              Near-realtime job submissions for this user. Range switches between hour, day and
-              week views.
+              Near-realtime job submission and completion trends for this user across hour, day
+              and week windows.
             </p>
           </div>
 
-          <span class="isolate inline-flex rounded-full shadow-[var(--shadow-soft)]">
-            <button
-              type="button"
-              :class="[
-                userMetricsRange == 'week'
-                  ? 'bg-[linear-gradient(135deg,rgba(182,232,44,0.95),rgba(152,201,31,0.95))] text-[var(--color-brand-deep)]'
-                  : 'bg-white/90 text-[var(--color-brand-muted)] hover:bg-white',
-                'relative inline-flex items-center rounded-l-full px-3 py-1.5 text-xs font-semibold ring-1 ring-[rgba(80,105,127,0.16)] ring-inset focus:z-10'
-              ]"
-              @click="setUserMetricsRange('week')"
-            >
-              week
-            </button>
-            <button
-              type="button"
-              :class="[
-                userMetricsRange == 'day'
-                  ? 'bg-[linear-gradient(135deg,rgba(182,232,44,0.95),rgba(152,201,31,0.95))] text-[var(--color-brand-deep)]'
-                  : 'bg-white/90 text-[var(--color-brand-muted)] hover:bg-white',
-                'relative inline-flex items-center px-3 py-1.5 text-xs font-semibold ring-1 ring-[rgba(80,105,127,0.16)] ring-inset focus:z-10'
-              ]"
-              @click="setUserMetricsRange('day')"
-            >
-              day
-            </button>
-            <button
-              type="button"
-              :class="[
-                userMetricsRange == 'hour'
-                  ? 'bg-[linear-gradient(135deg,rgba(182,232,44,0.95),rgba(152,201,31,0.95))] text-[var(--color-brand-deep)]'
-                  : 'bg-white/90 text-[var(--color-brand-muted)] hover:bg-white',
-                'relative inline-flex items-center rounded-r-full px-3 py-1.5 text-xs font-semibold ring-1 ring-[rgba(80,105,127,0.16)] ring-inset focus:z-10'
-              ]"
-              @click="setUserMetricsRange('hour')"
-            >
-              hour
-            </button>
-          </span>
+          <MetricRangeSelector
+            :model-value="userMetricsRange"
+            aria-label="Select user activity range"
+            @update:model-value="setUserMetricsRange"
+          />
         </div>
 
         <ErrorAlert v-if="userMetricsHistoryUnavailable">
-          Unable to retrieve submission history for this user.
+          Unable to retrieve submission or completion history for this user.
         </ErrorAlert>
         <div v-else-if="userMetricsHistoryLoading" class="text-[var(--color-brand-muted)]">
           <LoadingSpinner :size="4" />
-          Loading submission history...
+          Loading activity history...
         </div>
         <p v-else-if="!userMetricsHistoryHasData" class="ui-panel-description">
-          No submission history is available for this range.
+          No submission or completion history is available for this range.
         </p>
         <UserSubmissionHistoryChart v-else :history="userMetricsHistory" />
       </div>

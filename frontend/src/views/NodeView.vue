@@ -9,7 +9,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useRuntimeStore } from '@/stores/runtime'
 import ClusterMainLayout from '@/components/ClusterMainLayout.vue'
 import { useClusterDataPoller } from '@/composables/DataPoller'
@@ -18,6 +18,7 @@ import {
   getMBHumanUnit,
   getNodeGPU,
   getNodeGPUFromGres,
+  isMetricRange,
   useGatewayAPI
 } from '@/composables/GatewayAPI'
 import type {
@@ -39,12 +40,14 @@ import StatCardSkeleton from '@/components/StatCardSkeleton.vue'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
 import NodeMetricsHistoryChart from '@/components/node/NodeMetricsHistoryChart.vue'
 import PercentMetric from '@/components/PercentMetric.vue'
+import MetricRangeSelector from '@/components/MetricRangeSelector.vue'
 import ActionDialog from '@/components/operations/ActionDialog.vue'
 import { XCircleIcon } from '@heroicons/vue/20/solid'
 
 const { cluster, nodeName } = defineProps<{ cluster: string; nodeName: string }>()
 
 const router = useRouter()
+const route = useRoute()
 const runtimeStore = useRuntimeStore()
 const gateway = useGatewayAPI()
 const operationError = ref<string | null>(null)
@@ -243,8 +246,22 @@ function confirmDeleteNode(payload: Record<string, string>) {
 }
 
 function setMetricsRange(range: MetricRange) {
-  nodeMetricsRange.value = range
+  if (nodeMetricsRange.value === range && route.query.range === range) return
+  void router.replace({
+    query: {
+      ...route.query,
+      range
+    }
+  })
 }
+
+watch(
+  () => route.query.range,
+  (range) => {
+    nodeMetricsRange.value = isMetricRange(range) ? range : 'hour'
+  },
+  { immediate: true }
+)
 
 watch(
   () => cluster,
@@ -336,10 +353,22 @@ onUnmounted(() => {
                 >
                   {{ node.data.value.reason }}
                 </span>
-                <button v-if="canEditNode" type="button" class="ui-button-secondary" @click="editOpen = true">
+                <button
+                  v-if="canEditNode"
+                  type="button"
+                  class="ui-button-warning"
+                  title="Edit the node state and set a scheduler-visible reason."
+                  @click="editOpen = true"
+                >
                   Edit
                 </button>
-                <button v-if="canDeleteNode" type="button" class="ui-button-secondary" @click="deleteOpen = true">
+                <button
+                  v-if="canDeleteNode"
+                  type="button"
+                  class="ui-button-danger"
+                  title="Delete this node definition from the cluster."
+                  @click="deleteOpen = true"
+                >
                   Delete
                 </button>
               </template>
@@ -682,44 +711,11 @@ onUnmounted(() => {
                       </div>
                     </div>
 
-                    <span class="isolate inline-flex rounded-full shadow-[var(--shadow-soft)]">
-                      <button
-                        type="button"
-                        :class="[
-                          nodeMetricsRange == 'week'
-                            ? 'bg-[linear-gradient(135deg,rgba(182,232,44,0.95),rgba(152,201,31,0.95))] text-[var(--color-brand-deep)]'
-                            : 'bg-white/90 text-[var(--color-brand-muted)] hover:bg-white',
-                          'relative inline-flex items-center rounded-l-full px-3 py-1.5 text-xs font-semibold ring-1 ring-[rgba(80,105,127,0.16)] ring-inset focus:z-10'
-                        ]"
-                        @click="setMetricsRange('week')"
-                      >
-                        week
-                      </button>
-                      <button
-                        type="button"
-                        :class="[
-                          nodeMetricsRange == 'day'
-                            ? 'bg-[linear-gradient(135deg,rgba(182,232,44,0.95),rgba(152,201,31,0.95))] text-[var(--color-brand-deep)]'
-                            : 'bg-white/90 text-[var(--color-brand-muted)] hover:bg-white',
-                          'relative inline-flex items-center px-3 py-1.5 text-xs font-semibold ring-1 ring-[rgba(80,105,127,0.16)] ring-inset focus:z-10'
-                        ]"
-                        @click="setMetricsRange('day')"
-                      >
-                        day
-                      </button>
-                      <button
-                        type="button"
-                        :class="[
-                          nodeMetricsRange == 'hour'
-                            ? 'bg-[linear-gradient(135deg,rgba(182,232,44,0.95),rgba(152,201,31,0.95))] text-[var(--color-brand-deep)]'
-                            : 'bg-white/90 text-[var(--color-brand-muted)] hover:bg-white',
-                          'relative inline-flex items-center rounded-r-full px-3 py-1.5 text-xs font-semibold ring-1 ring-[rgba(80,105,127,0.16)] ring-inset focus:z-10'
-                        ]"
-                        @click="setMetricsRange('hour')"
-                      >
-                        hour
-                      </button>
-                    </span>
+                    <MetricRangeSelector
+                      :model-value="nodeMetricsRange"
+                      aria-label="Select node metrics range"
+                      @update:model-value="setMetricsRange"
+                    />
                   </div>
 
                   <div class="mt-3">
@@ -751,6 +747,8 @@ onUnmounted(() => {
       title="Edit Node"
       :description="`Update node ${nodeName} on ${cluster}.`"
       submit-label="Save changes"
+      submit-variant="warning"
+      submit-tooltip="Apply the edited node state and optional reason to the selected cluster node."
       :loading="operationBusy"
       :error="operationError"
       :initial-values="{
@@ -758,8 +756,20 @@ onUnmounted(() => {
         reason: node.data.value?.reason ?? ''
       }"
       :fields="[
-        { key: 'state', label: 'State', required: true },
-        { key: 'reason', label: 'Reason', type: 'textarea' }
+        {
+          key: 'state',
+          label: 'State',
+          required: true,
+          hint: 'Comma-separated Slurm state flags to apply to this node.',
+          tooltip: 'Examples include DRAIN, RESUME or UNDRAIN depending on the desired scheduler action.'
+        },
+        {
+          key: 'reason',
+          label: 'Reason',
+          type: 'textarea',
+          hint: 'Optional audit note shown with the node state inside the cluster UI and scheduler output.',
+          tooltip: 'Use this when draining or changing node behavior so operators understand why.'
+        }
       ]"
       @close="editOpen = false"
       @submit="saveNode"
@@ -770,9 +780,19 @@ onUnmounted(() => {
       title="Delete Node"
       :description="`Delete node ${nodeName}. This action is destructive.`"
       submit-label="Delete node"
+      submit-variant="danger"
+      submit-tooltip="Permanently remove the node definition after confirmation."
       :loading="operationBusy"
       :error="operationError"
-      :fields="[{ key: 'confirmation', label: 'Type DELETE to confirm', required: true }]"
+      :fields="[
+        {
+          key: 'confirmation',
+          label: 'Type DELETE to confirm',
+          required: true,
+          hint: 'Enter DELETE exactly to unlock this destructive action.',
+          tooltip: 'This safeguard prevents accidental node removal.'
+        }
+      ]"
       @close="deleteOpen = false"
       @submit="confirmDeleteNode"
     />

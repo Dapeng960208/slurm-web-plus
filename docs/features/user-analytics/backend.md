@@ -22,6 +22,22 @@
 - `GET /api/agents/<cluster>/user/<username>/metrics/history`
 - `GET /api/agents/<cluster>/associations`
 
+`metrics/history` 当前返回：
+
+- `submissions`
+  - 按所选时间范围聚合的提交作业数序列
+- `completions`
+  - 按所选时间范围聚合的完成作业数序列
+
+时间范围固定为：
+
+- `hour`
+  - 按分钟 bucket
+- `day`
+  - 按小时 bucket
+- `week`
+  - 按天 bucket
+
 ## 3. 权限要求
 
 用户空间当前按区块控制：
@@ -56,3 +72,11 @@
   - 对他人页面统一跳转 `/forbidden`
 - 数据请求失败：
   - 只在对应区块显示错误
+
+## 6. 当前前端展示约定
+
+- 用户分析页实时曲线同时展示：
+  - 提交作业数
+  - 完成作业数
+- 时间范围使用 `range` query 参数与页面状态同步
+- 切换范围后仅刷新用户分析区块，不影响用户资料区

@@ -54,6 +54,26 @@ class TestSlurmrestd(TestSlurmrestdBase):
         ):
             self.slurmrestd._request("slurm", "whatever", key="whatever")
 
+    def test_instances_returns_empty_list_when_slurmdb_warns_found_nothing(self):
+        self.setup_slurmrestd("25.11.0", "0.0.44")
+        self.slurmrestd.request_json = mock.Mock(
+            return_value={
+                "warnings": [
+                    {
+                        "description": "slurmdb_instances_get() found nothing",
+                        "source": "_dump_instance_cond",
+                    }
+                ],
+                "errors": [],
+            }
+        )
+
+        with self.assertLogs("slurmweb.slurmrestd", level="DEBUG") as cm:
+            result = self.slurmrestd.instances()
+
+        self.assertEqual(result, [])
+        self.assertIn("treating warning-only response as empty list", cm.output[-1])
+
     @all_slurm_api_versions
     def test_request_slurm_internal_error(self, slurm_version, api_version):
         self.setup_slurmrestd(slurm_version, api_version)

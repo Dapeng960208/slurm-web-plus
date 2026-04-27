@@ -591,7 +591,21 @@ class Slurmrestd:
         return self.request_json("GET", "slurmdb", "config")
 
     def instances(self):
-        return self._request("slurmdb", "instances", "instances")
+        result = self.request_json("GET", "slurmdb", "instances")
+        if "instances" in result:
+            return result["instances"]
+        warnings = result.get("warnings", [])
+        if any(
+            "found nothing" in str(warning.get("description", "")).lower()
+            for warning in warnings
+            if isinstance(warning, dict)
+        ):
+            logger.debug(
+                "slurmrestd instances query returned no instances payload; "
+                "treating warning-only response as empty list"
+            )
+            return []
+        raise KeyError("instances")
 
     def tres(self):
         try:

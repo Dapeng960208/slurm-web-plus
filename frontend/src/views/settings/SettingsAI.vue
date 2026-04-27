@@ -20,6 +20,7 @@ import AdminHeader from '@/components/admin/AdminHeader.vue'
 import InfoAlert from '@/components/InfoAlert.vue'
 import ErrorAlert from '@/components/ErrorAlert.vue'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
+import FormFieldLabel from '@/components/forms/FormFieldLabel.vue'
 
 type SecretMode = 'keep' | 'replace' | 'clear'
 
@@ -130,6 +131,9 @@ const currentProvider = computed(() => form.provider)
 const requiresDeployment = computed(() => currentProvider.value === 'azure-openai')
 const requiresApiVersion = computed(() => currentProvider.value === 'azure-openai')
 const supportsSecret = computed(() => currentProvider.value !== 'ollama')
+const secretFieldRequired = computed(
+  () => supportsSecret.value && (editingConfigId.value === null || secretMode.value === 'replace')
+)
 
 function formatTimestamp(value: string | null): string {
   if (!value) return 'Never'
@@ -417,6 +421,7 @@ onMounted(async () => {
             type="button"
             class="ui-button-primary"
             :disabled="!canManage || !aiAvailable"
+            title="Create a new cluster-scoped AI model configuration."
             @click="openCreateModal"
           >
             New model
@@ -526,8 +531,9 @@ onMounted(async () => {
               <div class="flex flex-wrap gap-2">
                 <button
                   type="button"
-                  class="ui-button-secondary"
+                  class="ui-button-warning"
                   :disabled="!canManage"
+                  title="Open the editor to update provider settings, routing, prompts and secrets."
                   @click="openEditModal(config)"
                 >
                   Edit
@@ -536,6 +542,7 @@ onMounted(async () => {
                   type="button"
                   class="ui-button-secondary"
                   :disabled="validatingId === config.id || !canManage"
+                  title="Run a live connectivity check with the current model configuration."
                   @click="validateConfig(config)"
                 >
                   {{ validatingId === config.id ? 'Testing...' : 'Test connection' }}
@@ -575,6 +582,7 @@ onMounted(async () => {
                 type="button"
                 class="ui-button-secondary"
                 :disabled="config.is_default || !canManage"
+                title="Make this model the default target for new AI conversations."
                 @click="setDefault(config)"
               >
                 Set default
@@ -583,6 +591,7 @@ onMounted(async () => {
                 type="button"
                 class="ui-button-secondary"
                 :disabled="!canManage"
+                title="Enable or disable this model without deleting its saved configuration."
                 @click="toggleEnabled(config)"
               >
                 {{ config.enabled ? 'Disable' : 'Enable' }}
@@ -590,8 +599,9 @@ onMounted(async () => {
               <button
                 v-if="canDelete"
                 type="button"
-                class="ui-button-secondary"
+                class="ui-button-danger"
                 :disabled="deletingId === config.id"
+                title="Delete this model configuration and remove its saved secret."
                 @click="deleteConfig(config)"
               >
                 {{ deletingId === config.id ? 'Deleting...' : 'Delete' }}
@@ -644,7 +654,12 @@ onMounted(async () => {
                 <form class="mt-6 space-y-6" @submit.prevent="submitForm">
                   <div class="grid gap-4 md:grid-cols-2">
                     <label class="block">
-                      <span class="text-sm font-semibold text-[var(--color-brand-ink-strong)]">Config name</span>
+                      <FormFieldLabel
+                        label="Config name"
+                        required
+                        hint="Stable identifier used to recognize this saved model entry."
+                        tooltip="Used inside the cluster configuration list and audit trail."
+                      />
                       <input
                         v-model="form.name"
                         type="text"
@@ -652,7 +667,12 @@ onMounted(async () => {
                       />
                     </label>
                     <label class="block">
-                      <span class="text-sm font-semibold text-[var(--color-brand-ink-strong)]">Display name</span>
+                      <FormFieldLabel
+                        label="Display name"
+                        required
+                        hint="Friendly label shown to end users when they choose a model."
+                        tooltip="This can be more readable than the provider model identifier."
+                      />
                       <input
                         v-model="form.display_name"
                         type="text"
@@ -660,7 +680,12 @@ onMounted(async () => {
                       />
                     </label>
                     <label class="block">
-                      <span class="text-sm font-semibold text-[var(--color-brand-ink-strong)]">provider</span>
+                      <FormFieldLabel
+                        label="Provider"
+                        required
+                        hint="Select which upstream AI service receives chat requests."
+                        tooltip="Provider controls which connection options are required below."
+                      />
                       <select
                         v-model="form.provider"
                         class="mt-2 block w-full rounded-[18px] border border-[rgba(80,105,127,0.14)] bg-white px-3 py-2.5 text-sm outline-hidden focus:border-[rgba(182,232,44,0.65)] focus:ring-4 focus:ring-[rgba(182,232,44,0.18)]"
@@ -671,7 +696,12 @@ onMounted(async () => {
                       </select>
                     </label>
                     <label class="block">
-                      <span class="text-sm font-semibold text-[var(--color-brand-ink-strong)]">Model</span>
+                      <FormFieldLabel
+                        label="Model"
+                        required
+                        hint="Provider-specific model identifier, deployment name or runtime tag."
+                        tooltip="Examples: gpt-4.1, claude-3-7-sonnet, qwen-max, llama3.1."
+                      />
                       <input
                         v-model="form.model"
                         type="text"
@@ -682,7 +712,11 @@ onMounted(async () => {
 
                   <div class="grid gap-4 md:grid-cols-2">
                     <label class="block">
-                      <span class="text-sm font-semibold text-[var(--color-brand-ink-strong)]">Base URL</span>
+                      <FormFieldLabel
+                        label="Base URL"
+                        hint="Optional override when the provider is served from a custom endpoint."
+                        tooltip="Leave empty to use the provider's default API base URL."
+                      />
                       <input
                         v-model="form.base_url"
                         type="text"
@@ -690,7 +724,11 @@ onMounted(async () => {
                       />
                     </label>
                     <label class="block">
-                      <span class="text-sm font-semibold text-[var(--color-brand-ink-strong)]">Sort order</span>
+                      <FormFieldLabel
+                        label="Sort order"
+                        hint="Optional numeric weight that controls how models are ordered in the UI."
+                        tooltip="Lower values appear earlier in lists; empty falls back to 0."
+                      />
                       <input
                         v-model="form.sort_order"
                         type="number"
@@ -698,7 +736,12 @@ onMounted(async () => {
                       />
                     </label>
                     <label v-if="requiresDeployment" class="block">
-                      <span class="text-sm font-semibold text-[var(--color-brand-ink-strong)]">Deployment</span>
+                      <FormFieldLabel
+                        label="Deployment"
+                        :required="requiresDeployment"
+                        hint="Azure OpenAI deployment name that routes requests to the target model."
+                        tooltip="Azure uses deployment identifiers rather than raw model names at request time."
+                      />
                       <input
                         v-model="form.deployment"
                         type="text"
@@ -706,7 +749,12 @@ onMounted(async () => {
                       />
                     </label>
                     <label v-if="requiresApiVersion" class="block">
-                      <span class="text-sm font-semibold text-[var(--color-brand-ink-strong)]">API version</span>
+                      <FormFieldLabel
+                        label="API version"
+                        :required="requiresApiVersion"
+                        hint="Azure API version appended to requests for compatibility."
+                        tooltip="Match this to the Azure OpenAI API version enabled for your deployment."
+                      />
                       <input
                         v-model="form.api_version"
                         type="text"
@@ -717,7 +765,11 @@ onMounted(async () => {
 
                   <div class="grid gap-4 md:grid-cols-2">
                     <label class="block">
-                      <span class="text-sm font-semibold text-[var(--color-brand-ink-strong)]">Request timeout</span>
+                      <FormFieldLabel
+                        label="Request timeout"
+                        hint="Optional timeout in seconds before chat or validation requests are aborted."
+                        tooltip="Useful for slower providers or on-premise gateways."
+                      />
                       <input
                         v-model="form.request_timeout"
                         type="number"
@@ -725,7 +777,11 @@ onMounted(async () => {
                       />
                     </label>
                     <label class="block">
-                      <span class="text-sm font-semibold text-[var(--color-brand-ink-strong)]">Temperature</span>
+                      <FormFieldLabel
+                        label="Temperature"
+                        hint="Optional sampling control for generation creativity and determinism."
+                        tooltip="Leave empty to let the provider or server defaults decide."
+                      />
                       <input
                         v-model="form.temperature"
                         type="number"
@@ -747,16 +803,31 @@ onMounted(async () => {
                         <button type="button" class="ui-button-secondary" @click="secretMode = 'keep'">
                           Keep
                         </button>
-                        <button type="button" class="ui-button-secondary" @click="secretMode = 'replace'">
+                        <button
+                          type="button"
+                          class="ui-button-warning"
+                          title="Replace the stored secret with a new API key."
+                          @click="secretMode = 'replace'"
+                        >
                           Replace
                         </button>
-                        <button type="button" class="ui-button-secondary" @click="secretMode = 'clear'">
+                        <button
+                          type="button"
+                          class="ui-button-danger"
+                          title="Remove the stored secret. Future requests will fail until a new secret is set."
+                          @click="secretMode = 'clear'"
+                        >
                           Clear
                         </button>
                       </div>
                     </div>
                     <label v-if="editingConfigId === null || secretMode === 'replace'" class="mt-4 block">
-                      <span class="text-sm font-semibold text-[var(--color-brand-ink-strong)]">API Key</span>
+                      <FormFieldLabel
+                        label="API Key"
+                        :required="secretFieldRequired"
+                        hint="Credential stored securely and only returned to the UI as a masked value."
+                        tooltip="Required for providers that authenticate with a bearer secret."
+                      />
                       <input
                         v-model="form.api_key"
                         type="password"
@@ -767,7 +838,11 @@ onMounted(async () => {
                   </div>
 
                   <label class="block">
-                    <span class="text-sm font-semibold text-[var(--color-brand-ink-strong)]">System prompt</span>
+                    <FormFieldLabel
+                      label="System prompt"
+                      hint="Optional instruction prefix applied to every new conversation for this model."
+                      tooltip="Use this to enforce tone, scope, safety policy or cluster-specific context."
+                    />
                     <textarea
                       v-model="form.system_prompt"
                       rows="4"
@@ -776,7 +851,11 @@ onMounted(async () => {
                   </label>
 
                   <label class="block">
-                    <span class="text-sm font-semibold text-[var(--color-brand-ink-strong)]">Extra options</span>
+                    <FormFieldLabel
+                      label="Extra options"
+                      hint="Optional JSON object for provider-specific request fields that do not have a dedicated form control."
+                      tooltip="Examples include max_tokens, top_p, reasoning options or custom headers."
+                    />
                     <textarea
                       v-model="form.extra_options"
                       rows="5"
@@ -798,7 +877,15 @@ onMounted(async () => {
 
                   <div class="flex flex-wrap justify-end gap-2">
                     <button type="button" class="ui-button-secondary" @click="closeModal">Cancel</button>
-                    <button type="submit" class="ui-button-primary">
+                    <button
+                      type="submit"
+                      :class="editingConfigId === null ? 'ui-button-primary' : 'ui-button-warning'"
+                      :title="
+                        editingConfigId === null
+                          ? 'Create a new model configuration for this cluster.'
+                          : 'Save the edited model configuration to the cluster.'
+                      "
+                    >
                       {{ editingConfigId === null ? 'Create model' : 'Save changes' }}
                     </button>
                   </div>

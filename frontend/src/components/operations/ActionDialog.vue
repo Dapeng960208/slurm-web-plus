@@ -9,8 +9,10 @@
 <script setup lang="ts">
 import { computed, reactive, watch } from 'vue'
 import { Dialog, DialogPanel, DialogTitle, TransitionChild, TransitionRoot } from '@headlessui/vue'
+import FormFieldLabel from '@/components/forms/FormFieldLabel.vue'
 
 export type ActionFieldType = 'text' | 'textarea' | 'number'
+export type ActionSubmitVariant = 'primary' | 'warning' | 'danger'
 
 export interface ActionField {
   key: string
@@ -18,6 +20,8 @@ export interface ActionField {
   type?: ActionFieldType
   placeholder?: string
   required?: boolean
+  hint?: string
+  tooltip?: string
 }
 
 const props = defineProps<{
@@ -29,6 +33,8 @@ const props = defineProps<{
   error?: string | null
   fields: ActionField[]
   initialValues?: Record<string, string>
+  submitVariant?: ActionSubmitVariant
+  submitTooltip?: string
 }>()
 
 const emit = defineEmits<{
@@ -37,6 +43,31 @@ const emit = defineEmits<{
 }>()
 
 const form = reactive<Record<string, string>>({})
+
+const resolvedSubmitVariant = computed<ActionSubmitVariant>(() => {
+  if (props.submitVariant) return props.submitVariant
+  const signal = `${props.title} ${props.submitLabel}`.toLowerCase()
+  if (signal.includes('delete') || signal.includes('cancel')) return 'danger'
+  if (signal.includes('edit') || signal.includes('save')) return 'warning'
+  return 'primary'
+})
+
+const submitButtonClass = computed(() => {
+  switch (resolvedSubmitVariant.value) {
+    case 'danger':
+      return 'ui-button-danger'
+    case 'warning':
+      return 'ui-button-warning'
+    default:
+      return 'ui-button-primary'
+  }
+})
+
+const resolvedSubmitTooltip = computed(() => {
+  if (props.submitTooltip) return props.submitTooltip
+  if (props.description) return props.description
+  return `Confirm ${props.submitLabel.toLowerCase()}.`
+})
 
 function resetForm() {
   for (const key of Object.keys(form)) {
@@ -102,7 +133,12 @@ watch(
 
               <form class="mt-6 space-y-4" @submit.prevent="emit('submit', { ...form })">
                 <label v-for="field in fields" :key="field.key" class="block">
-                  <span class="text-sm font-semibold text-[var(--color-brand-ink-strong)]">{{ field.label }}</span>
+                  <FormFieldLabel
+                    :label="field.label"
+                    :required="field.required"
+                    :hint="field.hint"
+                    :tooltip="field.tooltip"
+                  />
                   <textarea
                     v-if="field.type === 'textarea'"
                     v-model="form[field.key]"
@@ -123,7 +159,12 @@ watch(
 
                 <div class="flex flex-wrap justify-end gap-2">
                   <button type="button" class="ui-button-secondary" @click="emit('close')">Cancel</button>
-                  <button type="submit" class="ui-button-primary" :disabled="loading || !canSubmit">
+                  <button
+                    type="submit"
+                    :class="submitButtonClass"
+                    :title="resolvedSubmitTooltip"
+                    :disabled="loading || !canSubmit"
+                  >
                     {{ loading ? 'Working...' : submitLabel }}
                   </button>
                 </div>

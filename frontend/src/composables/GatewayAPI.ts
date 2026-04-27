@@ -1328,6 +1328,7 @@ export interface NodeMetricsHistory {
 
 export interface UserMetricsHistory {
   submissions: MetricValue[]
+  completions: MetricValue[]
 }
 
 export interface UserToolActivityRecord {

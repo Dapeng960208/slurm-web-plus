@@ -73,22 +73,6 @@ const navigation: Array<{
     feature: undefined
   },
   {
-    name: 'Admin',
-    route: 'admin-system',
-    icon: ShieldCheckIcon,
-    resource: 'admin/system',
-    operation: 'view',
-    feature: undefined
-  },
-  {
-    name: 'AI',
-    route: 'ai',
-    icon: ChatBubbleLeftRightIcon,
-    resource: 'ai',
-    operation: 'view',
-    feature: 'ai'
-  },
-  {
     name: 'Jobs',
     route: 'jobs',
     icon: PlayCircleIcon,
@@ -133,6 +117,22 @@ const navigation: Array<{
     route: 'accounts',
     icon: UserGroupIcon,
     resource: 'accounts',
+    operation: 'view',
+    feature: undefined
+  },
+  {
+    name: 'AI',
+    route: 'ai',
+    icon: ChatBubbleLeftRightIcon,
+    resource: 'ai',
+    operation: 'view',
+    feature: 'ai'
+  },
+  {
+    name: 'Admin',
+    route: 'admin-system',
+    icon: ShieldCheckIcon,
+    resource: 'admin/system',
     operation: 'view',
     feature: undefined
   }
