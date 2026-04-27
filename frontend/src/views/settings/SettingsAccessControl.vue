@@ -119,7 +119,6 @@ const selectedRoleNames = computed(() =>
 )
 const totalUserPages = computed(() => Math.max(Math.ceil(usersTotal.value / usersPageSize), 1))
 const sortedCatalogGroups = computed(() => catalog.value?.groups ?? [])
-const catalogOperations = computed(() => catalog.value?.operations ?? [])
 const totalCatalogResources = computed(() =>
   sortedCatalogGroups.value.reduce((count, group) => count + group.resources.length, 0)
 )

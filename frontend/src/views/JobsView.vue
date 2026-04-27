@@ -36,7 +36,7 @@ import { PencilSquareIcon, PlusSmallIcon, WindowIcon, XMarkIcon } from '@heroico
 const { cluster } = defineProps<{ cluster: string }>()
 
 const route = useRoute()
-const { data, unable, loaded, initialLoading, setCluster } = useClusterDataPoller<ClusterJob[]>(
+const { data, unable, loaded, setCluster } = useClusterDataPoller<ClusterJob[]>(
   cluster,
   'jobs',
   5000

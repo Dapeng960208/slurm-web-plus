@@ -10,7 +10,7 @@
 import { computed, ref, watch } from 'vue'
 import type { Component } from 'vue'
 import type { RouteLocationRaw } from 'vue-router'
-import { RouterLink, useRoute } from 'vue-router'
+import { useRoute } from 'vue-router'
 import ClusterMainLayout from '@/components/ClusterMainLayout.vue'
 import { useClusterDataPoller } from '@/composables/DataPoller'
 import { formatJobExitCode, jobRequestedGPU, jobAllocatedGPU } from '@/composables/GatewayAPI'
@@ -197,10 +197,6 @@ const jobFieldsContent = computed((): JobFieldRow[] => {
     })
   ]
 })
-
-const compactFields = computed((): JobCompactField[] =>
-  jobFieldsContent.value.filter((field): field is JobCompactField => field.layout === 'compact')
-)
 
 const fullFields = computed((): JobComponentField[] =>
   jobFieldsContent.value.filter((field): field is JobComponentField => field.layout === 'full')
