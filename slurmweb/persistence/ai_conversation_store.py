@@ -196,6 +196,8 @@ class AIConversationStore:
         username: str,
         tool_name: str,
         permission: str,
+        interface_key,
+        status_code,
         input_payload: dict,
         result_summary,
         status: str,
@@ -209,11 +211,11 @@ class AIConversationStore:
                     """
                     INSERT INTO ai_tool_calls (
                         conversation_id, message_id, cluster, username, tool_name,
-                        permission, input_payload, result_summary, status, error,
+                        permission, interface_key, status_code, input_payload, result_summary, status, error,
                         duration_ms, created_at
                     ) VALUES (
                         %s, %s, %s, %s, %s,
-                        %s, %s::jsonb, %s, %s, %s,
+                        %s, %s, %s, %s::jsonb, %s, %s, %s,
                         %s, NOW()
                     )
                     """,
@@ -224,6 +226,8 @@ class AIConversationStore:
                         username,
                         tool_name,
                         permission,
+                        interface_key,
+                        status_code,
                         json.dumps(input_payload or {}),
                         result_summary,
                         status,
@@ -240,3 +244,25 @@ class AIConversationStore:
             raise
         finally:
             self._release_conn(conn)
+
+    def list_tool_calls(self, cluster: str, username: str, conversation_id: int, limit=200):
+        import psycopg2.extras
+
+        conn = self._get_conn()
+        try:
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                cur.execute(
+                    """
+                    SELECT t.*
+                    FROM ai_tool_calls t
+                    JOIN ai_conversations c ON c.id = t.conversation_id
+                    WHERE c.cluster = %s AND c.username = %s AND c.id = %s
+                    ORDER BY t.created_at ASC, t.id ASC
+                    LIMIT %s
+                    """,
+                    (cluster, username, conversation_id, limit),
+                )
+                rows = cur.fetchall()
+        finally:
+            self._release_conn(conn)
+        return [dict(row) for row in rows]

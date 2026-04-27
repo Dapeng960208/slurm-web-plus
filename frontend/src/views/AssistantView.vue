@@ -15,6 +15,7 @@ import type {
   AIConversationMessage,
   AIConversationSummary,
   AIModelConfig,
+  AIToolCallRecord,
   ClusterDescription
 } from '@/composables/GatewayAPI'
 import { hasClusterAIAssistant, useGatewayAPI } from '@/composables/GatewayAPI'
@@ -25,9 +26,18 @@ import InfoAlert from '@/components/InfoAlert.vue'
 import ErrorAlert from '@/components/ErrorAlert.vue'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
 
-type ToolRun = AIChatToolEvent & {
-  id: number
-  status: 'running' | 'done'
+type ToolRun = {
+  id: number | string
+  tool_name: string
+  interface_key: string | null
+  arguments: Record<string, unknown>
+  result_summary: string | null
+  error: string | null
+  duration_ms: number | null
+  status_code: number | null
+  created_at: string | null
+  status: 'running' | 'ok' | 'error'
+  source: 'live' | 'history'
 }
 
 const { cluster } = defineProps<{ cluster: string }>()
@@ -56,6 +66,7 @@ const lastSubmittedPrompt = ref('')
 const pendingUserMessage = ref<string | null>(null)
 const streamingAssistantMessage = ref('')
 const toolRuns = ref<ToolRun[]>([])
+const expandedToolRuns = ref<Record<string, boolean>>({})
 const messageScroller = ref<HTMLElement | null>(null)
 
 const clusterDetails = computed<ClusterDescription | undefined>(() =>
@@ -101,6 +112,10 @@ const renderedMessages = computed<AIConversationMessage[]>(() => {
   }
   return messages
 })
+const historicalToolRuns = computed<ToolRun[]>(() =>
+  (selectedConversation.value?.tool_calls ?? []).map((toolCall) => normalizeToolRunFromHistory(toolCall))
+)
+const displayToolRuns = computed<ToolRun[]>(() => [...historicalToolRuns.value, ...toolRuns.value])
 const canSend = computed(
   () => canView.value && enabledModels.value.length > 0 && draft.value.trim().length > 0 && !sending.value
 )
@@ -118,12 +133,55 @@ function providerLabel(config: AIModelConfig | null): string {
   return config.provider_label || config.provider
 }
 
+function toolRunKey(tool: ToolRun): string {
+  return `${tool.source}:${tool.id}`
+}
+
+function isToolRunExpanded(tool: ToolRun): boolean {
+  return expandedToolRuns.value[toolRunKey(tool)] === true
+}
+
+function toggleToolRun(tool: ToolRun) {
+  const key = toolRunKey(tool)
+  expandedToolRuns.value = {
+    ...expandedToolRuns.value,
+    [key]: !expandedToolRuns.value[key]
+  }
+}
+
+function toolStatusLabel(tool: ToolRun): string {
+  if (tool.status === 'running') return 'running'
+  if (typeof tool.status_code === 'number') return `HTTP ${tool.status_code}`
+  return tool.status
+}
+
+function toolHeadline(tool: ToolRun): string {
+  return tool.interface_key || tool.tool_name
+}
+
+function normalizeToolRunFromHistory(toolCall: AIToolCallRecord): ToolRun {
+  return {
+    id: toolCall.id,
+    tool_name: toolCall.tool_name,
+    interface_key: toolCall.interface_key ?? null,
+    arguments: { ...(toolCall.input_payload ?? {}) },
+    result_summary: toolCall.result_summary ?? null,
+    error: toolCall.error ?? null,
+    duration_ms: toolCall.duration_ms ?? null,
+    status_code: toolCall.status_code ?? null,
+    created_at: toolCall.created_at ?? null,
+    status: toolCall.status === 'error' ? 'error' : 'ok',
+    source: 'history'
+  }
+}
+
 function resetComposerState() {
   sending.value = false
   sendError.value = null
   pendingUserMessage.value = null
   streamingAssistantMessage.value = ''
   toolRuns.value = []
+  expandedToolRuns.value = {}
 }
 
 function startNewConversation() {
@@ -219,29 +277,52 @@ async function refreshAll() {
 function addToolRun(event: AIChatToolEvent, status: ToolRun['status']) {
   if (status === 'running') {
     toolRuns.value.push({
+      tool_name: event.tool_name,
+      interface_key: event.interface_key ?? null,
+      arguments: { ...(event.arguments ?? {}) },
+      result_summary: event.result_summary ?? null,
+      error: event.error ?? null,
+      duration_ms: event.duration_ms ?? null,
+      status_code: event.status_code ?? null,
+      created_at: null,
       id: Date.now() + toolRuns.value.length,
       status,
-      ...event
+      source: 'live'
     })
     return
   }
   for (let index = toolRuns.value.length - 1; index >= 0; index -= 1) {
     if (
       toolRuns.value[index].tool_name === event.tool_name &&
+      toolRuns.value[index].interface_key === (event.interface_key ?? null) &&
       toolRuns.value[index].status === 'running'
     ) {
       toolRuns.value[index] = {
         ...toolRuns.value[index],
-        ...event,
-        status: 'done'
+        interface_key: event.interface_key ?? toolRuns.value[index].interface_key,
+        arguments: { ...(event.arguments ?? toolRuns.value[index].arguments ?? {}) },
+        result_summary: event.result_summary ?? null,
+        error: event.error ?? null,
+        duration_ms: event.duration_ms ?? null,
+        status_code: event.status_code ?? null,
+        status:
+          typeof event.status_code === 'number' && event.status_code >= 400 ? 'error' : 'ok'
       }
       return
     }
   }
   toolRuns.value.push({
+    tool_name: event.tool_name,
+    interface_key: event.interface_key ?? null,
+    arguments: { ...(event.arguments ?? {}) },
+    result_summary: event.result_summary ?? null,
+    error: event.error ?? null,
+    duration_ms: event.duration_ms ?? null,
+    status_code: event.status_code ?? null,
+    created_at: null,
     id: Date.now() + toolRuns.value.length,
     status,
-    ...event
+    source: 'live'
   })
 }
 
@@ -281,7 +362,7 @@ async function submitMessage() {
         addToolRun(event, 'running')
       },
       onToolEnd(event) {
-        addToolRun(event, 'done')
+        addToolRun(event, typeof event.status_code === 'number' && event.status_code >= 400 ? 'error' : 'ok')
       },
       onComplete(event) {
         selectedConversationId.value = event.conversation_id
@@ -335,7 +416,7 @@ watch(
 )
 
 watch(
-  () => [renderedMessages.value.length, streamingAssistantMessage.value, toolRuns.value.length],
+  () => [renderedMessages.value.length, streamingAssistantMessage.value, displayToolRuns.value.length],
   async () => {
     await nextTick()
     scrollMessagesToBottom()
@@ -587,29 +668,53 @@ watch(
                   <h3 class="text-base font-semibold text-[var(--color-brand-ink-strong)]">
                     Execution trace
                   </h3>
-                  <div v-if="toolRuns.length === 0" class="mt-3 text-sm text-[var(--color-brand-muted)]">
+                  <div v-if="displayToolRuns.length === 0" class="mt-3 text-sm text-[var(--color-brand-muted)]">
                     Tool events for the current run appear here.
                   </div>
                   <div v-else class="mt-4 space-y-3">
                     <div
-                      v-for="tool in toolRuns"
-                      :key="tool.id"
+                      v-for="tool in displayToolRuns"
+                      :key="toolRunKey(tool)"
                       class="rounded-[20px] border border-[rgba(80,105,127,0.12)] bg-white px-4 py-3"
                     >
-                      <div class="flex items-center justify-between gap-3">
-                        <p class="text-sm font-semibold text-[var(--color-brand-ink-strong)]">
-                          {{ tool.tool_name }}
+                      <button
+                        type="button"
+                        class="w-full text-left"
+                        @click="toggleToolRun(tool)"
+                      >
+                        <div class="flex items-center justify-between gap-3">
+                          <div class="min-w-0">
+                            <p class="text-sm font-semibold text-[var(--color-brand-ink-strong)]">
+                              {{ toolHeadline(tool) }}
+                            </p>
+                            <p class="mt-1 text-xs text-[var(--color-brand-muted)]">
+                              {{ tool.tool_name }}
+                            </p>
+                          </div>
+                          <div class="flex items-center gap-2">
+                            <span class="ui-chip">
+                              {{ toolStatusLabel(tool) }}
+                            </span>
+                            <span class="ui-chip">
+                              {{ tool.status === 'running' ? 'pending' : `${tool.duration_ms ?? 0} ms` }}
+                            </span>
+                          </div>
+                        </div>
+                      </button>
+                      <div v-if="isToolRunExpanded(tool)" class="mt-3 space-y-2">
+                        <p class="text-xs text-[var(--color-brand-muted)]">
+                          {{ formatTimestamp(tool.created_at) }}
                         </p>
-                        <span class="ui-chip">
-                          {{ tool.status === 'running' ? 'running' : `${tool.duration_ms ?? 0} ms` }}
-                        </span>
+                        <p class="text-xs text-[var(--color-brand-muted)]">
+                          {{ JSON.stringify(tool.arguments ?? {}) }}
+                        </p>
+                        <p v-if="tool.result_summary" class="text-sm text-[var(--color-brand-muted)]">
+                          {{ tool.result_summary }}
+                        </p>
+                        <p v-if="tool.error" class="text-sm text-red-600">
+                          {{ tool.error }}
+                        </p>
                       </div>
-                      <p class="mt-2 text-xs text-[var(--color-brand-muted)]">
-                        {{ JSON.stringify(tool.arguments ?? {}) }}
-                      </p>
-                      <p v-if="tool.result_summary" class="mt-2 text-sm text-[var(--color-brand-muted)]">
-                        {{ tool.result_summary }}
-                      </p>
                     </div>
                   </div>
                 </div>

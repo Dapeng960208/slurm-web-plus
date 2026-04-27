@@ -1,5 +1,41 @@
 ﻿# 最新功能
 
+## 本轮：AI 助手改为按 Agent 接口编排查询，并统一接口权限与执行轨迹
+
+本轮 AI 助手没有新增独立页面，但对对话执行链路做了收口：
+
+- AI 工具层不再直接把 `slurmrestd` / store 暴露给模型
+- 新增 Agent 进程内接口适配层，AI 统一按 Agent 接口语义取数
+- 模型现在可以在同一问题里连续调用多个接口后再汇总回答
+- 对模型的接口说明只描述“接口能做什么、需要什么参数”，不再把问题到接口的映射写死
+- 典型场景下，AI 可按需串联：
+  - `job`
+  - `jobs/history`
+  - `user/activity/summary`
+  - `user/metrics/history`
+- 查询权限继续复用现有 `resource:operation:scope` 规则
+- 通过 AI 触发 create / update / delete 现在直接复用 Agent 接口权限：
+  - `admin` 默认 `*:edit:*` 可执行对应 `edit` 类写接口
+  - `delete`、`self` 等边界仍由接口层按当前用户规则校验
+  - 无权限时，AI 会收到接口拒绝结果，不会绕过后端限制
+- AI 会话详情现在会返回历史 `tool_calls`
+- `ai_tool_calls` 新增记录：
+  - `interface_key`
+  - `status_code`
+- AI 页面 `Execution trace` 默认只显示：
+  - 工具名
+  - 命中接口
+  - 状态码
+  - 耗时
+- 参数、摘要、错误详情改为点击 trace 后展开查看
+
+本轮新增验证：
+
+- `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/apps/test_ai_service.py slurmweb/tests/views/test_agent_ai.py`
+- `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/apps/test_agent_ai.py slurmweb/tests/views/test_gateway_ai.py`
+- `cd frontend && npx vitest run tests/views/AssistantView.spec.ts tests/views/AssistantViewAIContract.spec.ts tests/composables/GatewayAPI.spec.ts`
+- `npm --prefix frontend run type-check`
+
 ## 本轮：分析与管理页改为结构化展示，并补统一时间范围与表单语义
 
 本轮继续围绕现有 `analysis`、`admin`、`dashboard`、`node` 与用户分析页面做交互增强，没有新增独立功能模块：

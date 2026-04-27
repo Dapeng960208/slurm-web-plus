@@ -84,6 +84,18 @@ describe('views/AssistantView.vue', () => {
       created_at: '2026-04-24T10:00:00Z',
       updated_at: '2026-04-24T10:05:00Z',
       model_config_id: 1,
+      tool_calls: [
+        {
+          id: 1,
+          tool_name: 'query_agent_interface',
+          interface_key: 'jobs',
+          status_code: 200,
+          status: 'ok',
+          duration_ms: 6,
+          input_payload: { limit: 10 },
+          result_summary: '10 jobs'
+        }
+      ],
       messages: [
         {
           id: 100,
@@ -125,6 +137,8 @@ describe('views/AssistantView.vue', () => {
     expect(wrapper.text()).toContain('Queue pressure')
     expect(wrapper.text()).toContain('GPU partition is saturated.')
     expect(wrapper.text()).toContain('Qwen Prod')
+    expect(wrapper.text()).toContain('HTTP 200')
+    expect(wrapper.text()).not.toContain('{"limit":10}')
   })
 
   test('streams a reply with the selected model', async () => {
@@ -170,6 +184,7 @@ describe('views/AssistantView.vue', () => {
       created_at: '2026-04-24T11:00:00Z',
       updated_at: '2026-04-24T11:00:05Z',
       model_config_id: 1,
+      tool_calls: [],
       messages: [
         {
           id: 200,
@@ -191,11 +206,13 @@ describe('views/AssistantView.vue', () => {
     })
     mockGatewayAPI.stream_ai_chat.mockImplementation((_cluster, _payload, handlers) => {
       handlers.onConversation?.({ conversation_id: 12, model_config_id: 1 })
-      handlers.onToolStart?.({ tool_name: 'list_nodes', arguments: {} })
+      handlers.onToolStart?.({ tool_name: 'query_agent_interface', interface_key: 'nodes', arguments: {} })
       handlers.onToolEnd?.({
-        tool_name: 'list_nodes',
+        tool_name: 'query_agent_interface',
+        interface_key: 'nodes',
         arguments: {},
         duration_ms: 10,
+        status_code: 200,
         result_summary: '2 nodes'
       })
       handlers.onContent?.('Node cn01 has the most free GPUs.')
@@ -237,6 +254,7 @@ describe('views/AssistantView.vue', () => {
       expect.any(Object)
     )
     expect(wrapper.text()).toContain('Node cn01 has the most free GPUs.')
-    expect(wrapper.text()).toContain('2 nodes')
+    expect(wrapper.text()).toContain('HTTP 200')
+    expect(wrapper.text()).toContain('nodes')
   })
 })

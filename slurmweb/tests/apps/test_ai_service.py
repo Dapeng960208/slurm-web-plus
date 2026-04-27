@@ -21,6 +21,7 @@ from slurmweb.ai.service import (
     DEFAULT_STREAM_CHUNK_SIZE,
 )
 from slurmweb.ai.tools import AIToolExecutionError, AIToolPermissionError
+from slurmweb.permission_rules import permission_rules_allow
 
 
 class InMemoryConfigStore:
@@ -94,6 +95,7 @@ class InMemoryConversationStore:
         self.tool_calls = []
         self._next_conversation_id = 1
         self._next_message_id = 1
+        self._next_tool_call_id = 1
 
     def create_conversation(self, cluster: str, username: str, title: str, model_config_id=None):
         row = {
@@ -170,45 +172,73 @@ class InMemoryConversationStore:
         username: str,
         tool_name: str,
         permission: str,
+        interface_key,
+        status_code,
         input_payload: dict,
         result_summary,
         status: str,
         error,
         duration_ms,
     ):
+        created_at = datetime.now(timezone.utc)
         self.tool_calls.append(
             {
+                "id": self._next_tool_call_id,
                 "conversation_id": conversation_id,
                 "message_id": message_id,
                 "cluster": cluster,
                 "username": username,
                 "tool_name": tool_name,
                 "permission": permission,
+                "interface_key": interface_key,
+                "status_code": status_code,
                 "input_payload": input_payload,
                 "result_summary": result_summary,
                 "status": status,
                 "error": error,
                 "duration_ms": duration_ms,
+                "created_at": created_at,
             }
         )
+        self._next_tool_call_id += 1
+
+    def list_tool_calls(self, cluster: str, username: str, conversation_id: int, limit=200):
+        owner = self.get_conversation(cluster, username, conversation_id)
+        if owner is None:
+            return []
+        return [
+            dict(row)
+            for row in self.tool_calls
+            if row["conversation_id"] == conversation_id
+        ][:limit]
 
 
 class DummyPolicy:
-    def __init__(self, allowed_actions):
-        self.allowed_actions = set(allowed_actions)
+    def __init__(self, allowed_rules):
+        self.allowed_rules = set(allowed_rules)
 
-    def allowed_user_action(self, user, action: str):
-        return action in self.allowed_actions
+    def allowed_user_permission(self, user, resource: str, operation: str, scope: str = "*"):
+        return permission_rules_allow(self.allowed_rules, resource, operation, scope)
 
 
 class DummySlurmrestd:
+    cluster_name = "test-cluster"
+    slurm_version = "25.11"
+    api_version = "0.0.44"
+
     @staticmethod
     def jobs():
-        return [{"job_id": 123, "job_state": ["RUNNING"]}]
+        return [{"job_id": 123, "job_state": ["RUNNING"], "association": {"user": "alice"}}]
 
     @staticmethod
     def job(job_id: int):
-        return {"job_id": job_id, "job_state": ["RUNNING"], "name": "train"}
+        owner = "alice" if int(job_id) == 123 else "bob"
+        return {
+            "job_id": job_id,
+            "job_state": ["RUNNING"],
+            "name": "train",
+            "association": {"user": owner},
+        }
 
     @staticmethod
     def nodes():
@@ -235,8 +265,40 @@ class DummySlurmrestd:
         return [{"name": "research"}]
 
     @staticmethod
+    def account(name: str):
+        return {"name": name}
+
+    @staticmethod
     def associations():
         return [{"account": "research", "user": "alice"}]
+
+    @staticmethod
+    def users():
+        return [{"name": "alice"}]
+
+    @staticmethod
+    def user(name: str):
+        return {"name": name}
+
+    @staticmethod
+    def job_cancel(job_id: int, payload=None):
+        return {"job_id": job_id, "cancelled": True, "payload": payload, "warnings": [], "errors": []}
+
+    @staticmethod
+    def job_update(job_id: int, payload):
+        return {"job_id": job_id, "updated": True, "payload": payload, "warnings": [], "errors": []}
+
+    @staticmethod
+    def qos_update(payload):
+        return {"updated": True, "payload": payload, "warnings": [], "errors": []}
+
+    @staticmethod
+    def supports_write_operations():
+        return True
+
+    @staticmethod
+    def discover():
+        return ("test-cluster", "25.11", "0.0.44")
 
     @staticmethod
     def _optional_number_value(value, default):
@@ -261,15 +323,15 @@ class TestAIService(TestCase):
             ),
             policy=DummyPolicy(
                 {
-                    "view-jobs",
-                    "view-stats",
-                    "view-nodes",
-                    "view-partitions",
-                    "view-qos",
-                    "view-reservations",
-                    "view-accounts",
-                    "associations-view",
-                    "view-history-jobs",
+                    "dashboard:view:*",
+                    "analysis:view:*",
+                    "jobs:view:*",
+                    "resources:view:*",
+                    "jobs/filter-partitions:view:*",
+                    "qos:view:*",
+                    "reservations:view:*",
+                    "accounts:view:*",
+                    "jobs-history:view:*",
                 }
             ),
             slurmrestd=DummySlurmrestd(),
@@ -367,7 +429,7 @@ class TestAIService(TestCase):
         self._create_model()
         provider = mock.Mock()
         provider.complete.side_effect = [
-            '{"type":"tool_call","tool":"get_job","arguments":{"job_id":"123"}}',
+            '{"type":"tool_call","tool":"query_agent_interface","arguments":{"interface_key":"job","arguments":{"job_id":"123"}}}',
             '{"type":"final","content":"Job 123 is running."}',
         ]
 
@@ -386,8 +448,10 @@ class TestAIService(TestCase):
         self.assertEqual(self.conversation_store.messages[0]["role"], "user")
         self.assertEqual(self.conversation_store.messages[1]["role"], "assistant")
         self.assertEqual(len(self.conversation_store.tool_calls), 1)
-        self.assertEqual(self.conversation_store.tool_calls[0]["tool_name"], "get_job")
-        self.assertEqual(self.conversation_store.tool_calls[0]["permission"], "view-jobs")
+        self.assertEqual(self.conversation_store.tool_calls[0]["tool_name"], "query_agent_interface")
+        self.assertEqual(self.conversation_store.tool_calls[0]["interface_key"], "job")
+        self.assertEqual(self.conversation_store.tool_calls[0]["permission"], "dynamic-query")
+        self.assertEqual(self.conversation_store.tool_calls[0]["status_code"], 200)
         self.assertEqual(self.conversation_store.tool_calls[0]["status"], "ok")
 
     def test_service_uses_default_runtime_limits(self):
@@ -438,34 +502,143 @@ class TestAIService(TestCase):
         self.assertEqual(sent_messages[-1]["content"], "m1")
         self.assertEqual(output.count("event: content"), 2)
 
+    def test_stream_chat_can_chain_multiple_interfaces_before_final_answer(self):
+        self._create_model()
+        provider = mock.Mock()
+        provider.complete.side_effect = [
+            '{"type":"tool_call","tool":"query_agent_interface","arguments":{"interface_key":"job","arguments":{"job_id":"123"}}}',
+            '{"type":"tool_call","tool":"query_agent_interface","arguments":{"interface_key":"jobs/history","arguments":{"job_id":"123","limit":"5"}}}',
+            '{"type":"final","content":"Job 123 is running and history data was also checked."}',
+        ]
+
+        with mock.patch("slurmweb.ai.service.get_provider_client", return_value=provider):
+            generator = self.service.stream_chat(self.user, {"message": "job 123 full context?"})
+            output = "".join(list(generator()))
+
+        self.assertIn("event: tool_start", output)
+        self.assertEqual(len(self.conversation_store.tool_calls), 2)
+        self.assertEqual(
+            [call["interface_key"] for call in self.conversation_store.tool_calls],
+            ["job", "jobs/history"],
+        )
+
     def test_tool_registry_enforces_permission_mapping(self):
         self._create_model()
-        self.app.policy = DummyPolicy({"view-stats"})
+        self.app.policy = DummyPolicy({"dashboard:view:*"})
         self.service.tools.app = self.app
 
         with self.assertRaises(AIToolPermissionError):
             self.service.tools.execute(
                 self.user,
                 conversation_id=1,
-                tool_name="get_job",
-                arguments={"job_id": 123},
+                tool_name="query_agent_interface",
+                arguments={"interface_key": "job", "arguments": {"job_id": 123}},
                 message_id=1,
             )
 
-        self.assertEqual(self.conversation_store.tool_calls[-1]["permission"], "view-jobs")
+        self.assertEqual(self.conversation_store.tool_calls[-1]["permission"], "dynamic-query")
         self.assertEqual(self.conversation_store.tool_calls[-1]["status"], "error")
+        self.assertEqual(self.conversation_store.tool_calls[-1]["status_code"], 403)
 
-    def test_fallback_readonly_api_rejects_unsupported_method(self):
+    def test_query_interface_rejects_unsupported_interface(self):
         self._create_model()
 
         with self.assertRaises(AIToolExecutionError):
             self.service.tools.execute(
                 self.user,
                 conversation_id=1,
-                tool_name="call_readonly_api",
-                arguments={"method": "delete_job", "arguments": {"job_id": 123}},
+                tool_name="query_agent_interface",
+                arguments={"interface_key": "unsupported", "arguments": {"job_id": 123}},
                 message_id=1,
             )
 
-        self.assertEqual(self.conversation_store.tool_calls[-1]["tool_name"], "call_readonly_api")
+        self.assertEqual(self.conversation_store.tool_calls[-1]["tool_name"], "query_agent_interface")
+        self.assertEqual(self.conversation_store.tool_calls[-1]["interface_key"], "unsupported")
         self.assertEqual(self.conversation_store.tool_calls[-1]["status"], "error")
+
+    def test_write_interface_requires_matching_user_permission(self):
+        self._create_model()
+
+        with self.assertRaises(AIToolPermissionError):
+            self.service.tools.execute(
+                self.user,
+                conversation_id=1,
+                tool_name="mutate_agent_interface",
+                arguments={"interface_key": "job/cancel", "arguments": {"job_id": 123}},
+                message_id=1,
+            )
+
+        self.assertEqual(self.conversation_store.tool_calls[-1]["status_code"], 403)
+
+        self.app.policy = DummyPolicy({"jobs:delete:self"})
+        self.service.tools.app = self.app
+
+        result = self.service.tools.execute(
+            self.user,
+            conversation_id=1,
+            tool_name="mutate_agent_interface",
+            arguments={"interface_key": "job/cancel", "arguments": {"job_id": 123}},
+            message_id=1,
+        )
+
+        self.assertEqual(result["interface_key"], "job/cancel")
+        self.assertEqual(result["status_code"], 200)
+        self.assertEqual(self.conversation_store.tool_calls[-1]["permission"], "dynamic-mutate")
+        self.assertEqual(self.conversation_store.tool_calls[-1]["status"], "ok")
+
+        with self.assertRaises(AIToolPermissionError):
+            self.service.tools.execute(
+                self.user,
+                conversation_id=1,
+                tool_name="mutate_agent_interface",
+                arguments={"interface_key": "job/cancel", "arguments": {"job_id": 456}},
+                message_id=1,
+            )
+
+        self.assertEqual(self.conversation_store.tool_calls[-1]["interface_key"], "job/cancel")
+        self.assertEqual(self.conversation_store.tool_calls[-1]["status_code"], 403)
+
+        self.app.policy = DummyPolicy({"jobs:delete:*"})
+        self.service.tools.app = self.app
+
+        result = self.service.tools.execute(
+            self.user,
+            conversation_id=1,
+            tool_name="mutate_agent_interface",
+            arguments={"interface_key": "job/cancel", "arguments": {"job_id": 456}},
+            message_id=1,
+        )
+
+        self.assertEqual(result["status_code"], 200)
+        self.assertEqual(self.conversation_store.tool_calls[-1]["status"], "ok")
+
+    def test_get_conversation_detail_includes_tool_calls(self):
+        self._create_model()
+        conversation = self.conversation_store.create_conversation(
+            cluster="test",
+            username="alice",
+            title="Existing",
+            model_config_id=1,
+        )
+        self.conversation_store.add_message(conversation["id"], "user", "m1", model_config_id=1)
+        self.conversation_store.record_tool_call(
+            conversation_id=conversation["id"],
+            message_id=1,
+            cluster="test",
+            username="alice",
+            tool_name="query_agent_interface",
+            permission="dynamic-query",
+            interface_key="job",
+            status_code=200,
+            input_payload={"job_id": 123},
+            result_summary="job payload",
+            status="ok",
+            error=None,
+            duration_ms=8,
+        )
+
+        details = self.service.get_conversation_detail(self.user, conversation["id"])
+
+        self.assertEqual(len(details["tool_calls"]), 1)
+        self.assertEqual(details["tool_calls"][0]["interface_key"], "job")
+        self.assertEqual(details["tool_calls"][0]["status_code"], 200)

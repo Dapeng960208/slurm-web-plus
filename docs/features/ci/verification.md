@@ -30,6 +30,7 @@
   - `Frontend ESLint`
   - `Frontend TypeScript type checking`
   - `Frontend production build`
+- `Frontend ESLint` 对前端源码中的 `@typescript-eslint/no-unused-vars` 与 `@typescript-eslint/no-empty-object-type` 仅报 warning，不应单独导致 workflow 失败
 
 ### 2.2 Push 自动触发
 

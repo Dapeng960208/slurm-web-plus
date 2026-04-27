@@ -232,8 +232,24 @@ export interface AIConversationMessage {
   metadata?: Record<string, unknown>
 }
 
+export interface AIToolCallRecord {
+  id: number
+  message_id?: number | null
+  tool_name: string
+  permission?: string | null
+  interface_key?: string | null
+  status_code?: number | null
+  input_payload?: Record<string, unknown>
+  result_summary?: string | null
+  status: 'ok' | 'error' | string
+  error?: string | null
+  duration_ms?: number | null
+  created_at?: string | null
+}
+
 export interface AIConversation extends AIConversationSummary {
   messages: AIConversationMessage[]
+  tool_calls: AIToolCallRecord[]
 }
 
 export interface AIConversationListResponse {
@@ -258,9 +274,12 @@ export interface AIChatConversationEvent {
 
 export interface AIChatToolEvent {
   tool_name: string
+  interface_key?: string | null
   arguments?: Record<string, unknown>
   duration_ms?: number
+  status_code?: number
   result_summary?: string
+  error?: string | null
 }
 
 export interface AIChatCompleteEvent {
@@ -342,10 +361,28 @@ function normalizeAIConversationMessage(message?: Partial<AIConversationMessage>
   }
 }
 
+function normalizeAIToolCallRecord(toolCall?: Partial<AIToolCallRecord>): AIToolCallRecord {
+  return {
+    id: toolCall?.id ?? 0,
+    message_id: toolCall?.message_id ?? null,
+    tool_name: toolCall?.tool_name ?? '',
+    permission: toolCall?.permission ?? null,
+    interface_key: toolCall?.interface_key ?? null,
+    status_code: toolCall?.status_code ?? null,
+    input_payload: { ...(toolCall?.input_payload ?? {}) },
+    result_summary: toolCall?.result_summary ?? null,
+    status: toolCall?.status ?? 'ok',
+    error: toolCall?.error ?? null,
+    duration_ms: toolCall?.duration_ms ?? null,
+    created_at: toolCall?.created_at ?? null
+  }
+}
+
 function normalizeAIConversation(conversation?: Partial<AIConversation>): AIConversation {
   return {
     ...normalizeAIConversationSummary(conversation),
-    messages: (conversation?.messages ?? []).map((message) => normalizeAIConversationMessage(message))
+    messages: (conversation?.messages ?? []).map((message) => normalizeAIConversationMessage(message)),
+    tool_calls: (conversation?.tool_calls ?? []).map((toolCall) => normalizeAIToolCallRecord(toolCall))
   }
 }
 

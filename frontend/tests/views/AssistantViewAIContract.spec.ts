@@ -23,6 +23,8 @@ describe('AI chat view contract', () => {
     expect(source).toContain('model_config_id')
     expect(source).toContain('onToolStart')
     expect(source).toContain('onToolEnd')
+    expect(source).toContain('interface_key')
+    expect(source).toContain('status_code')
     expect(source).toContain('onContent')
     expect(source).toContain('onComplete')
   })

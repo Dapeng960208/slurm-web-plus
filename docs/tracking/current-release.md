@@ -13,6 +13,35 @@
 
 ## 2. 已完成项
 
+- AI 助手已改为按 Agent 接口语义编排，而不是在工具层直接拼底层数据源调用
+- AI 当前首批可按需串联的查询接口包括：
+  - `stats`
+  - `jobs` / `job`
+  - `jobs/history` / `jobs/history/detail`
+  - `nodes` / `node`
+  - `node/metrics` / `node/metrics/history`
+  - `partitions`
+  - `qos`
+  - `reservations`
+  - `accounts` / `account`
+  - `associations`
+  - `users` / `user`
+  - `user/metrics/history`
+  - `user/activity/summary`
+- AI 在单个问题处理中已允许多接口串联，例如先查 `job` 再查 `jobs/history`
+- AI 查询权限已切到复用 Agent 现有 `resource:operation:scope` 规则
+- 通过 AI 触发 create / update / delete 已改为复用 Agent 接口层权限校验：
+  - `admin` 默认 `*:edit:*` 可执行对应 `edit` 类 AI 写接口
+  - `delete` 仍要求当前用户实际拥有对应删除权限
+  - `jobs:*:self` 等 owner-aware 规则继续生效，越权对象会返回拒绝
+  - 无权限时，AI 工具调用会收到拒绝响应并写入审计/轨迹
+- AI 执行轨迹已补接口级审计字段：
+  - `interface_key`
+  - `status_code`
+- AI 会话详情接口已返回历史 `tool_calls`
+- `AssistantView` 的 `Execution trace` 已改为默认简版：
+  - 仅显示工具名 / 接口名 / 状态码 / 耗时
+  - 参数 / 摘要 / 错误需点击展开
 - `analysis` 页的 `ping` / `diag` 已从原始 JSON 文本改为结构化字段展示
 - `Admin > System > Licenses` 已改为核心字段卡片展示，不再直接暴露原始 JSON 文本
 - `Admin > System > SlurmDB Instances` 已兼容“warning-only 且无 `instances` key”的空结果响应，避免页面直接 500
@@ -109,6 +138,8 @@
 
 ## 3. 进行中项
 
+- 评估是否继续扩大 AI 可调用的只读 Agent 接口目录，例如 `admin/system` 只读查询
+- 评估是否需要为 AI 写接口补更细的接口级 allowlist，作为现有接口权限校验之外的额外约束
 - 对齐 `accounts/users/qos/reservation` 的轻量前端表单字段与官方 JSON 结构边界
 - 评估是否继续把 `shares`、`slurmdb config`、`instances`、`tres` 等系统只读面板也收口为结构化摘要，而不是保留 JSON 输出
 - 继续评估是否需要为 `admin/system` 补更多官方只读面板
@@ -184,3 +215,7 @@
 - `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/test_permission_rules.py slurmweb/tests/test_access_control_policy.py slurmweb/tests/test_access_control_store.py slurmweb/tests/apps/test_agent.py slurmweb/tests/apps/test_agent_ai.py slurmweb/tests/views/test_agent_permissions.py slurmweb/tests/views/test_agent_ai.py slurmweb/tests/views/test_agent.py slurmweb/tests/views/test_gateway.py`
 - `cd frontend && npx vitest run tests/stores/runtime.spec.ts tests/components/MainMenu.spec.ts tests/views/JobsView.spec.ts tests/views/JobView.spec.ts tests/views/AssistantView.spec.ts tests/views/settings/SettingsAI.spec.ts tests/views/settings/SettingsAccessControl.spec.ts tests/composables/GatewayAPIAdminContract.spec.ts tests/composables/GatewayAPI.spec.ts tests/router/AdminPermissions.spec.ts tests/views/ForbiddenView.spec.ts`
 - `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/apps/test_ai_service.py slurmweb/tests/apps/test_agent_ai.py slurmweb/tests/views/test_agent_ai.py`
+- `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/apps/test_ai_service.py slurmweb/tests/views/test_agent_ai.py`
+- `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/apps/test_agent_ai.py slurmweb/tests/views/test_gateway_ai.py`
+- `cd frontend && npx vitest run tests/views/AssistantView.spec.ts tests/views/AssistantViewAIContract.spec.ts tests/composables/GatewayAPI.spec.ts`
+- `npm --prefix frontend run type-check`

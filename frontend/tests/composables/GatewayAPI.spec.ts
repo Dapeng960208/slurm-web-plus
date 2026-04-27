@@ -541,6 +541,16 @@ describe('gateway data APIs', () => {
       title: 'New conversation',
       created_at: '2026-04-24T10:00:00Z',
       updated_at: '2026-04-24T10:00:05Z',
+      tool_calls: [
+        {
+          id: 30,
+          tool_name: 'query_agent_interface',
+          interface_key: 'job',
+          status_code: 200,
+          status: 'ok',
+          input_payload: { job_id: 123 }
+        }
+      ],
       messages: [
         {
           id: 10,
@@ -557,6 +567,8 @@ describe('gateway data APIs', () => {
     expect(mockRestAPI.get).toHaveBeenCalledWith('/agents/cluster/ai/conversations/2')
     expect(result.id).toBe(2)
     expect(result.messages).toHaveLength(1)
+    expect(result.tool_calls).toHaveLength(1)
+    expect(result.tool_calls[0].interface_key).toBe('job')
   })
 
   test('normalizes permissions sources from merged payload', async () => {

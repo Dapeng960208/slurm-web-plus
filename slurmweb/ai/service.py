@@ -32,10 +32,14 @@ DEFAULT_MAX_HISTORY_MESSAGES = 24
 DEFAULT_STREAM_CHUNK_SIZE = 32
 
 SYSTEM_TOOL_PROMPT = """You are the Slurm Web cluster assistant.
-You can answer only with information available from safe read-only tools and previous conversation context.
-Never invent cluster data. If you need data, request exactly one tool call at a time.
+You can answer only with information available from agent interfaces and previous conversation context.
+Never invent cluster data.
+You may call multiple tools across the same user request when one interface is not enough.
+Only call another interface when the current information is insufficient.
+Before giving the final answer, consolidate, deduplicate, and explain the facts you gathered.
+If a write-capable interface is needed, the current user's interface permission still applies and denied calls will return tool errors.
 When requesting a tool, reply with strict JSON only:
-{"type":"tool_call","tool":"TOOL_NAME","arguments":{"key":"value"}}
+{"type":"tool_call","tool":"TOOL_NAME","arguments":{"interface_key":"INTERFACE_KEY","arguments":{"key":"value"}}}
 When you have enough information, reply with strict JSON only:
 {"type":"final","content":"your final user-facing answer"}
 Do not wrap JSON in markdown fences.
@@ -410,12 +414,29 @@ class AIService:
         )
         return [{"role": item["role"], "content": item["content"]} for item in messages]
 
-    def _build_planner_messages(self, model_config: dict, conversation_messages: Iterable[dict]):
+    def _build_planner_messages(self, user, model_config: dict, conversation_messages: Iterable[dict]):
         tool_descriptions = "\n".join(
             f"- {tool['name']} (permission={tool['permission']}): {tool['description']}"
-            for tool in self.tools.definitions()
+            for tool in self.tools.definitions(user)
         )
-        messages = [{"role": "system", "content": SYSTEM_TOOL_PROMPT + "\nAvailable tools:\n" + tool_descriptions}]
+        interface_descriptions = "\n".join(
+            (
+                f"- {interface['key']} [{interface['method']}]"
+                f" {'(write, permission checked at runtime)' if interface['write'] else '(read-only)'}:"
+                f" {interface['description']} Inputs: {interface['arguments_description']}"
+            )
+            for interface in self.tools.interface_catalog(user)
+        )
+        messages = [
+            {
+                "role": "system",
+                "content": SYSTEM_TOOL_PROMPT
+                + "\nAvailable tools:\n"
+                + tool_descriptions
+                + "\nAvailable agent interfaces:\n"
+                + interface_descriptions,
+            }
+        ]
         if model_config.get("system_prompt"):
             messages.append({"role": "system", "content": model_config["system_prompt"]})
         messages.extend(conversation_messages)
@@ -482,6 +503,7 @@ class AIService:
             try:
                 for _ in range(max_rounds):
                     planner_messages = self._build_planner_messages(
+                        user,
                         model_config,
                         working_messages,
                     )
@@ -496,7 +518,11 @@ class AIService:
                         arguments = action.get("arguments") or {}
                         yield self.sse_event(
                             "tool_start",
-                            {"tool_name": tool_name, "arguments": arguments},
+                            {
+                                "tool_name": tool_name,
+                                "interface_key": str(arguments.get("interface_key") or "").strip() or None,
+                                "arguments": arguments.get("arguments") or {},
+                            },
                         )
                         try:
                             tool_result = self.tools.execute(
@@ -510,8 +536,10 @@ class AIService:
                                 "tool_end",
                                 {
                                     "tool_name": tool_name,
-                                    "arguments": arguments,
+                                    "interface_key": tool_result["interface_key"],
+                                    "arguments": tool_result["arguments"],
                                     "duration_ms": tool_result["duration_ms"],
+                                    "status_code": tool_result["status_code"],
                                     "result_summary": tool_result["result_summary"],
                                 },
                             )
@@ -521,7 +549,8 @@ class AIService:
                                     "content": _serialize_json(
                                         {
                                             "tool_request": tool_name,
-                                            "arguments": arguments,
+                                            "interface_key": tool_result["interface_key"],
+                                            "arguments": tool_result["arguments"],
                                         }
                                     ),
                                 }
@@ -535,6 +564,20 @@ class AIService:
                             )
                             continue
                         except (AIToolExecutionError, AIToolPermissionError, KeyError, ValueError) as err:
+                            yield self.sse_event(
+                                "tool_end",
+                                {
+                                    "tool_name": tool_name,
+                                    "interface_key": getattr(err, "interface_key", None)
+                                    or str(arguments.get("interface_key") or "").strip()
+                                    or None,
+                                    "arguments": arguments.get("arguments") or {},
+                                    "duration_ms": None,
+                                    "status_code": getattr(err, "status_code", 500) or 500,
+                                    "result_summary": None,
+                                    "error": str(err),
+                                },
+                            )
                             working_messages.append(
                                 {
                                     "role": "user",
@@ -598,6 +641,11 @@ class AIService:
         if conversation is None:
             return None
         messages = self.conversation_store.list_messages(cluster, user.login, conversation_id)
+        tool_calls = self.conversation_store.list_tool_calls(
+            cluster,
+            user.login,
+            conversation_id,
+        )
         return {
             "id": conversation["id"],
             "title": conversation["title"],
@@ -614,5 +662,22 @@ class AIService:
                     "created_at": message["created_at"],
                 }
                 for message in messages
+            ],
+            "tool_calls": [
+                {
+                    "id": tool_call["id"],
+                    "message_id": tool_call.get("message_id"),
+                    "tool_name": tool_call["tool_name"],
+                    "permission": tool_call["permission"],
+                    "interface_key": tool_call.get("interface_key"),
+                    "status_code": tool_call.get("status_code"),
+                    "input_payload": tool_call.get("input_payload") or {},
+                    "result_summary": tool_call.get("result_summary"),
+                    "status": tool_call["status"],
+                    "error": tool_call.get("error"),
+                    "duration_ms": tool_call.get("duration_ms"),
+                    "created_at": tool_call.get("created_at"),
+                }
+                for tool_call in tool_calls
             ],
         }

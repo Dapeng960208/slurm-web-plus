@@ -17,6 +17,33 @@
 
 ## 条目
 
+### 2026-04-27：AI 服务写接口测试在 dummy slurmrestd 缺少 `api_version` 时会因结果归一化直接报 `AttributeError`
+
+- 场景：把 AI 写接口权限从 `super-admin` 总闸改为复用接口层实时权限校验后，补 `slurmweb/tests/apps/test_ai_service.py` 的写权限回归。
+- 现象：执行 `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/apps/test_ai_service.py` 时，`test_write_interface_requires_matching_user_permission` 在成功调用 `job/cancel` 后抛 `AttributeError: 'DummySlurmrestd' object has no attribute 'api_version'`。
+- 复现：使用当前测试文件中的 `DummySlurmrestd` 执行任一成功的 AI 写接口测试。
+- 根因：`slurmweb/ai/agent_interfaces.py` 的 `_normalize_operation_result()` 会读取 `self.app.slurmrestd.api_version`；旧 dummy 只覆盖了读接口，没有补齐写接口归一化所需的版本字段。
+- 解决：给 `DummySlurmrestd` 补 `cluster_name`、`slurm_version`、`api_version`，并顺手把 `job()` 调整成可区分 owner 的夹具，覆盖 `self` / `*` 写权限场景。
+- 预防：后续为 AI 或 Agent 写接口补单测时，测试夹具不能只模拟业务 payload，还要补齐版本探测、owner 判定等写路径公共依赖字段。
+
+### 2026-04-27：`npm --prefix frontend run test:unit -- --run ...` 不会切到单次执行，导致命令在开发中超时
+
+- 场景：为验证 AI 页面和 `GatewayAPI` 改动，尝试运行指定前端单测文件。
+- 现象：执行 `npm --prefix frontend run test:unit -- --run tests/views/AssistantView.spec.ts ...` 后命令超时，没有像预期那样直接退出。
+- 复现：在仓库根目录执行上述命令；`frontend/package.json` 中 `test:unit` 实际映射为裸 `vitest`。
+- 根因：`npm run test:unit -- --run ...` 只是把参数附加到 `vitest`，而不是显式切换到 `vitest run` 子命令；在当前脚本定义下容易落到交互/监听模式，导致自动化调用超时。
+- 解决：改用 `cd frontend && npx vitest run <files...>` 直接执行单次测试。
+- 预防：后续在本仓库跑定向前端单测时，优先使用显式的 `npx vitest run`，不要假设 `npm run test:unit -- --run` 一定会进入单次执行模式。
+
+### 2026-04-27：AI trace 状态枚举从 `done` 收紧为 `ok|error|running` 后，`AssistantView` 遗留旧字面量导致 `vue-tsc` 失败
+
+- 场景：扩展 AI 执行轨迹类型，新增 `status_code`、`interface_key` 并把前端 trace 状态细化为成功/失败/进行中。
+- 现象：执行 `npm --prefix frontend run type-check` 时，`src/views/AssistantView.vue` 报 `TS2345: Argument of type '"done"' is not assignable to parameter of type '"ok" | "error" | "running"'`。
+- 复现：在当前分支执行 `npm --prefix frontend run type-check`。
+- 根因：`ToolRun` 类型已改为 `ok|error|running`，但 `onToolEnd` 回调里仍沿用旧的 `'done'` 字面量。
+- 解决：把 `onToolEnd` 改为根据 `status_code` 映射到 `ok` 或 `error`，与新的 trace 类型保持一致。
+- 预防：后续收紧前端字面量联合类型时，要同步搜索所有事件回调和测试夹具，不要只改类型定义。
+
 ### 2026-04-27：`admin/system/slurmdb/instances` 在无实例时会因缺少 `instances` key 直接 500
 
 - 场景：访问 `Admin > System` 页面，前端请求 `GET /v6.0.0/admin/system/slurmdb/instances`。

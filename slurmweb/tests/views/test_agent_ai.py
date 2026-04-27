@@ -160,6 +160,38 @@ class TestAgentAIViews(TestAgentBase):
         self.assertEqual(response.status_code, 404)
         self.assertEqual(response.json["description"], "AI conversation 42 not found")
 
+    def test_ai_conversation_detail_returns_tool_calls(self):
+        self._enable_ai()
+        self._enable_rules("ai:view:*")
+        self.app.ai_service.get_conversation_detail.return_value = {
+            "id": 42,
+            "title": "job detail",
+            "model_config_id": 1,
+            "created_at": "2026-04-27T00:00:00Z",
+            "updated_at": "2026-04-27T00:00:01Z",
+            "messages": [],
+            "tool_calls": [
+                {
+                    "id": 7,
+                    "tool_name": "query_agent_interface",
+                    "interface_key": "job",
+                    "status_code": 200,
+                    "status": "ok",
+                    "duration_ms": 12,
+                    "input_payload": {"job_id": 123},
+                    "result_summary": "job payload",
+                    "error": None,
+                    "created_at": "2026-04-27T00:00:01Z",
+                }
+            ],
+        }
+
+        response = self.client.get(f"/v{get_version()}/ai/conversations/42")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json["tool_calls"][0]["interface_key"], "job")
+        self.assertEqual(response.json["tool_calls"][0]["status_code"], 200)
+
     def test_ai_configs_fail_when_ai_disabled(self):
         self.app.ai_enabled = False
         self.app.ai_service = None

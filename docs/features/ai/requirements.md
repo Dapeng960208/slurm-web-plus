@@ -60,15 +60,78 @@ AI 当前按数据库能力自动启用：
 
 ## 5. 运行约束
 
-当前仍然保持：
+当前实现已经调整为：
 
-- 仅允许白名单只读工具
-- 工具执行继续受底层权限控制
+- AI 工具层不再直接把 `slurmrestd` / store 暴露给模型，而是统一走 Agent 进程内的接口适配层
+- 对模型暴露的是“接口能力目录”，每个接口只说明：
+  - 能查询或写入什么
+  - 需要哪些输入
+  - 是否为写接口
+- 模型可在同一轮问题处理中连续调用多个接口，例如：
+  - 先查 `job`
+  - 再查 `jobs/history`
+  - 最后汇总回答
+- 系统提示词不再把“某个问题必须调用某个接口”写死，而是要求模型基于信息缺口自行选择接口
+- 模型不得编造集群数据；若现有接口信息不足，必须明确说明不确定性
+
+当前首批对 AI 开放的查询接口包括：
+
+- `stats`
+- `jobs` / `job`
+- `jobs/history` / `jobs/history/detail`
+- `nodes` / `node`
+- `node/metrics` / `node/metrics/history`
+- `partitions`
+- `qos`
+- `reservations`
+- `accounts` / `account`
+- `associations`
+- `users` / `user`
+- `user/metrics/history`
+- `user/activity/summary`
+
+边界：
+
+- 不向 AI 暴露 `/ai/*` 自身、`/permissions`、登录、静态资源、二进制绘图等递归或无意义接口
+- 查询接口权限继续复用 Agent 现有规则与 owner-aware 逻辑
+- 写接口也走 Agent 接口层的实时权限校验：
+  - `admin` 默认的 `*:edit:*` 可通过 AI 执行对应 `edit` 类写接口
+  - `delete`、`self` 等边界继续按当前用户实际规则与 owner-aware 逻辑判断
+  - 普通用户若没有对应接口权限，AI 调用会收到拒绝响应，不能绕过接口层限制
 - 密钥只返回掩码和配置状态
 - 会话默认仅允许当前用户读取自己的记录
 
 ## 6. 相关实现
 
 - 后端接口：`slurmweb/views/agent.py`
+- AI 接口适配层：`slurmweb/ai/agent_interfaces.py`
+- AI 工具编排：`slurmweb/ai/tools.py`
 - 前端设置页：`frontend/src/views/settings/SettingsAI.vue`
 - 前端对话页：`frontend/src/views/AssistantView.vue`
+
+## 7. 执行轨迹
+
+AI 执行轨迹当前按“工具 + 命中接口”双层记录：
+
+- SSE `tool_start` / `tool_end` 事件都会带 `interface_key`
+- `tool_end` 额外带 `status_code`
+- 会话详情接口会返回历史 `tool_calls`
+- `ai_tool_calls` 当前至少持久化：
+  - `tool_name`
+  - `permission`
+  - `interface_key`
+  - `status_code`
+  - `input_payload`
+  - `result_summary`
+  - `status`
+  - `error`
+  - `duration_ms`
+
+前端 `AssistantView` 默认只展示：
+
+- 工具名
+- 命中接口
+- 状态码
+- 耗时
+
+参数、摘要和错误详情需要点击单条 trace 后展开查看。

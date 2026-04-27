@@ -303,6 +303,8 @@ class AIToolCall(Base):
     username = sa.Column(sa.Text(), nullable=False)
     tool_name = sa.Column(sa.Text(), nullable=False)
     permission = sa.Column(sa.Text(), nullable=False)
+    interface_key = sa.Column(sa.Text(), nullable=True)
+    status_code = sa.Column(sa.Integer(), nullable=True)
     input_payload = sa.Column(
         postgresql.JSONB(astext_type=sa.Text()),
         nullable=False,

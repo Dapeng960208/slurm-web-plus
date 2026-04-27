@@ -28,6 +28,7 @@
   - 前端 `TypeScript type-check`
   - 前端 `build`
   - 固定 `Node 18`
+  - 前端源码中的 `@typescript-eslint/no-unused-vars` 与 `@typescript-eslint/no-empty-object-type` 当前按 warning 处理，不阻塞主线 CI
 
 本轮保留为手工触发的 workflow：
 

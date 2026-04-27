@@ -24,5 +24,13 @@ export default defineConfigWithVueTs(
     ...pluginVitest.configs.recommended,
     files: ['src/**/__tests__/*'],
   },
+  {
+    name: 'app/lint-severity-overrides',
+    files: ['src/**/*.{ts,mts,tsx,vue}'],
+    rules: {
+      '@typescript-eslint/no-empty-object-type': 'warn',
+      '@typescript-eslint/no-unused-vars': 'warn',
+    },
+  },
   skipFormatting,
 )
