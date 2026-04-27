@@ -248,3 +248,7 @@
 - 根因：外部网络连通性问题，不是本次 ESLint 修复内容导致的仓库错误。
 - 解决：保留本地 commit，并在 `docs/tracking/current-release.md` 记录待 push 状态；待网络恢复后重试 push。
 - 预防：当远端 workflow 依赖最新修复时，push 前后都要预留网络失败回退路径；若 push 失败，必须先把本地 commit hash 和记账状态写入跟踪文档。
+
+补充：
+
+- 后续新增的 `fix(frontend): remove remaining eslint dead code` 本地提交 `f90d428` 也因同一网络问题尚未 push。

@@ -97,6 +97,7 @@
 - 评估后续是否需要把 `CI Triage` 结果继续接给外部 AI agent 做只读诊断
 - 评估是否需要为结构化 CI 结果补 GitHub issue / PR comment 自动摘要
 - `fix(frontend): clear remaining eslint blockers` 已完成本地提交 `024bde9`，当前因网络不可达待 push 到 `origin/main`
+- `fix(frontend): remove remaining eslint dead code` 已完成本地提交 `f90d428`，当前因网络不可达待 push 到 `origin/main`
 
 ## 4. 风险与阻塞
 
