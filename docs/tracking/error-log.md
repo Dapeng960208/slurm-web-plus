@@ -378,3 +378,16 @@
   - Python 侧把 DB bucket 和游标都转换为 UTC epoch milliseconds 后匹配。
   - 新增 7 天窗口单测，覆盖 naive UTC bucket 仍能命中非 0 数据。
 - 预防：后续涉及 `TIMESTAMPTZ` 聚合 bucket 时，必须明确接口标准时区；跨 SQL 与 Python 匹配时优先使用 epoch 或显式 timezone，不要直接混用 naive/aware `datetime` 对象作为 key。
+
+### 2026-04-28：用户工具分析资源均值在顶层字段为空时返回空值
+
+- 场景：用户工具分析页或 AI 工具调用查询 `user/<username>/tools/analysis?start=<iso>&end=<iso>`，时间窗内有已完成作业。
+- 现象：`avg_max_memory_gb` 与 `avg_cpu_cores` 返回 `null`，但作业快照的 `usage_stats` 中已有定时采集程序计算出的内存和 CPU 数据。
+- 复现：构造 `job_snapshots.used_memory_gb IS NULL`、`job_snapshots.used_cpu_cores_avg IS NULL`，但 `usage_stats.memory.value_gb` 与 `usage_stats.cpu.estimated_cores_avg` 有值的历史作业，再查询用户工具分析接口。
+- 根因：用户分析实时聚合和当前日定时聚合只读取顶层 `used_memory_gb` / `used_cpu_cores_avg`，没有沿用采集程序写入 `usage_stats` 的资源统计结果；旧数据或部分采集链路补写不完整时，均值样本数为 0。
+- 解决：
+  - 用户分析聚合新增统一数值解析 helper。
+  - 内存优先使用 `used_memory_gb`，为空时回退 `usage_stats.memory.value_gb`。
+  - CPU 优先使用 `used_cpu_cores_avg`，兼容 `used_cpu_core_avg`，为空时回退 `usage_stats.cpu.estimated_cores_avg`。
+  - 当前日定时写入 `user_tool_daily_stats` 使用同一口径。
+- 预防：后续新增由采集程序派生出的统计字段时，聚合层必须同时检查“规范化顶层列”和“原始/派生 `usage_stats`”两条数据路径，并用单测覆盖顶层列为空的历史数据。

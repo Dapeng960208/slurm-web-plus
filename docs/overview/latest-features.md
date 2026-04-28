@@ -11,10 +11,12 @@
 - 用户数据分析页移除了重复的用户名信息卡，LDAP 姓名、组和更新时间压缩到时间范围栏中
 - 集群页与 Settings 页主内容区改为独立滚动区域，底部保留固定 `2rem` 浏览器边缘留白
 - 用户分析的 `Submission Activity`、`Usage Profile`、`Tool Analysis` 与 `Top Tools` 继续共享同一时间窗
+- `user/<username>/tools/analysis` 会先将时间窗覆盖的 UTC 日期聚合写入 `user_tool_daily_stats`，再从该表汇总返回工具分类统计
+- `user_tool_daily_stats` 补充资源样本数字段，用于跨多日工具统计时准确加权内存、CPU 与运行时间均值
 - 用户分析资源统计明确按已完成作业计算：
-  - 平均最大内存：`used_memory_gb`，返回 GB 与兼容 MB 字段
+  - 平均最大内存：优先使用 `used_memory_gb`，为空时回退 `usage_stats.memory.value_gb`，返回 GB 与兼容 MB 字段
   - 平均运行时间：`end_time - start_time`，返回小时与兼容秒字段
-  - 平均 CPU 核数：`used_cpu_cores_avg`
+  - 平均 CPU 核数：优先使用 `used_cpu_cores_avg`，为空时回退 `usage_stats.cpu.estimated_cores_avg`
 - `Submission Activity` 的提交时间线在 `submit_time` 缺失时会回退到 `start_time` / `last_seen`
 - 用户分析终态作业匹配改为大小写不敏感，避免 `completed` 这类小写状态导致时间窗内无数据
 - 用户分析 `metrics/history` 自定义窗口的 bucket 统一按 UTC 对齐，修复选择 `7 days` 时返回非零数据却前端序列全 0 的问题

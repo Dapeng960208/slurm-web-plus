@@ -177,6 +177,7 @@ Vue 页面
 - `slurmweb/alembic/versions/20260425_0007_access_control_permissions.py`
 - `slurmweb/alembic/versions/20260427_0008_ai_tool_interface_audit.py`
 - `slurmweb/alembic/versions/20260428_0009_ai_conversation_logical_delete.py`
+- `slurmweb/alembic/versions/20260428_0010_user_tool_daily_stat_samples.py`
 
 说明：
 
@@ -189,6 +190,10 @@ Vue 页面
 - `ai_conversations` 当前新增：
   - `deleted_at`
   - `deleted_by`
+- `user_tool_daily_stats` 当前新增：
+  - `memory_samples`
+  - `cpu_samples`
+  - `runtime_samples`
 
 ## 8. 前端权限消费点
 

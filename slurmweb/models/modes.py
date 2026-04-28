@@ -159,6 +159,57 @@ class JobSnapshot(Base):
     command = sa.Column(sa.Text(), nullable=True)
 
 
+class UserToolDailyStat(Base):
+    __tablename__ = "user_tool_daily_stats"
+    __table_args__ = (
+        sa.UniqueConstraint(
+            "activity_date",
+            "user_id",
+            "tool",
+            name="uq_user_tool_daily_stats",
+        ),
+        sa.Index(
+            "idx_user_tool_daily_stats_user_id_date",
+            "user_id",
+            sa.text("activity_date DESC"),
+        ),
+    )
+
+    activity_date = sa.Column(sa.Date(), nullable=False)
+    user_id = sa.Column(sa.BigInteger(), sa.ForeignKey("users.id"), nullable=False)
+    tool = sa.Column(sa.Text(), nullable=False)
+    jobs_count = sa.Column(sa.Integer(), nullable=False)
+    avg_max_memory_gb = sa.Column(sa.Float(), nullable=True)
+    avg_cpu_cores = sa.Column(sa.Float(), nullable=True)
+    avg_runtime_seconds = sa.Column(sa.Float(), nullable=True)
+    memory_samples = sa.Column(
+        sa.Integer(),
+        nullable=False,
+        server_default=sa.text("0"),
+    )
+    cpu_samples = sa.Column(
+        sa.Integer(),
+        nullable=False,
+        server_default=sa.text("0"),
+    )
+    runtime_samples = sa.Column(
+        sa.Integer(),
+        nullable=False,
+        server_default=sa.text("0"),
+    )
+    created_at = sa.Column(
+        sa.TIMESTAMP(timezone=True),
+        nullable=False,
+        server_default=sa.text("NOW()"),
+    )
+    updated_at = sa.Column(
+        sa.TIMESTAMP(timezone=True),
+        nullable=False,
+        server_default=sa.text("NOW()"),
+    )
+    __mapper_args__ = {"primary_key": [activity_date, user_id, tool]}
+
+
 class AIModelConfig(Base):
     __tablename__ = "ai_model_configs"
     __table_args__ = (

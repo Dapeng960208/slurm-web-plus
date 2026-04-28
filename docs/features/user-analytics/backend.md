@@ -22,6 +22,20 @@
 - `GET /api/agents/<cluster>/user/<username>/metrics/history`
 - `GET /api/agents/<cluster>/associations`
 
+`tools/analysis` 的工具分类统计以 `user_tool_daily_stats` 为返回来源。接口收到 `start` / `end` 后，会先把时间窗覆盖到的 UTC 自然日从 `job_snapshots` 重新聚合写入 `user_tool_daily_stats`，再从该表读取并汇总返回。
+
+`user_tool_daily_stats` 按 `(activity_date, user_id, tool)` 保存每日工具统计：
+
+- `jobs_count`
+- `avg_max_memory_gb`
+- `avg_cpu_cores`
+- `avg_runtime_seconds`
+- `memory_samples`
+- `cpu_samples`
+- `runtime_samples`
+
+其中 `memory_samples` / `cpu_samples` / `runtime_samples` 用于跨多日聚合时按真实样本数加权，避免只有部分作业存在资源数据时平均值被 `jobs_count` 拉偏。
+
 `tools/analysis` 当前固定要求：
 
 - `start`
@@ -52,8 +66,9 @@
 统计口径：
 
 - 只统计已完成或终态作业。
-- 内存均值按 `job_snapshots.used_memory_gb` 计算，接口同时保留 `avg_max_memory_mb` 作为前端兼容字段。
-- CPU 均值按 `job_snapshots.used_cpu_cores_avg` 计算；兼容历史行中的 `used_cpu_core_avg`。
+- `tools/analysis` 会按 `start` / `end` 覆盖到的 UTC 日期读取日聚合表；该接口的工具统计粒度为日。
+- 内存均值优先按 `job_snapshots.used_memory_gb` 计算；若历史行该字段为空，回退到 `usage_stats.memory.value_gb`。接口同时保留 `avg_max_memory_mb` 作为前端兼容字段。
+- CPU 均值优先按 `job_snapshots.used_cpu_cores_avg` 计算；兼容历史行中的 `used_cpu_core_avg`，若顶层字段为空，回退到 `usage_stats.cpu.estimated_cores_avg`。
 - 运行时间优先按 `end_time - start_time` 计算，并返回 `avg_runtime_hours`；兼容保留 `avg_runtime_seconds`。
 - 终态判断按 `UPPER(job_state)` 匹配，避免 `completed` / `COMPLETED` 大小写差异导致统计为空。
 

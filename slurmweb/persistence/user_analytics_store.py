@@ -136,6 +136,44 @@ def _runtime_seconds(row: dict):
     return None
 
 
+def _numeric_value(value):
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _memory_gb(row: dict):
+    memory_value = _numeric_value(row.get("used_memory_gb"))
+    if memory_value is not None:
+        return memory_value
+
+    usage_stats = row.get("usage_stats")
+    if not isinstance(usage_stats, dict):
+        return None
+    memory_stats = usage_stats.get("memory")
+    if not isinstance(memory_stats, dict):
+        return None
+    return _numeric_value(memory_stats.get("value_gb"))
+
+
+def _cpu_cores_avg(row: dict):
+    for key in ("used_cpu_cores_avg", "used_cpu_core_avg"):
+        cpu_value = _numeric_value(row.get(key))
+        if cpu_value is not None:
+            return cpu_value
+
+    usage_stats = row.get("usage_stats")
+    if not isinstance(usage_stats, dict):
+        return None
+    cpu_stats = usage_stats.get("cpu")
+    if not isinstance(cpu_stats, dict):
+        return None
+    return _numeric_value(cpu_stats.get("estimated_cores_avg"))
+
+
 def _memory_mb(value_gb):
     if value_gb is None:
         return None
@@ -195,18 +233,18 @@ def _aggregate_rows(rows, mapper=None):
         bucket["jobs"] += 1
         summary["jobs"] += 1
 
-        memory_value = row.get("used_memory_gb")
+        memory_value = _memory_gb(row)
         if memory_value is not None:
-            bucket["memory_total"] += float(memory_value)
+            bucket["memory_total"] += memory_value
             bucket["memory_samples"] += 1
-            summary["memory_total"] += float(memory_value)
+            summary["memory_total"] += memory_value
             summary["memory_samples"] += 1
 
-        cpu_value = row.get("used_cpu_cores_avg", row.get("used_cpu_core_avg"))
+        cpu_value = _cpu_cores_avg(row)
         if cpu_value is not None:
-            bucket["cpu_total"] += float(cpu_value)
+            bucket["cpu_total"] += cpu_value
             bucket["cpu_samples"] += 1
-            summary["cpu_total"] += float(cpu_value)
+            summary["cpu_total"] += cpu_value
             summary["cpu_samples"] += 1
 
         runtime_value = _runtime_seconds(row)
@@ -242,6 +280,122 @@ def _aggregate_rows(rows, mapper=None):
         summary["runtime_total"], summary["runtime_samples"]
     )
 
+    return {
+        "totals": {
+            "completed_jobs": summary["jobs"],
+            "active_tools": len(tool_breakdown),
+            "avg_max_memory_gb": avg_summary_memory_gb,
+            "avg_max_memory_mb": _memory_mb(avg_summary_memory_gb),
+            "avg_cpu_cores": _avg(summary["cpu_total"], summary["cpu_samples"]),
+            "avg_runtime_hours": _runtime_hours(avg_summary_runtime_seconds),
+            "avg_runtime_seconds": avg_summary_runtime_seconds,
+            "busiest_tool": busiest_tool,
+            "busiest_tool_jobs": busiest_tool_jobs,
+        },
+        "tool_breakdown": tool_breakdown,
+    }
+
+
+def _aggregate_daily_stat_rows(rows):
+    tools = defaultdict(
+        lambda: {
+            "jobs": 0,
+            "memory_total": 0.0,
+            "memory_samples": 0,
+            "cpu_total": 0.0,
+            "cpu_samples": 0,
+            "runtime_total": 0.0,
+            "runtime_samples": 0,
+        }
+    )
+    summary = {
+        "jobs": 0,
+        "memory_total": 0.0,
+        "memory_samples": 0,
+        "cpu_total": 0.0,
+        "cpu_samples": 0,
+        "runtime_total": 0.0,
+        "runtime_samples": 0,
+    }
+
+    for row in rows:
+        if isinstance(row, dict):
+            tool = row["tool"]
+            jobs = int(row["jobs_count"])
+            avg_memory_gb = row.get("avg_max_memory_gb")
+            avg_cpu_cores = row.get("avg_cpu_cores")
+            avg_runtime_seconds = row.get("avg_runtime_seconds")
+        else:
+            if len(row) >= 8:
+                (
+                    tool,
+                    jobs,
+                    avg_memory_gb,
+                    avg_cpu_cores,
+                    avg_runtime_seconds,
+                    memory_samples,
+                    cpu_samples,
+                    runtime_samples,
+                ) = row[:8]
+            else:
+                tool, jobs, avg_memory_gb, avg_cpu_cores, avg_runtime_seconds = row
+                memory_samples = cpu_samples = runtime_samples = None
+            jobs = int(jobs)
+        if isinstance(row, dict):
+            memory_samples = row.get("memory_samples")
+            cpu_samples = row.get("cpu_samples")
+            runtime_samples = row.get("runtime_samples")
+        memory_samples = int(memory_samples or 0)
+        cpu_samples = int(cpu_samples or 0)
+        runtime_samples = int(runtime_samples or 0)
+
+        bucket = tools[tool]
+        bucket["jobs"] += jobs
+        summary["jobs"] += jobs
+        if avg_memory_gb is not None:
+            samples = memory_samples or jobs
+            bucket["memory_total"] += float(avg_memory_gb) * samples
+            bucket["memory_samples"] += samples
+            summary["memory_total"] += float(avg_memory_gb) * samples
+            summary["memory_samples"] += samples
+        if avg_cpu_cores is not None:
+            samples = cpu_samples or jobs
+            bucket["cpu_total"] += float(avg_cpu_cores) * samples
+            bucket["cpu_samples"] += samples
+            summary["cpu_total"] += float(avg_cpu_cores) * samples
+            summary["cpu_samples"] += samples
+        if avg_runtime_seconds is not None:
+            samples = runtime_samples or jobs
+            bucket["runtime_total"] += float(avg_runtime_seconds) * samples
+            bucket["runtime_samples"] += samples
+            summary["runtime_total"] += float(avg_runtime_seconds) * samples
+            summary["runtime_samples"] += samples
+
+    tool_breakdown = []
+    for tool, values in tools.items():
+        avg_memory_gb = _avg(values["memory_total"], values["memory_samples"])
+        avg_runtime_seconds = _avg(
+            values["runtime_total"], values["runtime_samples"]
+        )
+        tool_breakdown.append(
+            {
+                "tool": tool,
+                "jobs": values["jobs"],
+                "avg_max_memory_gb": avg_memory_gb,
+                "avg_max_memory_mb": _memory_mb(avg_memory_gb),
+                "avg_cpu_cores": _avg(values["cpu_total"], values["cpu_samples"]),
+                "avg_runtime_hours": _runtime_hours(avg_runtime_seconds),
+                "avg_runtime_seconds": avg_runtime_seconds,
+            }
+        )
+    tool_breakdown.sort(key=lambda item: (-item["jobs"], item["tool"]))
+
+    busiest_tool = tool_breakdown[0]["tool"] if tool_breakdown else None
+    busiest_tool_jobs = tool_breakdown[0]["jobs"] if tool_breakdown else 0
+    avg_summary_memory_gb = _avg(summary["memory_total"], summary["memory_samples"])
+    avg_summary_runtime_seconds = _avg(
+        summary["runtime_total"], summary["runtime_samples"]
+    )
     return {
         "totals": {
             "completed_jobs": summary["jobs"],
@@ -488,11 +642,13 @@ class UserAnalyticsStore:
             start_time, end_time = self._default_analysis_window()
         if start_time >= end_time:
             raise ValueError("start must be earlier than end")
+        start_date = start_time.astimezone(timezone.utc).date()
+        end_date = end_time.astimezone(timezone.utc).date()
         profile = (
             self._users_store.get_ldap_user(username) if self._users_store is not None else None
         )
-        rows = self._completed_jobs_rows_window(username, start_time, end_time)
-        aggregated = _aggregate_rows(rows, mapper=self._tool_mapper)
+        self._refresh_user_tool_daily_stats(username, start_date, end_date)
+        aggregated = self._user_tool_daily_summary(username, start_date, end_date)
         return {
             "username": username,
             "profile": {
@@ -591,6 +747,34 @@ class UserAnalyticsStore:
         finally:
             self._release_conn(conn)
 
+    def _user_tool_daily_summary(self, username, start_date, end_date):
+        conn = self._get_conn()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT
+                        uds.tool,
+                        uds.jobs_count,
+                        uds.avg_max_memory_gb,
+                        uds.avg_cpu_cores,
+                        uds.avg_runtime_seconds,
+                        uds.memory_samples,
+                        uds.cpu_samples,
+                        uds.runtime_samples
+                    FROM user_tool_daily_stats uds
+                    INNER JOIN users u ON u.id = uds.user_id
+                    WHERE u.username = %s
+                      AND uds.activity_date >= %s
+                      AND uds.activity_date <= %s
+                    ORDER BY uds.jobs_count DESC, uds.tool ASC
+                    """,
+                    (username, start_date, end_date),
+                )
+                return _aggregate_daily_stat_rows(cur.fetchall())
+        finally:
+            self._release_conn(conn)
+
     def _run(self):
         interval = int(getattr(self._settings, "aggregation_interval", 3600))
         try:
@@ -604,6 +788,10 @@ class UserAnalyticsStore:
 
     def refresh_current_day_summary(self):
         rows = self._current_day_completed_rows()
+        payload = self._aggregate_daily_rows(rows)
+        self._upsert_current_day_summary(payload)
+
+    def _aggregate_daily_rows(self, rows):
         buckets = defaultdict(
             lambda: {
                 "jobs_count": 0,
@@ -624,11 +812,13 @@ class UserAnalyticsStore:
             key = (row["activity_date"], row["user_id"], tool)
             bucket = buckets[key]
             bucket["jobs_count"] += 1
-            if row.get("used_memory_gb") is not None:
-                bucket["memory_total"] += float(row["used_memory_gb"])
+            memory_value = _memory_gb(row)
+            if memory_value is not None:
+                bucket["memory_total"] += memory_value
                 bucket["memory_samples"] += 1
-            if row.get("used_cpu_cores_avg") is not None:
-                bucket["cpu_total"] += float(row["used_cpu_cores_avg"])
+            cpu_value = _cpu_cores_avg(row)
+            if cpu_value is not None:
+                bucket["cpu_total"] += cpu_value
                 bucket["cpu_samples"] += 1
             runtime_value = _runtime_seconds(row)
             if runtime_value is not None:
@@ -650,9 +840,21 @@ class UserAnalyticsStore:
                     "avg_runtime_seconds": _avg(
                         values["runtime_total"], values["runtime_samples"]
                     ),
+                    "memory_samples": values["memory_samples"],
+                    "cpu_samples": values["cpu_samples"],
+                    "runtime_samples": values["runtime_samples"],
                 }
             )
-        self._upsert_current_day_summary(payload)
+        return payload
+
+    def _refresh_user_tool_daily_stats(self, username, start_date, end_date):
+        rows = self._completed_jobs_rows_for_activity_dates(
+            start_date=start_date,
+            end_date=end_date,
+            username=username,
+        )
+        payload = self._aggregate_daily_rows(rows)
+        self._replace_user_tool_daily_stats(username, start_date, end_date, payload)
 
     def _submitted_jobs_today(self, username):
         conn = self._get_conn()
@@ -750,6 +952,45 @@ class UserAnalyticsStore:
         finally:
             self._release_conn(conn)
 
+    def _completed_jobs_rows_for_activity_dates(self, start_date, end_date, username):
+        import psycopg2.extras
+
+        terminal_params = [f"%{state}%" for state in TERMINAL_STATES]
+        where_terminal = " OR ".join(["UPPER(js.job_state) LIKE %s"] * len(TERMINAL_STATES))
+        conn = self._get_conn()
+        try:
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                cur.execute(
+                    """
+                    SELECT DISTINCT ON (js.job_id, js.submit_time)
+                        DATE(COALESCE(js.end_time, js.last_seen) AT TIME ZONE 'UTC') AS activity_date,
+                        js.user_id,
+                        js.job_name,
+                        js.command,
+                        js.used_memory_gb,
+                        js.used_cpu_cores_avg,
+                        js.start_time,
+                        js.end_time,
+                        js.last_seen,
+                        js.usage_stats
+                    FROM job_snapshots js
+                    INNER JOIN users u ON u.id = js.user_id
+                    WHERE u.username = %s
+                      AND DATE(COALESCE(js.end_time, js.last_seen) AT TIME ZONE 'UTC') >= %s
+                      AND DATE(COALESCE(js.end_time, js.last_seen) AT TIME ZONE 'UTC') <= %s
+                      AND (
+                    """
+                    + where_terminal
+                    + """
+                      )
+                    ORDER BY js.job_id, js.submit_time, js.last_seen DESC
+                    """,
+                    [username, start_date, end_date] + terminal_params,
+                )
+                return list(cur.fetchall())
+        finally:
+            self._release_conn(conn)
+
     def _current_day_completed_rows(self):
         import psycopg2.extras
 
@@ -786,6 +1027,70 @@ class UserAnalyticsStore:
         finally:
             self._release_conn(conn)
 
+    def _replace_user_tool_daily_stats(self, username, start_date, end_date, payload):
+        from psycopg2.extras import execute_values
+
+        conn = self._get_conn()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    DELETE FROM user_tool_daily_stats uds
+                    USING users u
+                    WHERE u.id = uds.user_id
+                      AND u.username = %s
+                      AND uds.activity_date >= %s
+                      AND uds.activity_date <= %s
+                    """,
+                    (username, start_date, end_date),
+                )
+                if payload:
+                    execute_values(
+                        cur,
+                        """
+                        INSERT INTO user_tool_daily_stats (
+                            activity_date,
+                            user_id,
+                            tool,
+                            jobs_count,
+                            avg_max_memory_gb,
+                            avg_cpu_cores,
+                            avg_runtime_seconds,
+                            memory_samples,
+                            cpu_samples,
+                            runtime_samples,
+                            created_at,
+                            updated_at
+                        ) VALUES %s
+                        ON CONFLICT (activity_date, user_id, tool) DO UPDATE SET
+                            jobs_count = EXCLUDED.jobs_count,
+                            avg_max_memory_gb = EXCLUDED.avg_max_memory_gb,
+                            avg_cpu_cores = EXCLUDED.avg_cpu_cores,
+                            avg_runtime_seconds = EXCLUDED.avg_runtime_seconds,
+                            memory_samples = EXCLUDED.memory_samples,
+                            cpu_samples = EXCLUDED.cpu_samples,
+                            runtime_samples = EXCLUDED.runtime_samples,
+                            updated_at = NOW()
+                        """,
+                        payload,
+                        template=(
+                            "(%(activity_date)s, %(user_id)s, %(tool)s, %(jobs_count)s, "
+                            "%(avg_max_memory_gb)s, %(avg_cpu_cores)s, "
+                            "%(avg_runtime_seconds)s, %(memory_samples)s, "
+                            "%(cpu_samples)s, %(runtime_samples)s, NOW(), NOW())"
+                        ),
+                        page_size=max(len(payload), 1),
+                    )
+            conn.commit()
+        except Exception:
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+            raise
+        finally:
+            self._release_conn(conn)
+
     def _upsert_current_day_summary(self, payload):
         from psycopg2.extras import execute_values
 
@@ -804,6 +1109,9 @@ class UserAnalyticsStore:
                             avg_max_memory_gb,
                             avg_cpu_cores,
                             avg_runtime_seconds,
+                            memory_samples,
+                            cpu_samples,
+                            runtime_samples,
                             created_at,
                             updated_at
                         ) VALUES %s
@@ -812,13 +1120,17 @@ class UserAnalyticsStore:
                             avg_max_memory_gb = EXCLUDED.avg_max_memory_gb,
                             avg_cpu_cores = EXCLUDED.avg_cpu_cores,
                             avg_runtime_seconds = EXCLUDED.avg_runtime_seconds,
+                            memory_samples = EXCLUDED.memory_samples,
+                            cpu_samples = EXCLUDED.cpu_samples,
+                            runtime_samples = EXCLUDED.runtime_samples,
                             updated_at = NOW()
                         """,
                         payload,
                         template=(
                             "(%(activity_date)s, %(user_id)s, %(tool)s, %(jobs_count)s, "
                             "%(avg_max_memory_gb)s, %(avg_cpu_cores)s, "
-                            "%(avg_runtime_seconds)s, NOW(), NOW())"
+                            "%(avg_runtime_seconds)s, %(memory_samples)s, "
+                            "%(cpu_samples)s, %(runtime_samples)s, NOW(), NOW())"
                         ),
                         page_size=max(len(payload), 1),
                     )

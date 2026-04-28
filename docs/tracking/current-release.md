@@ -155,10 +155,12 @@
 - 用户工具分析页已从常驻时间输入改为按钮弹框，提交活动、使用画像、工具分析和 Top Tools 继续共享同一窗口
 - 用户数据分析页已移除重复用户名卡片，用户姓名、LDAP 组和更新时间改为时间范围栏内的紧凑上下文标签
 - 集群页与 Settings 页已统一为主内容区独立滚动，内容超过视口时在内容区域内滚动，底部固定保留 `2rem` 边缘留白
+- `user/<username>/tools/analysis` 已改为先把时间窗覆盖的 UTC 日期写入 `user_tool_daily_stats`，再从该表返回工具分类统计
+- `user_tool_daily_stats` 已补 `memory_samples`、`cpu_samples`、`runtime_samples`，用于多日汇总时按真实资源样本数加权
 - 用户工具分析聚合已明确按已完成作业统计：
-  - `avg_max_memory_gb` 来自 `used_memory_gb`
+  - `avg_max_memory_gb` 优先来自 `used_memory_gb`，为空时回退 `usage_stats.memory.value_gb`
   - `avg_runtime_hours` 来自 `end_time - start_time`
-  - `avg_cpu_cores` 来自 `used_cpu_cores_avg`
+  - `avg_cpu_cores` 优先来自 `used_cpu_cores_avg`，为空时回退 `usage_stats.cpu.estimated_cores_avg`
   - 继续保留 `avg_max_memory_mb` 与 `avg_runtime_seconds` 兼容字段
 - `Submission Activity` 的提交时间线在 `submit_time` 缺失时会回退到 `start_time` / `last_seen`
 - 用户分析终态作业过滤已改为 `UPPER(job_state)` 匹配，避免小写状态导致自定义时间窗无数据

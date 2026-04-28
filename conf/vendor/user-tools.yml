@@ -3,6 +3,9 @@
 # Matching is applied to the normalized candidate from job_name first,
 # then command / submit_line first token basename.
 
+- pattern: '^regr($|[-_].*)'
+  tool: regr
+
 - pattern: '^alphafold($|[-_].*)'
   tool: alphafold
 

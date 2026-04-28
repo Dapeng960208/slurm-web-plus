@@ -111,6 +111,16 @@
 
 并增加逻辑删除查询索引。普通用户会话列表与详情过滤已删除记录；管理员 AI 审计视图可查看已删除会话及其消息、工具调用。
 
+### 3.10 `20260428_0010`：用户工具日聚合样本数
+
+在 `user_tool_daily_stats` 上增加：
+
+- `memory_samples`
+- `cpu_samples`
+- `runtime_samples`
+
+这些字段用于 `tools/analysis` 从日聚合表跨多日汇总时，按真实资源样本数加权计算 `avg_max_memory_gb`、`avg_cpu_cores` 与 `avg_runtime_seconds`。
+
 ## 4. 迁移验证（最小集）
 
 1. Alembic revision：
