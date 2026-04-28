@@ -4,14 +4,18 @@
 
 AI 功能当前覆盖：
 
-- `Settings > AI`
+- `/:cluster/admin/ai`
   - 管理模型配置
   - 设置默认模型
   - 连接校验
+  - 查看所有用户 AI 会话审计记录
+  - 按用户名和摘要关键字过滤审计记录，点击记录后加载详情
 - `/:cluster/ai`
   - 多轮对话
-  - 模型选择
   - 个人会话历史
+  - 会话逻辑删除
+  - 用户消息与 assistant 回复复制
+  - 输入区展示 token 估算和超限提示
 - 数据库存储：
   - 模型配置
   - 会话
@@ -47,7 +51,7 @@ AI 当前按数据库能力自动启用：
 - `view-ai` 与 `manage-ai` 已不再作为可配置动作入口，也不会再出现在 `/permissions.actions` 或角色页兼容动作列表中。
 - `admin-manage` 只是 `*:*:*` 的兼容别名，不是 AI 专属权限。
 
-由于 `edit` 自动满足 `view`，只有编辑权限的用户仍可打开设置页。
+由于 `edit` 自动满足 `view`，只有编辑权限的用户仍可打开管理页。
 
 ## 4. 能力暴露
 
@@ -111,10 +115,18 @@ AI 当前按数据库能力自动启用：
   - 普通用户若没有对应接口权限，AI 调用会收到拒绝响应，不能绕过接口层限制
 - 密钥只返回掩码和配置状态
 - 会话默认仅允许当前用户读取自己的记录
+- 普通对话页不展示模型、stream、persistence 等运行配置；模型配置查看与维护统一收口到 `/:cluster/admin/ai`
+- 普通对话页发送请求时继续使用后端默认模型或当前会话已有模型，不把配置项作为页面主控件暴露给用户
+- 普通用户会话列表和详情只返回本人且未逻辑删除的会话
+- 管理员审计接口返回所有用户会话，包含已逻辑删除会话
+- 用户逻辑删除会话后只写入删除状态，不物理删除会话、消息或工具调用记录
+- AI 对话页 token 数为前端估算值，包含模型 `system_prompt`、当前会话历史消息与输入草稿；限制优先读取模型配置 `extra_options.max_context_tokens`、`context_limit`、`token_limit`、`max_tokens`，否则使用默认 `8192`
+- 当前后端不返回真实 provider token usage，前端估算不等同于供应商计费或精确 tokenizer 结果
 
 ## 6. 相关实现
 
 - 后端接口：`slurmweb/views/agent.py`
+- Gateway AI 代理：`slurmweb/views/gateway.py`
 - AI 接口适配层：`slurmweb/ai/agent_interfaces.py`
 - AI 工具编排：`slurmweb/ai/tools.py`
 - 前端设置页：`frontend/src/views/settings/SettingsAI.vue`
@@ -131,6 +143,9 @@ AI 当前按数据库能力自动启用：
   - 不会作为真实 HTML 节点插入页面
   - 不允许通过消息内容注入脚本或事件属性
 - Markdown 链接默认新标签打开，并带 `rel="noopener noreferrer"`
+- 用户消息与 assistant 回复都提供复制按钮，复制内容为原始消息正文。
+- 用户可逻辑删除自己的会话；删除后普通列表与普通详情不再展示该会话，管理员审计仍可查看。
+- 输入区显示当前估算 token 用量；超过限制时显示提示、禁用发送按钮，并阻止提交流式请求。
 
 ## 7. 执行轨迹
 
@@ -158,3 +173,31 @@ AI 执行轨迹当前按“工具 + 命中接口”双层记录：
 - 耗时
 
 参数、摘要和错误详情需要点击单条 trace 后展开查看。
+
+## 8. 管理员会话审计
+
+`/:cluster/admin/ai` 现在除模型配置外，还提供 Conversation Audit 区域：
+
+- 列出当前集群所有 AI 会话
+- 展示 `username`、标题、创建/更新时间、删除状态
+- 可按用户名过滤审计摘要
+- 可按标题或最后消息关键字过滤审计摘要
+- 默认不自动打开第一条记录，需点击会话后才加载详情
+- 可打开会话详情查看消息与工具调用记录
+- 已删除会话显示 `deleted_at` 与 `deleted_by`
+
+对应接口：
+
+- `GET /api/agents/<cluster>/ai/admin/conversations`
+- `GET /api/agents/<cluster>/ai/admin/conversations/<conversation_id>`
+
+这两个接口要求 `admin/ai:view:*`，不能用普通 `ai:view:*` 访问。
+
+## 9. `association/update` 写入边界
+
+AI 写接口调用 `association/update` 时继续复用 Agent 写接口权限，典型权限为 `accounts:edit:*`。
+
+本轮修复了两类导致“接口返回成功但账户页和集群管理端未体现”的问题：
+
+- association payload 缺少 `cluster` 时，`slurmrestd` 适配层会按当前集群补齐。
+- account/user/association/qos 写入或删除后，缓存层会失效 `accounts` 与 `associations` 等相关 key，避免后续页面读取旧缓存。

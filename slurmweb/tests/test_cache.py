@@ -51,6 +51,11 @@ class TestCachingService(unittest.TestCase):
             "whetever", pickle.dumps(data), ex=10
         )
 
+    def test_delete(self):
+        self.cache.connection.delete = mock.Mock()
+        self.cache.delete(CacheKey("whatever"))
+        self.cache.connection.delete.assert_called_once_with("whatever")
+
     def test_put_connection_error(self):
         self.cache.connection.set = mock.Mock(
             side_effect=redis.exceptions.ConnectionError

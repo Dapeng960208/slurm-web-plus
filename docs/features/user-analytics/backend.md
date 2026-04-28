@@ -40,12 +40,22 @@
 - `totals`
   - `completed_jobs`
   - `active_tools`
+  - `avg_max_memory_gb`
   - `avg_max_memory_mb`
   - `avg_cpu_cores`
+  - `avg_runtime_hours`
   - `avg_runtime_seconds`
   - `busiest_tool`
   - `busiest_tool_jobs`
 - `tool_breakdown`
+
+统计口径：
+
+- 只统计已完成或终态作业。
+- 内存均值按 `job_snapshots.used_memory_gb` 计算，接口同时保留 `avg_max_memory_mb` 作为前端兼容字段。
+- CPU 均值按 `job_snapshots.used_cpu_cores_avg` 计算；兼容历史行中的 `used_cpu_core_avg`。
+- 运行时间优先按 `end_time - start_time` 计算，并返回 `avg_runtime_hours`；兼容保留 `avg_runtime_seconds`。
+- 终态判断按 `UPPER(job_state)` 匹配，避免 `completed` / `COMPLETED` 大小写差异导致统计为空。
 
 `metrics/history` 当前返回：
 
@@ -65,6 +75,8 @@
 - 旧 `range=hour|day|week`
 - 新 `start` / `end`
 
+`submissions` 默认按 `submit_time` 过滤；如果历史数据缺少 `submit_time`，会回退使用 `start_time`，再回退 `last_seen`，避免旧快照在自定义时间窗下完全不展示。
+
 当显式传 `start` / `end` 时，bucket 规则固定为：
 
 - `<= 48h`
@@ -73,6 +85,17 @@
   - 按天 bucket
 - `> 62d`
   - 按周 bucket
+
+自定义窗口的 bucket 统一按 UTC 对齐。后端 SQL 会先把 `TIMESTAMPTZ` 转成 UTC 时间再 `date_trunc`，Python 侧也用 UTC epoch milliseconds 匹配 bucket，避免数据库 session timezone 与前端 UTC 窗口不一致时，`7 days`、`15 days`、`1 month` 这类 day bucket 序列全部显示为 0。
+
+工具名归类可通过 `[user_metrics].tool_mapping_file` 指定 YAML 规则文件。仓库内置示例位于 `conf/vendor/user-tools.yml`，规则格式为有序列表：
+
+```yaml
+- pattern: '^(blast|blastn|blastp)$'
+  tool: blast
+```
+
+规则从上到下匹配，先命中的规则生效；匹配对象为规范化后的 `job_name`，若缺失则回退到 `command` / `submit_line` 的第一个可执行 token。
 
 ## 3. 权限要求
 
@@ -114,10 +137,18 @@
 - 用户分析页实时曲线同时展示：
   - 提交作业数
   - 完成作业数
-- 用户分析页顶部统一使用共享时间窗：
+- 用户名由页面标题承载，分析面板内部不再重复展示独立用户名卡片。
+- LDAP 姓名、组和更新时间压缩展示在时间范围栏的轻量上下文标签中。
+- 用户分析页顶部统一使用共享时间窗按钮：
   - `start`
   - `end`
-- 页面输入控件为 `datetime-local`
+- 点击按钮后弹出时间选择框，起止输入精确到时分；该交互与节点详情页 `Real Metrics` 保持一致
+- 时间选择框内置快捷窗口：
+  - `1 day`
+  - `3 days`
+  - `7 days`
+  - `15 days`
+  - `1 month`
 - 页面首次进入时若 query 缺失或非法，会自动回填“当天 00:00 -> 当前时间”
 - 前端发送请求前会把本地 `datetime-local` 转成带时区的 UTC ISO 8601
 - `Tool Analysis`、`Top Tools`、`Usage Profile` 与趋势图共用同一时间窗

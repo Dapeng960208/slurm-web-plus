@@ -24,6 +24,7 @@ import {
 import type {
   ClusterIndividualNode,
   ClusterJob,
+  DateTimeWindowQuery,
   MetricRange,
   NodeInstantMetrics,
   NodeMetricsHistory
@@ -61,6 +62,9 @@ const nodeMetricsError = ref(false)
 const nodeMetricsHistoryError = ref(false)
 const nodeMetricsHistoryLoading = ref(false)
 const nodeMetricsRange = ref<MetricRange>('hour')
+const nodeMetricsWindow = ref<DateTimeWindowQuery | null>(null)
+const nodeMetricsStartLocal = ref('')
+const nodeMetricsEndLocal = ref('')
 let metricsTimer: ReturnType<typeof setInterval> | null = null
 let metricsHistoryTimer: ReturnType<typeof setInterval> | null = null
 
@@ -97,7 +101,7 @@ async function fetchNodeMetricsHistory() {
     nodeMetricsHistory.value = await gateway.node_metrics_history(
       cluster,
       nodeName,
-      nodeMetricsRange.value
+      nodeMetricsWindow.value ?? nodeMetricsRange.value
     )
     nodeMetricsHistoryError.value = false
   } catch {
@@ -135,6 +139,48 @@ function roundToDecimal(value: number, decimals = 1): number {
 
 function formatTimestamp(set: boolean, value: number): string {
   return set ? new Date(value * 10 ** 3).toLocaleString() : 'N/A'
+}
+
+function pad2(value: number): string {
+  return value.toString().padStart(2, '0')
+}
+
+function formatDateTimeLocal(date: Date): string {
+  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}T${pad2(
+    date.getHours()
+  )}:${pad2(date.getMinutes())}`
+}
+
+function parseDateTimeLocal(value: string): Date | null {
+  if (!value) return null
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return null
+  return parsed
+}
+
+function defaultMetricsWindowLocal(): { start: string; end: string } {
+  const end = new Date()
+  const start = new Date(end.getTime() - 60 * 60 * 1000)
+  return {
+    start: formatDateTimeLocal(start),
+    end: formatDateTimeLocal(end)
+  }
+}
+
+function resolveMetricsWindowQuery(
+  startQuery: unknown,
+  endQuery: unknown
+): { startLocal: string; endLocal: string; startUtc: string; endUtc: string } | null {
+  if (typeof startQuery !== 'string' || typeof endQuery !== 'string') return null
+  const startDate = parseDateTimeLocal(startQuery)
+  const endDate = parseDateTimeLocal(endQuery)
+  if (!startDate || !endDate || startDate >= endDate) return null
+  return {
+    startLocal: startQuery,
+    endLocal: endQuery,
+    startUtc: startDate.toISOString(),
+    endUtc: endDate.toISOString()
+  }
 }
 
 const node = useClusterDataPoller<ClusterIndividualNode>(cluster, 'node', 5000, nodeName)
@@ -203,7 +249,9 @@ const nodeMetricsHistoryHasData = computed(() => {
 })
 
 const canEditNode = computed(() => runtimeStore.hasRoutePermission(cluster, 'resources', 'edit'))
-const canDeleteNode = computed(() => runtimeStore.hasRoutePermission(cluster, 'resources', 'delete'))
+const canDeleteNode = computed(() =>
+  runtimeStore.hasRoutePermission(cluster, 'resources', 'delete')
+)
 
 async function saveNode(payload: Record<string, string>) {
   operationBusy.value = true
@@ -246,19 +294,68 @@ function confirmDeleteNode(payload: Record<string, string>) {
 }
 
 function setMetricsRange(range: MetricRange) {
-  if (nodeMetricsRange.value === range && route.query.range === range) return
+  if (
+    nodeMetricsRange.value === range &&
+    route.query.range === range &&
+    !route.query.start &&
+    !route.query.end
+  ) {
+    return
+  }
+  const { start, end, ...query } = route.query
+  void start
+  void end
   void router.replace({
     query: {
-      ...route.query,
+      ...query,
       range
     }
   })
 }
 
+function applyMetricsWindow(window: { start: string; end: string }) {
+  const startDate = parseDateTimeLocal(window.start)
+  const endDate = parseDateTimeLocal(window.end)
+  if (!startDate || !endDate || startDate >= endDate) return
+  void router.replace({
+    query: {
+      ...route.query,
+      start: window.start,
+      end: window.end
+    }
+  })
+}
+
+function resetMetricsWindow() {
+  const { start, end, ...query } = route.query
+  void start
+  void end
+  void router.replace({
+    query: {
+      ...query,
+      range: 'hour'
+    }
+  })
+}
+
 watch(
-  () => route.query.range,
-  (range) => {
+  () => [route.query.range, route.query.start, route.query.end],
+  ([range, startQuery, endQuery]) => {
     nodeMetricsRange.value = isMetricRange(range) ? range : 'hour'
+    const resolved = resolveMetricsWindowQuery(startQuery, endQuery)
+    if (resolved) {
+      nodeMetricsStartLocal.value = resolved.startLocal
+      nodeMetricsEndLocal.value = resolved.endLocal
+      nodeMetricsWindow.value = {
+        start: resolved.startUtc,
+        end: resolved.endUtc
+      }
+      return
+    }
+    nodeMetricsWindow.value = null
+    const fallback = defaultMetricsWindowLocal()
+    nodeMetricsStartLocal.value = fallback.start
+    nodeMetricsEndLocal.value = fallback.end
   },
   { immediate: true }
 )
@@ -308,7 +405,11 @@ watch(
 )
 
 watch(
-  () => nodeMetricsRange.value,
+  () => [
+    nodeMetricsRange.value,
+    nodeMetricsWindow.value?.start ?? null,
+    nodeMetricsWindow.value?.end ?? null
+  ],
   () => {
     if (nodeMetricsEnabled.value) {
       nodeMetricsHistory.value = null
@@ -714,7 +815,14 @@ onUnmounted(() => {
                     <MetricRangeSelector
                       :model-value="nodeMetricsRange"
                       aria-label="Select node metrics range"
+                      enable-custom-window
+                      :start-value="nodeMetricsStartLocal"
+                      :end-value="nodeMetricsEndLocal"
+                      custom-button-label="Custom"
+                      reset-label="Last hour"
                       @update:model-value="setMetricsRange"
+                      @apply-window="applyMetricsWindow"
+                      @reset-window="resetMetricsWindow"
                     />
                   </div>
 
@@ -761,7 +869,8 @@ onUnmounted(() => {
           label: 'State',
           required: true,
           hint: 'Comma-separated Slurm state flags to apply to this node.',
-          tooltip: 'Examples include DRAIN, RESUME or UNDRAIN depending on the desired scheduler action.'
+          tooltip:
+            'Examples include DRAIN, RESUME or UNDRAIN depending on the desired scheduler action.'
         },
         {
           key: 'reason',

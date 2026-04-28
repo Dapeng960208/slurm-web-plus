@@ -99,12 +99,38 @@ class TestUserMetricsAggregation(unittest.TestCase):
         self.assertEqual(result["totals"]["busiest_tool"], "rna-seq")
         self.assertEqual(result["totals"]["busiest_tool_jobs"], 2)
         self.assertAlmostEqual(result["totals"]["avg_max_memory_mb"], (40.0 / 3.0) * 1024.0)
+        self.assertAlmostEqual(result["totals"]["avg_max_memory_gb"], 40.0 / 3.0)
         self.assertAlmostEqual(result["totals"]["avg_cpu_cores"], 6.0)
+        self.assertAlmostEqual(
+            result["totals"]["avg_runtime_hours"], ((3600 + 5400 + 1800) / 3.0) / 3600.0
+        )
         self.assertAlmostEqual(
             result["totals"]["avg_runtime_seconds"], (3600 + 5400 + 1800) / 3.0
         )
         self.assertEqual(result["tool_breakdown"][0]["tool"], "rna-seq")
         self.assertEqual(result["tool_breakdown"][0]["jobs"], 2)
+        self.assertAlmostEqual(result["tool_breakdown"][0]["avg_max_memory_gb"], 10.0)
+        self.assertAlmostEqual(result["tool_breakdown"][0]["avg_runtime_hours"], 1.25)
+
+    def test_aggregate_rows_accepts_legacy_singular_cpu_key(self):
+        result = _aggregate_rows(
+            [
+                {
+                    "job_name": "blast",
+                    "command": "blastp",
+                    "submit_line": None,
+                    "used_memory_gb": 2.0,
+                    "used_cpu_core_avg": 3.5,
+                    "start_time": datetime(2026, 4, 24, 1, 0, tzinfo=timezone.utc),
+                    "end_time": datetime(2026, 4, 24, 3, 0, tzinfo=timezone.utc),
+                    "usage_stats": None,
+                }
+            ]
+        )
+
+        self.assertEqual(result["totals"]["completed_jobs"], 1)
+        self.assertEqual(result["totals"]["avg_cpu_cores"], 3.5)
+        self.assertEqual(result["totals"]["avg_runtime_hours"], 2.0)
 
 
 class TestUserMetricsTimeline(unittest.TestCase):
@@ -242,3 +268,70 @@ class TestUserMetricsQueries(unittest.TestCase):
         self.assertEqual(params[0], "alice")
         self.assertEqual(params[1], start_time)
         self.assertEqual(params[2], end_time)
+        self.assertIn("UPPER(js.job_state) LIKE %s", sql)
+
+    def test_submission_timeline_uses_fallback_time_when_submit_time_missing(self):
+        start_time = datetime(2026, 4, 24, 0, 0, tzinfo=timezone.utc)
+        end_time = datetime(2026, 4, 24, 3, 0, tzinfo=timezone.utc)
+
+        self.store.submission_timeline("alice", start_time=start_time, end_time=end_time)
+
+        sql = self.cursor.execute.call_args.args[0]
+        self.assertIn("COALESCE(js.submit_time, js.start_time, js.last_seen) >= %s", sql)
+        self.assertIn("COALESCE(js.submit_time, js.start_time, js.last_seen) <= %s", sql)
+        self.assertIn(
+            "date_trunc(%s, COALESCE(js.submit_time, js.start_time, js.last_seen) AT TIME ZONE 'UTC')",
+            sql,
+        )
+
+    def test_completion_timeline_uses_utc_bucket(self):
+        start_time = datetime(2026, 4, 24, 0, 0, tzinfo=timezone.utc)
+        end_time = datetime(2026, 4, 24, 3, 0, tzinfo=timezone.utc)
+
+        self.store.completion_timeline("alice", start_time=start_time, end_time=end_time)
+
+        sql = self.cursor.execute.call_args.args[0]
+        self.assertIn(
+            "date_trunc(%s, COALESCE(js.end_time, js.last_seen) AT TIME ZONE 'UTC')",
+            sql,
+        )
+
+    def test_user_metrics_history_seven_day_window_matches_naive_utc_buckets(self):
+        start_time = datetime(2026, 4, 17, 12, 30, tzinfo=timezone.utc)
+        end_time = datetime(2026, 4, 24, 12, 30, tzinfo=timezone.utc)
+        submission_bucket = datetime(2026, 4, 18)
+        completion_bucket = datetime(2026, 4, 19)
+        self.cursor.fetchall.side_effect = [
+            [(submission_bucket, 3)],
+            [(completion_bucket, 2)],
+        ]
+
+        result = self.store.user_metrics_history(
+            "alice",
+            start_time=start_time,
+            end_time=end_time,
+        )
+
+        submission_bucket_ms = int(
+            datetime(2026, 4, 18, tzinfo=timezone.utc).timestamp() * 1000
+        )
+        completion_bucket_ms = int(
+            datetime(2026, 4, 19, tzinfo=timezone.utc).timestamp() * 1000
+        )
+        self.assertEqual(result["totals"]["submitted_jobs"], 3)
+        self.assertEqual(result["totals"]["completed_jobs"], 2)
+        self.assertIn([submission_bucket_ms, 3], result["submissions"])
+        self.assertIn([completion_bucket_ms, 2], result["completions"])
+        submission_sql = self.cursor.execute.call_args_list[0].args[0]
+        completion_sql = self.cursor.execute.call_args_list[1].args[0]
+        self.assertIn("AT TIME ZONE 'UTC'", submission_sql)
+        self.assertIn("AT TIME ZONE 'UTC'", completion_sql)
+
+    def test_completion_timeline_matches_terminal_states_case_insensitively(self):
+        start_time = datetime(2026, 4, 24, 0, 0, tzinfo=timezone.utc)
+        end_time = datetime(2026, 4, 24, 3, 0, tzinfo=timezone.utc)
+
+        self.store.completion_timeline("alice", start_time=start_time, end_time=end_time)
+
+        sql = self.cursor.execute.call_args.args[0]
+        self.assertIn("UPPER(js.job_state) LIKE %s", sql)

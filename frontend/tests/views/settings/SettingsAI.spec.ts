@@ -11,7 +11,9 @@ const mockGatewayAPI = {
   create_ai_config: vi.fn(),
   update_ai_config: vi.fn(),
   delete_ai_config: vi.fn(),
-  validate_ai_config: vi.fn()
+  validate_ai_config: vi.fn(),
+  ai_admin_conversations: vi.fn(),
+  ai_admin_conversation: vi.fn()
 }
 
 vi.mock('@/composables/GatewayAPI', async (importOriginal) => {
@@ -58,7 +60,7 @@ describe('views/settings/SettingsAI.vue', () => {
   }
 
   async function mountOnAdminRoute(router: RouterMock) {
-    await router.push({ name: 'admin-ai', params: { cluster: 'foo' } })
+    await router.push('/foo/admin/ai')
     await router.getPendingNavigation()
   }
 
@@ -83,6 +85,29 @@ describe('views/settings/SettingsAI.vue', () => {
   beforeEach(() => {
     void init_plugins()
     vi.clearAllMocks()
+    mockGatewayAPI.ai_admin_conversations.mockResolvedValue([])
+    mockGatewayAPI.ai_admin_conversation.mockResolvedValue({
+      id: 21,
+      username: 'alice',
+      title: 'Queue pressure',
+      created_at: '2026-04-24T10:00:00Z',
+      updated_at: '2026-04-24T10:05:00Z',
+      deleted_at: null,
+      deleted_by: null,
+      last_message: 'GPU partition is saturated.',
+      model_config_id: 1,
+      messages: [
+        {
+          id: 101,
+          role: 'user',
+          content: 'How busy is the GPU queue?',
+          created_at: '2026-04-24T10:00:00Z',
+          model_config_id: 1,
+          metadata: {}
+        }
+      ],
+      tool_calls: []
+    })
   })
 
   test('loads AI configs and renders masked secret details', async () => {
@@ -132,6 +157,124 @@ describe('views/settings/SettingsAI.vue', () => {
     expect(wrapper.text()).toContain('***1234')
     expect(wrapper.text()).toContain('Default')
     expect(wrapper.text()).toContain('Delete')
+    expect(wrapper.find('[data-testid="ai-config-tag"]').exists()).toBe(true)
+  })
+
+  test('filters admin audit records and loads details only after row click', async () => {
+    const router = init_plugins()
+    seedRuntime()
+    mockGatewayAPI.ai_configs.mockResolvedValue([])
+    mockGatewayAPI.ai_admin_conversations.mockResolvedValue([
+      {
+        id: 21,
+        username: 'alice',
+        title: 'Queue pressure',
+        created_at: '2026-04-24T10:00:00Z',
+        updated_at: '2026-04-24T10:05:00Z',
+        deleted_at: null,
+        deleted_by: null,
+        last_message: 'GPU partition is saturated.',
+        model_config_id: 1
+      },
+      {
+        id: 22,
+        username: 'bob',
+        title: 'Node capacity',
+        created_at: '2026-04-24T11:00:00Z',
+        updated_at: '2026-04-24T11:05:00Z',
+        deleted_at: null,
+        deleted_by: null,
+        last_message: 'cn01 has free memory.',
+        model_config_id: 1
+      }
+    ])
+
+    await mountOnAdminRoute(router)
+
+    const wrapper = mount(SettingsAIView, {
+      global: {
+        stubs: {
+          ...globalStubs,
+          AdminTabs: true,
+          AdminHeader: true
+        }
+      }
+    })
+
+    await flushPromises()
+
+    expect(mockGatewayAPI.ai_admin_conversations).toHaveBeenCalledWith('foo')
+    expect(mockGatewayAPI.ai_admin_conversation).not.toHaveBeenCalled()
+    expect(wrapper.text()).toContain('Queue pressure')
+    expect(wrapper.text()).toContain('Node capacity')
+
+    await wrapper.get('[data-testid="audit-username-filter"]').setValue('alice')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Queue pressure')
+    expect(wrapper.text()).not.toContain('Node capacity')
+
+    await wrapper.get('[data-testid="audit-keyword-filter"]').setValue('gpu')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Queue pressure')
+
+    await wrapper.find('tbody tr').trigger('click')
+    await flushPromises()
+
+    expect(mockGatewayAPI.ai_admin_conversation).toHaveBeenCalledWith('foo', 21)
+    expect(wrapper.text()).toContain('How busy is the GPU queue?')
+  })
+
+  test('deletes a model configuration from the tag list', async () => {
+    const router = init_plugins()
+    seedRuntime()
+    mockGatewayAPI.ai_configs
+      .mockResolvedValueOnce([
+        {
+          id: 1,
+          name: 'qwen-prod',
+          provider: 'qwen',
+          provider_label: 'Qwen',
+          model: 'qwen3-coder',
+          display_name: 'Qwen Prod',
+          enabled: true,
+          is_default: true,
+          sort_order: 10,
+          base_url: null,
+          deployment: null,
+          api_version: null,
+          request_timeout: null,
+          temperature: null,
+          system_prompt: null,
+          extra_options: {},
+          secret_configured: true,
+          secret_mask: '***1234',
+          last_validated_at: null,
+          last_validation_error: null
+        }
+      ])
+      .mockResolvedValueOnce([])
+    mockGatewayAPI.delete_ai_config.mockResolvedValue({})
+
+    await mountOnAdminRoute(router)
+
+    const wrapper = mount(SettingsAIView, {
+      global: {
+        stubs: {
+          ...globalStubs,
+          AdminTabs: true,
+          AdminHeader: true
+        }
+      }
+    })
+
+    await flushPromises()
+    await getButtonByText(wrapper, 'Delete').trigger('click')
+    await flushPromises()
+
+    expect(mockGatewayAPI.delete_ai_config).toHaveBeenCalledWith('foo', 1)
+    expect(wrapper.text()).toContain('Qwen Prod deleted.')
   })
 
   test('creates a new AI config', async () => {

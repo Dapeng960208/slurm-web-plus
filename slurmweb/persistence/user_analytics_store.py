@@ -142,6 +142,20 @@ def _memory_mb(value_gb):
     return float(value_gb) * 1024.0
 
 
+def _runtime_hours(value_seconds):
+    if value_seconds is None:
+        return None
+    return float(value_seconds) / 3600.0
+
+
+def _bucket_epoch_ms(value):
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=timezone.utc)
+    return int(value.timestamp() * 1000)
+
+
 def _avg(total, samples):
     if samples <= 0:
         return None
@@ -188,7 +202,7 @@ def _aggregate_rows(rows, mapper=None):
             summary["memory_total"] += float(memory_value)
             summary["memory_samples"] += 1
 
-        cpu_value = row.get("used_cpu_cores_avg")
+        cpu_value = row.get("used_cpu_cores_avg", row.get("used_cpu_core_avg"))
         if cpu_value is not None:
             bucket["cpu_total"] += float(cpu_value)
             bucket["cpu_samples"] += 1
@@ -202,36 +216,41 @@ def _aggregate_rows(rows, mapper=None):
             summary["runtime_total"] += float(runtime_value)
             summary["runtime_samples"] += 1
 
-    tool_breakdown = [
-        {
-            "tool": tool,
-            "jobs": values["jobs"],
-            "avg_max_memory_mb": _memory_mb(
-                _avg(values["memory_total"], values["memory_samples"])
-            ),
-            "avg_cpu_cores": _avg(values["cpu_total"], values["cpu_samples"]),
-            "avg_runtime_seconds": _avg(
-                values["runtime_total"], values["runtime_samples"]
-            ),
-        }
-        for tool, values in tools.items()
-    ]
+    tool_breakdown = []
+    for tool, values in tools.items():
+        avg_memory_gb = _avg(values["memory_total"], values["memory_samples"])
+        avg_runtime_seconds = _avg(
+            values["runtime_total"], values["runtime_samples"]
+        )
+        tool_breakdown.append(
+            {
+                "tool": tool,
+                "jobs": values["jobs"],
+                "avg_max_memory_gb": avg_memory_gb,
+                "avg_max_memory_mb": _memory_mb(avg_memory_gb),
+                "avg_cpu_cores": _avg(values["cpu_total"], values["cpu_samples"]),
+                "avg_runtime_hours": _runtime_hours(avg_runtime_seconds),
+                "avg_runtime_seconds": avg_runtime_seconds,
+            }
+        )
     tool_breakdown.sort(key=lambda item: (-item["jobs"], item["tool"]))
 
     busiest_tool = tool_breakdown[0]["tool"] if tool_breakdown else None
     busiest_tool_jobs = tool_breakdown[0]["jobs"] if tool_breakdown else 0
+    avg_summary_memory_gb = _avg(summary["memory_total"], summary["memory_samples"])
+    avg_summary_runtime_seconds = _avg(
+        summary["runtime_total"], summary["runtime_samples"]
+    )
 
     return {
         "totals": {
             "completed_jobs": summary["jobs"],
             "active_tools": len(tool_breakdown),
-            "avg_max_memory_mb": _memory_mb(
-                _avg(summary["memory_total"], summary["memory_samples"])
-            ),
+            "avg_max_memory_gb": avg_summary_memory_gb,
+            "avg_max_memory_mb": _memory_mb(avg_summary_memory_gb),
             "avg_cpu_cores": _avg(summary["cpu_total"], summary["cpu_samples"]),
-            "avg_runtime_seconds": _avg(
-                summary["runtime_total"], summary["runtime_samples"]
-            ),
+            "avg_runtime_hours": _runtime_hours(avg_summary_runtime_seconds),
+            "avg_runtime_seconds": avg_summary_runtime_seconds,
             "busiest_tool": busiest_tool,
             "busiest_tool_jobs": busiest_tool_jobs,
         },
@@ -350,14 +369,14 @@ class UserAnalyticsStore:
                     SELECT bucket, COUNT(*)::int AS job_count
                     FROM (
                         SELECT DISTINCT ON (js.job_id, js.submit_time)
-                            date_trunc(%s, js.submit_time) AS bucket,
+                            date_trunc(%s, COALESCE(js.submit_time, js.start_time, js.last_seen) AT TIME ZONE 'UTC') AS bucket,
                             js.job_id,
                             js.submit_time
                         FROM job_snapshots js
                         INNER JOIN users u ON u.id = js.user_id
                         WHERE u.username = %s
-                          AND js.submit_time >= %s
-                          AND js.submit_time <= %s
+                          AND COALESCE(js.submit_time, js.start_time, js.last_seen) >= %s
+                          AND COALESCE(js.submit_time, js.start_time, js.last_seen) <= %s
                         ORDER BY js.job_id, js.submit_time, js.last_seen DESC
                     ) submitted_jobs
                     GROUP BY bucket
@@ -369,11 +388,12 @@ class UserAnalyticsStore:
         finally:
             self._release_conn(conn)
 
-        values = {bucket_time: count for bucket_time, count in rows}
+        values = {_bucket_epoch_ms(bucket_time): count for bucket_time, count in rows}
         cursor = self._align_bucket(start_time, resolution)
         series = []
         while cursor <= end_time:
-            series.append([int(cursor.timestamp() * 1000), values.get(cursor, 0)])
+            bucket_ms = _bucket_epoch_ms(cursor)
+            series.append([bucket_ms, values.get(bucket_ms, 0)])
             cursor += resolution
         return {"submissions": series}
 
@@ -386,7 +406,7 @@ class UserAnalyticsStore:
             )
         )
         terminal_params = [f"%{state}%" for state in TERMINAL_STATES]
-        where_terminal = " OR ".join(["js.job_state LIKE %s"] * len(TERMINAL_STATES))
+        where_terminal = " OR ".join(["UPPER(js.job_state) LIKE %s"] * len(TERMINAL_STATES))
 
         conn = self._get_conn()
         try:
@@ -396,7 +416,7 @@ class UserAnalyticsStore:
                     SELECT bucket, COUNT(*)::int AS job_count
                     FROM (
                         SELECT DISTINCT ON (js.job_id, js.submit_time)
-                            date_trunc(%s, COALESCE(js.end_time, js.last_seen)) AS bucket,
+                            date_trunc(%s, COALESCE(js.end_time, js.last_seen) AT TIME ZONE 'UTC') AS bucket,
                             js.job_id,
                             js.submit_time
                         FROM job_snapshots js
@@ -420,11 +440,12 @@ class UserAnalyticsStore:
         finally:
             self._release_conn(conn)
 
-        values = {bucket_time: count for bucket_time, count in rows}
+        values = {_bucket_epoch_ms(bucket_time): count for bucket_time, count in rows}
         cursor = self._align_bucket(start_time, resolution)
         series = []
         while cursor <= end_time:
-            series.append([int(cursor.timestamp() * 1000), values.get(cursor, 0)])
+            bucket_ms = _bucket_epoch_ms(cursor)
+            series.append([bucket_ms, values.get(bucket_ms, 0)])
             cursor += resolution
         return {"completions": series}
 
@@ -660,7 +681,7 @@ class UserAnalyticsStore:
         import psycopg2.extras
 
         terminal_params = [f"%{state}%" for state in TERMINAL_STATES]
-        where_terminal = " OR ".join(["js.job_state LIKE %s"] * len(TERMINAL_STATES))
+        where_terminal = " OR ".join(["UPPER(js.job_state) LIKE %s"] * len(TERMINAL_STATES))
         conn = self._get_conn()
         try:
             with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
@@ -696,7 +717,7 @@ class UserAnalyticsStore:
         import psycopg2.extras
 
         terminal_params = [f"%{state}%" for state in TERMINAL_STATES]
-        where_terminal = " OR ".join(["js.job_state LIKE %s"] * len(TERMINAL_STATES))
+        where_terminal = " OR ".join(["UPPER(js.job_state) LIKE %s"] * len(TERMINAL_STATES))
         conn = self._get_conn()
         try:
             with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
@@ -733,7 +754,7 @@ class UserAnalyticsStore:
         import psycopg2.extras
 
         terminal_params = [f"%{state}%" for state in TERMINAL_STATES]
-        where_terminal = " OR ".join(["js.job_state LIKE %s"] * len(TERMINAL_STATES))
+        where_terminal = " OR ".join(["UPPER(js.job_state) LIKE %s"] * len(TERMINAL_STATES))
         conn = self._get_conn()
         try:
             with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:

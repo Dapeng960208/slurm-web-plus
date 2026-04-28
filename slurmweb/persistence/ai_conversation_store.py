@@ -70,7 +70,13 @@ class AIConversationStore:
             self._release_conn(conn)
         return dict(row)
 
-    def get_conversation(self, cluster: str, username: str, conversation_id: int):
+    def get_conversation(
+        self,
+        cluster: str,
+        username: str,
+        conversation_id: int,
+        include_deleted=False,
+    ):
         import psycopg2.extras
 
         conn = self._get_conn()
@@ -88,15 +94,43 @@ class AIConversationStore:
                         LIMIT 1
                     ) m ON TRUE
                     WHERE c.cluster = %s AND c.username = %s AND c.id = %s
+                      AND (%s OR c.deleted_at IS NULL)
                     """,
-                    (cluster, username, conversation_id),
+                    (cluster, username, conversation_id, include_deleted),
                 )
                 row = cur.fetchone()
         finally:
             self._release_conn(conn)
         return None if row is None else dict(row)
 
-    def list_conversations(self, cluster: str, username: str, limit=100):
+    def get_conversation_by_id(self, cluster: str, conversation_id: int, include_deleted=False):
+        import psycopg2.extras
+
+        conn = self._get_conn()
+        try:
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                cur.execute(
+                    """
+                    SELECT c.*, m.content AS last_message
+                    FROM ai_conversations c
+                    LEFT JOIN LATERAL (
+                        SELECT content
+                        FROM ai_messages
+                        WHERE conversation_id = c.id
+                        ORDER BY created_at DESC, id DESC
+                        LIMIT 1
+                    ) m ON TRUE
+                    WHERE c.cluster = %s AND c.id = %s
+                      AND (%s OR c.deleted_at IS NULL)
+                    """,
+                    (cluster, conversation_id, include_deleted),
+                )
+                row = cur.fetchone()
+        finally:
+            self._release_conn(conn)
+        return None if row is None else dict(row)
+
+    def list_conversations(self, cluster: str, username: str, limit=100, include_deleted=False):
         import psycopg2.extras
 
         conn = self._get_conn()
@@ -114,10 +148,40 @@ class AIConversationStore:
                         LIMIT 1
                     ) m ON TRUE
                     WHERE c.cluster = %s AND c.username = %s
+                      AND (%s OR c.deleted_at IS NULL)
                     ORDER BY c.updated_at DESC, c.id DESC
                     LIMIT %s
                     """,
-                    (cluster, username, limit),
+                    (cluster, username, include_deleted, limit),
+                )
+                rows = cur.fetchall()
+        finally:
+            self._release_conn(conn)
+        return [dict(row) for row in rows]
+
+    def list_all_conversations(self, cluster: str, limit=200, include_deleted=True):
+        import psycopg2.extras
+
+        conn = self._get_conn()
+        try:
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                cur.execute(
+                    """
+                    SELECT c.*, m.content AS last_message
+                    FROM ai_conversations c
+                    LEFT JOIN LATERAL (
+                        SELECT content
+                        FROM ai_messages
+                        WHERE conversation_id = c.id
+                        ORDER BY created_at DESC, id DESC
+                        LIMIT 1
+                    ) m ON TRUE
+                    WHERE c.cluster = %s
+                      AND (%s OR c.deleted_at IS NULL)
+                    ORDER BY c.updated_at DESC, c.id DESC
+                    LIMIT %s
+                    """,
+                    (cluster, include_deleted, limit),
                 )
                 rows = cur.fetchall()
         finally:
@@ -166,7 +230,14 @@ class AIConversationStore:
             self._release_conn(conn)
         return dict(row)
 
-    def list_messages(self, cluster: str, username: str, conversation_id: int, limit=100):
+    def list_messages(
+        self,
+        cluster: str,
+        username: str | None,
+        conversation_id: int,
+        limit=100,
+        include_deleted=False,
+    ):
         import psycopg2.extras
 
         conn = self._get_conn()
@@ -177,16 +248,47 @@ class AIConversationStore:
                     SELECT m.*
                     FROM ai_messages m
                     JOIN ai_conversations c ON c.id = m.conversation_id
-                    WHERE c.cluster = %s AND c.username = %s AND c.id = %s
+                    WHERE c.cluster = %s AND (%s IS NULL OR c.username = %s) AND c.id = %s
+                      AND (%s OR c.deleted_at IS NULL)
                     ORDER BY m.created_at ASC, m.id ASC
                     LIMIT %s
                     """,
-                    (cluster, username, conversation_id, limit),
+                    (cluster, username, username, conversation_id, include_deleted, limit),
                 )
                 rows = cur.fetchall()
         finally:
             self._release_conn(conn)
         return [dict(row) for row in rows]
+
+    def soft_delete_conversation(
+        self,
+        cluster: str,
+        username: str,
+        conversation_id: int,
+        deleted_by: str,
+    ) -> bool:
+        conn = self._get_conn()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    UPDATE ai_conversations
+                    SET deleted_at = NOW(), deleted_by = %s, updated_at = NOW()
+                    WHERE cluster = %s AND username = %s AND id = %s AND deleted_at IS NULL
+                    """,
+                    (deleted_by, cluster, username, conversation_id),
+                )
+                deleted = cur.rowcount
+            conn.commit()
+        except Exception:
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+            raise
+        finally:
+            self._release_conn(conn)
+        return bool(deleted)
 
     def record_tool_call(
         self,
@@ -245,7 +347,14 @@ class AIConversationStore:
         finally:
             self._release_conn(conn)
 
-    def list_tool_calls(self, cluster: str, username: str, conversation_id: int, limit=200):
+    def list_tool_calls(
+        self,
+        cluster: str,
+        username: str | None,
+        conversation_id: int,
+        limit=200,
+        include_deleted=False,
+    ):
         import psycopg2.extras
 
         conn = self._get_conn()
@@ -256,11 +365,12 @@ class AIConversationStore:
                     SELECT t.*
                     FROM ai_tool_calls t
                     JOIN ai_conversations c ON c.id = t.conversation_id
-                    WHERE c.cluster = %s AND c.username = %s AND c.id = %s
+                    WHERE c.cluster = %s AND (%s IS NULL OR c.username = %s) AND c.id = %s
+                      AND (%s OR c.deleted_at IS NULL)
                     ORDER BY t.created_at ASC, t.id ASC
                     LIMIT %s
                     """,
-                    (cluster, username, conversation_id, limit),
+                    (cluster, username, username, conversation_id, include_deleted, limit),
                 )
                 rows = cur.fetchall()
         finally:

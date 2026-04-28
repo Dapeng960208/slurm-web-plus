@@ -24,6 +24,18 @@ function formatDuration(seconds: number | null): string {
   return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`
 }
 
+function formatGb(value: number | null | undefined): string {
+  if (value == null || Number.isNaN(value)) return 'N/A'
+  return `${value.toFixed(value >= 10 ? 1 : 2)} GB`
+}
+
+function formatRuntime(tool: UserToolActivityRecord): string {
+  if (tool.avg_runtime_hours != null) {
+    return `${tool.avg_runtime_hours.toFixed(tool.avg_runtime_hours >= 10 ? 1 : 2)} h`
+  }
+  return formatDuration(tool.avg_runtime_seconds)
+}
+
 const maxMemory = computed(() =>
   Math.max(...tools.map((tool) => tool.avg_max_memory_mb ?? 0), 0)
 )
@@ -38,6 +50,11 @@ function memoryWidth(tool: UserToolActivityRecord): string {
 function jobsWidth(tool: UserToolActivityRecord): string {
   if (!maxJobs.value) return '0%'
   return `${(tool.jobs / maxJobs.value) * 100}%`
+}
+
+function memoryLabel(tool: UserToolActivityRecord): string {
+  if (tool.avg_max_memory_gb != null) return formatGb(tool.avg_max_memory_gb)
+  return tool.avg_max_memory_mb != null ? getMBHumanUnit(tool.avg_max_memory_mb) : 'N/A'
 }
 </script>
 
@@ -60,7 +77,7 @@ function jobsWidth(tool: UserToolActivityRecord): string {
         </div>
         <div class="flex flex-wrap gap-2">
           <span class="ui-chip">
-            {{ tool.avg_max_memory_mb != null ? getMBHumanUnit(tool.avg_max_memory_mb) : 'N/A' }}
+            {{ memoryLabel(tool) }}
           </span>
           <span class="ui-chip">{{ tool.jobs }} jobs</span>
         </div>
@@ -71,7 +88,7 @@ function jobsWidth(tool: UserToolActivityRecord): string {
           <div class="mb-2 flex items-center justify-between gap-3">
             <span class="ui-stat-label">Average Max Memory</span>
             <span class="text-sm font-semibold text-[var(--color-brand-ink-strong)]">
-              {{ tool.avg_max_memory_mb != null ? getMBHumanUnit(tool.avg_max_memory_mb) : 'N/A' }}
+              {{ memoryLabel(tool) }}
             </span>
           </div>
           <div class="ui-tool-chart-track">
@@ -103,7 +120,7 @@ function jobsWidth(tool: UserToolActivityRecord): string {
           CPU:
           {{ tool.avg_cpu_cores != null ? `${tool.avg_cpu_cores.toFixed(1)} cores` : 'N/A' }}
         </div>
-        <div>Runtime: {{ formatDuration(tool.avg_runtime_seconds) }}</div>
+        <div>Runtime: {{ formatRuntime(tool) }}</div>
         <div>
           Peak reference:
           {{ maxMemory > 0 ? getMBHumanUnit(maxMemory) : 'N/A' }}

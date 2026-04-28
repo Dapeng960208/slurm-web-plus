@@ -10,7 +10,13 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { Dialog, DialogPanel, DialogTitle, TransitionChild, TransitionRoot } from '@headlessui/vue'
-import type { AIModelConfig, AIModelConfigPayload, AIProviderOption } from '@/composables/GatewayAPI'
+import type {
+  AIConversation,
+  AIConversationSummary,
+  AIModelConfig,
+  AIModelConfigPayload,
+  AIProviderOption
+} from '@/composables/GatewayAPI'
 import { hasClusterAIAssistant, useGatewayAPI } from '@/composables/GatewayAPI'
 import { useRuntimeStore } from '@/stores/runtime'
 import SettingsTabs from '@/components/settings/SettingsTabs.vue'
@@ -40,7 +46,9 @@ const gateway = useGatewayAPI()
 const runtimeStore = useRuntimeStore()
 const route = useRoute()
 
-const isAdminRoute = computed(() => String(route.name ?? '').startsWith('admin-'))
+const isAdminRoute = computed(
+  () => String(route.name ?? '').startsWith('admin-') || String(route.path ?? '').includes('/admin/')
+)
 const tabsComponent = computed(() => (isAdminRoute.value ? AdminTabs : SettingsTabs))
 const headerComponent = computed(() => (isAdminRoute.value ? AdminHeader : SettingsHeader))
 const loading = ref(false)
@@ -50,6 +58,13 @@ const submitSuccess = ref<string | null>(null)
 const validatingId = ref<number | null>(null)
 const deletingId = ref<number | null>(null)
 const configs = ref<AIModelConfig[]>([])
+const auditConversations = ref<AIConversationSummary[]>([])
+const auditConversation = ref<AIConversation | null>(null)
+const auditUsernameFilter = ref('')
+const auditKeywordFilter = ref('')
+const auditLoading = ref(false)
+const auditDetailLoading = ref(false)
+const auditError = ref<string | null>(null)
 const modalOpen = ref(false)
 const editingConfigId = ref<number | null>(null)
 const secretMode = ref<SecretMode>('replace')
@@ -125,6 +140,15 @@ const sortedConfigs = computed(() =>
     return left.display_name.localeCompare(right.display_name)
   })
 )
+const filteredAuditConversations = computed(() => {
+  const username = auditUsernameFilter.value.trim().toLowerCase()
+  const keyword = auditKeywordFilter.value.trim().toLowerCase()
+  return auditConversations.value.filter((conversation) => {
+    const conversationUsername = (conversation.username ?? '').toLowerCase()
+    const searchableText = `${conversation.title} ${conversation.last_message ?? ''}`.toLowerCase()
+    return (!username || conversationUsername.includes(username)) && (!keyword || searchableText.includes(keyword))
+  })
+})
 const enabledConfigsCount = computed(() => configs.value.filter((config) => config.enabled).length)
 const defaultConfig = computed(() => configs.value.find((config) => config.is_default) ?? null)
 const currentProvider = computed(() => form.provider)
@@ -296,6 +320,37 @@ async function loadConfigs() {
   }
 }
 
+async function loadAuditConversations() {
+  if (!isAdminRoute.value || !aiAvailable.value || !canView.value || !currentClusterName.value) {
+    auditConversations.value = []
+    auditConversation.value = null
+    return
+  }
+  auditLoading.value = true
+  auditError.value = null
+  try {
+    auditConversations.value = await gateway.ai_admin_conversations(currentClusterName.value)
+    auditConversation.value = null
+  } catch (err: unknown) {
+    auditError.value = err instanceof Error ? err.message : String(err)
+  } finally {
+    auditLoading.value = false
+  }
+}
+
+async function loadAuditConversation(conversationId: number) {
+  if (!currentClusterName.value) return
+  auditDetailLoading.value = true
+  auditError.value = null
+  try {
+    auditConversation.value = await gateway.ai_admin_conversation(currentClusterName.value, conversationId)
+  } catch (err: unknown) {
+    auditError.value = err instanceof Error ? err.message : String(err)
+  } finally {
+    auditDetailLoading.value = false
+  }
+}
+
 async function submitForm() {
   if (!currentClusterName.value) return
   clearFeedback()
@@ -381,6 +436,7 @@ watch(
     closeModal()
     clearFeedback()
     await loadConfigs()
+    await loadAuditConversations()
   }
 )
 
@@ -393,8 +449,16 @@ watch(
   }
 )
 
+watch(filteredAuditConversations, (conversations) => {
+  if (!auditConversation.value) return
+  if (!conversations.some((conversation) => conversation.id === auditConversation.value?.id)) {
+    auditConversation.value = null
+  }
+})
+
 onMounted(async () => {
   await loadConfigs()
+  await loadAuditConversations()
 })
 </script>
 
@@ -506,13 +570,14 @@ onMounted(async () => {
           No model configs exist for this cluster yet.
         </InfoAlert>
 
-        <div v-else class="mt-6 grid gap-4 xl:grid-cols-2">
+        <div v-else class="mt-6 flex flex-wrap gap-3">
           <article
             v-for="config in sortedConfigs"
             :key="config.id"
-            class="rounded-[28px] border border-[rgba(80,105,127,0.12)] bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(239,244,246,0.84))] px-5 py-5 shadow-[var(--shadow-soft)]"
+            data-testid="ai-config-tag"
+            class="flex max-w-full flex-col gap-3 rounded-[18px] border border-[rgba(80,105,127,0.12)] bg-white px-4 py-3 shadow-[var(--shadow-soft)] sm:min-w-[24rem]"
           >
-            <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
               <div class="min-w-0">
                 <div class="flex flex-wrap gap-2">
                   <span class="ui-chip">{{ providerLabel(config) }}</span>
@@ -521,17 +586,17 @@ onMounted(async () => {
                   <span v-if="config.is_default" class="ui-chip">Default</span>
                   <span v-if="config.secret_configured" class="ui-chip">Secret ready</span>
                 </div>
-                <h3 class="mt-3 text-lg font-semibold text-[var(--color-brand-ink-strong)]">
+                <h3 class="mt-2 truncate text-base font-semibold text-[var(--color-brand-ink-strong)]">
                   {{ config.display_name }}
                 </h3>
-                <p class="mt-1 text-sm text-[var(--color-brand-muted)]">
-                  {{ config.model }}
+                <p class="mt-1 break-all text-sm text-[var(--color-brand-muted)]">
+                  {{ config.name }} / {{ config.model }}
                 </p>
               </div>
               <div class="flex flex-wrap gap-2">
                 <button
                   type="button"
-                  class="ui-button-warning"
+                  class="ui-button-secondary"
                   :disabled="!canManage"
                   title="Open the editor to update provider settings, routing, prompts and secrets."
                   @click="openEditModal(config)"
@@ -550,34 +615,34 @@ onMounted(async () => {
               </div>
             </div>
 
-            <dl class="mt-5 grid gap-3 text-sm text-[var(--color-brand-muted)] sm:grid-cols-2">
-              <div class="ui-panel-soft px-4 py-3">
+            <dl class="grid gap-2 text-sm text-[var(--color-brand-muted)] sm:grid-cols-2">
+              <div class="rounded-lg bg-[rgba(32,42,53,0.04)] px-3 py-2">
                 <dt class="font-semibold text-[var(--color-brand-ink-strong)]">Config name</dt>
                 <dd class="mt-1">{{ config.name }}</dd>
               </div>
-              <div class="ui-panel-soft px-4 py-3">
+              <div class="rounded-lg bg-[rgba(32,42,53,0.04)] px-3 py-2">
                 <dt class="font-semibold text-[var(--color-brand-ink-strong)]">secret_mask</dt>
                 <dd class="mt-1">{{ config.secret_mask || 'Not configured' }}</dd>
               </div>
-              <div class="ui-panel-soft px-4 py-3">
+              <div class="rounded-lg bg-[rgba(32,42,53,0.04)] px-3 py-2">
                 <dt class="font-semibold text-[var(--color-brand-ink-strong)]">Base URL</dt>
                 <dd class="mt-1 break-all">{{ config.base_url || 'Default endpoint' }}</dd>
               </div>
-              <div class="ui-panel-soft px-4 py-3">
+              <div class="rounded-lg bg-[rgba(32,42,53,0.04)] px-3 py-2">
                 <dt class="font-semibold text-[var(--color-brand-ink-strong)]">Sort order</dt>
                 <dd class="mt-1">{{ config.sort_order }}</dd>
               </div>
-              <div class="ui-panel-soft px-4 py-3">
+              <div class="rounded-lg bg-[rgba(32,42,53,0.04)] px-3 py-2">
                 <dt class="font-semibold text-[var(--color-brand-ink-strong)]">Validated</dt>
                 <dd class="mt-1">{{ formatTimestamp(config.last_validated_at) }}</dd>
               </div>
-              <div class="ui-panel-soft px-4 py-3">
+              <div class="rounded-lg bg-[rgba(32,42,53,0.04)] px-3 py-2">
                 <dt class="font-semibold text-[var(--color-brand-ink-strong)]">Validation error</dt>
                 <dd class="mt-1 line-clamp-3">{{ config.last_validation_error || 'None' }}</dd>
               </div>
             </dl>
 
-            <div class="mt-5 flex flex-wrap gap-2">
+            <div class="flex flex-wrap gap-2">
               <button
                 type="button"
                 class="ui-button-secondary"
@@ -608,6 +673,164 @@ onMounted(async () => {
               </button>
             </div>
           </article>
+        </div>
+      </section>
+
+      <section v-if="isAdminRoute" class="ui-panel ui-section">
+        <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <p class="ui-page-kicker">Conversation Audit</p>
+            <h2 class="ui-panel-title">AI conversation records</h2>
+            <p class="ui-panel-description mt-2">
+              Admin audit includes all users and conversations hidden from normal user history.
+            </p>
+          </div>
+          <button
+            type="button"
+            class="ui-button-secondary"
+            :disabled="auditLoading"
+            @click="loadAuditConversations"
+          >
+            Refresh
+          </button>
+        </div>
+
+        <ErrorAlert v-if="auditError" class="mt-5">
+          {{ auditError }}
+        </ErrorAlert>
+        <div class="mt-5 grid gap-3 lg:grid-cols-2">
+          <label class="block">
+            <span class="text-sm font-semibold text-[var(--color-brand-ink-strong)]">Username</span>
+            <input
+              v-model="auditUsernameFilter"
+              data-testid="audit-username-filter"
+              type="search"
+              class="mt-2 block w-full rounded-lg border border-[rgba(80,105,127,0.16)] bg-white px-3 py-2 text-sm text-[var(--color-brand-ink-strong)] outline-hidden focus:border-[rgba(182,232,44,0.65)] focus:ring-4 focus:ring-[rgba(182,232,44,0.18)]"
+              placeholder="Filter by username"
+            />
+          </label>
+          <label class="block">
+            <span class="text-sm font-semibold text-[var(--color-brand-ink-strong)]">Keyword</span>
+            <input
+              v-model="auditKeywordFilter"
+              data-testid="audit-keyword-filter"
+              type="search"
+              class="mt-2 block w-full rounded-lg border border-[rgba(80,105,127,0.16)] bg-white px-3 py-2 text-sm text-[var(--color-brand-ink-strong)] outline-hidden focus:border-[rgba(182,232,44,0.65)] focus:ring-4 focus:ring-[rgba(182,232,44,0.18)]"
+              placeholder="Filter by title or last message"
+            />
+          </label>
+        </div>
+        <div v-if="auditLoading" class="mt-6 text-[var(--color-brand-muted)]">
+          <LoadingSpinner :size="5" />
+          Loading conversation audit...
+        </div>
+        <InfoAlert v-else-if="auditConversations.length === 0" class="mt-6">
+          No AI conversation records exist for this cluster.
+        </InfoAlert>
+        <InfoAlert v-else-if="filteredAuditConversations.length === 0" class="mt-6">
+          No AI conversation records match the current filters.
+        </InfoAlert>
+        <div v-else class="mt-6 grid gap-4 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+          <div class="ui-table-shell overflow-x-auto">
+            <table class="ui-table min-w-full">
+              <thead>
+                <tr>
+                  <th scope="col" class="py-3.5 pr-3 pl-6 text-left">Conversation</th>
+                  <th scope="col" class="px-3 py-3.5 text-left">User</th>
+                  <th scope="col" class="px-3 py-3.5 text-left">State</th>
+                  <th scope="col" class="px-3 py-3.5 text-left">Updated</th>
+                </tr>
+              </thead>
+              <tbody class="text-sm text-[var(--color-brand-muted)]">
+                <tr
+                  v-for="conversation in filteredAuditConversations"
+                  :key="conversation.id"
+                  class="cursor-pointer"
+                  :class="
+                    auditConversation?.id === conversation.id
+                      ? 'bg-[rgba(182,232,44,0.12)]'
+                      : 'hover:bg-[rgba(244,248,251,0.82)]'
+                  "
+                  @click="loadAuditConversation(conversation.id)"
+                >
+                  <td class="py-4 pr-3 pl-6 align-top font-semibold text-[var(--color-brand-ink-strong)]">
+                    {{ conversation.title }}
+                    <p class="mt-1 line-clamp-1 font-normal text-[var(--color-brand-muted)]">
+                      {{ conversation.last_message || 'No message content.' }}
+                    </p>
+                  </td>
+                  <td class="px-3 py-4 align-top">{{ conversation.username || '-' }}</td>
+                  <td class="px-3 py-4 align-top">
+                    <span class="ui-chip">
+                      {{ conversation.deleted_at ? 'Deleted' : 'Active' }}
+                    </span>
+                  </td>
+                  <td class="px-3 py-4 align-top">{{ formatTimestamp(conversation.updated_at) }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="ui-panel-soft px-5 py-5">
+            <div v-if="auditDetailLoading" class="text-[var(--color-brand-muted)]">
+              <LoadingSpinner :size="5" />
+              Loading audit detail...
+            </div>
+            <template v-else-if="auditConversation">
+              <div class="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p class="ui-page-kicker">Selected Record</p>
+                  <h3 class="text-lg font-semibold text-[var(--color-brand-ink-strong)]">
+                    {{ auditConversation.title }}
+                  </h3>
+                  <p class="mt-1 text-sm text-[var(--color-brand-muted)]">
+                    {{ auditConversation.username || '-' }} / {{ formatTimestamp(auditConversation.updated_at) }}
+                  </p>
+                </div>
+                <span class="ui-chip">
+                  {{ auditConversation.deleted_at ? 'Deleted' : 'Active' }}
+                </span>
+              </div>
+              <p v-if="auditConversation.deleted_at" class="mt-3 text-sm text-[var(--color-brand-muted)]">
+                Deleted by {{ auditConversation.deleted_by || '-' }} at {{ formatTimestamp(auditConversation.deleted_at) }}.
+              </p>
+
+              <div class="mt-5 space-y-3">
+                <article
+                  v-for="message in auditConversation.messages"
+                  :key="message.id"
+                  class="rounded-[18px] border border-[rgba(80,105,127,0.1)] bg-white px-4 py-3"
+                >
+                  <div class="flex flex-wrap items-center justify-between gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--color-brand-muted)]">
+                    <span>{{ message.role }}</span>
+                    <span>{{ formatTimestamp(message.created_at) }}</span>
+                  </div>
+                  <p class="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-[var(--color-brand-ink-strong)]">
+                    {{ message.content }}
+                  </p>
+                </article>
+              </div>
+
+              <div v-if="auditConversation.tool_calls.length > 0" class="mt-5">
+                <p class="text-sm font-semibold text-[var(--color-brand-ink-strong)]">Tool calls</p>
+                <div class="mt-3 space-y-2">
+                  <div
+                    v-for="toolCall in auditConversation.tool_calls"
+                    :key="toolCall.id"
+                    class="rounded-[16px] bg-white px-3 py-2 text-sm text-[var(--color-brand-muted)]"
+                  >
+                    <span class="font-semibold text-[var(--color-brand-ink-strong)]">
+                      {{ toolCall.interface_key || toolCall.tool_name }}
+                    </span>
+                    / {{ toolCall.status_code || toolCall.status }} / {{ toolCall.duration_ms ?? 0 }} ms
+                  </div>
+                </div>
+              </div>
+            </template>
+            <InfoAlert v-else>
+              Select an audit row to inspect conversation content.
+            </InfoAlert>
+          </div>
         </div>
       </section>
     </template>

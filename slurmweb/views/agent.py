@@ -1251,6 +1251,43 @@ def ai_conversation_detail(conversation_id: int):
     return jsonify(details)
 
 
+@permission_required(("ai", "view", "*"))
+def delete_ai_conversation(conversation_id: int):
+    _require_ai()
+    try:
+        deleted = current_app.ai_service.delete_conversation(request.user, conversation_id)
+    except Exception as err:
+        logger.warning("Unable to delete AI conversation %s: %s", conversation_id, err)
+        abort(500, str(err))
+    if not deleted:
+        abort(404, f"AI conversation {conversation_id} not found")
+    return jsonify({"result": "AI conversation deleted"})
+
+
+@permission_required(("admin/ai", "view", "*"))
+def admin_ai_conversations():
+    _require_ai()
+    try:
+        limit = min(_positive_int_query_arg("limit", 200), 500)
+        return jsonify(current_app.ai_service.list_all_conversations(limit=limit))
+    except Exception as err:
+        logger.warning("Unable to list AI conversation audit records: %s", err)
+        abort(500, str(err))
+
+
+@permission_required(("admin/ai", "view", "*"))
+def admin_ai_conversation_detail(conversation_id: int):
+    _require_ai()
+    try:
+        details = current_app.ai_service.get_any_conversation_detail(conversation_id)
+    except Exception as err:
+        logger.warning("Unable to audit AI conversation %s: %s", conversation_id, err)
+        abort(500, str(err))
+    if details is None:
+        abort(404, f"AI conversation {conversation_id} not found")
+    return jsonify(details)
+
+
 @permission_required(
     (
         "user/analysis",
@@ -1342,12 +1379,24 @@ def node_metrics_history(name: str):
         logger.warning(error)
         abort(501, error)
     try:
+        start_time, end_time = _parse_metrics_window_query_args()
         result = current_app.node_metrics_db.node_history_metrics(
             name,
             request.args.get("range", "hour"),
             current_app.settings.node_metrics.node_hostname_label,
+            start_time=start_time,
+            end_time=end_time,
         )
         return jsonify(result)
+    except ValueError as err:
+        logger.warning("Invalid node metrics history query for %s: %s", name, err)
+        return jsonify(
+            {
+                "code": 400,
+                "description": str(err),
+                "name": "Bad Request",
+            }
+        ), 400
     except SlurmwebMetricsDBError as err:
         logger.warning("Node metrics history query error for %s: %s", name, err)
         abort(500, str(err))

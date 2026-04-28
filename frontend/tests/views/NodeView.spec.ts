@@ -132,6 +132,44 @@ describe('NodeView.vue', () => {
     expect(mockGatewayAPI.node_metrics_history).toHaveBeenCalledWith('foo', 'cn1', 'week')
   })
 
+  test('applies and resets a custom realtime metrics history window', async () => {
+    useRuntimeStore().availableClusters = [
+      {
+        ...useRuntimeStore().availableClusters[0],
+        node_metrics: true
+      }
+    ]
+    useClusterDataPoller.mockReturnValueOnce(mockNodeDataPoller)
+    useClusterDataPoller.mockReturnValueOnce(mockJobsDataPoller)
+    mockNodeDataPoller.data.value = nodeAllocated
+    mockJobsDataPoller.data.value = jobsNode
+
+    const wrapper = mount(NodeView, {
+      props: {
+        cluster: 'foo',
+        nodeName: 'cn1'
+      }
+    })
+    await flushPromises()
+
+    await wrapper.get('[data-testid="metric-range-custom-button"]').trigger('click')
+    await wrapper.get('[data-testid="metric-range-start"]').setValue('2026-04-24T08:30')
+    await wrapper.get('[data-testid="metric-range-end"]').setValue('2026-04-24T11:45')
+    await wrapper.get('[data-testid="metric-range-apply"]').trigger('click')
+    await flushPromises()
+
+    expect(mockGatewayAPI.node_metrics_history).toHaveBeenCalledWith('foo', 'cn1', {
+      start: new Date('2026-04-24T08:30').toISOString(),
+      end: new Date('2026-04-24T11:45').toISOString()
+    })
+
+    await wrapper.get('[data-testid="metric-range-custom-button"]').trigger('click')
+    await wrapper.get('[data-testid="metric-range-reset"]').trigger('click')
+    await flushPromises()
+
+    expect(mockGatewayAPI.node_metrics_history).toHaveBeenLastCalledWith('foo', 'cn1', 'hour')
+  })
+
   test('display node details', async () => {
     useClusterDataPoller.mockReturnValueOnce(mockNodeDataPoller)
     useClusterDataPoller.mockReturnValueOnce(mockJobsDataPoller)

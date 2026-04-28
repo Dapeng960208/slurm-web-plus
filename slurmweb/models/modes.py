@@ -225,6 +225,7 @@ class AIConversation(Base):
     __table_args__ = (
         sa.Index("idx_ai_conversations_cluster_user", "cluster", "username"),
         sa.Index("idx_ai_conversations_updated_at", sa.text("updated_at DESC")),
+        sa.Index("idx_ai_conversations_deleted_at", "deleted_at"),
     )
 
     id = sa.Column(sa.BigInteger(), primary_key=True, autoincrement=True)
@@ -246,6 +247,8 @@ class AIConversation(Base):
         nullable=False,
         server_default=sa.text("NOW()"),
     )
+    deleted_at = sa.Column(sa.TIMESTAMP(timezone=True), nullable=True)
+    deleted_by = sa.Column(sa.Text(), nullable=True)
 
 
 class AIMessage(Base):

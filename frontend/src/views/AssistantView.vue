@@ -9,6 +9,7 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
+import { ClipboardDocumentIcon, TrashIcon } from '@heroicons/vue/24/outline'
 import type {
   AIChatToolEvent,
   AIConversation,
@@ -41,6 +42,9 @@ type ToolRun = {
   source: 'live' | 'history'
 }
 
+const DEFAULT_TOKEN_LIMIT = 8192
+const TOKEN_LIMIT_OPTION_KEYS = ['max_context_tokens', 'context_limit', 'token_limit', 'max_tokens']
+
 const { cluster } = defineProps<{ cluster: string }>()
 
 const gateway = useGatewayAPI()
@@ -69,6 +73,8 @@ const streamingAssistantMessage = ref('')
 const toolRuns = ref<ToolRun[]>([])
 const expandedToolRuns = ref<Record<string, boolean>>({})
 const messageScroller = ref<HTMLElement | null>(null)
+const copiedMessageId = ref<number | string | null>(null)
+const deletingConversationId = ref<number | null>(null)
 
 const clusterDetails = computed<ClusterDescription | undefined>(() =>
   runtimeStore.availableClusters.find((value) => value.name === cluster)
@@ -87,8 +93,8 @@ const enabledModels = computed(() =>
       return left.display_name.localeCompare(right.display_name)
     })
 )
-const selectedModel = computed(
-  () => enabledModels.value.find((config) => config.id === selectedModelId.value) ?? null
+const selectedModelConfig = computed(
+  () => enabledModels.value.find((config) => config.id === selectedModelId.value) ?? enabledModels.value[0] ?? null
 )
 const renderedMessages = computed<AIConversationMessage[]>(() => {
   const messages = [...(selectedConversation.value?.messages ?? [])]
@@ -117,9 +123,46 @@ const historicalToolRuns = computed<ToolRun[]>(() =>
   (selectedConversation.value?.tool_calls ?? []).map((toolCall) => normalizeToolRunFromHistory(toolCall))
 )
 const displayToolRuns = computed<ToolRun[]>(() => [...historicalToolRuns.value, ...toolRuns.value])
+const tokenLimit = computed(() => readTokenLimit(selectedModelConfig.value) ?? DEFAULT_TOKEN_LIMIT)
+const draftTokenCount = computed(() => estimateTokens(draft.value.trim()))
+const conversationTokenCount = computed(() => {
+  const systemPromptTokens = estimateTokens(selectedModelConfig.value?.system_prompt ?? '')
+  const messageTokens = (selectedConversation.value?.messages ?? []).reduce(
+    (total, message) => total + estimateTokens(message.content) + 4,
+    0
+  )
+  return systemPromptTokens + messageTokens
+})
+const estimatedTokenCount = computed(() => conversationTokenCount.value + draftTokenCount.value)
+const tokenLimitExceeded = computed(() => estimatedTokenCount.value > tokenLimit.value)
 const canSend = computed(
-  () => canView.value && enabledModels.value.length > 0 && draft.value.trim().length > 0 && !sending.value
+  () =>
+    canView.value &&
+    enabledModels.value.length > 0 &&
+    draft.value.trim().length > 0 &&
+    !sending.value &&
+    !tokenLimitExceeded.value
 )
+
+function estimateTokens(value: string): number {
+  const trimmed = value.trim()
+  if (!trimmed) return 0
+  const cjkChars = trimmed.match(/[\u3400-\u9fff]/g)?.length ?? 0
+  const nonCjkChars = trimmed.length - cjkChars
+  return Math.ceil(cjkChars * 1.5 + nonCjkChars / 4)
+}
+
+function readTokenLimit(config: AIModelConfig | null): number | null {
+  if (!config) return null
+  for (const key of TOKEN_LIMIT_OPTION_KEYS) {
+    const rawValue = config.extra_options?.[key]
+    const value = typeof rawValue === 'string' ? Number(rawValue) : rawValue
+    if (typeof value === 'number' && Number.isFinite(value) && value > 0) {
+      return Math.floor(value)
+    }
+  }
+  return null
+}
 
 function formatTimestamp(value: string | null): string {
   if (!value) return 'Just now'
@@ -127,11 +170,6 @@ function formatTimestamp(value: string | null): string {
     dateStyle: 'medium',
     timeStyle: 'short'
   }).format(new Date(value))
-}
-
-function providerLabel(config: AIModelConfig | null): string {
-  if (!config) return 'No model selected'
-  return config.provider_label || config.provider
 }
 
 function toolRunKey(tool: ToolRun): string {
@@ -162,6 +200,21 @@ function toolHeadline(tool: ToolRun): string {
 
 function toolDetailLabel(tool: ToolRun): string {
   return isToolRunExpanded(tool) ? 'Hide details' : 'View details'
+}
+
+function formatJson(value: unknown): string {
+  return JSON.stringify(value ?? {}, null, 2)
+}
+
+async function copyMessage(message: AIConversationMessage) {
+  if (!navigator.clipboard?.writeText) return
+  await navigator.clipboard.writeText(message.content)
+  copiedMessageId.value = message.id
+  window.setTimeout(() => {
+    if (copiedMessageId.value === message.id) {
+      copiedMessageId.value = null
+    }
+  }, 1600)
 }
 
 function normalizeToolRunFromHistory(toolCall: AIToolCallRecord): ToolRun {
@@ -331,8 +384,28 @@ function addToolRun(event: AIChatToolEvent, status: ToolRun['status']) {
   })
 }
 
+async function deleteConversation(conversationId: number) {
+  deletingConversationId.value = conversationId
+  conversationsError.value = null
+  try {
+    await gateway.delete_ai_conversation(cluster, conversationId)
+    if (selectedConversationId.value === conversationId) {
+      startNewConversation()
+    }
+    await loadConversations()
+  } catch (error: unknown) {
+    conversationsError.value = error instanceof Error ? error.message : String(error)
+  } finally {
+    deletingConversationId.value = null
+  }
+}
+
 async function submitMessage() {
   const message = draft.value.trim()
+  if (tokenLimitExceeded.value) {
+    sendError.value = `Estimated token usage exceeds the current limit (${estimatedTokenCount.value}/${tokenLimit.value}). Shorten the prompt or start a new chat.`
+    return
+  }
   if (!canSend.value) return
 
   const sessionModelId = selectedModelId.value
@@ -435,9 +508,7 @@ watch(
       <PageHeader
         kicker="Cluster Copilot"
         title="AI"
-        description="Use enabled cluster models for multi-turn chat, model switching, and live tool trace visibility."
-        :metric-value="enabledModels.length"
-        metric-label="enabled models"
+        description="Use the cluster assistant for multi-turn chat and live tool trace visibility."
       >
         <template #actions>
           <RouterLink
@@ -464,34 +535,7 @@ watch(
       </ErrorAlert>
 
       <template v-else>
-        <div class="ui-summary-strip">
-          <div class="ui-summary-item">
-            <div class="ui-summary-label">Model</div>
-            <div class="ui-summary-value">{{ selectedModel?.display_name || 'Not selected' }}</div>
-            <div class="ui-summary-subtle">{{ providerLabel(selectedModel) }}</div>
-          </div>
-          <div class="ui-summary-item">
-            <div class="ui-summary-label">Streaming</div>
-            <div class="ui-summary-value">
-              {{ clusterDetails?.ai?.streaming ? 'Enabled' : 'Unavailable' }}
-            </div>
-            <div class="ui-summary-subtle">SSE incremental responses</div>
-          </div>
-          <div class="ui-summary-item">
-            <div class="ui-summary-label">Persistence</div>
-            <div class="ui-summary-value">
-              {{ clusterDetails?.ai?.persistence ? 'Enabled' : 'Unavailable' }}
-            </div>
-            <div class="ui-summary-subtle">User-owned conversation history</div>
-          </div>
-          <div class="ui-summary-item">
-            <div class="ui-summary-label">Available</div>
-            <div class="ui-summary-value">{{ enabledModels.length }}</div>
-            <div class="ui-summary-subtle">Enabled model configs in this cluster</div>
-          </div>
-        </div>
-
-        <div class="mt-4 grid gap-4 xl:grid-cols-[320px_minmax(0,1fr)]">
+        <div class="grid gap-4 xl:grid-cols-[320px_minmax(0,1fr)]">
           <aside class="ui-panel ui-section ui-panel-stack">
             <div class="flex items-start justify-between gap-3">
               <div>
@@ -504,25 +548,6 @@ watch(
               <button type="button" class="ui-button-secondary" :disabled="conversationsLoading" @click="loadConversations()">
                 Refresh
               </button>
-            </div>
-
-            <div class="ui-panel-soft mt-2 px-4 py-4">
-              <label class="block text-sm font-semibold text-[var(--color-brand-ink-strong)]">
-                Active model
-              </label>
-              <select
-                v-model="selectedModelId"
-                :disabled="configsLoading || enabledModels.length === 0 || sending"
-                class="mt-3 block w-full rounded-[18px] border border-[rgba(80,105,127,0.14)] bg-white px-3 py-2.5 text-sm text-[var(--color-brand-ink-strong)] outline-hidden focus:border-[rgba(182,232,44,0.65)] focus:ring-4 focus:ring-[rgba(182,232,44,0.18)]"
-              >
-                <option :value="null" disabled>Select a model</option>
-                <option v-for="config in enabledModels" :key="config.id" :value="config.id">
-                  {{ config.display_name }} / {{ config.model }}
-                </option>
-              </select>
-              <p class="mt-3 text-xs text-[var(--color-brand-muted)]">
-                Chat requests send the selected `model_config_id` explicitly.
-              </p>
             </div>
 
             <ErrorAlert v-if="conversationsError">
@@ -539,38 +564,39 @@ watch(
             </InfoAlert>
 
             <div v-else class="space-y-3">
-              <button
+              <article
                 v-for="conversation in conversations"
                 :key="conversation.id"
-                type="button"
                 class="w-full rounded-[22px] border px-4 py-4 text-left transition"
                 :class="
                   selectedConversationId === conversation.id
                     ? 'border-[rgba(182,232,44,0.55)] bg-[rgba(182,232,44,0.12)]'
                     : 'border-[rgba(80,105,127,0.1)] bg-[rgba(244,248,251,0.82)]'
                 "
-                @click="loadConversation(conversation.id)"
               >
                 <div class="flex items-start justify-between gap-3">
-                  <div class="min-w-0">
+                  <button type="button" class="min-w-0 flex-1 text-left" @click="loadConversation(conversation.id)">
                     <p class="truncate font-semibold text-[var(--color-brand-ink-strong)]">
                       {{ conversation.title }}
                     </p>
                     <p class="mt-1 line-clamp-2 text-sm text-[var(--color-brand-muted)]">
                       {{ conversation.last_message || 'No assistant reply yet.' }}
                     </p>
-                  </div>
-                  <span class="ui-chip">
-                    {{
-                      enabledModels.find((config) => config.id === conversation.model_config_id)?.display_name ||
-                      `#${conversation.model_config_id ?? '-'}`
-                    }}
-                  </span>
+                  </button>
+                  <button
+                    type="button"
+                    class="rounded-full p-2 text-[var(--color-brand-muted)] transition hover:bg-white hover:text-red-600"
+                    :disabled="deletingConversationId === conversation.id"
+                    title="Delete conversation"
+                    @click="deleteConversation(conversation.id)"
+                  >
+                    <TrashIcon class="h-4 w-4" aria-hidden="true" />
+                  </button>
                 </div>
                 <p class="mt-3 text-xs text-[var(--color-brand-muted)]">
                   Updated {{ formatTimestamp(conversation.updated_at) }}
                 </p>
-              </button>
+              </article>
             </div>
           </aside>
 
@@ -587,7 +613,6 @@ watch(
               </div>
               <div class="flex flex-wrap gap-2">
                 <span class="ui-chip">Cluster {{ cluster }}</span>
-                <span class="ui-chip">{{ selectedModel?.display_name || 'No model' }}</span>
               </div>
             </div>
 
@@ -601,7 +626,7 @@ watch(
               No enabled model exists for this cluster yet. Create one in Admin > AI first.
             </InfoAlert>
 
-            <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_280px]">
+            <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
               <div
                 ref="messageScroller"
                 class="min-h-[30rem] max-h-[38rem] overflow-y-auto rounded-[28px] border border-[rgba(80,105,127,0.12)] bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(239,244,246,0.84))] px-4 py-4 sm:px-5"
@@ -651,7 +676,17 @@ watch(
                     >
                       <div class="flex items-center justify-between gap-3 text-xs font-semibold tracking-[0.12em] uppercase">
                         <span>{{ message.role }}</span>
-                        <span class="opacity-70">{{ formatTimestamp(message.created_at) }}</span>
+                        <div class="flex items-center gap-2">
+                          <span class="opacity-70">{{ formatTimestamp(message.created_at) }}</span>
+                          <button
+                            type="button"
+                            class="rounded-full p-1.5 opacity-70 transition hover:bg-black/5 hover:opacity-100"
+                            :title="copiedMessageId === message.id ? 'Copied' : 'Copy message'"
+                            @click="copyMessage(message)"
+                          >
+                            <ClipboardDocumentIcon class="h-4 w-4" aria-hidden="true" />
+                          </button>
+                        </div>
                       </div>
                       <p
                         v-if="message.id === '__pending-assistant__' && !message.content"
@@ -685,18 +720,14 @@ watch(
                       :key="toolRunKey(tool)"
                       class="rounded-[20px] border border-[rgba(80,105,127,0.12)] bg-white px-4 py-3"
                     >
-                      <button
-                        type="button"
-                        class="w-full text-left"
-                        @click="toggleToolRun(tool)"
-                      >
-                        <div class="flex items-center justify-between gap-3">
+                      <button type="button" class="w-full text-left" @click="toggleToolRun(tool)">
+                        <div class="flex flex-col gap-2">
                           <div class="min-w-0">
-                            <p class="text-sm font-semibold text-[var(--color-brand-ink-strong)]">
+                            <p class="break-words text-sm font-semibold leading-5 text-[var(--color-brand-ink-strong)]">
                               {{ toolHeadline(tool) }}
                             </p>
                           </div>
-                          <div class="flex items-center gap-2">
+                          <div class="flex flex-wrap items-center gap-2">
                             <span class="ui-chip">
                               {{ toolStatusLabel(tool) }}
                             </span>
@@ -722,13 +753,11 @@ watch(
                         <p class="text-xs text-[var(--color-brand-muted)]">
                           {{ formatTimestamp(tool.created_at) }}
                         </p>
-                        <p class="text-xs text-[var(--color-brand-muted)]">
-                          {{ JSON.stringify(tool.arguments ?? {}) }}
-                        </p>
-                        <p v-if="tool.result_summary" class="text-sm text-[var(--color-brand-muted)]">
+                        <pre class="max-h-48 overflow-auto whitespace-pre-wrap break-words rounded-[14px] bg-[rgba(32,42,53,0.04)] px-3 py-2 font-mono text-xs leading-5 text-[var(--color-brand-muted)]">{{ formatJson(tool.arguments) }}</pre>
+                        <p v-if="tool.result_summary" class="break-words text-sm leading-6 text-[var(--color-brand-muted)]">
                           {{ tool.result_summary }}
                         </p>
-                        <p v-if="tool.error" class="text-sm text-red-600">
+                        <p v-if="tool.error" class="break-words text-sm leading-6 text-red-600">
                           {{ tool.error }}
                         </p>
                       </div>
@@ -765,9 +794,17 @@ watch(
                 placeholder="Ask about a job, node resources, partitions, or another read-only cluster question."
               />
               <div class="flex flex-wrap items-center justify-between gap-3">
-                <p class="text-sm text-[var(--color-brand-muted)]">
-                  Using model: {{ selectedModel?.display_name || 'Not selected' }}.
-                </p>
+                <div class="text-sm text-[var(--color-brand-muted)]">
+                  <span
+                    class="font-semibold"
+                    :class="tokenLimitExceeded ? 'text-red-600' : 'text-[var(--color-brand-ink-strong)]'"
+                  >
+                    Estimated tokens {{ estimatedTokenCount }} / {{ tokenLimit }}
+                  </span>
+                  <p v-if="tokenLimitExceeded" class="mt-1 text-red-600">
+                    Token estimate exceeds the current limit. Shorten the prompt or start a new chat.
+                  </p>
+                </div>
                 <div class="flex flex-wrap gap-2">
                   <button type="button" class="ui-button-secondary" :disabled="sending" @click="draft = ''">
                     Clear

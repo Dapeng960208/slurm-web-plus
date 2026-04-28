@@ -81,7 +81,7 @@ const navigationCluster = computed(() => {
       </div>
     </div>
 
-    <main class="px-2 py-3 sm:px-3 lg:px-4 lg:py-4 xl:px-5 2xl:px-6">
+    <main class="ui-content-scroll px-2 pt-3 sm:px-3 lg:px-4 lg:pt-4 xl:px-5 2xl:px-6">
       <div
         class="rounded-[36px] border border-white/60 bg-[rgba(255,255,255,0.5)] px-3 py-2.5 shadow-[var(--shadow-soft)] backdrop-blur-sm sm:px-5 sm:py-3 lg:px-6 lg:py-4 xl:px-6 xl:py-4 2xl:px-7"
       >

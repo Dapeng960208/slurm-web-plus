@@ -225,6 +225,34 @@ class Slurmrestd:
             self.discover()
         return self.api_version in self.WRITE_SUPPORTED_VERSIONS
 
+    def _current_cluster_name(self) -> t.Optional[str]:
+        if self.cluster_name is None:
+            try:
+                self.discover()
+            except Exception:
+                return self.cluster_name_hint
+        return self.cluster_name or self.cluster_name_hint
+
+    def _normalize_associations_payload(self, payload: t.Dict[str, t.Any]) -> t.Dict[str, t.Any]:
+        if not isinstance(payload, dict):
+            return payload
+        associations = payload.get("associations")
+        if not isinstance(associations, list):
+            return payload
+        cluster = self._current_cluster_name()
+        if not cluster:
+            return payload
+        normalized = dict(payload)
+        normalized["associations"] = [
+            (
+                {**association, "cluster": association.get("cluster") or cluster}
+                if isinstance(association, dict)
+                else association
+            )
+            for association in associations
+        ]
+        return normalized
+
     def discover(self) -> t.Tuple[str, str, str]:
         """Discover the actual slurmrestd API version and Slurm version by trying
         versions from the configured list. Returns a tuple of
@@ -546,10 +574,20 @@ class Slurmrestd:
         return self.request_json("DELETE", "slurmdb", f"user/{username}")
 
     def associations_update(self, payload: t.Dict[str, t.Any]):
-        return self.request_json("POST", "slurmdb", "associations", payload=payload)
+        return self.request_json(
+            "POST",
+            "slurmdb",
+            "associations",
+            payload=self._normalize_associations_payload(payload),
+        )
 
     def associations_delete(self, payload: t.Dict[str, t.Any]):
-        return self.request_json("DELETE", "slurmdb", "association", payload=payload)
+        return self.request_json(
+            "DELETE",
+            "slurmdb",
+            "association",
+            payload=self._normalize_associations_payload(payload),
+        )
 
     def qos_update(self, payload: t.Dict[str, t.Any]):
         return self.request_json("POST", "slurmdb", "qos", payload=payload)
@@ -807,6 +845,12 @@ class SlurmrestdFilteredCached(SlurmrestdFiltered):
             self.service.count_hit(key)
         return data
 
+    def _invalidate_cached_keys(self, *keys: "CacheKey"):
+        if not self.cache.enabled:
+            return
+        for key in keys:
+            self.service.delete(key)
+
     def jobs(self, **kwargs):
         if kwargs:
             return super().jobs(**kwargs)
@@ -870,3 +914,43 @@ class SlurmrestdFilteredCached(SlurmrestdFiltered):
         if kwargs:
             return super().qos(**kwargs)
         return self._cached(CacheKey("qos"), self.cache.qos, super().qos)
+
+    def accounts_update(self, payload: t.Dict[str, t.Any]):
+        result = super().accounts_update(payload)
+        self._invalidate_cached_keys(CacheKey("accounts"), CacheKey("associations"))
+        return result
+
+    def account_delete(self, account_name: str):
+        result = super().account_delete(account_name)
+        self._invalidate_cached_keys(CacheKey("accounts"), CacheKey("associations"))
+        return result
+
+    def users_update(self, payload: t.Dict[str, t.Any]):
+        result = super().users_update(payload)
+        self._invalidate_cached_keys(CacheKey("associations"))
+        return result
+
+    def user_delete(self, username: str):
+        result = super().user_delete(username)
+        self._invalidate_cached_keys(CacheKey("associations"))
+        return result
+
+    def associations_update(self, payload: t.Dict[str, t.Any]):
+        result = super().associations_update(payload)
+        self._invalidate_cached_keys(CacheKey("accounts"), CacheKey("associations"))
+        return result
+
+    def associations_delete(self, payload: t.Dict[str, t.Any]):
+        result = super().associations_delete(payload)
+        self._invalidate_cached_keys(CacheKey("accounts"), CacheKey("associations"))
+        return result
+
+    def qos_update(self, payload: t.Dict[str, t.Any]):
+        result = super().qos_update(payload)
+        self._invalidate_cached_keys(CacheKey("qos"), CacheKey("associations"))
+        return result
+
+    def qos_delete(self, qos_name: str):
+        result = super().qos_delete(qos_name)
+        self._invalidate_cached_keys(CacheKey("qos"), CacheKey("associations"))
+        return result

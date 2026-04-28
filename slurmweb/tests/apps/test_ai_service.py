@@ -106,27 +106,57 @@ class InMemoryConversationStore:
             "model_config_id": model_config_id,
             "created_at": datetime.now(timezone.utc),
             "updated_at": datetime.now(timezone.utc),
+            "deleted_at": None,
+            "deleted_by": None,
             "last_message": None,
         }
         self._next_conversation_id += 1
         self.conversations.append(row)
         return dict(row)
 
-    def get_conversation(self, cluster: str, username: str, conversation_id: int):
+    def get_conversation(
+        self,
+        cluster: str,
+        username: str,
+        conversation_id: int,
+        include_deleted=False,
+    ):
         for row in self.conversations:
             if (
                 row["cluster"] == cluster
                 and row["username"] == username
                 and row["id"] == conversation_id
+                and (include_deleted or row.get("deleted_at") is None)
             ):
                 return dict(row)
         return None
 
-    def list_conversations(self, cluster: str, username: str, limit=100):
+    def get_conversation_by_id(self, cluster: str, conversation_id: int, include_deleted=False):
+        for row in self.conversations:
+            if (
+                row["cluster"] == cluster
+                and row["id"] == conversation_id
+                and (include_deleted or row.get("deleted_at") is None)
+            ):
+                return dict(row)
+        return None
+
+    def list_conversations(self, cluster: str, username: str, limit=100, include_deleted=False):
         rows = [
             dict(row)
             for row in self.conversations
-            if row["cluster"] == cluster and row["username"] == username
+            if row["cluster"] == cluster
+            and row["username"] == username
+            and (include_deleted or row.get("deleted_at") is None)
+        ]
+        rows.sort(key=lambda item: (item["updated_at"], item["id"]), reverse=True)
+        return rows[:limit]
+
+    def list_all_conversations(self, cluster: str, limit=200, include_deleted=True):
+        rows = [
+            dict(row)
+            for row in self.conversations
+            if row["cluster"] == cluster and (include_deleted or row.get("deleted_at") is None)
         ]
         rows.sort(key=lambda item: (item["updated_at"], item["id"]), reverse=True)
         return rows[:limit]
@@ -152,8 +182,23 @@ class InMemoryConversationStore:
                 break
         return dict(row)
 
-    def list_messages(self, cluster: str, username: str, conversation_id: int, limit=100):
-        owner = self.get_conversation(cluster, username, conversation_id)
+    def list_messages(
+        self,
+        cluster: str,
+        username: str | None,
+        conversation_id: int,
+        limit=100,
+        include_deleted=False,
+    ):
+        if username is None:
+            owner = self.get_conversation_by_id(cluster, conversation_id, include_deleted=include_deleted)
+        else:
+            owner = self.get_conversation(
+                cluster,
+                username,
+                conversation_id,
+                include_deleted=include_deleted,
+            )
         if owner is None:
             return []
         rows = [
@@ -163,6 +208,26 @@ class InMemoryConversationStore:
         ]
         rows.sort(key=lambda item: (item["created_at"], item["id"]))
         return rows[:limit]
+
+    def soft_delete_conversation(
+        self,
+        cluster: str,
+        username: str,
+        conversation_id: int,
+        deleted_by: str,
+    ):
+        for row in self.conversations:
+            if (
+                row["cluster"] == cluster
+                and row["username"] == username
+                and row["id"] == conversation_id
+                and row.get("deleted_at") is None
+            ):
+                row["deleted_at"] = datetime.now(timezone.utc)
+                row["deleted_by"] = deleted_by
+                row["updated_at"] = row["deleted_at"]
+                return True
+        return False
 
     def record_tool_call(
         self,
@@ -202,8 +267,23 @@ class InMemoryConversationStore:
         )
         self._next_tool_call_id += 1
 
-    def list_tool_calls(self, cluster: str, username: str, conversation_id: int, limit=200):
-        owner = self.get_conversation(cluster, username, conversation_id)
+    def list_tool_calls(
+        self,
+        cluster: str,
+        username: str | None,
+        conversation_id: int,
+        limit=200,
+        include_deleted=False,
+    ):
+        if username is None:
+            owner = self.get_conversation_by_id(cluster, conversation_id, include_deleted=include_deleted)
+        else:
+            owner = self.get_conversation(
+                cluster,
+                username,
+                conversation_id,
+                include_deleted=include_deleted,
+            )
         if owner is None:
             return []
         return [
@@ -290,6 +370,10 @@ class DummySlurmrestd:
 
     @staticmethod
     def qos_update(payload):
+        return {"updated": True, "payload": payload, "warnings": [], "errors": []}
+
+    @staticmethod
+    def associations_update(payload):
         return {"updated": True, "payload": payload, "warnings": [], "errors": []}
 
     @staticmethod
@@ -675,3 +759,52 @@ class TestAIService(TestCase):
         self.assertEqual(len(details["tool_calls"]), 1)
         self.assertEqual(details["tool_calls"][0]["interface_key"], "job")
         self.assertEqual(details["tool_calls"][0]["status_code"], 200)
+
+    def test_delete_conversation_hides_user_view_but_admin_audit_keeps_content(self):
+        self._create_model()
+        conversation = self.conversation_store.create_conversation(
+            cluster="test",
+            username="alice",
+            title="Existing",
+            model_config_id=1,
+        )
+        self.conversation_store.add_message(
+            conversation["id"],
+            "user",
+            "remove me from normal history",
+            model_config_id=1,
+        )
+
+        self.assertTrue(self.service.delete_conversation(self.user, conversation["id"]))
+        self.assertEqual(self.service.list_conversations(self.user)["items"], [])
+
+        audit = self.service.list_all_conversations()["items"]
+        self.assertEqual(len(audit), 1)
+        self.assertIsNotNone(audit[0]["deleted_at"])
+        details = self.service.get_any_conversation_detail(conversation["id"])
+        self.assertEqual(details["messages"][0]["content"], "remove me from normal history")
+
+    def test_association_update_uses_slurmrestd_payload_adapter(self):
+        self._create_model()
+        self.app.policy = DummyPolicy({"accounts:edit:*"})
+        self.service.tools.app = self.app
+
+        result = self.service.tools.execute(
+            self.user,
+            conversation_id=1,
+            tool_name="mutate_agent_interface",
+            arguments={
+                "interface_key": "association/update",
+                "arguments": {
+                    "payload": {
+                        "associations": [
+                            {"account": "ip-user", "user": "guojianpeng"}
+                        ]
+                    }
+                },
+            },
+            message_id=1,
+        )
+
+        self.assertEqual(result["interface_key"], "association/update")
+        self.assertEqual(result["status_code"], 200)

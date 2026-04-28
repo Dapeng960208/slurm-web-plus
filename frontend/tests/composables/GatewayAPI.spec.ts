@@ -340,25 +340,16 @@ describe('gateway data APIs', () => {
     await gateway.update_node('cluster', 'cn-01', { state: 'DRAIN' })
     await gateway.delete_node('cluster', 'cn-01')
 
-    expect(mockRestAPI.post).toHaveBeenNthCalledWith(
-      1,
-      '/agents/cluster/job/12/update',
-      { qos: 'debug' }
-    )
-    expect(mockRestAPI.delete).toHaveBeenNthCalledWith(
-      1,
-      '/agents/cluster/job/12/cancel',
-      { signal: 'TERM' }
-    )
-    expect(mockRestAPI.post).toHaveBeenNthCalledWith(
-      2,
-      '/agents/cluster/node/cn-01/update',
-      { state: 'DRAIN' }
-    )
-    expect(mockRestAPI.delete).toHaveBeenNthCalledWith(
-      2,
-      '/agents/cluster/node/cn-01/delete'
-    )
+    expect(mockRestAPI.post).toHaveBeenNthCalledWith(1, '/agents/cluster/job/12/update', {
+      qos: 'debug'
+    })
+    expect(mockRestAPI.delete).toHaveBeenNthCalledWith(1, '/agents/cluster/job/12/cancel', {
+      signal: 'TERM'
+    })
+    expect(mockRestAPI.post).toHaveBeenNthCalledWith(2, '/agents/cluster/node/cn-01/update', {
+      state: 'DRAIN'
+    })
+    expect(mockRestAPI.delete).toHaveBeenNthCalledWith(2, '/agents/cluster/node/cn-01/delete')
   })
 
   test('uses delete endpoints with explicit /delete suffixes for SlurmDB resources', async () => {
@@ -379,18 +370,9 @@ describe('gateway data APIs', () => {
       1,
       '/agents/cluster/reservation/maint/delete'
     )
-    expect(mockRestAPI.delete).toHaveBeenNthCalledWith(
-      2,
-      '/agents/cluster/account/science/delete'
-    )
-    expect(mockRestAPI.delete).toHaveBeenNthCalledWith(
-      3,
-      '/agents/cluster/user/alice/delete'
-    )
-    expect(mockRestAPI.delete).toHaveBeenNthCalledWith(
-      4,
-      '/agents/cluster/qos/debug/delete'
-    )
+    expect(mockRestAPI.delete).toHaveBeenNthCalledWith(2, '/agents/cluster/account/science/delete')
+    expect(mockRestAPI.delete).toHaveBeenNthCalledWith(3, '/agents/cluster/user/alice/delete')
+    expect(mockRestAPI.delete).toHaveBeenNthCalledWith(4, '/agents/cluster/qos/debug/delete')
   })
 
   test('detects AI capability from discovery payloads', () => {
@@ -473,9 +455,12 @@ describe('gateway data APIs', () => {
     expect(result).toStrictEqual([
       {
         id: 1,
+        username: null,
         title: 'Queue pressure',
         created_at: '2026-04-24T09:00:00Z',
         updated_at: '2026-04-24T09:05:00Z',
+        deleted_at: null,
+        deleted_by: null,
         last_message: 'GPU partition is saturated.',
         model_config_id: 7
       }
@@ -921,6 +906,24 @@ describe('gateway data APIs', () => {
       '/agents/cluster/node/cn1/metrics/history?range=day'
     )
     expect(result.cpu_usage).toStrictEqual([[1748004750000, 0.2]])
+  })
+
+  test('requests node metrics history with start and end', async () => {
+    mockRestAPI.get.mockResolvedValue({
+      cpu_usage: [[1748004750000, 0.2]],
+      memory_usage: [],
+      disk_usage: []
+    })
+
+    const gateway = useGatewayAPI()
+    await gateway.node_metrics_history('cluster', 'cn1', {
+      start: '2026-04-24T00:00:00Z',
+      end: '2026-04-24T12:00:00Z'
+    })
+
+    expect(mockRestAPI.get).toHaveBeenCalledWith(
+      '/agents/cluster/node/cn1/metrics/history?start=2026-04-24T00%3A00%3A00Z&end=2026-04-24T12%3A00%3A00Z'
+    )
   })
 })
 

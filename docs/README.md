@@ -20,6 +20,9 @@
 - AI
   - [需求说明](./features/ai/requirements.md)
   - [测试计划](./features/ai/test-plan.md)
+- AI 审计与指标时间窗
+  - [需求说明](./features/ai-audit-and-metrics-time-range/requirements.md)
+  - [测试计划](./features/ai-audit-and-metrics-time-range/test-plan.md)
 - 访问控制
   - [需求说明](./features/access-control/requirements.md)
   - [测试计划](./features/access-control/test-plan.md)
@@ -63,6 +66,9 @@
 本轮已落地的重点包括：
 
 - GitHub Actions 已切到 `main` 分支自动测试，并补结构化 CI 结果 artifact 与手工 triage 入口。
+- AI 管理页新增所有用户会话审计；普通 AI 会话支持逻辑删除和消息复制。
+- 节点 `Real Metrics` 与用户工具分析页统一为按钮触发的起止时间弹框。
+- 时间范围弹框新增 `1 day`、`3 days`、`7 days`、`15 days`、`1 month` 快捷窗口；用户分析按已完成作业统计平均最大内存 GB、平均运行小时和平均 CPU 核数。
 - 基于现有业务页面增强 Slurm 管理能力，补齐单对象创建、编辑、删除、取消。
 - 新增集群级 `/:cluster/admin` 管理入口；默认跳回 `/:cluster/analysis`，后台子页统一承载 `AI`、`LDAP Cache`、`Cache`、`Access Control`。
 - `jobs` 资源正式落地 `self` scope，普通用户默认只读非 `admin/*` 页面，并允许查看、编辑、取消自己的作业。

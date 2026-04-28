@@ -85,6 +85,32 @@
 - `ai_tool_calls`
 - 相关索引（按 cluster、conversation、username 等维度）
 
+### 3.7 `20260425_0007`：访问控制 permissions 字段
+
+在 `roles` 上增加：
+
+- `permissions`（JSONB）
+
+该字段用于保存当前正式权限规则 `resource:operation:scope`，并保留对旧 `actions` 的兼容迁移边界。
+
+### 3.8 `20260427_0008`：AI 工具调用接口审计字段
+
+在 `ai_tool_calls` 上增加：
+
+- `interface_key`
+- `status_code`
+
+该迁移让历史工具调用记录能展示命中的 Agent 接口与 HTTP 状态码。
+
+### 3.9 `20260428_0009`：AI 会话逻辑删除
+
+在 `ai_conversations` 上增加：
+
+- `deleted_at`
+- `deleted_by`
+
+并增加逻辑删除查询索引。普通用户会话列表与详情过滤已删除记录；管理员 AI 审计视图可查看已删除会话及其消息、工具调用。
+
 ## 4. 迁移验证（最小集）
 
 1. Alembic revision：

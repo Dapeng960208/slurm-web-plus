@@ -92,6 +92,13 @@ aggregation_interval = 3600
 # tool_mapping_file = /etc/slurm-web/user-tools.yml
 ```
 
+`tool_mapping_file` 是可选 YAML 规则文件，用于把作业名或命令归类成稳定工具名。仓库提供示例 `conf/vendor/user-tools.yml`，可复制到部署目录后启用：
+
+```ini
+[user_metrics]
+tool_mapping_file = /etc/slurm-web/user-tools.yml
+```
+
 依赖（当前实现事实）：
 
 - 数据库可用（`database = true`）

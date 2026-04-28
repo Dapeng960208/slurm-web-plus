@@ -107,3 +107,117 @@ class TestGatewayAIViews(TestGatewayBase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json["title"], "GPU capacity")
         self.assertEqual(mock_proxy_agent.call_args.args[:2], ("foo", "ai/conversations/12"))
+
+    @mock.patch("slurmweb.views.gateway.proxy_agent")
+    def test_delete_ai_conversation_proxy(self, mock_proxy_agent):
+        self.app_set_agents({"foo": fake_slurmweb_agent("foo")})
+        mock_proxy_agent.return_value = (
+            self.app.response_class(
+                response='{"result":"AI conversation deleted"}',
+                status=200,
+                mimetype="application/json",
+            ),
+            200,
+        )
+
+        response = self.client.delete("/api/agents/foo/ai/conversations/12")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json["result"], "AI conversation deleted")
+        self.assertEqual(mock_proxy_agent.call_args.args[:2], ("foo", "ai/conversations/12"))
+
+    @mock.patch("slurmweb.views.gateway.proxy_agent")
+    def test_admin_ai_conversations_proxy(self, mock_proxy_agent):
+        self.app_set_agents({"foo": fake_slurmweb_agent("foo")})
+        mock_proxy_agent.return_value = (
+            self.app.response_class(
+                response='{"items":[{"id":12,"username":"test","title":"GPU capacity"}]}',
+                status=200,
+                mimetype="application/json",
+            ),
+            200,
+        )
+
+        response = self.client.get("/api/agents/foo/ai/admin/conversations")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json["items"][0]["username"], "test")
+        self.assertEqual(mock_proxy_agent.call_args.args[:2], ("foo", "ai/admin/conversations"))
+
+    @mock.patch("slurmweb.views.gateway.proxy_agent")
+    def test_admin_ai_conversation_detail_proxy(self, mock_proxy_agent):
+        self.app_set_agents({"foo": fake_slurmweb_agent("foo")})
+        mock_proxy_agent.return_value = (
+            self.app.response_class(
+                response='{"id":12,"username":"test","title":"GPU capacity","messages":[]}',
+                status=200,
+                mimetype="application/json",
+            ),
+            200,
+        )
+
+        response = self.client.get("/api/agents/foo/ai/admin/conversations/12")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json["username"], "test")
+        self.assertEqual(
+            mock_proxy_agent.call_args.args[:2],
+            ("foo", "ai/admin/conversations/12"),
+        )
+
+    @mock.patch("slurmweb.views.gateway.proxy_agent")
+    def test_delete_ai_conversation_proxy(self, mock_proxy_agent):
+        self.app_set_agents({"foo": fake_slurmweb_agent("foo")})
+        mock_proxy_agent.return_value = (
+            self.app.response_class(
+                response='{"result":"AI conversation deleted"}',
+                status=200,
+                mimetype="application/json",
+            ),
+            200,
+        )
+
+        response = self.client.delete("/api/agents/foo/ai/conversations/12")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json["result"], "AI conversation deleted")
+        self.assertEqual(mock_proxy_agent.call_args.args[:2], ("foo", "ai/conversations/12"))
+
+    @mock.patch("slurmweb.views.gateway.proxy_agent")
+    def test_admin_ai_conversations_proxy(self, mock_proxy_agent):
+        self.app_set_agents({"foo": fake_slurmweb_agent("foo")})
+        mock_proxy_agent.return_value = (
+            self.app.response_class(
+                response='{"items":[{"id":12,"username":"alice","deleted_at":"2026-04-28T00:00:00Z"}]}',
+                status=200,
+                mimetype="application/json",
+            ),
+            200,
+        )
+
+        response = self.client.get("/api/agents/foo/ai/admin/conversations")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json["items"][0]["username"], "alice")
+        self.assertEqual(mock_proxy_agent.call_args.args[:2], ("foo", "ai/admin/conversations"))
+
+    @mock.patch("slurmweb.views.gateway.proxy_agent")
+    def test_admin_ai_conversation_detail_proxy(self, mock_proxy_agent):
+        self.app_set_agents({"foo": fake_slurmweb_agent("foo")})
+        mock_proxy_agent.return_value = (
+            self.app.response_class(
+                response='{"id":12,"username":"alice","messages":[{"content":"deleted"}]}',
+                status=200,
+                mimetype="application/json",
+            ),
+            200,
+        )
+
+        response = self.client.get("/api/agents/foo/ai/admin/conversations/12")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json["messages"][0]["content"], "deleted")
+        self.assertEqual(
+            mock_proxy_agent.call_args.args[:2],
+            ("foo", "ai/admin/conversations/12"),
+        )

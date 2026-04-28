@@ -331,26 +331,42 @@ class SlurmwebMetricsDB:
         return asyncio_run(_fetch())
 
     def node_history_metrics(
-        self, node_name: str, last: str, hostname_label: str = "hostname"
+        self,
+        node_name: str,
+        last: str,
+        hostname_label: str = "hostname",
+        start_time=None,
+        end_time=None,
     ):
         """
         Query Prometheus for historical node_exporter metrics for a specific node.
         Returns a dict with CPU, memory, and disk usage series.
         """
-        try:
-            resolution = getattr(self.RANGE_RESOLUTIONS["30s"], last)
-        except AttributeError as err:
-            raise SlurmwebMetricsDBError(f"Unsupported metric range {last}") from err
-
-        end = datetime.now()
-        if last == "hour":
-            start = end - timedelta(hours=1)
-        elif last == "day":
-            start = end - timedelta(days=1)
-        elif last == "week":
-            start = end - timedelta(days=7)
+        if start_time is not None and end_time is not None:
+            start = start_time
+            end = end_time
+            duration = end - start
+            if duration <= timedelta(hours=2):
+                resolution = self.RANGE_RESOLUTIONS["30s"].hour
+            elif duration <= timedelta(days=2):
+                resolution = self.RANGE_RESOLUTIONS["30s"].day
+            else:
+                resolution = self.RANGE_RESOLUTIONS["30s"].week
         else:
-            raise SlurmwebMetricsDBError(f"Unsupported metric range {last}")
+            try:
+                resolution = getattr(self.RANGE_RESOLUTIONS["30s"], last)
+            except AttributeError as err:
+                raise SlurmwebMetricsDBError(f"Unsupported metric range {last}") from err
+
+            end = datetime.now()
+            if last == "hour":
+                start = end - timedelta(hours=1)
+            elif last == "day":
+                start = end - timedelta(days=1)
+            elif last == "week":
+                start = end - timedelta(days=7)
+            else:
+                raise SlurmwebMetricsDBError(f"Unsupported metric range {last}")
 
         def _rounded_timestamp(timestamp):
             return int(timestamp - timestamp % resolution.rounding)

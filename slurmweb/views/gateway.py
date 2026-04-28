@@ -561,6 +561,24 @@ def ai_conversation_detail(cluster: str, conversation_id: int):
 
 @check_jwt
 @validate_cluster
+def delete_ai_conversation(cluster: str, conversation_id: int):
+    return proxy_agent(cluster, f"ai/conversations/{conversation_id}", request.token)
+
+
+@check_jwt
+@validate_cluster
+def admin_ai_conversations(cluster: str):
+    return proxy_agent(cluster, "ai/admin/conversations", request.token)
+
+
+@check_jwt
+@validate_cluster
+def admin_ai_conversation_detail(cluster: str, conversation_id: int):
+    return proxy_agent(cluster, f"ai/admin/conversations/{conversation_id}", request.token)
+
+
+@check_jwt
+@validate_cluster
 def user_metrics_history(cluster: str, username: str):
     return proxy_agent(cluster, f"user/{username}/metrics/history", request.token)
 

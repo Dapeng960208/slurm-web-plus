@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeEach, vi } from 'vitest'
+import { afterEach, describe, test, expect, beforeEach, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import UserAnalysisView from '@/views/UserAnalysisView.vue'
 import { init_plugins } from '../lib/common'
@@ -78,6 +78,10 @@ describe('UserAnalysisView.vue', () => {
     })
   })
 
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
   test('loads analytics panels', async () => {
     const wrapper = mount(UserAnalysisView, {
       props: {
@@ -97,6 +101,10 @@ describe('UserAnalysisView.vue', () => {
     expect(wrapper.text()).toContain('User Analysis')
     expect(wrapper.text()).toContain('Submission Activity')
     expect(wrapper.text()).toContain('Tool Analysis')
+    expect(wrapper.text()).toContain('Analysis Window')
+    expect(wrapper.text()).toContain('Root User')
+    expect(wrapper.text()).toContain('Groups: admins, science')
+    expect(wrapper.text()).not.toContain('Username')
     expect(mockGatewayAPI.user_tools_analysis).toHaveBeenCalledWith(
       'foo',
       'root',
@@ -138,5 +146,106 @@ describe('UserAnalysisView.vue', () => {
     await flushPromises()
 
     expect(wrapper.text()).toContain('User analytics is not enabled for this cluster.')
+  })
+
+  test('applies analytics time range from the compact dialog', async () => {
+    const wrapper = mount(UserAnalysisView, {
+      props: {
+        cluster: 'foo',
+        user: 'root'
+      },
+      global: {
+        stubs: {
+          UserSubmissionHistoryChart: true,
+          UserToolAnalysisChart: true
+        }
+      }
+    })
+
+    await flushPromises()
+    mockGatewayAPI.user_tools_analysis.mockClear()
+    mockGatewayAPI.user_metrics_history.mockClear()
+
+    await wrapper.get('[data-testid="metric-range-custom-button"]').trigger('click')
+    await wrapper.get('[data-testid="metric-range-start"]').setValue('2026-04-24T08:30')
+    await wrapper.get('[data-testid="metric-range-end"]').setValue('2026-04-24T11:45')
+    await wrapper.get('[data-testid="metric-range-apply"]').trigger('click')
+    await flushPromises()
+
+    const expectedWindow = {
+      start: new Date('2026-04-24T08:30').toISOString(),
+      end: new Date('2026-04-24T11:45').toISOString()
+    }
+    expect(mockGatewayAPI.user_tools_analysis).toHaveBeenCalledWith('foo', 'root', expectedWindow)
+    expect(mockGatewayAPI.user_metrics_history).toHaveBeenCalledWith('foo', 'root', expectedWindow)
+  })
+
+  test('applies predefined analytics windows from the compact dialog', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-04-24T12:30'))
+    const wrapper = mount(UserAnalysisView, {
+      props: {
+        cluster: 'foo',
+        user: 'root'
+      },
+      global: {
+        stubs: {
+          UserSubmissionHistoryChart: true,
+          UserToolAnalysisChart: true
+        }
+      }
+    })
+
+    await flushPromises()
+    mockGatewayAPI.user_tools_analysis.mockClear()
+    mockGatewayAPI.user_metrics_history.mockClear()
+
+    await wrapper.get('[data-testid="metric-range-custom-button"]').trigger('click')
+    await wrapper.get('[data-testid="metric-range-quick-15d"]').trigger('click')
+    await wrapper.get('[data-testid="metric-range-apply"]').trigger('click')
+    await flushPromises()
+
+    const expectedWindow = {
+      start: new Date('2026-04-09T12:30').toISOString(),
+      end: new Date('2026-04-24T12:30').toISOString()
+    }
+    expect(mockGatewayAPI.user_tools_analysis).toHaveBeenCalledWith('foo', 'root', expectedWindow)
+    expect(mockGatewayAPI.user_metrics_history).toHaveBeenCalledWith('foo', 'root', expectedWindow)
+  })
+
+  test('applies the seven day analytics window and keeps activity data visible', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-04-24T12:30'))
+    const wrapper = mount(UserAnalysisView, {
+      props: {
+        cluster: 'foo',
+        user: 'root'
+      },
+      global: {
+        stubs: {
+          UserSubmissionHistoryChart: true,
+          UserToolAnalysisChart: true
+        }
+      }
+    })
+
+    await flushPromises()
+    mockGatewayAPI.user_tools_analysis.mockClear()
+    mockGatewayAPI.user_metrics_history.mockClear()
+
+    await wrapper.get('[data-testid="metric-range-custom-button"]').trigger('click')
+    await wrapper.get('[data-testid="metric-range-quick-7d"]').trigger('click')
+    await wrapper.get('[data-testid="metric-range-apply"]').trigger('click')
+    await flushPromises()
+
+    const expectedWindow = {
+      start: new Date('2026-04-17T12:30').toISOString(),
+      end: new Date('2026-04-24T12:30').toISOString()
+    }
+    expect(mockGatewayAPI.user_tools_analysis).toHaveBeenCalledWith('foo', 'root', expectedWindow)
+    expect(mockGatewayAPI.user_metrics_history).toHaveBeenCalledWith('foo', 'root', expectedWindow)
+    expect(wrapper.text()).toContain('Submitted in Range')
+    expect(wrapper.text()).toContain('17')
+    expect(wrapper.text()).not.toContain('No submission or completion history is available for this range.')
   })
 })

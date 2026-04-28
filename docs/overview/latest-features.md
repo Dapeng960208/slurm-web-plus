@@ -1,5 +1,46 @@
 ﻿# 最新功能
 
+## 本轮：AI 审计、会话逻辑删除、复制操作与指标时间窗弹框
+
+本轮围绕节点指标、用户分析和 AI 对话做交互与审计收口：
+
+- 节点详情页 `Real Metrics` 支持点击按钮打开时间范围弹框
+- 节点指标自定义窗口支持 `start` / `end`，精确到时分，并同步到 URL query
+- 用户工具分析页改为与节点详情一致的时间范围按钮和弹框
+- 时间范围弹框新增 `1 day`、`3 days`、`7 days`、`15 days`、`1 month` 快捷窗口
+- 用户数据分析页移除了重复的用户名信息卡，LDAP 姓名、组和更新时间压缩到时间范围栏中
+- 集群页与 Settings 页主内容区改为独立滚动区域，底部保留固定 `2rem` 浏览器边缘留白
+- 用户分析的 `Submission Activity`、`Usage Profile`、`Tool Analysis` 与 `Top Tools` 继续共享同一时间窗
+- 用户分析资源统计明确按已完成作业计算：
+  - 平均最大内存：`used_memory_gb`，返回 GB 与兼容 MB 字段
+  - 平均运行时间：`end_time - start_time`，返回小时与兼容秒字段
+  - 平均 CPU 核数：`used_cpu_cores_avg`
+- `Submission Activity` 的提交时间线在 `submit_time` 缺失时会回退到 `start_time` / `last_seen`
+- 用户分析终态作业匹配改为大小写不敏感，避免 `completed` 这类小写状态导致时间窗内无数据
+- 用户分析 `metrics/history` 自定义窗口的 bucket 统一按 UTC 对齐，修复选择 `7 days` 时返回非零数据却前端序列全 0 的问题
+- `conf/vendor/user-tools.yml` 新增 `tool_mapping_file` demo，可直接作为 `[user_metrics].tool_mapping_file` 规则模板
+- 普通 AI 对话页不再展示模型、stream、persistence 等运行配置块
+- AI 右侧 Tool Calls 记录改为可换行、可展开的接口调用展示，避免接口名、状态、参数摘要堆叠
+- AI 用户消息与 assistant 回复都提供复制按钮
+- AI 对话输入区新增 token 估算展示，超出模型配置限制或默认 `8192` 时提示并阻止发送
+- 普通用户可逻辑删除自己的 AI 会话，删除后普通列表和普通详情不再展示
+- 管理员可在 `/:cluster/admin/ai` 查看所有用户 AI 会话审计记录，包含已逻辑删除会话
+- 管理员 AI 配置页保留弹窗式创建/编辑，已有配置改为紧凑标签式展示，并支持删除配置
+- 管理员 AI 审计列表支持按用户名、标题或最后消息关键字过滤，点击记录后才加载详情
+- AI 会话逻辑删除新增 `ai_conversations.deleted_at` 与 `deleted_by`
+- Gateway 与 Agent 新增 AI 会话删除、管理员审计列表和详情接口
+- `association/update` 写入修复：
+  - association payload 缺少 `cluster` 时按当前集群补齐
+  - account/user/association/qos 写入或删除后失效相关缓存，避免账户页继续显示旧数据
+
+本轮新增验证：
+
+- `cd frontend && npx vitest run tests/components/MetricRangeSelector.spec.ts tests/views/NodeView.spec.ts tests/views/UserAnalysisView.spec.ts tests/views/AssistantView.spec.ts tests/views/settings/SettingsAI.spec.ts tests/composables/GatewayAPI.spec.ts`
+- `cd frontend && npx vitest run tests/views/settings/SettingsAI.spec.ts tests/views/AssistantView.spec.ts`
+- `npm --prefix frontend run type-check`
+- `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/apps/test_ai_service.py slurmweb/tests/views/test_agent_ai.py slurmweb/tests/views/test_gateway_ai.py slurmweb/tests/views/test_agent_metrics_requests.py slurmweb/tests/slurmrestd/test_slurmrestd_write_operations.py slurmweb/tests/test_cache.py`
+- `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/views/test_agent_operations.py slurmweb/tests/slurmrestd/test_slurmrestd_filtered_cached.py slurmweb/tests/test_cache.py`
+
 ## 本轮：AI 对话、用户工具分析时间窗与接口命名统一修复
 
 本轮继续在已上线 AI 助手和用户分析页面上做行为收口，没有新增独立页面：

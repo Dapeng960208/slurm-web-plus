@@ -19,6 +19,7 @@ import type {
 import ErrorAlert from '@/components/ErrorAlert.vue'
 import InfoAlert from '@/components/InfoAlert.vue'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
+import MetricRangeSelector from '@/components/MetricRangeSelector.vue'
 import StatCardSkeleton from '@/components/StatCardSkeleton.vue'
 import UserSubmissionHistoryChart from '@/components/user/UserSubmissionHistoryChart.vue'
 import UserToolAnalysisChart from '@/components/user/UserToolAnalysisChart.vue'
@@ -50,6 +51,13 @@ const userGroupsLabel = computed(() => {
   return groups.length ? groups.join(', ') : null
 })
 
+const userFullnameLabel = computed(() => userToolAnalysis.value?.profile?.fullname ?? null)
+
+const userProfileStatusLabel = computed(() => {
+  if (!userToolAnalysis.value?.profile) return null
+  return userToolAnalysis.value.profile.ldap_found ? 'LDAP profile available' : 'LDAP profile unavailable'
+})
+
 const userMetricsGeneratedAtLabel = computed(() => {
   const value = userToolAnalysis.value?.generated_at
   if (!value) return null
@@ -71,15 +79,13 @@ const topTools = computed<UserToolActivityRecord[]>(() => {
     .slice(0, 6)
 })
 
-const submittedJobsInRange = computed(
-  () => userMetricsHistory.value?.totals?.submitted_jobs ?? 0
-)
+const submittedJobsInRange = computed(() => userMetricsHistory.value?.totals?.submitted_jobs ?? 0)
 
-const completedJobsInRange = computed(
-  () => userMetricsHistory.value?.totals?.completed_jobs ?? 0
-)
+const completedJobsInRange = computed(() => userMetricsHistory.value?.totals?.completed_jobs ?? 0)
 
 const averageMemoryLabel = computed(() => {
+  const gbValue = userToolAnalysis.value?.totals.avg_max_memory_gb
+  if (gbValue != null) return formatGb(gbValue)
   const value = userToolAnalysis.value?.totals.avg_max_memory_mb
   return value != null ? getMBHumanUnit(value) : '--'
 })
@@ -90,6 +96,8 @@ const averageCpuLabel = computed(() => {
 })
 
 const averageRuntimeLabel = computed(() => {
+  const value = userToolAnalysis.value?.totals.avg_runtime_hours
+  if (value != null) return formatHours(value)
   return formatDuration(userToolAnalysis.value?.totals.avg_runtime_seconds)
 })
 
@@ -111,12 +119,24 @@ function formatDuration(value: number | null | undefined): string {
   return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`
 }
 
+function formatGb(value: number | null | undefined): string {
+  if (value == null || Number.isNaN(value)) return '--'
+  return `${value.toFixed(value >= 10 ? 1 : 2)} GB`
+}
+
+function formatHours(value: number | null | undefined): string {
+  if (value == null || Number.isNaN(value)) return '--'
+  return `${value.toFixed(value >= 10 ? 1 : 2)} h`
+}
+
 function pad2(value: number): string {
   return value.toString().padStart(2, '0')
 }
 
 function formatDateTimeLocal(date: Date): string {
-  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}T${pad2(date.getHours())}:${pad2(date.getMinutes())}`
+  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}T${pad2(
+    date.getHours()
+  )}:${pad2(date.getMinutes())}`
 }
 
 function parseDateTimeLocal(value: string): Date | null {
@@ -192,7 +212,11 @@ async function fetchUserMetricsHistory() {
 
   userMetricsHistoryLoading.value = true
   try {
-    userMetricsHistory.value = await gateway.user_metrics_history(cluster, user, appliedWindow.value)
+    userMetricsHistory.value = await gateway.user_metrics_history(
+      cluster,
+      user,
+      appliedWindow.value
+    )
     userMetricsHistoryUnavailable.value = false
   } catch {
     userMetricsHistoryUnavailable.value = true
@@ -225,7 +249,9 @@ function stopUserMetricsPolling() {
   }
 }
 
-function applyTimeWindow() {
+function applyTimeWindow(window: { start: string; end: string }) {
+  draftStart.value = window.start
+  draftEnd.value = window.end
   timeWindowError.value = null
   const startDate = parseDateTimeLocal(draftStart.value)
   const endDate = parseDateTimeLocal(draftEnd.value)
@@ -312,75 +338,58 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <InfoAlert v-if="!enabled">
-    User analytics is not enabled for this cluster.
-  </InfoAlert>
+  <InfoAlert v-if="!enabled"> User analytics is not enabled for this cluster. </InfoAlert>
 
   <div v-else class="ui-section-stack">
-    <div
-      v-if="userMetricsReady || userGroupsLabel || userMetricsGeneratedAtLabel"
-      class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3"
-    >
-      <div class="ui-panel-soft px-4 py-3">
-        <div class="ui-stat-label">Username</div>
-        <div class="mt-2 text-lg font-semibold text-[var(--color-brand-ink-strong)]">
-          {{ user }}
-        </div>
-        <div class="mt-1.5 text-sm text-[var(--color-brand-muted)]">
-          LDAP
-          {{
-            userToolAnalysis?.profile?.ldap_found ? 'profile available' : 'profile unavailable'
-          }}
-        </div>
-      </div>
-      <div v-if="userGroupsLabel" class="ui-panel-soft px-4 py-3">
-        <div class="ui-stat-label">LDAP Groups</div>
-        <div class="mt-2 text-sm font-medium text-[var(--color-brand-ink-strong)]">
-          {{ userGroupsLabel }}
-        </div>
-      </div>
-      <div v-if="userMetricsGeneratedAtLabel" class="ui-panel-soft px-4 py-3">
-        <div class="ui-stat-label">Metrics Updated</div>
-        <div class="mt-2 text-sm font-medium text-[var(--color-brand-ink-strong)]">
-          {{ userMetricsGeneratedAtLabel }}
-        </div>
-      </div>
-    </div>
-
     <div class="ui-panel-soft px-4 py-4">
       <div class="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <div class="ui-stat-label">Selected Time Range</div>
+        <div class="min-w-0">
+          <div class="ui-stat-label">Analysis Window</div>
           <div class="mt-2 text-sm text-[var(--color-brand-muted)]">
             Use one shared window for submissions, usage profile, tool analysis and top tools.
           </div>
+          <div
+            v-if="userFullnameLabel || userGroupsLabel || userProfileStatusLabel || userMetricsGeneratedAtLabel"
+            class="mt-3 flex flex-wrap items-center gap-2 text-xs text-[var(--color-brand-muted)]"
+          >
+            <span
+              v-if="userFullnameLabel"
+              class="rounded-full border border-[rgba(80,105,127,0.12)] bg-white/80 px-3 py-1 font-medium text-[var(--color-brand-ink-strong)]"
+            >
+              {{ userFullnameLabel }}
+            </span>
+            <span
+              v-if="userProfileStatusLabel"
+              class="rounded-full border border-[rgba(80,105,127,0.12)] bg-white/80 px-3 py-1"
+            >
+              {{ userProfileStatusLabel }}
+            </span>
+            <span
+              v-if="userGroupsLabel"
+              class="rounded-full border border-[rgba(80,105,127,0.12)] bg-white/80 px-3 py-1"
+            >
+              Groups: {{ userGroupsLabel }}
+            </span>
+            <span
+              v-if="userMetricsGeneratedAtLabel"
+              class="rounded-full border border-[rgba(80,105,127,0.12)] bg-white/80 px-3 py-1"
+            >
+              Updated {{ userMetricsGeneratedAtLabel }}
+            </span>
+          </div>
         </div>
-        <div class="flex flex-wrap gap-2">
-          <button type="button" class="ui-button-secondary" @click="resetTimeWindow">
-            Reset to today
-          </button>
-          <button type="button" class="ui-button-primary" @click="applyTimeWindow">
-            Apply
-          </button>
-        </div>
-      </div>
-      <div class="mt-4 grid gap-3 md:grid-cols-2">
-        <label class="block text-sm font-semibold text-[var(--color-brand-ink-strong)]">
-          Start time
-          <input
-            v-model="draftStart"
-            type="datetime-local"
-            class="mt-2 block w-full rounded-[18px] border border-[rgba(80,105,127,0.14)] bg-white px-3 py-2.5 text-sm text-[var(--color-brand-ink-strong)] outline-hidden focus:border-[rgba(182,232,44,0.65)] focus:ring-4 focus:ring-[rgba(182,232,44,0.18)]"
-          />
-        </label>
-        <label class="block text-sm font-semibold text-[var(--color-brand-ink-strong)]">
-          End time
-          <input
-            v-model="draftEnd"
-            type="datetime-local"
-            class="mt-2 block w-full rounded-[18px] border border-[rgba(80,105,127,0.14)] bg-white px-3 py-2.5 text-sm text-[var(--color-brand-ink-strong)] outline-hidden focus:border-[rgba(182,232,44,0.65)] focus:ring-4 focus:ring-[rgba(182,232,44,0.18)]"
-          />
-        </label>
+        <MetricRangeSelector
+          :model-value="'hour'"
+          aria-label="Select user analytics time range"
+          enable-custom-window
+          :show-preset-buttons="false"
+          :start-value="draftStart"
+          :end-value="draftEnd"
+          custom-button-label="Time range"
+          reset-label="Today"
+          @apply-window="applyTimeWindow"
+          @reset-window="resetTimeWindow"
+        />
       </div>
       <p v-if="timeWindowError" class="mt-3 text-sm text-red-600">
         {{ timeWindowError }}
@@ -532,20 +541,29 @@ onUnmounted(() => {
               </div>
               <span class="ui-chip">{{ tool.jobs }} jobs</span>
             </div>
-            <div
-              class="mt-3 grid gap-2 text-sm text-[var(--color-brand-muted)] sm:grid-cols-3"
-            >
+            <div class="mt-3 grid gap-2 text-sm text-[var(--color-brand-muted)] sm:grid-cols-3">
               <div>
                 Memory:
                 {{
-                  tool.avg_max_memory_mb != null ? getMBHumanUnit(tool.avg_max_memory_mb) : '--'
+                  tool.avg_max_memory_gb != null
+                    ? formatGb(tool.avg_max_memory_gb)
+                    : tool.avg_max_memory_mb != null
+                      ? getMBHumanUnit(tool.avg_max_memory_mb)
+                      : '--'
                 }}
               </div>
               <div>
                 CPU:
                 {{ tool.avg_cpu_cores != null ? `${tool.avg_cpu_cores.toFixed(1)} cores` : '--' }}
               </div>
-              <div>Runtime: {{ formatDuration(tool.avg_runtime_seconds) }}</div>
+              <div>
+                Runtime:
+                {{
+                  tool.avg_runtime_hours != null
+                    ? formatHours(tool.avg_runtime_hours)
+                    : formatDuration(tool.avg_runtime_seconds)
+                }}
+              </div>
             </div>
           </div>
         </div>

@@ -646,15 +646,51 @@ class AIService:
             "items": [
                 {
                     "id": item["id"],
+                    "username": item["username"],
                     "title": item["title"],
                     "model_config_id": item["model_config_id"],
                     "created_at": item["created_at"],
                     "updated_at": item["updated_at"],
+                    "deleted_at": item.get("deleted_at"),
+                    "deleted_by": item.get("deleted_by"),
                     "last_message": item.get("last_message"),
                 }
                 for item in conversations
             ]
         }
+
+    def list_all_conversations(self, limit=200):
+        cluster = self.app.settings.service.cluster
+        conversations = self.conversation_store.list_all_conversations(
+            cluster,
+            limit=limit,
+            include_deleted=True,
+        )
+        return {
+            "items": [
+                {
+                    "id": item["id"],
+                    "username": item["username"],
+                    "title": item["title"],
+                    "model_config_id": item["model_config_id"],
+                    "created_at": item["created_at"],
+                    "updated_at": item["updated_at"],
+                    "deleted_at": item.get("deleted_at"),
+                    "deleted_by": item.get("deleted_by"),
+                    "last_message": item.get("last_message"),
+                }
+                for item in conversations
+            ]
+        }
+
+    def delete_conversation(self, user, conversation_id: int) -> bool:
+        cluster = self.app.settings.service.cluster
+        return self.conversation_store.soft_delete_conversation(
+            cluster,
+            user.login,
+            conversation_id,
+            user.login,
+        )
 
     def get_conversation_detail(self, user, conversation_id: int):
         cluster = self.app.settings.service.cluster
@@ -669,10 +705,73 @@ class AIService:
         )
         return {
             "id": conversation["id"],
+            "username": conversation["username"],
             "title": conversation["title"],
             "model_config_id": conversation["model_config_id"],
             "created_at": conversation["created_at"],
             "updated_at": conversation["updated_at"],
+            "deleted_at": conversation.get("deleted_at"),
+            "deleted_by": conversation.get("deleted_by"),
+            "messages": [
+                {
+                    "id": message["id"],
+                    "role": message["role"],
+                    "content": message["content"],
+                    "model_config_id": message["model_config_id"],
+                    "metadata": message["metadata"] or {},
+                    "created_at": message["created_at"],
+                }
+                for message in messages
+            ],
+            "tool_calls": [
+                {
+                    "id": tool_call["id"],
+                    "message_id": tool_call.get("message_id"),
+                    "tool_name": tool_call["tool_name"],
+                    "permission": tool_call["permission"],
+                    "interface_key": tool_call.get("interface_key"),
+                    "status_code": tool_call.get("status_code"),
+                    "input_payload": tool_call.get("input_payload") or {},
+                    "result_summary": tool_call.get("result_summary"),
+                    "status": tool_call["status"],
+                    "error": tool_call.get("error"),
+                    "duration_ms": tool_call.get("duration_ms"),
+                    "created_at": tool_call.get("created_at"),
+                }
+                for tool_call in tool_calls
+            ],
+        }
+
+    def get_any_conversation_detail(self, conversation_id: int):
+        cluster = self.app.settings.service.cluster
+        conversation = self.conversation_store.get_conversation_by_id(
+            cluster,
+            conversation_id,
+            include_deleted=True,
+        )
+        if conversation is None:
+            return None
+        messages = self.conversation_store.list_messages(
+            cluster,
+            None,
+            conversation_id,
+            include_deleted=True,
+        )
+        tool_calls = self.conversation_store.list_tool_calls(
+            cluster,
+            None,
+            conversation_id,
+            include_deleted=True,
+        )
+        return {
+            "id": conversation["id"],
+            "username": conversation["username"],
+            "title": conversation["title"],
+            "model_config_id": conversation["model_config_id"],
+            "created_at": conversation["created_at"],
+            "updated_at": conversation["updated_at"],
+            "deleted_at": conversation.get("deleted_at"),
+            "deleted_by": conversation.get("deleted_by"),
             "messages": [
                 {
                     "id": message["id"],

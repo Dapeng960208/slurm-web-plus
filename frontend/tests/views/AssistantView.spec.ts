@@ -8,6 +8,7 @@ const mockGatewayAPI = {
   ai_configs: vi.fn(),
   ai_conversations: vi.fn(),
   ai_conversation: vi.fn(),
+  delete_ai_conversation: vi.fn(),
   stream_ai_chat: vi.fn()
 }
 
@@ -140,7 +141,9 @@ describe('views/AssistantView.vue', () => {
     expect(mockGatewayAPI.ai_conversation).toHaveBeenCalledWith('foo', 9)
     expect(wrapper.text()).toContain('Queue pressure')
     expect(wrapper.text()).toContain('GPU partition is saturated.')
-    expect(wrapper.text()).toContain('Qwen Prod')
+    expect(wrapper.text()).not.toContain('Active model')
+    expect(wrapper.text()).not.toContain('Qwen Prod')
+    expect(wrapper.text()).not.toContain('Chat requests send the selected')
     expect(wrapper.text()).toContain('HTTP 200')
     expect(wrapper.text()).not.toContain('{"limit":10}')
     expect(wrapper.text()).not.toContain('10 jobs')
@@ -358,5 +361,52 @@ describe('views/AssistantView.vue', () => {
     expect(wrapper.text()).toContain('nodes')
     expect(wrapper.text()).not.toContain('2 nodes')
     expect(wrapper.findAll('.ui-markdown')[1].find('a').attributes('rel')).toBe('noopener noreferrer')
+  })
+
+  test('shows token usage and blocks prompts that exceed the configured limit', async () => {
+    mockGatewayAPI.ai_configs.mockResolvedValue([
+      {
+        id: 1,
+        name: 'qwen-prod',
+        provider: 'qwen',
+        provider_label: 'Qwen',
+        model: 'qwen3-coder',
+        display_name: 'Qwen Prod',
+        enabled: true,
+        is_default: true,
+        sort_order: 10,
+        base_url: null,
+        deployment: null,
+        api_version: null,
+        request_timeout: null,
+        temperature: null,
+        system_prompt: null,
+        extra_options: { context_limit: 10 },
+        secret_configured: true,
+        secret_mask: '***1234',
+        last_validated_at: null,
+        last_validation_error: null
+      }
+    ])
+    mockGatewayAPI.ai_conversations.mockResolvedValue([])
+
+    const wrapper = mountAssistantView()
+
+    await flushPromises()
+    expect(wrapper.text()).toContain('Estimated tokens 0 / 10')
+
+    await wrapper
+      .get('textarea[placeholder="Ask about a job, node resources, partitions, or another read-only cluster question."]')
+      .setValue('Explain the current job scheduling pressure across every partition with detailed evidence.')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Token estimate exceeds the current limit')
+    expect(wrapper.get('button[type="submit"]').attributes('disabled')).toBeDefined()
+
+    await wrapper.get('form').trigger('submit.prevent')
+    await flushPromises()
+
+    expect(mockGatewayAPI.stream_ai_chat).not.toHaveBeenCalled()
+    expect(wrapper.text()).toContain('Estimated token usage exceeds the current limit')
   })
 })

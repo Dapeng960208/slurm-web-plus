@@ -105,6 +105,9 @@ AI model
 - AI 写接口不再额外走 `super-admin` 总闸，而是复用 Agent 接口层现有权限校验
 - 当接口层拒绝访问时，工具执行会把权限错误与状态码回传给模型和执行轨迹
 - 若模型错误回显内部 `tool_request` / `interface_key` / `arguments` envelope，AIService 不会把它透传为最终消息，而是继续要求模型输出合法 `final`
+- 普通对话页不展示模型、stream、persistence 等配置块；这些配置集中在 `/:cluster/admin/ai`
+- 普通会话查询默认过滤 `ai_conversations.deleted_at IS NOT NULL` 的逻辑删除记录
+- 管理员审计查询可列出所有用户会话，并包含逻辑删除记录
 
 执行轨迹链路同步变为：
 
@@ -112,6 +115,7 @@ AI model
 - `tool_end` 记录 `interface_key` 与 `status_code`
 - `ai_conversations/<id>` 会返回历史 `tool_calls`
 - `ai_tool_calls` 持久化接口名、状态码、输入、摘要、错误和耗时
+- 会话逻辑删除只更新 `ai_conversations.deleted_at` 与 `deleted_by`，不物理删除消息和工具调用
 
 ## 5. 集群管理写路径
 
@@ -130,6 +134,8 @@ Vue 页面
 - Agent 为 `jobs self` 先查 owner，再按 `self` 校验
 - `slurmweb.slurmrestd` 扩展为通用 `GET/POST/DELETE` 请求层
 - `analysis/ping`、`analysis/diag` 走集群级系统接口
+- account/user/association/qos 写入或删除后，过滤缓存层会失效相关 `accounts` 与 `associations` key
+- association 写入 payload 缺少 `cluster` 时，会按当前集群补齐后再发给 SlurmDB
 
 典型写路径包括：
 
@@ -170,6 +176,7 @@ Vue 页面
 
 - `slurmweb/alembic/versions/20260425_0007_access_control_permissions.py`
 - `slurmweb/alembic/versions/20260427_0008_ai_tool_interface_audit.py`
+- `slurmweb/alembic/versions/20260428_0009_ai_conversation_logical_delete.py`
 
 说明：
 
@@ -179,6 +186,9 @@ Vue 页面
 - `ai_tool_calls` 当前新增：
   - `interface_key`
   - `status_code`
+- `ai_conversations` 当前新增：
+  - `deleted_at`
+  - `deleted_by`
 
 ## 8. 前端权限消费点
 
@@ -204,7 +214,16 @@ Vue 页面
 
 旧 `hasClusterPermission(...)` 仍保留，用于兼容尚未迁移的 action 级消费点和旧测试数据。
 
-## 9. GitHub 自动 CI 与 triage 链路
+## 9. 前端页面滚动边界
+
+集群内页面和 Settings 页面采用固定视口 shell：
+
+- `.ui-shell` 固定为 `100vh`，承载顶部栏与内容区域。
+- `<main class="ui-content-scroll">` 是页面内容的垂直滚动容器。
+- 主内容区域底部固定保留 `2rem` 留白，避免内容贴住浏览器下边缘。
+- 页面内部仍可按需使用横向滚动容器，例如表格的 `.ui-table-shell overflow-x-auto`。
+
+## 10. GitHub 自动 CI 与 triage 链路
 
 本轮新增一条独立于运行时架构之外的仓库交付链路：
 

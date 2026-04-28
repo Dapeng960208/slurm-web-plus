@@ -207,6 +207,19 @@ class SlurmwebAppAgent(SlurmwebWebApp, RFLTokenizedRBACWebApp):
             views.ai_conversation_detail,
         ),
         SlurmwebAppRoute(
+            f"/v{get_version()}/ai/conversations/<int:conversation_id>",
+            views.delete_ai_conversation,
+            methods=["DELETE"],
+        ),
+        SlurmwebAppRoute(
+            f"/v{get_version()}/ai/admin/conversations",
+            views.admin_ai_conversations,
+        ),
+        SlurmwebAppRoute(
+            f"/v{get_version()}/ai/admin/conversations/<int:conversation_id>",
+            views.admin_ai_conversation_detail,
+        ),
+        SlurmwebAppRoute(
             f"/v{get_version()}/user/<username>/metrics/history",
             views.user_metrics_history,
         ),

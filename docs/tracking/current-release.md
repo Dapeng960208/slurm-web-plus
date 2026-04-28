@@ -10,6 +10,10 @@
 - 以 `jobs:view|edit|delete:*|self` 落地 owner-aware 权限校验
 - 补齐 `slurmrestd 0.39-0.44` 的读写兼容策略与测试基线
 - 收敛 GitHub CI 到 `main` 分支自动测试，并为后续 AI / 脚本补结构化结果产物
+- 统一节点 `Real Metrics` 与用户工具分析的自定义起止时间弹框
+- 收敛普通 AI 对话页配置展示，补会话逻辑删除、复制和管理员审计
+- 优化管理员 AI 配置页为弹窗式编辑、紧凑标签展示，并补审计搜索与对话 token 超限提示
+- 修复 AI 调用 `association/update` 给 account 添加用户时 payload 缺少 `cluster` 与写后缓存未失效的问题
 
 ## 2. 已完成项
 
@@ -145,6 +149,36 @@
 - `JobHistoryView`、`ClusterAnalysis`、`SettingsTabs` 与 `GatewayAPI` 已清理剩余 ESLint 阻塞项，修复未使用符号和空接口类型告警
 - `JobView`、`JobsView` 与 `SettingsAccessControl` 已清理新增 ESLint 阻塞项，修复未使用符号告警
 - 前端源码中的 `@typescript-eslint/no-unused-vars` 与 `@typescript-eslint/no-empty-object-type` 已降级为 warning，不再单独阻塞 `Frontend ESLint`
+- 新增 `MetricRangeSelector` 自定义时间窗弹框能力，节点详情和用户工具分析共用按钮触发交互
+- `MetricRangeSelector` 弹框已补 `1 day`、`3 days`、`7 days`、`15 days`、`1 month` 快捷窗口，可回填起止时间
+- `NodeView` 的 `Real Metrics` 已支持 `start` / `end` 自定义窗口并同步 URL query
+- 用户工具分析页已从常驻时间输入改为按钮弹框，提交活动、使用画像、工具分析和 Top Tools 继续共享同一窗口
+- 用户数据分析页已移除重复用户名卡片，用户姓名、LDAP 组和更新时间改为时间范围栏内的紧凑上下文标签
+- 集群页与 Settings 页已统一为主内容区独立滚动，内容超过视口时在内容区域内滚动，底部固定保留 `2rem` 边缘留白
+- 用户工具分析聚合已明确按已完成作业统计：
+  - `avg_max_memory_gb` 来自 `used_memory_gb`
+  - `avg_runtime_hours` 来自 `end_time - start_time`
+  - `avg_cpu_cores` 来自 `used_cpu_cores_avg`
+  - 继续保留 `avg_max_memory_mb` 与 `avg_runtime_seconds` 兼容字段
+- `Submission Activity` 的提交时间线在 `submit_time` 缺失时会回退到 `start_time` / `last_seen`
+- 用户分析终态作业过滤已改为 `UPPER(job_state)` 匹配，避免小写状态导致自定义时间窗无数据
+- 用户分析 `metrics/history` 自定义窗口已统一使用 UTC bucket 与 epoch milliseconds 匹配，避免 `7 days` 等 day bucket 因数据库时区差异返回全 0
+- `conf/vendor/user-tools.yml` 已新增 `tool_mapping_file` demo，供 `[user_metrics].tool_mapping_file` 直接引用或复制调整
+- 普通 `AssistantView` 已移除模型、stream、persistence 等配置展示块；配置查看与维护收口到 `/:cluster/admin/ai`
+- AI 右侧 Tool Calls 展示已改为可换行、可展开结构，避免接口调用文本堆叠
+- AI 用户消息和 assistant 回复已补复制按钮
+- `AssistantView` 输入区已显示前端估算 token 用量，超出模型配置限制或默认 `8192` 时提示并阻止发送
+- 普通用户可逻辑删除自己的 AI 会话，删除后普通列表和普通详情不展示
+- `/:cluster/admin/ai` 已新增 Conversation Audit 区域，可查看所有用户会话、已删除状态、消息和工具调用
+- `/:cluster/admin/ai` 模型配置列表已改为紧凑标签式展示，继续支持弹窗编辑、设置默认、校验连接和删除
+- Conversation Audit 已支持按用户名、标题或最后消息关键字过滤，并改为点击记录后才加载详情
+- Agent 与 Gateway 已新增：
+  - `DELETE /ai/conversations/<conversation_id>`
+  - `GET /ai/admin/conversations`
+  - `GET /ai/admin/conversations/<conversation_id>`
+- 新增 Alembic revision `20260428_0009_ai_conversation_logical_delete.py`，为 `ai_conversations` 增加 `deleted_at` 与 `deleted_by`
+- `association/update` 写入 payload 缺少 `cluster` 时，`slurmrestd` 适配层会按当前集群补齐
+- account/user/association/qos 写入或删除后，会失效相关 `accounts` 与 `associations` 缓存，避免账户页继续读取旧状态
 
 ## 3. 进行中项
 
@@ -153,6 +187,7 @@
 - 视 Linux/CI 环境情况补全更大范围后端回归
 - 评估后续是否需要把 `CI Triage` 结果继续接给外部 AI agent 做只读诊断
 - 评估是否需要为结构化 CI 结果补 GitHub issue / PR comment 自动摘要
+- 结合真实 SlurmDB 环境复验 “AI 给 `ip-user` 添加 `guojianpeng`” 的端到端效果，确认接口返回、账户页和集群管理端结果一致
 
 ## 4. 风险与阻塞
 
@@ -163,6 +198,11 @@
 - 部分前端测试夹具仍以旧 `actions[]` 为主，若继续扩大回归范围，需继续向 `rules[]` 夹具收敛
 - 无数据库部署下，普通用户不再有自有 Jobs 的旧动作兜底；该差异需要部署文档显式说明
 - 当前仓库内置 AI 仍不能直接读取 GitHub Actions run；本轮只打通“结构化结果可查询”，未实现自动修复
+- 当前 `association/update` 修复已通过适配层和缓存层单元测试；真实集群端到端仍需在具备 SlurmDB 写权限的环境手工复验
+- 当前用户分析的真实集群时间窗仍需结合数据库时区与旧快照字段完整性复验；代码已对缺失 `submit_time` 与小写终态做兼容
+- 当前 `tool_mapping_file` demo 只提供常见工具归类示例，不会默认启用；生产环境仍需按实际集群命名规则调整
+- 当前 AI token 计数为前端估算，不等同于 provider 真实 usage 或计费 token；若后续需要精确计量，需要扩展后端 provider 返回与持久化结构
+- 当前 Conversation Audit 搜索只过滤已加载摘要，不搜索完整消息正文；如需全文检索需要扩展审计接口
 
 ## 5. 已同步文档
 
@@ -183,6 +223,8 @@
 - `docs/guides/deployment-guide.md`
 - `docs/guides/verification-checklist.md`
 - `docs/features/user-analytics/backend.md`
+- `docs/features/ai-audit-and-metrics-time-range/requirements.md`
+- `docs/features/ai-audit-and-metrics-time-range/test-plan.md`
 - `docs/tracking/current-release.md`
 - `docs/tracking/error-log.md`
 
@@ -226,6 +268,15 @@
 - `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/apps/test_agent_ai.py slurmweb/tests/views/test_gateway_ai.py`
 - `cd frontend && npx vitest run tests/views/AssistantView.spec.ts tests/views/AssistantViewAIContract.spec.ts tests/composables/GatewayAPI.spec.ts`
 - `npm --prefix frontend run type-check`
+- `cd frontend && npx vitest run tests/components/MetricRangeSelector.spec.ts tests/views/NodeView.spec.ts tests/views/UserAnalysisView.spec.ts tests/views/AssistantView.spec.ts tests/views/settings/SettingsAI.spec.ts tests/composables/GatewayAPI.spec.ts`
+- `npm --prefix frontend run type-check`
+- `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/apps/test_ai_service.py slurmweb/tests/views/test_agent_ai.py slurmweb/tests/views/test_gateway_ai.py slurmweb/tests/views/test_agent_metrics_requests.py slurmweb/tests/slurmrestd/test_slurmrestd_write_operations.py`
+- `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/views/test_agent_operations.py slurmweb/tests/slurmrestd/test_slurmrestd_filtered_cached.py slurmweb/tests/test_cache.py`
+- `cd frontend && npx vitest run tests/components/MetricRangeSelector.spec.ts tests/views/UserAnalysisView.spec.ts tests/components/user/UserToolAnalysisChart.spec.ts`
+- `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/apps/test_user_analytics_store.py`
+- `cd frontend && npx vitest run tests/views/settings/SettingsAI.spec.ts tests/views/AssistantView.spec.ts`
+- `cd frontend && npx vitest run tests/components/MetricRangeSelector.spec.ts tests/views/UserAnalysisView.spec.ts`
+- `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/apps/test_user_analytics_store.py slurmweb/tests/views/test_agent_metrics_requests.py`
 
 待同步：
 

@@ -150,9 +150,22 @@
   }
 
   .ui-shell {
+    display: flex;
     min-height: 100vh;
+    height: 100vh;
+    flex-direction: column;
+    overflow: hidden;
     background: radial-gradient(circle at 16% 0%, rgba(182, 232, 44, 0.18), transparent 22%),
       linear-gradient(180deg, rgba(244, 248, 248, 0.96), rgba(235, 242, 244, 0.96));
+  }
+
+  .ui-content-scroll {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+    padding-bottom: 2rem;
   }
 
   .ui-public-shell {

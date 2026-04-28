@@ -57,6 +57,15 @@ class CachingService:
         ) as err:
             raise SlurmwebCacheError(str(err)) from err
 
+    def delete(self, key: CacheKey):
+        try:
+            self.connection.delete(key.main)
+        except (
+            redis.exceptions.ConnectionError,
+            redis.exceptions.ResponseError,
+        ) as err:
+            raise SlurmwebCacheError(str(err)) from err
+
     def count_miss(self, key: CacheKey):
         self.connection.sadd("cache-miss-keys", key.count)
         _key = f"{self.KEY_PREFIX_MISS}{key.count}"

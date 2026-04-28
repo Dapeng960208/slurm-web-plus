@@ -388,6 +388,33 @@ class TestAgentNodeMetricsHistoryRequest(TestAgentBase):
         )
         self.assertGreater(len(response.json["cpu_usage"]), 0)
 
+    @mock.patch("slurmweb.metrics.db.aiohttp.ClientSession.get")
+    def test_request_node_metrics_history_with_start_end(self, mock_get):
+        _, response = mock_prometheus_response("node-history-hour")
+        mock_get.side_effect = [response, response, response]
+        response = self.client.get(
+            f"/v{get_version()}/node/cn01/metrics/history?start=2026-04-24T00:00:00Z&end=2026-04-24T12:00:00Z"
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertCountEqual(
+            response.json.keys(),
+            ["cpu_usage", "memory_usage", "disk_usage"],
+        )
+
+    def test_request_node_metrics_history_invalid_start_end(self):
+        response = self.client.get(
+            f"/v{get_version()}/node/cn01/metrics/history?start=2026-04-24T12:00:00Z&end=2026-04-24T00:00:00Z"
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(
+            response.json,
+            {
+                "code": 400,
+                "description": "start must be earlier than end",
+                "name": "Bad Request",
+            },
+        )
+
     def test_request_node_metrics_history_invalid_range(self):
         response = self.client.get(
             f"/v{get_version()}/node/cn01/metrics/history?range=fail"
@@ -511,6 +538,29 @@ class TestAgentUserMetricsRequests(TestAgentBase):
         _, kwargs = self.app.user_metrics_store.user_metrics_history.call_args
         self.assertEqual(kwargs["start_time"].isoformat(), "2026-04-24T00:00:00+00:00")
         self.assertEqual(kwargs["end_time"].isoformat(), "2026-04-24T12:00:00+00:00")
+
+    def test_request_user_metrics_history_with_seven_day_window(self):
+        self.app.user_metrics_enabled = True
+        self.app.user_metrics_store = mock.Mock()
+        self._enable_custom_rules("user/analysis:view:self")
+        self.app.user_metrics_store.user_metrics_history.return_value = {
+            "window": {
+                "start": "2026-04-17T12:30:00+00:00",
+                "end": "2026-04-24T12:30:00+00:00",
+            },
+            "totals": {"submitted_jobs": 3, "completed_jobs": 2},
+            "submissions": [[1713398400000, 3]],
+            "completions": [[1713484800000, 2]],
+        }
+
+        response = self.client.get(
+            f"/v{get_version()}/user/{self.user.login}/metrics/history?start=2026-04-17T12:30:00Z&end=2026-04-24T12:30:00Z"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        _, kwargs = self.app.user_metrics_store.user_metrics_history.call_args
+        self.assertEqual(kwargs["start_time"].isoformat(), "2026-04-17T12:30:00+00:00")
+        self.assertEqual(kwargs["end_time"].isoformat(), "2026-04-24T12:30:00+00:00")
 
     def test_request_user_metrics_history_invalid_range(self):
         self.app.user_metrics_enabled = True

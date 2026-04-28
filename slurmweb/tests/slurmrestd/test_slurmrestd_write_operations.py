@@ -59,3 +59,37 @@ class TestSlurmrestdWriteOperations(TestSlurmrestdBase):
     def test_supports_write_operations_for_unsupported_versions(self):
         self.setup_slurmrestd("23.02.0", "0.0.40")
         self.assertFalse(self.slurmrestd.supports_write_operations())
+
+    def test_associations_update_injects_current_cluster_when_missing(self):
+        self.setup_slurmrestd("25.11.0", "0.0.44")
+        self.slurmrestd.cluster_name = "test-cluster"
+        response = mock.create_autospec(requests.Response)
+        response.url = "/mocked/query"
+        response.status_code = 200
+        response.headers = {"content-type": "application/json"}
+        response.json.return_value = {
+            "warnings": [],
+            "errors": [],
+            "associations": [],
+        }
+        self.slurmrestd.session.request = mock.Mock(return_value=response)
+
+        self.slurmrestd.associations_update(
+            {"associations": [{"account": "ip-user", "user": "guojianpeng"}]}
+        )
+
+        self.slurmrestd.session.request.assert_called_once_with(
+            "POST",
+            "http+unix://slurmrestd/slurmdb/v0.0.44/associations",
+            headers=mock.ANY,
+            json={
+                "associations": [
+                    {
+                        "account": "ip-user",
+                        "user": "guojianpeng",
+                        "cluster": "test-cluster",
+                    }
+                ]
+            },
+            params=None,
+        )

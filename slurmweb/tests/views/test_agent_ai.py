@@ -192,6 +192,57 @@ class TestAgentAIViews(TestAgentBase):
         self.assertEqual(response.json["tool_calls"][0]["interface_key"], "job")
         self.assertEqual(response.json["tool_calls"][0]["status_code"], 200)
 
+    def test_delete_ai_conversation(self):
+        self._enable_ai()
+        self._enable_rules("ai:view:*")
+        self.app.ai_service.delete_conversation.return_value = True
+
+        response = self.client.delete(f"/v{get_version()}/ai/conversations/42")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json["result"], "AI conversation deleted")
+        self.app.ai_service.delete_conversation.assert_called_once()
+        self.assertEqual(self.app.ai_service.delete_conversation.call_args.args[1], 42)
+
+    def test_admin_ai_conversations_include_deleted_records(self):
+        self._enable_ai()
+        self._enable_rules("admin/ai:view:*")
+        self.app.ai_service.list_all_conversations.return_value = {
+            "items": [
+                {
+                    "id": 42,
+                    "username": "alice",
+                    "title": "deleted chat",
+                    "deleted_at": "2026-04-28T00:00:00Z",
+                }
+            ]
+        }
+
+        response = self.client.get(f"/v{get_version()}/ai/admin/conversations")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json["items"][0]["username"], "alice")
+        self.assertEqual(response.json["items"][0]["deleted_at"], "2026-04-28T00:00:00Z")
+        self.app.ai_service.list_all_conversations.assert_called_once_with(limit=200)
+
+    def test_admin_ai_conversation_detail(self):
+        self._enable_ai()
+        self._enable_rules("admin/ai:view:*")
+        self.app.ai_service.get_any_conversation_detail.return_value = {
+            "id": 42,
+            "username": "alice",
+            "title": "deleted chat",
+            "deleted_at": "2026-04-28T00:00:00Z",
+            "messages": [{"id": 1, "role": "user", "content": "secret"}],
+            "tool_calls": [],
+        }
+
+        response = self.client.get(f"/v{get_version()}/ai/admin/conversations/42")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json["messages"][0]["content"], "secret")
+        self.app.ai_service.get_any_conversation_detail.assert_called_once_with(42)
+
     def test_ai_configs_fail_when_ai_disabled(self):
         self.app.ai_enabled = False
         self.app.ai_service = None

@@ -17,6 +17,42 @@
 
 ## 条目
 
+### 2026-04-28：用户分析自定义时间窗下 `Submission Activity` 可能不显示历史任务
+
+- 场景：在用户工具分析页面选择自定义起止时间后查看 `Submission Activity`。
+- 现象：时间窗内预期有任务，但提交/完成趋势没有展示有效任务数据。
+- 复现：历史作业快照中 `submit_time` 缺失，或 `job_state` 保存为 `completed` 等小写状态时，选择包含这些作业的自定义窗口。
+- 根因：提交趋势只按 `submit_time` 过滤，旧快照缺少该字段时无法命中；完成趋势和工具分析用 `js.job_state LIKE %COMPLETED%` 做大小写敏感匹配，小写终态不会被统计。
+- 解决：`submission_timeline` 改为 `COALESCE(submit_time, start_time, last_seen)` 作为提交时间兜底；终态过滤改为 `UPPER(job_state) LIKE %STATE%`；补 `test_user_analytics_store.py` 回归。
+- 预防：后续历史快照统计不要假设关键时间字段必定完整，也不要对外部状态字符串做大小写敏感匹配。
+
+### 2026-04-28：AI `association/update` 成功返回但账户页和集群端未显示新增用户
+
+- 场景：让 AI 给 account `ip-user` 添加用户 `guojianpeng`。
+- 现象：AI 调用 `association/update` 返回成功，但账户页面查询 `ip-user` 没有该用户，在集群管理端检查也未添加成功或仍显示旧状态。
+- 复现：通过 AI 发起 association update，payload 中只带 account/user 等字段但缺少 association `cluster`，随后立即查询 account 或 associations。
+- 根因：SlurmDB association 写入需要集群上下文；AI 生成的写入 payload 可能缺少 `cluster`。同时写入后 `accounts` / `associations` 缓存未失效时，页面可能继续读取旧缓存。
+- 解决：`slurmweb/slurmrestd/__init__.py` 在 association 写入 payload 缺少 `cluster` 时按当前集群补齐；account/user/association/qos 写入和删除后统一失效相关缓存。
+- 预防：后续新增 AI 写接口时，必须对照底层 SlurmDB 契约补齐隐式上下文，并为写后缓存失效补单元测试。
+
+### 2026-04-28：新增 AI 会话审计字段后，旧前端 GatewayAPI 测试仍按旧响应结构断言
+
+- 场景：执行前端定向 Vitest，覆盖 `frontend/tests/composables/GatewayAPI.spec.ts`。
+- 现象：AI conversation summary 断言失败，测试期望结构缺少 `username`、`deleted_at`、`deleted_by`。
+- 复现：在新增管理员审计和逻辑删除字段后运行 `cd frontend && npx vitest run tests/composables/GatewayAPI.spec.ts`。
+- 根因：Gateway API 类型和运行时解析已经返回审计字段，但测试夹具仍停留在逻辑删除前的最小结构。
+- 解决：同步更新 `GatewayAPI.spec.ts` 的响应夹具和期望字段。
+- 预防：会话、审计、权限等 API 响应字段扩展时，必须同步检查 GatewayAPI 类型、夹具和页面测试，不要只改后端返回。
+
+### 2026-04-28：节点 metrics 自定义 `start/end` 非法输入返回非 JSON 400，测试无法稳定断言
+
+- 场景：为 `node/metrics/history` 增加自定义 `start` / `end` 后补 Agent 视图测试。
+- 现象：非法 `start/end` 用例返回 400，但响应体不是稳定 JSON，测试按 `response.json["description"]` 断言失败。
+- 复现：访问 `GET /v<version>/node/<node>/metrics/history?start=bad&end=...` 并在测试中直接读取 JSON body。
+- 根因：新增分支最初沿用了非 JSON 错误路径；而该接口其他错误测试期望 JSON 结构，导致同一视图错误响应契约不一致。
+- 解决：`node_metrics_history` 对非法自定义窗口返回明确 JSON 错误响应，并保持 400 状态码。
+- 预防：为已有 JSON 契约的 Agent 视图新增错误分支时，要保持同接口错误响应格式一致，并补非法参数回归测试。
+
 ### 2026-04-27：用户分析图表升级为双曲线后，旧 Vitest 仍按单数据集断言
 
 - 场景：执行 `cd frontend && npx vitest run` 做前端全量回归。
@@ -319,3 +355,26 @@
 补充：
 
 - 后续新增的 `fix(frontend): remove remaining eslint dead code` 本地提交 `f90d428` 也因同一网络问题尚未 push。
+
+### 2026-04-28：`vue-router-mock` 未提供 admin 路径上下文时，`SettingsAI` 审计测试不会触发管理员接口
+
+- 场景：为 `SettingsAI` 增加管理员 Conversation Audit 搜索和“点击后加载详情”测试时，测试 helper 使用 `router.push({ name: 'admin-ai', params: { cluster: 'foo' } })`。
+- 现象：`ai_admin_conversations` 断言失败，实际调用次数为 0；组件没有进入 admin 路由分支。
+- 复现：在 `frontend/` 目录执行 `npx vitest run tests/views/settings/SettingsAI.spec.ts tests/views/AssistantView.spec.ts`。
+- 根因：当前测试使用的是 `vue-router-mock`，未加载真实路由表；按命名路由 push 不能稳定给 `useRoute()` 提供真实 admin path/name 上下文，导致 `isAdminRoute` 判定不成立。
+- 解决：
+  - 测试 helper 改为 `router.push('/foo/admin/ai')`，直接提供 admin path。
+  - `SettingsAI` 的 admin 路由判定补充 path 兜底：route name 以 `admin-` 开头，或 route path 包含 `/admin/`。
+- 预防：后续测试依赖路由分支但未使用真实 router 时，应优先设置组件实际依赖的 `path` / `params`；若组件逻辑只依赖 `route.name`，要确认 mock router 是否真的注入了该 name。
+
+### 2026-04-28：用户分析 7 天窗口因 day bucket 时区不一致导致 `metrics/history` 序列全 0
+
+- 场景：用户工具分析页点击时间范围弹框中的 `7 days`，前端调用 `user/<username>/metrics/history?start=<iso>&end=<iso>`。
+- 现象：时间窗内实际有提交或完成作业，但接口返回的 `submissions` / `completions` 序列值全部为 0，页面显示无活动数据。
+- 复现：对超过 48 小时的自定义窗口触发 `day` bucket，数据库 session timezone 与前端 UTC ISO 窗口不一致时，`date_trunc('day', timestamptz)` 返回的 bucket 与 Python UTC 游标不完全一致。
+- 根因：SQL 侧以数据库 session timezone 对 `TIMESTAMPTZ` 做 `date_trunc`，Python 侧以 UTC 对齐 bucket；`values` 又直接用 `datetime` 对象做 key，导致实际有数据的 bucket 无法命中。
+- 解决：
+  - SQL bucket 改为 `date_trunc(..., <timestamp> AT TIME ZONE 'UTC')`。
+  - Python 侧把 DB bucket 和游标都转换为 UTC epoch milliseconds 后匹配。
+  - 新增 7 天窗口单测，覆盖 naive UTC bucket 仍能命中非 0 数据。
+- 预防：后续涉及 `TIMESTAMPTZ` 聚合 bucket 时，必须明确接口标准时区；跨 SQL 与 Python 匹配时优先使用 epoch 或显式 timezone，不要直接混用 naive/aware `datetime` 对象作为 key。

@@ -41,7 +41,11 @@ npm --prefix frontend run test:unit
 - `MainMenu` 的 AI 导航门控（capability + `ai:view:*`）
 - `SettingsTabs` 的 AI tab 门控（capability + `admin/ai:view:*` / `admin/ai:edit:*`）
 - `SettingsAI` 的配置管理流程
-- `AssistantView` 的模型选择、流式渲染、安全 Markdown 消息展示、历史 trace 回放与折叠式工具轨迹展示
+- `AssistantView` 的普通对话、流式渲染、安全 Markdown 消息展示、历史 trace 回放、折叠式工具轨迹展示、消息复制与逻辑删除
+- `AssistantView` 的 token 估算展示、模型配置限制读取和超限阻止发送
+- 普通对话页不展示模型、stream、persistence 等运行配置；相关配置只在 `/:cluster/admin/ai` 查看和维护
+- `SettingsAI` 的弹窗式配置管理、标签式配置列表和配置删除
+- `SettingsAI` 的 Conversation Audit 列表、用户名/关键字过滤与点击后加载详情
 - 路由守卫对 `ai:view:*` / `admin/ai:*` 的约束
 
 ## 3. 详细测试点（建议最小集）
@@ -120,6 +124,10 @@ npm --prefix frontend run test:unit
 - 会话列表只返回当前用户
 - 会话详情返回历史 `tool_calls`
 - 其他用户会话详情不可读取
+- 普通会话列表与详情不返回已逻辑删除会话
+- 用户删除会话只更新 `ai_conversations.deleted_at` / `deleted_by`，不物理删除消息和工具调用
+- 管理员审计列表返回所有用户会话，包含已逻辑删除会话
+- 管理员审计详情可读取已逻辑删除会话的消息和工具调用
 
 ### 3.8 Markdown 消息渲染
 
@@ -135,6 +143,37 @@ npm --prefix frontend run test:unit
   - 保留换行
   - 支持横向滚动
 
+### 3.9 会话审计、逻辑删除与复制
+
+- 用户会话列表仅展示本人未删除会话
+- 删除本人会话后：
+  - 普通列表消失
+  - 普通详情不可读
+  - 管理员审计仍可见
+- 无 `admin/ai:view:*` 不能调用管理员审计列表或详情
+- 管理员审计列表展示 `username` 与删除状态
+- 管理员审计列表默认不自动加载第一条详情
+- 管理员审计列表可按用户名、标题或最后消息过滤
+- 管理员审计详情需要点击列表记录后加载，并展示消息与工具调用
+- 用户消息与 assistant 回复均有复制按钮，复制内容为消息原文
+
+### 3.10 前端 token 估算
+
+- 输入区空草稿时显示 `0 / limit`
+- 草稿变化时估算 token 数同步变化
+- 估算范围包含当前模型 `system_prompt`、当前会话历史消息和草稿
+- token 限制优先读取 `extra_options.max_context_tokens`、`context_limit`、`token_limit`、`max_tokens`
+- 未配置限制时使用默认 `8192`
+- 超限时显示提示、禁用发送按钮，并阻止 `stream_ai_chat` 请求
+- 当前测试只验证前端估算与阻止发送，不验证 provider 真实 usage
+
+### 3.11 `association/update` 写入
+
+- AI 调用 `association/update` 时仍要求底层 `accounts:edit:*` 权限
+- payload 缺少 association `cluster` 时，适配层按当前集群补齐
+- 写入 account/user/association/qos 后，应失效相关 `accounts` / `associations` 缓存
+- 后续账户页或 association 查询应重新读取底层状态，不能继续展示旧缓存
+
 ## 4. 手工验证场景（建议）
 
 - 配置 Qwen/DeepSeek/Kimi（兼容路径）、Ollama、本地 OpenAI-compatible 服务
@@ -143,6 +182,9 @@ npm --prefix frontend run test:unit
 - 提问单个作业详情时，确认 AI 可以按需串联 `job` + `jobs/history`
 - 检查执行轨迹默认仅展示接口名 / 状态码 / 耗时，点击后才显示参数和摘要
 - 让模型返回 Markdown 列表、引用、代码块和链接，确认页面按安全 Markdown 正常显示
+- 在普通 AI 页面确认不展示模型、stream、persistence 等配置块
+- 删除一个普通用户会话，确认普通用户不可见、管理员审计可见
+- 让 AI 执行“给 `ip-user` 添加用户 `guojianpeng`”，确认接口返回、账户页和集群管理端结果一致
 
 ## 5. 相关测试文件（已存在）
 
@@ -160,3 +202,5 @@ npm --prefix frontend run test:unit
 - `frontend/tests/components/settings/SettingsTabsAIContract.spec.ts`
 - `frontend/tests/views/settings/SettingsAIAIContract.spec.ts`
 - `frontend/tests/views/AssistantViewAIContract.spec.ts`
+- `frontend/tests/views/AssistantView.spec.ts`
+- `frontend/tests/views/settings/SettingsAI.spec.ts`

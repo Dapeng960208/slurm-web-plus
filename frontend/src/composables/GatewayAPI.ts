@@ -216,9 +216,12 @@ export interface AIModelConfigPayload {
 
 export interface AIConversationSummary {
   id: number
+  username?: string | null
   title: string
   created_at: string | null
   updated_at: string | null
+  deleted_at?: string | null
+  deleted_by?: string | null
   last_message: string | null
   model_config_id: number | null
 }
@@ -342,9 +345,12 @@ function normalizeAIModelConfig(config?: Partial<AIModelConfig>): AIModelConfig 
 function normalizeAIConversationSummary(summary?: Partial<AIConversationSummary>): AIConversationSummary {
   return {
     id: summary?.id ?? 0,
+    username: summary?.username ?? null,
     title: summary?.title ?? 'Untitled conversation',
     created_at: summary?.created_at ?? null,
     updated_at: summary?.updated_at ?? null,
+    deleted_at: summary?.deleted_at ?? null,
+    deleted_by: summary?.deleted_by ?? null,
     last_message: summary?.last_message ?? null,
     model_config_id: summary?.model_config_id ?? null
   }
@@ -1379,8 +1385,10 @@ export interface UserMetricsHistory {
 export interface UserToolActivityRecord {
   tool: string
   jobs: number
+  avg_max_memory_gb?: number | null
   avg_max_memory_mb: number | null
   avg_cpu_cores: number | null
+  avg_runtime_hours?: number | null
   avg_runtime_seconds: number | null
 }
 
@@ -1402,8 +1410,10 @@ export interface UserToolAnalysisSummary {
   totals: {
     completed_jobs: number
     active_tools: number
+    avg_max_memory_gb?: number | null
     avg_max_memory_mb: number | null
     avg_cpu_cores: number | null
+    avg_runtime_hours?: number | null
     avg_runtime_seconds: number | null
     busiest_tool: string | null
     busiest_tool_jobs: number
@@ -2002,6 +2012,33 @@ export function useGatewayAPI() {
     return normalizeAIConversation(result)
   }
 
+  async function delete_ai_conversation(
+    cluster: string,
+    conversationId: number
+  ): Promise<{ result: string }> {
+    return await restAPI.delete<{ result: string }>(
+      `/agents/${cluster}/ai/conversations/${conversationId}`
+    )
+  }
+
+  async function ai_admin_conversations(cluster: string): Promise<AIConversationSummary[]> {
+    const result = await restAPI.get<AIConversationListResponse | AIConversationSummary[]>(
+      `/agents/${cluster}/ai/admin/conversations`
+    )
+    const items = isAIConversationListResponse(result) ? result.items : result
+    return items.map((conversation) => normalizeAIConversationSummary(conversation))
+  }
+
+  async function ai_admin_conversation(
+    cluster: string,
+    conversationId: number
+  ): Promise<AIConversation> {
+    const result = await restAPI.get<Partial<AIConversation>>(
+      `/agents/${cluster}/ai/admin/conversations/${conversationId}`
+    )
+    return normalizeAIConversation(result)
+  }
+
   function stream_ai_chat(
     cluster: string,
     payload: AIChatRequest,
@@ -2170,9 +2207,12 @@ export function useGatewayAPI() {
   async function node_metrics_history(
     cluster: string,
     nodeName: string,
-    range: MetricRange
+    query: MetricRange | DateTimeWindowQuery
   ): Promise<NodeMetricsHistory> {
-    const url = `/agents/${cluster}/node/${nodeName}/metrics/history?range=${range}`
+    const url =
+      typeof query === 'string'
+        ? `/agents/${cluster}/node/${nodeName}/metrics/history?range=${query}`
+        : `/agents/${cluster}/node/${nodeName}/metrics/history?start=${encodeURIComponent(query.start)}&end=${encodeURIComponent(query.end)}`
     console.log('[GatewayAPI] node_metrics_history request URL:', url)
     const result = await restAPI.get<NodeMetricsHistory>(url)
     console.log('[GatewayAPI] node_metrics_history response:', result)
@@ -2332,6 +2372,9 @@ export function useGatewayAPI() {
     validate_ai_config,
     ai_conversations,
     ai_conversation,
+    delete_ai_conversation,
+    ai_admin_conversations,
+    ai_admin_conversation,
     stream_ai_chat,
     metrics_nodes,
     metrics_cores,
