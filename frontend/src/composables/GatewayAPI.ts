@@ -897,6 +897,7 @@ export type ClusterNodeMainState =
   | 'down'
   | 'error'
   | 'drain'
+  | 'drained'
   | 'draining'
   | 'fail'
   | 'failing'
@@ -915,6 +916,7 @@ export function getNodeMainState(status: string[]): ClusterNodeMainState {
   } else if (status.includes('DRAIN')) {
     if (status.includes('ALLOCATED') || status.includes('MIXED') || status.includes('COMPLETING'))
       return 'draining'
+    else if (status.includes('IDLE')) return 'drained'
     else return 'drain'
   } else if (status.includes('FAIL')) {
     if (status.includes('ALLOCATED') || status.includes('MIXED') || status.includes('COMPLETING'))

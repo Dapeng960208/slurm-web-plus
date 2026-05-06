@@ -33,7 +33,7 @@ export const resourcesStates: Record<
   { label: string; status: ClusterNodeMainState[] }
 > = {
   up: { label: 'Up', status: ['up'] },
-  drain: { label: 'Drain', status: ['drain', 'draining'] },
+  drain: { label: 'Drain', status: ['drain', 'drained', 'draining'] },
   down: { label: 'Down', status: ['down'] },
   error: { label: 'Error', status: ['error'] },
   fail: { label: 'Fail', status: ['fail', 'failing'] }

@@ -255,6 +255,7 @@ const canDeleteNode = computed(() =>
 
 function nodeEditInitialState(state: string[] | undefined): string {
   if (!state || state.length === 0) return ''
+  if (state.includes('DRAIN') && state.includes('IDLE')) return 'DRAINED'
   if (state.includes('DRAIN')) return 'DRAIN'
   if (state.includes('DOWN')) return 'DOWN'
   if (state.includes('FAIL')) return 'FAIL'
@@ -883,6 +884,7 @@ onUnmounted(() => {
           placeholder: 'Select node state',
           options: [
             { label: 'MIXED (current state)', value: 'MIXED', disabled: true },
+            { label: 'DRAINED (current state)', value: 'DRAINED', disabled: true },
             { label: 'DRAIN', value: 'DRAIN' },
             { label: 'RESUME', value: 'RESUME' },
             { label: 'UNDRAIN', value: 'UNDRAIN' },
@@ -891,9 +893,9 @@ onUnmounted(() => {
             { label: 'FAIL', value: 'FAIL' },
             { label: 'FUTURE', value: 'FUTURE' }
           ],
-          hint: 'Select the Slurm state action to apply to this node.',
+          hint: 'Select the Slurm state action to apply to this node. Disabled entries only describe the current node state.',
           tooltip:
-            'Examples include DRAIN, RESUME or UNDRAIN depending on the desired scheduler action.'
+            'Use DRAIN to start draining a node. Slurm may later report the node as DRAINING or DRAINED depending on running jobs.'
         },
         {
           key: 'reason',

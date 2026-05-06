@@ -96,6 +96,12 @@ const nodeMainLabelColors = computed<NodeMainLabelColors>(() => {
         label: 'drain',
         circle: 'fill-fuchsia-700'
       }
+    case 'drained':
+      return {
+        span: 'bg-fuchsia-100 dark:bg-fuchsia-900/60 text-fuchsia-700 dark:text-fuchsia-100',
+        label: 'drained',
+        circle: 'fill-fuchsia-700'
+      }
     case 'draining':
       return {
         span: 'bg-fuchsia-100 dark:bg-fuchsia-900/60 text-fuchsia-700 dark:text-fuchsia-100',

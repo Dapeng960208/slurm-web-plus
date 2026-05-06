@@ -20,6 +20,7 @@
 - 作业编辑支持提交 Slurm REST `memory_per_cpu`，首版单位为 MB
 - Resources 列表移除节点行尾管理按钮，节点状态编辑改为详情页下拉选择
 - 修复节点状态编辑缺少 `MIXED` 当前态展示，以及共享表单在后台轮询刷新期间重置输入的问题
+- 修复节点状态展示把 `DRAIN` 动作与 `DRAINED` 结果态混淆的问题
 - Jobs 用户筛选支持直接输入用户名并加入筛选
 - 修正 `user_tool_daily_stats` 当天与跨天聚合口径，避免 `avg_max_memory_gb` / `avg_cpu_cores` 返回空值
 - 修复 QOS 创建 payload 包装、QOS 默认限制补齐、accounts 创建 payload 包装，以及 account-user association 删除条件过宽问题
@@ -101,6 +102,7 @@
 - `NodeView` 详情页继续保留单节点更新、删除
 - `NodeView` 的 Edit Node 中 `state` 已改为下拉框，选项为 `DRAIN`、`RESUME`、`UNDRAIN`、`DOWN`、`IDLE`、`FAIL`、`FUTURE`
 - mixed 节点打开 `Edit Node` 时，表单会额外显示禁用的 `MIXED` 当前态占位，避免当前状态缺失；实际提交动作仍使用显式 Slurm 状态操作值
+- drained 节点现在会在状态 badge 和节点详情中明确显示为 `DRAINED`；编辑表单会显示禁用的 `DRAINED` 当前态占位，但仍通过 `DRAIN` 作为可提交动作请求 Slurm 状态变更
 - `ReservationsView` 已补创建、更新、删除
 - `AccountsView` / `AccountView` 已补创建、更新、删除
 - `UserView` 已补 SlurmDB 用户更新、删除

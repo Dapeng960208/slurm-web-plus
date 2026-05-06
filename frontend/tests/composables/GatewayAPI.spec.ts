@@ -1600,7 +1600,10 @@ describe('getNodeMainState', () => {
     expect(getNodeMainState(['FUTURE'])).toStrictEqual('future')
   })
   test('node drain', () => {
-    expect(getNodeMainState(['IDLE', 'DRAIN'])).toStrictEqual('drain')
+    expect(getNodeMainState(['DRAIN'])).toStrictEqual('drain')
+  })
+  test('node drained', () => {
+    expect(getNodeMainState(['IDLE', 'DRAIN'])).toStrictEqual('drained')
   })
   test('node draining', () => {
     expect(getNodeMainState(['ALLOCATED', 'DRAIN'])).toStrictEqual('draining')

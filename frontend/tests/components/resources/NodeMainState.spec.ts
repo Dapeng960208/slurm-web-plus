@@ -55,13 +55,24 @@ describe('NodeMainState.vue', () => {
   test('badge drain node', () => {
     const wrapper = mount(NodeMainState, {
       props: {
-        status: ['IDLE', 'DRAIN']
+        status: ['DRAIN']
       }
     })
     expect(wrapper.get('span').classes('bg-fuchsia-100')).toBe(true)
     expect(wrapper.get('span').classes('text-fuchsia-700')).toBe(true)
     expect(wrapper.get('svg').classes('fill-fuchsia-700')).toBe(true)
     expect(wrapper.get('span').text()).toBe('DRAIN')
+  })
+  test('badge drained node', () => {
+    const wrapper = mount(NodeMainState, {
+      props: {
+        status: ['IDLE', 'DRAIN']
+      }
+    })
+    expect(wrapper.get('span').classes('bg-fuchsia-100')).toBe(true)
+    expect(wrapper.get('span').classes('text-fuchsia-700')).toBe(true)
+    expect(wrapper.get('svg').classes('fill-fuchsia-700')).toBe(true)
+    expect(wrapper.get('span').text()).toBe('DRAINED')
   })
   test('badge draining node', () => {
     const wrapper = mount(NodeMainState, {
