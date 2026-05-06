@@ -166,4 +166,29 @@ describe('ResourcesView.vue', () => {
     }
     expect(addFiltersButton.classes()).toContain('ui-button-primary')
   })
+
+  test('omits row management buttons while node links still open details', () => {
+    mockClusterDataPoller.data.value = [nodes[0] as ClusterNode]
+
+    const wrapper = mount(ResourcesView, {
+      props: { cluster: 'foo' },
+      global: { stubs: { ResourcesDiagramThumbnail: true } }
+    })
+
+    expect(wrapper.text()).not.toContain('Manage')
+    expect(wrapper.text()).not.toContain('Delete')
+    expect(wrapper.find('th:last-child').text()).toBe('Partitions')
+
+    const nodeLink = wrapper
+      .findAllComponents({ name: 'RouterLink' })
+      .find((link) => link.props('to')?.name === 'node')
+    if (!nodeLink) {
+      throw new Error('Node detail link not found')
+    }
+    expect(nodeLink.props('to')).toEqual({
+      name: 'node',
+      params: { cluster: 'foo', nodeName: (nodes[0] as ClusterNode).name },
+      query: { returnTo: 'resources' }
+    })
+  })
 })

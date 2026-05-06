@@ -32,6 +32,7 @@ import {
   renderQosLabel,
   renderWalltime
 } from '@/composables/GatewayAPI'
+import { parseOptionalCsvList, stringifyList } from '@/composables/management'
 import { resolveUserWorkspaceSections } from '@/composables/userWorkspace'
 import { useRuntimeStore } from '@/stores/runtime'
 import { useAuthStore } from '@/stores/auth'
@@ -179,6 +180,8 @@ async function saveUser(payload: Record<string, string>) {
       name: viewedUser.value,
       description: payload.description || null,
       default_account: payload.default_account || undefined,
+      default_qos: payload.default_qos || undefined,
+      qos: parseOptionalCsvList(payload.qos),
       default_wckey: payload.default_wckey || undefined,
       admin_level: payload.admin_level || undefined
     })
@@ -257,7 +260,7 @@ async function removeUser() {
                 <button
                   v-if="canManageUser"
                   type="button"
-                  class="ui-button-secondary"
+                  class="ui-button-warning"
                   @click="editOpen = true"
                 >
                   Edit user
@@ -265,7 +268,7 @@ async function removeUser() {
                 <button
                   v-if="canDeleteUser"
                   type="button"
-                  class="ui-button-secondary"
+                  class="ui-button-danger"
                   @click="deleteOpen = true"
                 >
                   Delete user
@@ -558,9 +561,16 @@ async function removeUser() {
       :submit-label="knownUser ? 'Save changes' : 'Create user'"
       :loading="operationBusy"
       :error="operationError"
+      :initial-values="{
+        default_account: userAssociations[0]?.account ?? '',
+        default_qos: userAssociations.find((association) => association.default?.qos)?.default?.qos ?? '',
+        qos: stringifyList([...new Set(userAssociations.flatMap((association) => association.qos ?? []))])
+      }"
       :fields="[
         { key: 'description', label: 'Description', type: 'textarea' },
         { key: 'default_account', label: 'Default account' },
+        { key: 'default_qos', label: 'Default QOS' },
+        { key: 'qos', label: 'Assigned QOS (comma separated)' },
         { key: 'default_wckey', label: 'Default WCKEY' },
         { key: 'admin_level', label: 'Admin level' }
       ]"

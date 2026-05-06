@@ -100,6 +100,8 @@ AI model
 
 - 模型看到的是“接口能力目录”，而不是底层实现细节
 - 单个问题可连续调用多个接口后再回答，例如 `job` + `jobs/history`
+- `jobs/history` 被明确视为持久化历史存储，字段与实时作业详情接近；实时 `job` 缺失或作业已完成时，AI 可补查历史记录
+- 已完成作业历史记录可保留 `used_memory_gb` 最大内存和 `used_cpu_cores_avg` 平均 CPU 使用核心数
 - 对用户工具资源推荐类问题，优先使用 `user/tools/analysis` 聚合证据，再视情况补查 `jobs/history`
 - 查询接口继续复用 Agent 已有资源规则和 owner-aware 逻辑
 - AI 写接口不再额外走 `super-admin` 总闸，而是复用 Agent 接口层现有权限校验
@@ -141,12 +143,14 @@ Vue 页面
 
 - `job/<id>/update`
 - `job/<id>/cancel`
+- `job/<id>/update` 支持透传 `memory_per_cpu`，前端首版以 `Memory per CPU (MB)` 正整数输入构造该对象
 - `node/<name>/update`
 - `node/<name>/delete`
 - `reservation`
 - `reservation/<name>/update`
 - `reservation/<name>/delete`
 - `accounts`
+- `associations` / `DELETE associations`
 - `users`
 - `qos`
 

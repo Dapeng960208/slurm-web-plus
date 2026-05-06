@@ -151,12 +151,17 @@ async function editJob(payload: Record<string, string>) {
   operationBusy.value = true
   operationError.value = null
   try {
+    const memoryPerCpu = parsePositiveInteger(payload.memory_per_cpu_mb)
     await gateway.update_job(cluster, selectedJob.value.job_id, {
       partition: payload.partition || undefined,
       qos: payload.qos || undefined,
       priority: payload.priority ? Number(payload.priority) : null,
       time_limit: payload.time_limit || undefined,
-      comment: payload.comment || undefined
+      comment: payload.comment || undefined,
+      memory_per_cpu:
+        memoryPerCpu == null
+          ? undefined
+          : { set: true, infinite: false, number: memoryPerCpu }
     })
     runtimeStore.reportInfo(`Job ${selectedJob.value.job_id} update requested.`)
     editOpen.value = false
@@ -165,6 +170,15 @@ async function editJob(payload: Record<string, string>) {
   } finally {
     operationBusy.value = false
   }
+}
+
+function parsePositiveInteger(value: string): number | null {
+  if (!value.trim()) return null
+  const parsed = Number(value)
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    throw new Error('Memory per CPU must be a positive integer in MB.')
+  }
+  return parsed
 }
 
 async function cancelJob(payload: Record<string, string>) {
@@ -320,7 +334,7 @@ onMounted(async () => {
           <div class="mx-auto flex items-center justify-between px-4 sm:px-6 lg:px-8">
             <JobsSorter @sort="sortJobs" />
 
-            <button type="button" class="ui-button-primary" @click="runtimeStore.jobs.openFiltersPanel = true">
+            <button type="button" class="ui-button-secondary" @click="runtimeStore.jobs.openFiltersPanel = true">
               <PlusSmallIcon class="-ml-0.5 h-5 w-5" aria-hidden="true" />
               Add filters
             </button>
@@ -399,7 +413,7 @@ onMounted(async () => {
                       <button
                         v-if="canEditJob(job)"
                         type="button"
-                        class="ui-button-secondary"
+                        class="ui-button-warning"
                         @click="openEditDialog(job)"
                       >
                         <PencilSquareIcon class="h-4 w-4" aria-hidden="true" />
@@ -408,7 +422,7 @@ onMounted(async () => {
                       <button
                         v-if="canCancelJob(job)"
                         type="button"
-                        class="ui-button-secondary"
+                        class="ui-button-danger"
                         @click="openCancelDialog(job)"
                       >
                         <XMarkIcon class="h-4 w-4" aria-hidden="true" />
@@ -477,6 +491,7 @@ onMounted(async () => {
         partition: selectedJob?.partition ?? '',
         qos: selectedJob?.qos ?? '',
         priority: selectedJob?.priority?.set ? String(selectedJob.priority.number) : '',
+        memory_per_cpu_mb: '',
         time_limit: '',
         comment: ''
       }"
@@ -484,6 +499,13 @@ onMounted(async () => {
         { key: 'partition', label: 'Partition' },
         { key: 'qos', label: 'QOS' },
         { key: 'priority', label: 'Priority', type: 'number' },
+        {
+          key: 'memory_per_cpu_mb',
+          label: 'Memory per CPU (MB)',
+          type: 'number',
+          hint: 'Optional',
+          tooltip: 'Submitted as Slurm REST memory_per_cpu.number when set.'
+        },
         { key: 'time_limit', label: 'Time limit' },
         { key: 'comment', label: 'Comment', type: 'textarea' }
       ]"

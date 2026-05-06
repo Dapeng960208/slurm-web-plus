@@ -258,5 +258,8 @@ describe('ClusterAnalysis', () => {
     })
     expect(result.recommendations.map((item) => item.id)).toContain('recover-capacity')
     expect(result.recommendations.map((item) => item.id)).toContain('reduce-fragmentation')
+    expect(result.capacityMetrics.find((metric) => metric.id === 'memory')?.detail).toBe(
+      '192 GB committed out of 512 GB.'
+    )
   })
 })

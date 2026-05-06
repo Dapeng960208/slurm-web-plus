@@ -325,7 +325,7 @@ if (route.query.page_size) {
                     <button
                       v-if="canEditQos"
                       type="button"
-                      class="ui-button-secondary"
+                      class="ui-button-warning"
                       @click="openEditDialog(qos)"
                     >
                       Edit
@@ -333,7 +333,7 @@ if (route.query.page_size) {
                     <button
                       v-if="canDeleteQos"
                       type="button"
-                      class="ui-button-secondary"
+                      class="ui-button-danger"
                       @click="openDeleteDialog(qos)"
                     >
                       Delete

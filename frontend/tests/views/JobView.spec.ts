@@ -5,6 +5,7 @@ import { useRuntimeStore } from '@/stores/runtime'
 import { useAuthStore } from '@/stores/auth'
 import JobView from '@/views/JobView.vue'
 import JobBackButton from '@/components/job/JobBackButton.vue'
+import ActionDialog from '@/components/operations/ActionDialog.vue'
 import { init_plugins, getMockClusterDataPoller } from '../lib/common'
 import type { ClusterIndividualJob } from '@/composables/GatewayAPI'
 import jobRunning from '../assets/job-running.json'
@@ -50,6 +51,7 @@ describe('JobView.vue', () => {
     mockClusterDataPoller.unable.value = false
     mockClusterDataPoller.loaded.value = true
     mockClusterDataPoller.initialLoading.value = false
+    document.body.innerHTML = ''
   })
 
   test('displays job details', () => {
@@ -58,6 +60,15 @@ describe('JobView.vue', () => {
       props: {
         cluster: 'foo',
         id: 1234
+      },
+      global: {
+        stubs: {
+          Dialog: { template: '<div><slot /></div>' },
+          DialogPanel: { template: '<div><slot /></div>' },
+          DialogTitle: { template: '<div><slot /></div>' },
+          TransitionChild: { template: '<div><slot /></div>' },
+          TransitionRoot: { template: '<div><slot /></div>' }
+        }
       }
     })
 
@@ -156,6 +167,57 @@ describe('JobView.vue', () => {
 
     expect(wrapper.text()).toContain('Edit')
     expect(wrapper.text()).toContain('Cancel')
+  })
+
+  test('submits memory per CPU when editing the job', async () => {
+    useRuntimeStore().availableClusters = [
+      {
+        name: 'foo',
+        permissions: {
+          roles: [],
+          actions: [],
+          rules: ['jobs:view:*', 'jobs:edit:*']
+        },
+        racksdb: true,
+        infrastructure: 'foo',
+        metrics: true,
+        cache: true
+      }
+    ]
+    mockGatewayAPI.update_job.mockResolvedValue({ operation: 'jobs.update' })
+    mockClusterDataPoller.data.value = jobRunning
+
+    const wrapper = mount(JobView, {
+      attachTo: document.body,
+      props: {
+        cluster: 'foo',
+        id: 1234
+      }
+    })
+
+    await wrapper.findAll('button').find((button) => button.text() === 'Edit')!.trigger('click')
+    await nextTick()
+    wrapper
+      .findAllComponents(ActionDialog)
+      .find((dialog) => dialog.props('title') === 'Edit Job')!
+      .vm.$emit('submit', {
+        partition: 'normal',
+        qos: 'normal',
+        priority: '',
+        memory_per_cpu_mb: '4096',
+        time_limit: '',
+        comment: ''
+      })
+    await nextTick()
+
+    expect(mockGatewayAPI.update_job).toHaveBeenCalledWith(
+      'foo',
+      1234,
+      expect.objectContaining({
+        memory_per_cpu: { set: true, infinite: false, number: 4096 }
+      })
+    )
+    wrapper.unmount()
   })
 
   test('hides edit and cancel for another users job under self scope', () => {

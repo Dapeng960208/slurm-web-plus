@@ -22,9 +22,15 @@
   - 单作业提交
   - 单作业编辑
   - 单作业取消
+  - 编辑时可填写 `Memory per CPU (MB)`，正整数会提交为 Slurm REST `memory_per_cpu` 对象；空值不发送
+- `JobsHistoryView` / `JobHistoryView`
+  - 支持从历史作业跳转实时作业详情
+  - 使用历史记录中的 Slurm `job_id` 跳转到 `/:cluster/job/:job_id`
+  - 历史页不直接提供编辑或取消，避免对持久化历史记录误发写操作
 - `ResourcesView` / `NodeView`
-  - 单节点更新
-  - 单节点删除
+  - `ResourcesView` 列表页只保留节点名称详情跳转，不在行尾显示 `Manage` / `Delete`
+  - `NodeView` 详情页保留单节点更新和删除入口
+  - `NodeView` 编辑节点时，`state` 使用下拉框选择：`DRAIN`、`RESUME`、`UNDRAIN`、`DOWN`、`IDLE`、`FAIL`、`FUTURE`
 - `ReservationsView`
   - 创建
   - 更新
@@ -33,9 +39,11 @@
   - 账户创建
   - 账户更新
   - 账户删除
+  - account-user association 增加用户、编辑 QOS/default QOS、删除用户关联
 - `UserView`
   - SlurmDB 用户创建/更新
   - 用户删除
+  - 编辑用户默认 QOS 与分配 QOS
 - `QosView`
   - QoS 创建
   - QoS 更新
@@ -44,6 +52,7 @@
   - `Slurm ping`
   - `Slurm diag`
   - `hour/day/week` 时间范围切换
+  - 内存容量详情按 GB 展示，评分与百分比仍使用原始 MB 数值
 - `/:cluster/admin`
   - `AI`
   - `LDAP Cache`
@@ -140,6 +149,8 @@
 - `reservation/<name>/update`
 - `reservation/<name>/delete`
 - `accounts`
+- `associations`
+- `DELETE associations`
 - `account/<name>/delete`
 - `users`
 - `user/<name>/delete`
@@ -199,6 +210,13 @@
 - 编辑类按钮使用橙色语义，删除/取消使用红色警示语义
 - 关键字段与操作按钮补 tooltip / hint，说明行为影响
 - `Dashboard`、`Cluster Analysis`、`Node` 指标统一支持 `hour/day/week` 时间范围切换
+- 按操作语义统一按钮颜色：
+  - 创建/提交/主要确认：`ui-button-primary`
+  - 编辑/保存修改：`ui-button-warning`
+  - 删除/取消作业/破坏性操作：`ui-button-danger`
+  - 查看/返回/筛选/普通导航/弹窗关闭：`ui-button-secondary`
+- 不把所有按钮统一改为同一颜色；页面按钮按实际操作语义选择样式
+- Jobs 用户筛选保留 `/users` 查询建议，同时支持直接输入用户名并通过 `Add username` 加入筛选；空值不添加，重复用户名不重复添加，添加后清空输入。
 
 `jobs:self` 的前端行为：
 

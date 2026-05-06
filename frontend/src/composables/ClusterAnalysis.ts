@@ -134,6 +134,10 @@ function round(value: number, digits = 1): number {
   return Math.round(value * factor) / factor
 }
 
+function formatMemoryGb(valueMb: number): string {
+  return `${round(valueMb / 1024, 1)} GB`
+}
+
 function countJobsInStates(jobs: ClusterJob[], states: readonly string[]): ClusterJob[] {
   return jobs.filter((job) => job.job_state.some((state) => states.includes(state)))
 }
@@ -606,7 +610,7 @@ export function analyzeCluster(input: ClusterAnalysisInput): ClusterAnalysisResu
       value: memoryUtilization,
       detail:
         memoryAllocated != null && totalMemory > 0
-          ? `${memoryAllocated} MB committed out of ${totalMemory} MB.`
+          ? `${formatMemoryGb(memoryAllocated)} committed out of ${formatMemoryGb(totalMemory)}.`
           : 'Memory commitment is unavailable in current telemetry.'
     },
     {

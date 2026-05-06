@@ -1,4 +1,5 @@
 import { describe, test, expect, beforeEach, vi } from 'vitest'
+import { nextTick } from 'vue'
 import { flushPromises, mount } from '@vue/test-utils'
 import UserView from '@/views/UserView.vue'
 import { init_plugins, getMockClusterDataPoller } from '../lib/common'
@@ -11,6 +12,10 @@ import AccountBreadcrumb from '@/components/accounts/AccountBreadcrumb.vue'
 import PanelSkeleton from '@/components/PanelSkeleton.vue'
 
 const mockClusterDataPoller = getMockClusterDataPoller<ClusterAssociation[]>()
+const mockGatewayAPI = {
+  save_user: vi.fn(),
+  delete_user: vi.fn()
+}
 const analyticsPanelsStub = {
   template: '<div>Completed Job Tool Analysis</div>'
 }
@@ -19,9 +24,18 @@ vi.mock('@/composables/DataPoller', () => ({
   useClusterDataPoller: () => mockClusterDataPoller
 }))
 
+vi.mock('@/composables/GatewayAPI', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/composables/GatewayAPI')>()
+  return {
+    ...actual,
+    useGatewayAPI: () => mockGatewayAPI
+  }
+})
+
 describe('UserView.vue', () => {
   beforeEach(() => {
     init_plugins()
+    vi.clearAllMocks()
     useRuntimeStore().availableClusters = [
       {
         name: 'foo',
@@ -45,12 +59,18 @@ describe('UserView.vue', () => {
     mockClusterDataPoller.data.value = associations as ClusterAssociation[]
 
     const wrapper = mount(UserView, {
+      attachTo: document.body,
       props: {
         cluster: 'foo',
         user: 'root'
       },
       global: {
         stubs: {
+          Dialog: { template: '<div><slot /></div>' },
+          DialogPanel: { template: '<div><slot /></div>' },
+          DialogTitle: { template: '<div><slot /></div>' },
+          TransitionChild: { template: '<div><slot /></div>' },
+          TransitionRoot: { template: '<div><slot /></div>' },
           UserAnalyticsPanels: analyticsPanelsStub
         }
       }
@@ -199,5 +219,69 @@ describe('UserView.vue', () => {
     const infoAlert = wrapper.findComponent(InfoAlert)
     expect(infoAlert.exists()).toBe(true)
     expect(infoAlert.text()).toContain('User nonexistent has no associations on this cluster')
+  })
+
+  test('submits default and assigned QOS when editing a user', async () => {
+    useRuntimeStore().availableClusters = [
+      {
+        name: 'foo',
+        permissions: {
+          roles: [],
+          actions: [],
+          rules: ['accounts:view:*', 'users-admin:edit:*', 'user/profile:view:*']
+        },
+        racksdb: true,
+        infrastructure: 'foo',
+        metrics: true,
+        cache: true,
+        user_metrics: false
+      }
+    ]
+    mockGatewayAPI.save_user.mockResolvedValue({ operation: 'users.update' })
+    mockClusterDataPoller.loaded.value = true
+    mockClusterDataPoller.data.value = [
+      {
+        ...(associations as ClusterAssociation[])[0],
+        account: 'root',
+        user: 'root',
+        qos: ['normal'],
+        default: { qos: 'normal' }
+      }
+    ] as ClusterAssociation[]
+
+    const wrapper = mount(UserView, {
+      props: {
+        cluster: 'foo',
+        user: 'root'
+      },
+      global: {
+        stubs: {
+          UserAnalyticsPanels: analyticsPanelsStub
+        }
+      }
+    })
+    await flushPromises()
+
+    await wrapper.findAll('button').find((button) => button.text() === 'Edit user')!.trigger('click')
+    await nextTick()
+    const inputs = document.body.querySelectorAll<HTMLInputElement>('input')
+    inputs[1].value = 'debug'
+    inputs[1].dispatchEvent(new Event('input', { bubbles: true }))
+    inputs[2].value = 'normal, debug'
+    inputs[2].dispatchEvent(new Event('input', { bubbles: true }))
+    document.body.querySelector<HTMLFormElement>('form')!.dispatchEvent(
+      new Event('submit', { bubbles: true, cancelable: true })
+    )
+    await flushPromises()
+
+    expect(mockGatewayAPI.save_user).toHaveBeenCalledWith(
+      'foo',
+      expect.objectContaining({
+        name: 'root',
+        default_qos: 'debug',
+        qos: ['normal', 'debug']
+      })
+    )
+    wrapper.unmount()
   })
 })

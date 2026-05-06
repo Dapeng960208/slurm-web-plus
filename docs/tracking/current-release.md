@@ -14,6 +14,13 @@
 - 收敛普通 AI 对话页配置展示，补会话逻辑删除、复制和管理员审计
 - 优化管理员 AI 配置页为弹窗式编辑、紧凑标签展示，并补审计搜索与对话 token 超限提示
 - 修复 AI 调用 `association/update` 给 account 添加用户时 payload 缺少 `cluster` 与写后缓存未失效的问题
+- 按操作语义统一按钮颜色，避免所有按钮被错误改成同一颜色
+- 在历史作业页补实时作业详情跳转，并避免对持久化历史记录直接发编辑/取消写操作
+- 扩展用户默认 QOS、用户分配 QOS、account-user association QOS/default QOS 管理能力
+- 作业编辑支持提交 Slurm REST `memory_per_cpu`，首版单位为 MB
+- Resources 列表移除节点行尾管理按钮，节点状态编辑改为详情页下拉选择
+- Jobs 用户筛选支持直接输入用户名并加入筛选
+- 修正 `user_tool_daily_stats` 当天与跨天聚合口径，避免 `avg_max_memory_gb` / `avg_cpu_cores` 返回空值
 
 ## 2. 已完成项
 
@@ -87,7 +94,9 @@
   - `Access Control`
 - `ClusterAnalysisView` 已补 `Slurm ping` 与 `diag`
 - `JobsView` / `JobView` 已补单作业提交、编辑、取消
-- `ResourcesView` / `NodeView` 已补单节点更新、删除
+- `ResourcesView` 列表页不再显示节点行尾 `Manage` / `Delete` 按钮，节点名称仍可进入详情
+- `NodeView` 详情页继续保留单节点更新、删除
+- `NodeView` 的 Edit Node 中 `state` 已改为下拉框，选项为 `DRAIN`、`RESUME`、`UNDRAIN`、`DOWN`、`IDLE`、`FAIL`、`FUTURE`
 - `ReservationsView` 已补创建、更新、删除
 - `AccountsView` / `AccountView` 已补创建、更新、删除
 - `UserView` 已补 SlurmDB 用户更新、删除
@@ -156,14 +165,18 @@
 - 用户详情分析页已将原 `Tool Analysis` 与 `Top Tools` 合并为 `Completed Job Tool Analysis` 单一栏目，集中展示已完成作业的工具维度图表与资源汇总
 - 用户数据分析页已移除重复用户名卡片，用户姓名、LDAP 组和更新时间改为时间范围栏内的紧凑上下文标签
 - 集群页与 Settings 页已统一为主内容区独立滚动，内容超过视口时在内容区域内滚动，底部固定保留 `2rem` 边缘留白
-- `user/<username>/tools/analysis` 已改为只按时间窗覆盖的 UTC 日期读取 `user_tool_daily_stats` 并返回工具分类统计，查询多天时按样本数合并多天日表记录，请求路径不实时扫描 `job_snapshots` 或 SlurmDB
-- 后台用户工具日聚合已按 `[user_metrics].aggregation_interval` 周期更新当天 UTC 自然日统计，并与 `slurmweb/rebuild-user-tool.py` 复用同一套聚合函数，保持工具归类、空值过滤和插入口径一致
-- `user_tool_daily_stats` 已补 `memory_samples`、`cpu_samples`、`runtime_samples`，用于多日汇总时按真实资源样本数加权
+- `user/<username>/tools/analysis` 已改为只按时间窗覆盖的 UTC 日期读取 `user_tool_daily_stats` 并返回工具分类统计，请求路径不实时扫描 `job_snapshots` 或 SlurmDB
+- 后台用户工具日聚合已按 `[user_metrics].aggregation_interval` 周期更新当天 UTC 自然日统计，并与维护脚本复用同一套聚合函数，保持工具归类、空值过滤和插入口径一致
+- `user_tool_daily_stats` 已补 `memory_samples`、`cpu_samples`、`runtime_samples` 作为诊断字段；当前跨多天返回的内存与 CPU 均值按每日 `jobs_count` 加权，不再按样本数加权
 - 用户工具分析聚合已明确按已完成作业统计：
-  - `avg_max_memory_gb` 优先来自 `used_memory_gb`，为空时回退 `usage_stats.memory.value_gb`；若 Slurm step 级实际内存缺失，再从 `tres_allocated` / `tres_requested` / TRES 字符串中的 `mem` 兜底
+  - 当天日聚合按 `activity_date + user_id + tool` 分组
+  - `avg_max_memory_gb` 只平均 `used_memory_gb > 0`
   - `avg_runtime_hours` 来自 `end_time - start_time`
-  - `avg_cpu_cores` 优先来自 `used_cpu_cores_avg`，为空时回退 `usage_stats.cpu.estimated_cores_avg`
+  - `avg_cpu_cores` 只平均 `used_cpu_cores_avg > 0`
+  - `None`、`0`、负数和非法资源值不参与当天资源平均；无有效样本时保存并返回 `0`
+  - 跨多天同工具合并按 `sum(day.avg * day.jobs_count) / sum(day.jobs_count)` 计算，但只有当天存在对应资源样本时，该日才参与对应资源均值分母；`totals` 层使用相同口径
   - 继续保留 `avg_max_memory_mb` 与 `avg_runtime_seconds` 兼容字段
+- 新增维护脚本 `slurmweb/repair-user-tool-daily-stats.py`，支持 `--start YYYY-MM-DD`、`--end YYYY-MM-DD`、可选 `--user <username>` 和 `--dry-run`
 - `Submission Activity` 的提交时间线在 `submit_time` 缺失时会回退到 `start_time` / `last_seen`
 - 用户分析终态作业过滤已改为 `UPPER(job_state)` 匹配，避免小写状态导致自定义时间窗无数据
 - 用户分析 `metrics/history` 自定义窗口已统一使用 UTC bucket 与 epoch milliseconds 匹配，避免 `7 days` 等 day bucket 因数据库时区差异返回全 0
@@ -183,6 +196,24 @@
 - 新增 Alembic revision `20260428_0009_ai_conversation_logical_delete.py`，为 `ai_conversations` 增加 `deleted_at` 与 `deleted_by`
 - `association/update` 写入 payload 缺少 `cluster` 时，`slurmrestd` 适配层会按当前集群补齐
 - account/user/association/qos 写入或删除后，会失效相关 `accounts` 与 `associations` 缓存，避免账户页继续读取旧状态
+- 前端按钮颜色已按操作语义收口：
+  - 创建/提交/主要确认：`ui-button-primary`
+  - 编辑/保存修改：`ui-button-warning`
+  - 删除/取消作业/破坏性操作：`ui-button-danger`
+  - 查看/返回/筛选/普通导航/弹窗关闭：`ui-button-secondary`
+- `JobsHistoryView` 和 `JobHistoryView` 已增加 `Live job` 跳转，使用历史记录中的 Slurm `job_id` 跳转到 `/:cluster/job/:job_id`
+- 历史作业页不直接提供 Edit/Cancel，避免把已完成持久化记录误当成实时可写作业
+- AI system prompt 与接口目录已明确 `jobs/history` 是持久化存储，字段与 `job` 详情接近；已完成作业历史可保留 `used_memory_gb` 和 `used_cpu_cores_avg`
+- `UserView` 编辑用户弹框已支持提交 `default_qos` 和逗号分隔的 `qos`
+- `AccountView` 的 `User Associations` 已支持：
+  - `Add user`
+  - 行级 `Edit QOS`
+  - 行级 `Delete`
+- 前端 Gateway 已新增 `delete_association(cluster, payload)`，复用 `DELETE /agents/:cluster/associations`
+- `ClusterAssociation` 前端类型已新增可选 `default.qos`
+- `ClusterAnalysis` 内存容量详情已改为 GB 展示，评分和百分比计算仍使用原始 MB 数值
+- `JobsView` 与 `JobView` 的编辑作业弹框已新增 `Memory per CPU (MB)`，空值不发送，正整数提交为 Slurm REST `memory_per_cpu` 对象
+- Jobs 用户筛选已支持直接输入用户名并点击 `Add username` 加入筛选；空值不添加，重复用户名不重复添加，添加后清空输入
 
 ## 3. 进行中项
 
@@ -281,6 +312,11 @@
 - `cd frontend && npx vitest run tests/views/settings/SettingsAI.spec.ts tests/views/AssistantView.spec.ts`
 - `cd frontend && npx vitest run tests/components/MetricRangeSelector.spec.ts tests/views/UserAnalysisView.spec.ts`
 - `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/apps/test_user_analytics_store.py slurmweb/tests/views/test_agent_metrics_requests.py`
+- `cd frontend && npx vitest run tests/views/JobsView.spec.ts tests/views/JobView.spec.ts tests/views/JobsHistoryView.spec.ts tests/views/JobHistoryView.spec.ts tests/views/AccountView.spec.ts tests/views/UserView.spec.ts tests/composables/GatewayAPI.spec.ts tests/composables/ClusterAnalysis.spec.ts tests/components/operations/ActionDialog.spec.ts`
+- `npm --prefix frontend run type-check`
+- `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/apps/test_ai_service.py slurmweb/tests/slurmrestd/test_slurmrestd_write_operations.py slurmweb/tests/views/test_agent_operations.py`
+- `cd frontend && npx vitest run tests/views/resources/ResourcesView.spec.ts tests/views/NodeView.spec.ts tests/components/operations/ActionDialog.spec.ts tests/components/jobs/UserFilterSelector.spec.ts`
+- `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/apps/test_user_analytics_store.py`
 
 待同步：
 

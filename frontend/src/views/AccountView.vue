@@ -28,7 +28,7 @@ import {
   renderQosLabel,
   renderWalltime
 } from '@/composables/GatewayAPI'
-import { parseCsvList, stringifyList } from '@/composables/management'
+import { parseCsvList, parseOptionalCsvList, stringifyList } from '@/composables/management'
 import { useRuntimeStore } from '@/stores/runtime'
 
 const { cluster, account } = defineProps<{
@@ -41,8 +41,12 @@ const gateway = useGatewayAPI()
 const runtimeStore = useRuntimeStore()
 const editOpen = ref(false)
 const deleteOpen = ref(false)
+const addUserOpen = ref(false)
+const editUserQosOpen = ref(false)
+const deleteAssociationOpen = ref(false)
 const operationBusy = ref(false)
 const operationError = ref<string | null>(null)
+const selectedAssociation = ref<ClusterAssociation | null>(null)
 const { data, unable, loaded, initialLoading, setCluster } = useClusterDataPoller<ClusterAssociation[]>(
   cluster,
   'associations',
@@ -123,6 +127,24 @@ const canDeleteAccount = computed(() =>
   runtimeStore.hasRoutePermission(cluster, 'accounts', 'delete')
 )
 
+function associationPayload(association: {
+  account: string
+  user?: string
+  qos?: string[]
+  default_qos?: string
+}) {
+  return {
+    associations: [
+      {
+        account: association.account,
+        user: association.user || undefined,
+        qos: association.qos ?? undefined,
+        default: association.default_qos ? { qos: association.default_qos } : undefined
+      }
+    ]
+  }
+}
+
 async function saveAccount(payload: Record<string, string>) {
   operationBusy.value = true
   operationError.value = null
@@ -142,6 +164,72 @@ async function saveAccount(payload: Record<string, string>) {
   }
 }
 
+async function addUserAssociation(payload: Record<string, string>) {
+  operationBusy.value = true
+  operationError.value = null
+  try {
+    await gateway.save_association(
+      cluster,
+      associationPayload({
+        account,
+        user: payload.user,
+        qos: parseOptionalCsvList(payload.qos),
+        default_qos: payload.default_qos
+      })
+    )
+    runtimeStore.reportInfo(`User ${payload.user} association requested for account ${account}.`)
+    addUserOpen.value = false
+  } catch (error: unknown) {
+    operationError.value = error instanceof Error ? error.message : String(error)
+  } finally {
+    operationBusy.value = false
+  }
+}
+
+async function saveUserAssociationQos(payload: Record<string, string>) {
+  if (!selectedAssociation.value?.user) return
+  operationBusy.value = true
+  operationError.value = null
+  try {
+    await gateway.save_association(
+      cluster,
+      associationPayload({
+        account,
+        user: selectedAssociation.value.user,
+        qos: parseOptionalCsvList(payload.qos),
+        default_qos: payload.default_qos
+      })
+    )
+    runtimeStore.reportInfo(`QOS update requested for ${selectedAssociation.value.user} on ${account}.`)
+    editUserQosOpen.value = false
+  } catch (error: unknown) {
+    operationError.value = error instanceof Error ? error.message : String(error)
+  } finally {
+    operationBusy.value = false
+  }
+}
+
+async function removeUserAssociation() {
+  if (!selectedAssociation.value?.user) return
+  operationBusy.value = true
+  operationError.value = null
+  try {
+    await gateway.delete_association(
+      cluster,
+      associationPayload({
+        account,
+        user: selectedAssociation.value.user
+      })
+    )
+    runtimeStore.reportInfo(`User ${selectedAssociation.value.user} removal requested from ${account}.`)
+    deleteAssociationOpen.value = false
+  } catch (error: unknown) {
+    operationError.value = error instanceof Error ? error.message : String(error)
+  } finally {
+    operationBusy.value = false
+  }
+}
+
 async function removeAccount() {
   operationBusy.value = true
   operationError.value = null
@@ -154,6 +242,18 @@ async function removeAccount() {
   } finally {
     operationBusy.value = false
   }
+}
+
+function openEditAssociationDialog(association: ClusterAssociation) {
+  selectedAssociation.value = association
+  operationError.value = null
+  editUserQosOpen.value = true
+}
+
+function openDeleteAssociationDialog(association: ClusterAssociation) {
+  selectedAssociation.value = association
+  operationError.value = null
+  deleteAssociationOpen.value = true
 }
 
 function userJobLimits(association: ClusterAssociation) {
@@ -306,7 +406,7 @@ function hasDifferentQos(userAssociation: ClusterAssociation): boolean {
                 <button
                   v-if="canEditAccount"
                   type="button"
-                  class="ui-button-secondary"
+                  class="ui-button-warning"
                   @click="editOpen = true"
                 >
                   Edit
@@ -314,7 +414,7 @@ function hasDifferentQos(userAssociation: ClusterAssociation): boolean {
                 <button
                   v-if="canDeleteAccount"
                   type="button"
-                  class="ui-button-secondary"
+                  class="ui-button-danger"
                   @click="deleteOpen = true"
                 >
                   Delete
@@ -459,11 +559,21 @@ function hasDifferentQos(userAssociation: ClusterAssociation): boolean {
         </InfoAlert>
 
         <div v-else class="ui-table-shell overflow-x-auto">
-          <div class="border-b border-[rgba(80,105,127,0.08)] px-6 py-5">
-            <h2 class="ui-panel-title">User Associations</h2>
-            <p class="ui-panel-description mt-2">
-              User associations attached to this account, with inherited values visually de-emphasized.
-            </p>
+          <div class="flex flex-wrap items-start justify-between gap-3 border-b border-[rgba(80,105,127,0.08)] px-6 py-5">
+            <div>
+              <h2 class="ui-panel-title">User Associations</h2>
+              <p class="ui-panel-description mt-2">
+                User associations attached to this account, with inherited values visually de-emphasized.
+              </p>
+            </div>
+            <button
+              v-if="canEditAccount"
+              type="button"
+              class="ui-button-primary"
+              @click="addUserOpen = true"
+            >
+              Add user
+            </button>
           </div>
 
           <div class="inline-block min-w-full align-middle">
@@ -475,6 +585,7 @@ function hasDifferentQos(userAssociation: ClusterAssociation): boolean {
                   <th scope="col" class="hidden w-72 px-3 py-3.5 text-left lg:table-cell">Resource limits</th>
                   <th scope="col" class="hidden w-72 px-3 py-3.5 text-left md:table-cell">Time limits</th>
                   <th scope="col" class="hidden w-48 px-3 py-3.5 text-left 2xl:table-cell">QoS</th>
+                  <th scope="col" class="py-3.5 pr-6 pl-3 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody class="text-sm text-[var(--color-brand-muted)]">
@@ -536,7 +647,30 @@ function hasDifferentQos(userAssociation: ClusterAssociation): boolean {
                   <td class="hidden px-3 py-4 align-top 2xl:table-cell">
                     <span :class="hasDifferentQos(association) ? '' : 'opacity-40'">
                       {{ renderQosLabel(association.qos) }}
+                      <span v-if="association.default?.qos" class="block text-xs">
+                        Default: {{ association.default.qos }}
+                      </span>
                     </span>
+                  </td>
+                  <td class="py-4 pr-6 pl-3 align-top text-right">
+                    <div class="flex flex-wrap justify-end gap-2">
+                      <button
+                        v-if="canEditAccount"
+                        type="button"
+                        class="ui-button-warning"
+                        @click="openEditAssociationDialog(association)"
+                      >
+                        Edit QOS
+                      </button>
+                      <button
+                        v-if="canDeleteAccount"
+                        type="button"
+                        class="ui-button-danger"
+                        @click="openDeleteAssociationDialog(association)"
+                      >
+                        Delete
+                      </button>
+                    </div>
                   </td>
                 </tr>
               </tbody>
@@ -569,6 +703,41 @@ function hasDifferentQos(userAssociation: ClusterAssociation): boolean {
     />
 
     <ActionDialog
+      :open="addUserOpen"
+      title="Add User Association"
+      :description="`Add a user to account ${account}.`"
+      submit-label="Add user"
+      :loading="operationBusy"
+      :error="operationError"
+      :fields="[
+        { key: 'user', label: 'Username', required: true },
+        { key: 'qos', label: 'Assigned QOS (comma separated)' },
+        { key: 'default_qos', label: 'Default QOS' }
+      ]"
+      @close="addUserOpen = false"
+      @submit="addUserAssociation"
+    />
+
+    <ActionDialog
+      :open="editUserQosOpen"
+      title="Edit User QOS"
+      :description="selectedAssociation?.user ? `Update QOS for ${selectedAssociation.user} on ${account}.` : ''"
+      submit-label="Save changes"
+      :loading="operationBusy"
+      :error="operationError"
+      :initial-values="{
+        qos: stringifyList(selectedAssociation?.qos),
+        default_qos: selectedAssociation?.default?.qos ?? ''
+      }"
+      :fields="[
+        { key: 'qos', label: 'Assigned QOS (comma separated)' },
+        { key: 'default_qos', label: 'Default QOS' }
+      ]"
+      @close="editUserQosOpen = false"
+      @submit="saveUserAssociationQos"
+    />
+
+    <ActionDialog
       :open="deleteOpen"
       title="Delete Account"
       :description="`Delete account ${account}. This action is destructive.`"
@@ -578,6 +747,18 @@ function hasDifferentQos(userAssociation: ClusterAssociation): boolean {
       :fields="[]"
       @close="deleteOpen = false"
       @submit="removeAccount"
+    />
+
+    <ActionDialog
+      :open="deleteAssociationOpen"
+      title="Delete User Association"
+      :description="selectedAssociation?.user ? `Remove ${selectedAssociation.user} from account ${account}. This action is destructive.` : ''"
+      submit-label="Delete association"
+      :loading="operationBusy"
+      :error="operationError"
+      :fields="[]"
+      @close="deleteAssociationOpen = false"
+      @submit="removeUserAssociation"
     />
   </ClusterMainLayout>
 </template>

@@ -39,6 +39,25 @@ const filteredUsers = computed(() => {
       })
 })
 
+const manualUsername = computed(() => query.value.trim())
+const canAddManualUsername = computed(() => {
+  const username = manualUsername.value
+  if (!username) return false
+  return !runtimeStore.jobs.filters.users.some(
+    (user) => user.toLocaleLowerCase() === username.toLocaleLowerCase()
+  )
+})
+
+function addManualUsername() {
+  if (!canAddManualUsername.value) return
+  runtimeStore.jobs.filters.users.push(manualUsername.value)
+  query.value = ''
+}
+
+function updateQuery(event: Event) {
+  query.value = (event.target as HTMLInputElement).value
+}
+
 function queryPlaceholder() {
   if (runtimeStore.jobs.filters.users.length == 0) {
     return 'Search user…'
@@ -53,16 +72,29 @@ const { data } = useGatewayDataGetter<UserDescription[]>('users')
 <template>
   <div class="relative mt-2">
     <Combobox as="div" v-model="runtimeStore.jobs.filters.users" multiple>
-      <ComboboxInput
-        class="focus:ring-slurmweb w-full rounded-md border-0 bg-white py-1.5 pr-12 pl-3 shadow-xs ring-1 ring-gray-300 ring-inset focus:ring-2 focus:ring-inset sm:text-sm sm:leading-6 dark:bg-gray-800 dark:ring-gray-700"
-        @change="query = $event.target.value"
-        :placeholder="queryPlaceholder()"
-      />
-      <ComboboxButton
-        class="absolute inset-y-0 right-0 flex items-center rounded-r-md px-2 focus:outline-hidden"
-      >
-        <ChevronUpDownIcon class="h-5 w-5 text-gray-400" aria-hidden="true" />
-      </ComboboxButton>
+      <div class="flex gap-2">
+        <div class="relative min-w-0 flex-1">
+          <ComboboxInput
+            class="focus:ring-slurmweb w-full rounded-md border-0 bg-white py-1.5 pr-12 pl-3 shadow-xs ring-1 ring-gray-300 ring-inset focus:ring-2 focus:ring-inset sm:text-sm sm:leading-6 dark:bg-gray-800 dark:ring-gray-700"
+            :value="query"
+            @input="updateQuery"
+            :placeholder="queryPlaceholder()"
+          />
+          <ComboboxButton
+            class="absolute inset-y-0 right-0 flex items-center rounded-r-md px-2 focus:outline-hidden"
+          >
+            <ChevronUpDownIcon class="h-5 w-5 text-gray-400" aria-hidden="true" />
+          </ComboboxButton>
+        </div>
+        <button
+          type="button"
+          class="ui-button-primary shrink-0"
+          :disabled="!canAddManualUsername"
+          @click="addManualUsername"
+        >
+          Add username
+        </button>
+      </div>
 
       <ComboboxOptions
         v-if="filteredUsers.length > 0"

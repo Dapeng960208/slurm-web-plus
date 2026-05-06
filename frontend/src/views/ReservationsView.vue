@@ -269,7 +269,7 @@ if (route.query.page_size) {
                     <button
                       v-if="canEditReservation"
                       type="button"
-                      class="ui-button-secondary"
+                      class="ui-button-warning"
                       @click="openEditDialog(reservation)"
                     >
                       Edit
@@ -277,7 +277,7 @@ if (route.query.page_size) {
                     <button
                       v-if="canDeleteReservation"
                       type="button"
-                      class="ui-button-secondary"
+                      class="ui-button-danger"
                       @click="openDeleteDialog(reservation)"
                     >
                       Delete

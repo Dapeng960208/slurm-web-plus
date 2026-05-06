@@ -867,8 +867,19 @@ onUnmounted(() => {
         {
           key: 'state',
           label: 'State',
+          type: 'select',
           required: true,
-          hint: 'Comma-separated Slurm state flags to apply to this node.',
+          placeholder: 'Select node state',
+          options: [
+            { label: 'DRAIN', value: 'DRAIN' },
+            { label: 'RESUME', value: 'RESUME' },
+            { label: 'UNDRAIN', value: 'UNDRAIN' },
+            { label: 'DOWN', value: 'DOWN' },
+            { label: 'IDLE', value: 'IDLE' },
+            { label: 'FAIL', value: 'FAIL' },
+            { label: 'FUTURE', value: 'FUTURE' }
+          ],
+          hint: 'Select the Slurm state action to apply to this node.',
           tooltip:
             'Examples include DRAIN, RESUME or UNDRAIN depending on the desired scheduler action.'
         },

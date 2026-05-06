@@ -13,6 +13,11 @@ export function parseCsvList(value: string): string[] {
     .filter((item) => item.length > 0)
 }
 
+export function parseOptionalCsvList(value: string): string[] | undefined {
+  const items = parseCsvList(value)
+  return items.length > 0 ? items : undefined
+}
+
 export function stringifyList(values: string[] | string | null | undefined): string {
   if (!values) return ''
   if (typeof values === 'string') return values

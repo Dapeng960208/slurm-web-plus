@@ -67,6 +67,10 @@
 
 - GitHub Actions 已切到 `main` 分支自动测试，并补结构化 CI 结果 artifact 与手工 triage 入口。
 - AI 管理页新增所有用户会话审计；普通 AI 会话支持逻辑删除和消息复制。
+- AI 单作业查询已强化历史作业认知：实时 `job` 不足或作业完成后，可补查持久化 `jobs/history`，并识别 `used_memory_gb` 与 `used_cpu_cores_avg`。
+- 历史作业页新增跳转实时作业详情入口；作业编辑新增 `Memory per CPU (MB)`。
+- 用户和 account-user association 管理支持默认 QOS、分配 QOS、增加用户关联与删除关联。
+- 页面按钮颜色按语义区分：创建/提交、编辑/保存、删除/取消、查看/筛选分别使用不同样式。
 - 节点 `Real Metrics` 与用户工具分析页统一为按钮触发的起止时间弹框。
 - 时间范围弹框新增 `1 day`、`3 days`、`7 days`、`15 days`、`1 month` 快捷窗口；用户分析按已完成作业统计平均最大内存 GB、平均运行小时和平均 CPU 核数。
 - 基于现有业务页面增强 Slurm 管理能力，补齐单对象创建、编辑、删除、取消。

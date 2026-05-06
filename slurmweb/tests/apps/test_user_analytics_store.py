@@ -7,6 +7,7 @@
 from datetime import date, datetime, timedelta, timezone
 from types import SimpleNamespace
 import os
+from pathlib import Path
 import re
 import tempfile
 import types
@@ -21,6 +22,9 @@ from slurmweb.persistence.user_analytics_store import (
     ToolNameMapper,
     UserAnalyticsStore,
 )
+
+
+REPO_ROOT = Path(__file__).resolve().parents[3]
 
 
 class TestUserMetricsToolName(unittest.TestCase):
@@ -251,14 +255,86 @@ class TestUserMetricsAggregation(unittest.TestCase):
         self.assertEqual(payload[0]["tool"], "regr")
         self.assertEqual(payload[0]["jobs_count"], 2)
         self.assertEqual(payload[0]["avg_max_memory_gb"], 8.0)
+        self.assertEqual(payload[0]["avg_cpu_cores"], 2.0)
         self.assertEqual(payload[0]["memory_samples"], 1)
+        self.assertEqual(payload[0]["cpu_samples"], 1)
         self.assertEqual(payload[0]["runtime_samples"], 2)
 
-    def test_aggregate_daily_stat_rows_weights_persisted_tool_stats(self):
+    def test_daily_aggregation_uses_direct_positive_resource_fields(self):
+        rows = [
+            {
+                "activity_date": date(2026, 4, 24),
+                "user_id": 1,
+                "job_name": "blast",
+                "command": "blastp",
+                "used_memory_gb": 4.0,
+                "used_cpu_cores_avg": 2.0,
+                "start_time": datetime(2026, 4, 24, 8, 0, tzinfo=timezone.utc),
+                "end_time": datetime(2026, 4, 24, 9, 0, tzinfo=timezone.utc),
+                "usage_stats": None,
+            },
+            {
+                "activity_date": date(2026, 4, 24),
+                "user_id": 1,
+                "job_name": "blast",
+                "command": "blastp",
+                "used_memory_gb": 0.0,
+                "used_cpu_cores_avg": 0.0,
+                "start_time": datetime(2026, 4, 24, 10, 0, tzinfo=timezone.utc),
+                "end_time": datetime(2026, 4, 24, 11, 0, tzinfo=timezone.utc),
+                "usage_stats": None,
+            },
+            {
+                "activity_date": date(2026, 4, 24),
+                "user_id": 1,
+                "job_name": "blast",
+                "command": "blastp",
+                "used_memory_gb": -1.0,
+                "used_cpu_cores_avg": -2.0,
+                "start_time": datetime(2026, 4, 24, 12, 0, tzinfo=timezone.utc),
+                "end_time": datetime(2026, 4, 24, 13, 0, tzinfo=timezone.utc),
+                "usage_stats": {
+                    "memory": {"value_gb": 100.0},
+                    "cpu": {"estimated_cores_avg": 50.0},
+                },
+            },
+            {
+                "activity_date": date(2026, 4, 24),
+                "user_id": 2,
+                "job_name": "blast",
+                "command": "blastp",
+                "used_memory_gb": None,
+                "used_cpu_cores_avg": None,
+                "start_time": datetime(2026, 4, 24, 14, 0, tzinfo=timezone.utc),
+                "end_time": datetime(2026, 4, 24, 15, 0, tzinfo=timezone.utc),
+                "usage_stats": {
+                    "memory": {"value_gb": 100.0},
+                    "cpu": {"estimated_cores_avg": 50.0},
+                },
+            },
+        ]
+
+        payload = sorted(
+            aggregate_user_tool_daily_rows(rows, ToolNameMapper()),
+            key=lambda item: item["user_id"],
+        )
+
+        self.assertEqual(payload[0]["jobs_count"], 3)
+        self.assertEqual(payload[0]["avg_max_memory_gb"], 4.0)
+        self.assertEqual(payload[0]["avg_cpu_cores"], 2.0)
+        self.assertEqual(payload[0]["memory_samples"], 1)
+        self.assertEqual(payload[0]["cpu_samples"], 1)
+        self.assertEqual(payload[1]["jobs_count"], 1)
+        self.assertEqual(payload[1]["avg_max_memory_gb"], 0.0)
+        self.assertEqual(payload[1]["avg_cpu_cores"], 0.0)
+        self.assertEqual(payload[1]["memory_samples"], 0)
+        self.assertEqual(payload[1]["cpu_samples"], 0)
+
+    def test_aggregate_daily_stat_rows_weights_persisted_tool_stats_by_jobs(self):
         result = _aggregate_daily_stat_rows(
             [
-                ("blast", 2, 4.0, 8.0, 3600.0, 2, 2, 2),
-                ("blast", 1, 10.0, 2.0, 7200.0, 1, 1, 1),
+                ("blast", 2, 4.0, 8.0, 3600.0, 1, 1, 2),
+                ("blast", 1, 10.0, 2.0, 7200.0, 99, 99, 1),
                 ("bwa", 1, None, None, None, 0, 0, 0),
             ]
         )
@@ -268,7 +344,25 @@ class TestUserMetricsAggregation(unittest.TestCase):
         self.assertEqual(result["totals"]["busiest_tool"], "blast")
         self.assertAlmostEqual(result["tool_breakdown"][0]["avg_max_memory_gb"], 6.0)
         self.assertAlmostEqual(result["tool_breakdown"][0]["avg_cpu_cores"], 6.0)
+        self.assertAlmostEqual(result["totals"]["avg_max_memory_gb"], 6.0)
+        self.assertAlmostEqual(result["totals"]["avg_cpu_cores"], 6.0)
+        self.assertEqual(result["tool_breakdown"][1]["avg_max_memory_gb"], 0.0)
+        self.assertEqual(result["tool_breakdown"][1]["avg_cpu_cores"], 0.0)
         self.assertAlmostEqual(result["tool_breakdown"][0]["avg_runtime_hours"], 1.3333333333333333)
+
+    def test_aggregate_daily_stat_rows_skips_days_without_resource_samples(self):
+        result = _aggregate_daily_stat_rows(
+            [
+                ("blast", 2, 4.0, 8.0, 3600.0, 2, 2, 2),
+                ("blast", 3, 0.0, 0.0, 1800.0, 0, 0, 3),
+            ]
+        )
+
+        self.assertEqual(result["totals"]["completed_jobs"], 5)
+        self.assertAlmostEqual(result["tool_breakdown"][0]["avg_max_memory_gb"], 4.0)
+        self.assertAlmostEqual(result["tool_breakdown"][0]["avg_cpu_cores"], 8.0)
+        self.assertAlmostEqual(result["totals"]["avg_max_memory_gb"], 4.0)
+        self.assertAlmostEqual(result["totals"]["avg_cpu_cores"], 8.0)
 
 
 class TestUserMetricsTimeline(unittest.TestCase):
@@ -417,7 +511,7 @@ class TestUserMetricsQueries(unittest.TestCase):
         self.assertEqual(payload[0]["tool"], "blastp")
         self.assertEqual(payload[0]["jobs_count"], 1)
 
-    def test_refresh_current_day_summary_uses_usage_stats_resource_fallback(self):
+    def test_refresh_current_day_summary_ignores_usage_stats_resource_fallback(self):
         self.store._current_day_completed_rows = mock.Mock(
             return_value=[
                 {
@@ -442,12 +536,12 @@ class TestUserMetricsQueries(unittest.TestCase):
         self.store.refresh_current_day_summary()
 
         payload = self.store._upsert_current_day_summary.call_args.args[0]
-        self.assertEqual(payload[0]["avg_max_memory_gb"], 16.0)
-        self.assertEqual(payload[0]["avg_cpu_cores"], 8.0)
-        self.assertEqual(payload[0]["memory_samples"], 1)
-        self.assertEqual(payload[0]["cpu_samples"], 1)
+        self.assertEqual(payload[0]["avg_max_memory_gb"], 0.0)
+        self.assertEqual(payload[0]["avg_cpu_cores"], 0.0)
+        self.assertEqual(payload[0]["memory_samples"], 0)
+        self.assertEqual(payload[0]["cpu_samples"], 0)
 
-    def test_refresh_current_day_summary_uses_tres_memory_fallback(self):
+    def test_refresh_current_day_summary_ignores_tres_memory_fallback(self):
         self.store._current_day_completed_rows = mock.Mock(
             return_value=[
                 {
@@ -474,8 +568,8 @@ class TestUserMetricsQueries(unittest.TestCase):
         self.store.refresh_current_day_summary()
 
         payload = self.store._upsert_current_day_summary.call_args.args[0]
-        self.assertEqual(payload[0]["avg_max_memory_gb"], 16.0)
-        self.assertEqual(payload[0]["memory_samples"], 1)
+        self.assertEqual(payload[0]["avg_max_memory_gb"], 0.0)
+        self.assertEqual(payload[0]["memory_samples"], 0)
 
     def test_refresh_user_tool_daily_stats_replaces_persisted_rows(self):
         self.store._completed_jobs_rows_for_activity_dates = mock.Mock(
@@ -530,6 +624,41 @@ class TestUserMetricsQueries(unittest.TestCase):
         self.assertEqual(result["totals"]["completed_jobs"], 3)
         self.assertAlmostEqual(result["totals"]["avg_max_memory_gb"], 6.0)
         self.assertAlmostEqual(result["totals"]["avg_cpu_cores"], 6.0)
+
+    def test_user_tool_daily_summary_treats_old_null_fields_as_zero(self):
+        self.cursor.fetchall.return_value = [
+            ("blast", 1, None, None, None, 0, 0, 0),
+        ]
+
+        result = self.store._user_tool_daily_summary(
+            "alice",
+            date(2026, 4, 24),
+            date(2026, 4, 24),
+        )
+
+        self.assertEqual(result["totals"]["completed_jobs"], 1)
+        self.assertEqual(result["totals"]["avg_max_memory_gb"], 0.0)
+        self.assertEqual(result["totals"]["avg_cpu_cores"], 0.0)
+        self.assertEqual(result["tool_breakdown"][0]["avg_max_memory_gb"], 0.0)
+        self.assertEqual(result["tool_breakdown"][0]["avg_cpu_cores"], 0.0)
+
+    def test_user_tool_daily_summary_skips_null_resource_days_from_resource_averages(self):
+        self.cursor.fetchall.return_value = [
+            ("blast", 2, 4.0, 8.0, 3600.0, 2, 2, 2),
+            ("blast", 3, None, None, 1800.0, 0, 0, 3),
+        ]
+
+        result = self.store._user_tool_daily_summary(
+            "alice",
+            date(2026, 4, 24),
+            date(2026, 4, 25),
+        )
+
+        self.assertEqual(result["totals"]["completed_jobs"], 5)
+        self.assertAlmostEqual(result["totals"]["avg_max_memory_gb"], 4.0)
+        self.assertAlmostEqual(result["totals"]["avg_cpu_cores"], 8.0)
+        self.assertAlmostEqual(result["tool_breakdown"][0]["avg_max_memory_gb"], 4.0)
+        self.assertAlmostEqual(result["tool_breakdown"][0]["avg_cpu_cores"], 8.0)
 
     def test_completed_jobs_window_query_filters_by_time_range(self):
         start_time = datetime(2026, 4, 24, 0, 0, tzinfo=timezone.utc)
@@ -611,3 +740,102 @@ class TestUserMetricsQueries(unittest.TestCase):
 
         sql = self.cursor.execute.call_args.args[0]
         self.assertIn("UPPER(js.job_state) LIKE %s", sql)
+
+
+class TestRepairUserToolDailyStatsScript(unittest.TestCase):
+    def _load_script(self):
+        import importlib.util
+
+        path = REPO_ROOT / "slurmweb" / "repair-user-tool-daily-stats.py"
+        spec = importlib.util.spec_from_file_location("repair_user_tool_daily_stats", path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    def test_rebuild_dry_run_does_not_write(self):
+        script = self._load_script()
+        conn = mock.Mock()
+        args = SimpleNamespace(
+            start=date(2026, 4, 24),
+            end=date(2026, 4, 25),
+            user="alice",
+            dry_run=True,
+            rewrite_pattern=r"^regr([_-].*)?$",
+            rewrite_tool="regr",
+        )
+
+        with mock.patch.object(
+            script,
+            "completed_rows",
+            return_value=[
+                {
+                    "activity_date": date(2026, 4, 24),
+                    "user_id": 1,
+                    "job_name": "blast",
+                    "command": "blastp",
+                    "used_memory_gb": 4.0,
+                    "used_cpu_cores_avg": 2.0,
+                    "start_time": datetime(2026, 4, 24, 8, 0, tzinfo=timezone.utc),
+                    "end_time": datetime(2026, 4, 24, 9, 0, tzinfo=timezone.utc),
+                    "usage_stats": None,
+                }
+            ],
+        ), mock.patch.object(script, "count_target_rows", return_value=3) as count_target, mock.patch.object(
+            script, "replace_target_rows"
+        ) as replace_target:
+            result = script.rebuild(
+                conn,
+                args,
+                SimpleNamespace(tool_mapping_file=None),
+            )
+
+        self.assertEqual(result, {"source_jobs": 1, "deleted": 3, "inserted": 1})
+        count_target.assert_called_once_with(
+            conn, date(2026, 4, 24), date(2026, 4, 25), username="alice"
+        )
+        replace_target.assert_not_called()
+        conn.commit.assert_not_called()
+
+    def test_rebuild_writes_rebuilt_payload(self):
+        script = self._load_script()
+        conn = mock.Mock()
+        args = SimpleNamespace(
+            start=date(2026, 4, 24),
+            end=date(2026, 4, 24),
+            user=None,
+            dry_run=False,
+            rewrite_pattern=r"^regr([_-].*)?$",
+            rewrite_tool="regr",
+        )
+
+        with mock.patch.object(
+            script,
+            "completed_rows",
+            return_value=[
+                {
+                    "activity_date": date(2026, 4, 24),
+                    "user_id": 1,
+                    "job_name": "blast",
+                    "command": "blastp",
+                    "used_memory_gb": None,
+                    "used_cpu_cores_avg": None,
+                    "start_time": datetime(2026, 4, 24, 8, 0, tzinfo=timezone.utc),
+                    "end_time": datetime(2026, 4, 24, 9, 0, tzinfo=timezone.utc),
+                    "usage_stats": None,
+                }
+            ],
+        ), mock.patch.object(script, "count_target_rows", return_value=0), mock.patch.object(
+            script, "replace_target_rows", return_value=2
+        ) as replace_target:
+            result = script.rebuild(
+                conn,
+                args,
+                SimpleNamespace(tool_mapping_file=None),
+            )
+
+        payload = replace_target.call_args.args[3]
+        self.assertEqual(result, {"source_jobs": 1, "deleted": 2, "inserted": 1})
+        self.assertEqual(payload[0]["avg_max_memory_gb"], 0.0)
+        self.assertEqual(payload[0]["avg_cpu_cores"], 0.0)
+        replace_target.assert_called_once()
+        conn.commit.assert_called_once()

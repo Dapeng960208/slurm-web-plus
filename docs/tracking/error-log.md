@@ -17,6 +17,15 @@
 
 ## 条目
 
+### 2026-05-06：Headless UI Teleport 残留 DOM 导致前端弹窗表单测试提交错对象
+
+- 场景：为 `JobsView`、`JobView`、`AccountView` 补作业内存和 association QOS 写操作前端单测。
+- 现象：`update_job` 没有被调用，或第二次 association 保存把上一轮 Add User 弹窗的输入当成当前 Edit QOS 表单字段。
+- 复现：在 `frontend/` 下执行 `npx vitest run tests/views/JobsView.spec.ts tests/views/JobView.spec.ts tests/views/AccountView.spec.ts tests/views/UserView.spec.ts`，测试通过 `document.body.querySelector('form')` 或全局 `input` 下标提交弹窗。
+- 根因：Headless UI Dialog/Transition 与 `attachTo: document.body` 会把弹窗内容渲染到 body；关闭后的过渡 DOM 或前一个测试残留 DOM 可能仍被全局选择器命中，导致测试操作的不是当前业务弹窗。
+- 解决：相关测试改为清理 `document.body.innerHTML`，并直接定位页面内的 `ActionDialog` 组件后触发其 `submit` 事件，验证页面提交 payload，而不是依赖弹窗内部 DOM 排序。
+- 预防：后续测试复用 `ActionDialog`、Headless UI Dialog 或 Teleport 弹窗时，不要用全局表单/输入下标作为核心断言路径；优先按组件实例、标题或明确 test id 定位当前弹窗。
+
 ### 2026-04-28：用户分析自定义时间窗下 `Submission Activity` 可能不显示历史任务
 
 - 场景：在用户工具分析页面选择自定义起止时间后查看 `Submission Activity`。

@@ -74,6 +74,13 @@ describe('JobHistoryView.vue', () => {
     const badge = wrapper.getComponent(JobStatusBadge)
     expect(badge.props('status')).toStrictEqual(['UNKNOWN'])
     expect(badge.text()).toContain('UNKNOWN')
+    const liveLink = wrapper
+      .findAllComponents({ name: 'RouterLink' })
+      .find((link) => JSON.stringify(link.props('to')) === JSON.stringify({
+        name: 'job',
+        params: { cluster: 'foo', id: 1234 }
+      }))
+    expect(liveLink).toBeDefined()
     expect(wrapper.text()).toContain('0 node, 0 CPU')
     expect(wrapper.text()).toContain('Exit Code')
     expect(wrapper.get('[data-testid="detail-summary-strip"]').text()).toContain('SUCCESS (0)')

@@ -261,12 +261,17 @@ async function saveJobEdits(payload: Record<string, string>) {
   operationBusy.value = true
   operationError.value = null
   try {
+    const memoryPerCpu = parsePositiveInteger(payload.memory_per_cpu_mb)
     await gateway.update_job(cluster, id, {
       partition: payload.partition || undefined,
       qos: payload.qos || undefined,
       priority: payload.priority ? Number(payload.priority) : null,
       time_limit: payload.time_limit || undefined,
-      comment: payload.comment || undefined
+      comment: payload.comment || undefined,
+      memory_per_cpu:
+        memoryPerCpu == null
+          ? undefined
+          : { set: true, infinite: false, number: memoryPerCpu }
     })
     runtimeStore.reportInfo(`Job ${id} update requested.`)
     editOpen.value = false
@@ -292,6 +297,15 @@ async function cancelJob(payload: Record<string, string>) {
   } finally {
     operationBusy.value = false
   }
+}
+
+function parsePositiveInteger(value: string): number | null {
+  if (!value.trim()) return null
+  const parsed = Number(value)
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    throw new Error('Memory per CPU must be a positive integer in MB.')
+  }
+  return parsed
 }
 
 function highlightField(field: JobField) {
@@ -353,10 +367,10 @@ watch(
                 >
                   {{ data.state.reason }}
                 </span>
-                <button v-if="canEdit" type="button" class="ui-button-secondary" @click="editOpen = true">
+                <button v-if="canEdit" type="button" class="ui-button-warning" @click="editOpen = true">
                   Edit
                 </button>
-                <button v-if="canCancel" type="button" class="ui-button-secondary" @click="cancelOpen = true">
+                <button v-if="canCancel" type="button" class="ui-button-danger" @click="cancelOpen = true">
                   Cancel
                 </button>
               </template>
@@ -471,6 +485,7 @@ watch(
         partition: data?.partition ?? '',
         qos: data?.qos ?? '',
         priority: data?.priority?.set ? String(data.priority.number) : '',
+        memory_per_cpu_mb: '',
         time_limit: '',
         comment: data?.comment?.administrator || data?.comment?.job || ''
       }"
@@ -478,6 +493,13 @@ watch(
         { key: 'partition', label: 'Partition' },
         { key: 'qos', label: 'QOS' },
         { key: 'priority', label: 'Priority', type: 'number' },
+        {
+          key: 'memory_per_cpu_mb',
+          label: 'Memory per CPU (MB)',
+          type: 'number',
+          hint: 'Optional',
+          tooltip: 'Submitted as Slurm REST memory_per_cpu.number when set.'
+        },
         { key: 'time_limit', label: 'Time limit' },
         { key: 'comment', label: 'Comment', type: 'textarea' }
       ]"

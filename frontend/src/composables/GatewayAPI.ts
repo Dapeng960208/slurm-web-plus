@@ -1069,6 +1069,9 @@ export interface ClusterQos {
 
 export interface ClusterAssociation {
   account: string
+  default?: {
+    qos?: string
+  }
   max: {
     jobs: {
       accruing: ClusterOptionalNumber // MaxJobsAccrue
@@ -1220,6 +1223,7 @@ export interface JobUpdatePayload extends Record<string, unknown> {
   priority?: number | null
   time_limit?: string | null
   comment?: string | null
+  memory_per_cpu?: { set: boolean; infinite: boolean; number: number } | null
 }
 
 export interface NodeUpdatePayload extends Record<string, unknown> {
@@ -1826,6 +1830,13 @@ export function useGatewayAPI() {
     return await restAPI.post<ClusterOperationResult>(`/agents/${cluster}/associations`, payload)
   }
 
+  async function delete_association(
+    cluster: string,
+    payload: Record<string, unknown>
+  ): Promise<ClusterOperationResult> {
+    return await restAPI.delete<ClusterOperationResult>(`/agents/${cluster}/associations`, payload)
+  }
+
   async function save_qos(
     cluster: string,
     payload: SlurmdbObjectPayload
@@ -2349,6 +2360,7 @@ export function useGatewayAPI() {
     delete_account,
     associations,
     save_association,
+    delete_association,
     save_user,
     delete_user,
     save_qos,

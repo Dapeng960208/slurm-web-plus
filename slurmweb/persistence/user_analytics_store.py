@@ -5,6 +5,7 @@
 # SPDX-License-Identifier: MIT
 
 import logging
+import math
 import ntpath
 import posixpath
 import re
@@ -145,6 +146,13 @@ def _numeric_value(value):
         return None
 
 
+def _positive_numeric_value(value):
+    parsed = _numeric_value(value)
+    if parsed is None or not math.isfinite(parsed) or parsed <= 0:
+        return None
+    return parsed
+
+
 def _json_mapping(value):
     if isinstance(value, dict):
         return value
@@ -238,6 +246,12 @@ def _bucket_epoch_ms(value):
 def _avg(total, samples):
     if samples <= 0:
         return None
+    return float(total) / float(samples)
+
+
+def _avg_or_zero(total, samples):
+    if samples <= 0:
+        return 0.0
     return float(total) / float(samples)
 
 
@@ -393,18 +407,18 @@ def _aggregate_daily_stat_rows(rows):
         bucket = tools[tool]
         bucket["jobs"] += jobs
         summary["jobs"] += jobs
-        if avg_memory_gb is not None:
-            samples = memory_samples or jobs
-            bucket["memory_total"] += float(avg_memory_gb) * samples
-            bucket["memory_samples"] += samples
-            summary["memory_total"] += float(avg_memory_gb) * samples
-            summary["memory_samples"] += samples
-        if avg_cpu_cores is not None:
-            samples = cpu_samples or jobs
-            bucket["cpu_total"] += float(avg_cpu_cores) * samples
-            bucket["cpu_samples"] += samples
-            summary["cpu_total"] += float(avg_cpu_cores) * samples
-            summary["cpu_samples"] += samples
+        memory_value = _positive_numeric_value(avg_memory_gb)
+        cpu_value = _positive_numeric_value(avg_cpu_cores)
+        if memory_value is not None and memory_samples > 0:
+            bucket["memory_total"] += memory_value * jobs
+            bucket["memory_samples"] += jobs
+            summary["memory_total"] += memory_value * jobs
+            summary["memory_samples"] += jobs
+        if cpu_value is not None and cpu_samples > 0:
+            bucket["cpu_total"] += cpu_value * jobs
+            bucket["cpu_samples"] += jobs
+            summary["cpu_total"] += cpu_value * jobs
+            summary["cpu_samples"] += jobs
         if avg_runtime_seconds is not None:
             samples = runtime_samples or jobs
             bucket["runtime_total"] += float(avg_runtime_seconds) * samples
@@ -414,7 +428,7 @@ def _aggregate_daily_stat_rows(rows):
 
     tool_breakdown = []
     for tool, values in tools.items():
-        avg_memory_gb = _avg(values["memory_total"], values["memory_samples"])
+        avg_memory_gb = _avg_or_zero(values["memory_total"], values["memory_samples"])
         avg_runtime_seconds = _avg(
             values["runtime_total"], values["runtime_samples"]
         )
@@ -424,7 +438,7 @@ def _aggregate_daily_stat_rows(rows):
                 "jobs": values["jobs"],
                 "avg_max_memory_gb": avg_memory_gb,
                 "avg_max_memory_mb": _memory_mb(avg_memory_gb),
-                "avg_cpu_cores": _avg(values["cpu_total"], values["cpu_samples"]),
+                "avg_cpu_cores": _avg_or_zero(values["cpu_total"], values["cpu_samples"]),
                 "avg_runtime_hours": _runtime_hours(avg_runtime_seconds),
                 "avg_runtime_seconds": avg_runtime_seconds,
             }
@@ -433,7 +447,9 @@ def _aggregate_daily_stat_rows(rows):
 
     busiest_tool = tool_breakdown[0]["tool"] if tool_breakdown else None
     busiest_tool_jobs = tool_breakdown[0]["jobs"] if tool_breakdown else 0
-    avg_summary_memory_gb = _avg(summary["memory_total"], summary["memory_samples"])
+    avg_summary_memory_gb = _avg_or_zero(
+        summary["memory_total"], summary["memory_samples"]
+    )
     avg_summary_runtime_seconds = _avg(
         summary["runtime_total"], summary["runtime_samples"]
     )
@@ -443,7 +459,9 @@ def _aggregate_daily_stat_rows(rows):
             "active_tools": len(tool_breakdown),
             "avg_max_memory_gb": avg_summary_memory_gb,
             "avg_max_memory_mb": _memory_mb(avg_summary_memory_gb),
-            "avg_cpu_cores": _avg(summary["cpu_total"], summary["cpu_samples"]),
+            "avg_cpu_cores": _avg_or_zero(
+                summary["cpu_total"], summary["cpu_samples"]
+            ),
             "avg_runtime_hours": _runtime_hours(avg_summary_runtime_seconds),
             "avg_runtime_seconds": avg_summary_runtime_seconds,
             "busiest_tool": busiest_tool,
@@ -513,11 +531,11 @@ def aggregate_user_tool_daily_rows(
         key = (activity_date, user_id, tool)
         bucket = buckets[key]
         bucket["jobs_count"] += 1
-        memory_value = _memory_gb(row)
+        memory_value = _positive_numeric_value(row.get("used_memory_gb"))
         if memory_value is not None:
             bucket["memory_total"] += memory_value
             bucket["memory_samples"] += 1
-        cpu_value = _cpu_cores_avg(row)
+        cpu_value = _positive_numeric_value(row.get("used_cpu_cores_avg"))
         if cpu_value is not None:
             bucket["cpu_total"] += cpu_value
             bucket["cpu_samples"] += 1
@@ -534,10 +552,12 @@ def aggregate_user_tool_daily_rows(
                 "user_id": user_id,
                 "tool": tool,
                 "jobs_count": values["jobs_count"],
-                "avg_max_memory_gb": _avg(
+                "avg_max_memory_gb": _avg_or_zero(
                     values["memory_total"], values["memory_samples"]
                 ),
-                "avg_cpu_cores": _avg(values["cpu_total"], values["cpu_samples"]),
+                "avg_cpu_cores": _avg_or_zero(
+                    values["cpu_total"], values["cpu_samples"]
+                ),
                 "avg_runtime_seconds": _avg(
                     values["runtime_total"], values["runtime_samples"]
                 ),

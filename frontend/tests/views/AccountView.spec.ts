@@ -1,7 +1,9 @@
 import { describe, test, expect, beforeEach, vi } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { nextTick } from 'vue'
+import { flushPromises, mount } from '@vue/test-utils'
 import { RouterLink } from 'vue-router'
 import AccountView from '@/views/AccountView.vue'
+import ActionDialog from '@/components/operations/ActionDialog.vue'
 import { init_plugins, getMockClusterDataPoller } from '../lib/common'
 import { useRuntimeStore } from '@/stores/runtime'
 import type { ClusterAssociation } from '@/composables/GatewayAPI'
@@ -12,14 +14,29 @@ import AccountBreadcrumb from '@/components/accounts/AccountBreadcrumb.vue'
 import PanelSkeleton from '@/components/PanelSkeleton.vue'
 
 const mockClusterDataPoller = getMockClusterDataPoller<ClusterAssociation[]>()
+const mockGatewayAPI = {
+  save_account: vi.fn(),
+  delete_account: vi.fn(),
+  save_association: vi.fn(),
+  delete_association: vi.fn()
+}
 
 vi.mock('@/composables/DataPoller', () => ({
   useClusterDataPoller: () => mockClusterDataPoller
 }))
 
+vi.mock('@/composables/GatewayAPI', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/composables/GatewayAPI')>()
+  return {
+    ...actual,
+    useGatewayAPI: () => mockGatewayAPI
+  }
+})
+
 describe('AccountView.vue', () => {
   beforeEach(() => {
     init_plugins()
+    vi.clearAllMocks()
     useRuntimeStore().availableClusters = [
       {
         name: 'foo',
@@ -34,6 +51,7 @@ describe('AccountView.vue', () => {
     mockClusterDataPoller.unable.value = false
     mockClusterDataPoller.loaded.value = false
     mockClusterDataPoller.initialLoading.value = false
+    document.body.innerHTML = ''
   })
 
   test('displays account details', () => {
@@ -45,6 +63,15 @@ describe('AccountView.vue', () => {
       props: {
         cluster: 'foo',
         account: 'root'
+      },
+      global: {
+        stubs: {
+          Dialog: { template: '<div><slot /></div>' },
+          DialogPanel: { template: '<div><slot /></div>' },
+          DialogTitle: { template: '<div><slot /></div>' },
+          TransitionChild: { template: '<div><slot /></div>' },
+          TransitionRoot: { template: '<div><slot /></div>' }
+        }
       }
     })
 
@@ -201,5 +228,114 @@ describe('AccountView.vue', () => {
     const infoAlert = wrapper.findComponent(InfoAlert)
     expect(infoAlert.exists()).toBe(true)
     expect(infoAlert.text()).toContain('has no end-user associations')
+  })
+
+  test('adds, edits QOS, and deletes account user associations', async () => {
+    useRuntimeStore().availableClusters = [
+      {
+        name: 'foo',
+        permissions: {
+          roles: [],
+          actions: [],
+          rules: ['accounts:view:*', 'accounts:edit:*', 'accounts:delete:*']
+        },
+        racksdb: true,
+        infrastructure: 'foo',
+        metrics: true,
+        cache: true
+      }
+    ]
+    mockGatewayAPI.save_association.mockResolvedValue({ operation: 'accounts.associations.update' })
+    mockGatewayAPI.delete_association.mockResolvedValue({ operation: 'accounts.associations.delete' })
+    mockClusterDataPoller.loaded.value = true
+    mockClusterDataPoller.initialLoading.value = false
+    mockClusterDataPoller.data.value = [
+      {
+        ...(associations as ClusterAssociation[])[0],
+        account: 'root',
+        user: '',
+        qos: ['normal']
+      },
+      {
+        ...(associations as ClusterAssociation[])[0],
+        account: 'root',
+        user: 'alice',
+        qos: ['normal'],
+        default: { qos: 'normal' }
+      }
+    ] as ClusterAssociation[]
+
+    const wrapper = mount(AccountView, {
+      attachTo: document.body,
+      props: {
+        cluster: 'foo',
+        account: 'root'
+      }
+    })
+
+    await wrapper.findAll('button').find((button) => button.text() === 'Add user')!.trigger('click')
+    await nextTick()
+    wrapper
+      .findAllComponents(ActionDialog)
+      .find((dialog) => dialog.props('title') === 'Add User Association')!
+      .vm.$emit('submit', {
+        user: 'bob',
+        qos: 'normal, study',
+        default_qos: 'study'
+      })
+    await flushPromises()
+
+    expect(mockGatewayAPI.save_association).toHaveBeenCalledWith('foo', {
+      associations: [
+        {
+          account: 'root',
+          user: 'bob',
+          qos: ['normal', 'study'],
+          default: { qos: 'study' }
+        }
+      ]
+    })
+
+    await wrapper.findAll('button').find((button) => button.text() === 'Edit QOS')!.trigger('click')
+    await nextTick()
+    wrapper
+      .findAllComponents(ActionDialog)
+      .find((dialog) => dialog.props('title') === 'Edit User QOS')!
+      .vm.$emit('submit', {
+        qos: 'debug',
+        default_qos: 'debug'
+      })
+    await flushPromises()
+
+    expect(mockGatewayAPI.save_association).toHaveBeenLastCalledWith('foo', {
+      associations: [
+        {
+          account: 'root',
+          user: 'alice',
+          qos: ['debug'],
+          default: { qos: 'debug' }
+        }
+      ]
+    })
+
+    await wrapper.findAll('button').find((button) => button.text() === 'Delete')!.trigger('click')
+    await nextTick()
+    wrapper
+      .findAllComponents(ActionDialog)
+      .find((dialog) => dialog.props('title') === 'Delete User Association')!
+      .vm.$emit('submit', {})
+    await flushPromises()
+
+    expect(mockGatewayAPI.delete_association).toHaveBeenCalledWith('foo', {
+      associations: [
+        {
+          account: 'root',
+          user: 'alice',
+          qos: undefined,
+          default: undefined
+        }
+      ]
+    })
+    wrapper.unmount()
   })
 })

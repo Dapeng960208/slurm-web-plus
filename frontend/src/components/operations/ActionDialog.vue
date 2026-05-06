@@ -11,13 +11,14 @@ import { computed, reactive, watch } from 'vue'
 import { Dialog, DialogPanel, DialogTitle, TransitionChild, TransitionRoot } from '@headlessui/vue'
 import FormFieldLabel from '@/components/forms/FormFieldLabel.vue'
 
-export type ActionFieldType = 'text' | 'textarea' | 'number'
+export type ActionFieldType = 'text' | 'textarea' | 'number' | 'select'
 export type ActionSubmitVariant = 'primary' | 'warning' | 'danger'
 
 export interface ActionField {
   key: string
   label: string
   type?: ActionFieldType
+  options?: { label: string; value: string }[]
   placeholder?: string
   required?: boolean
   hint?: string
@@ -146,6 +147,20 @@ watch(
                     class="mt-2 block w-full rounded-[20px] border border-[rgba(80,105,127,0.14)] bg-white px-3 py-3 text-sm outline-hidden focus:border-[rgba(182,232,44,0.65)] focus:ring-4 focus:ring-[rgba(182,232,44,0.18)]"
                     :placeholder="field.placeholder"
                   />
+                  <select
+                    v-else-if="field.type === 'select'"
+                    v-model="form[field.key]"
+                    class="mt-2 block w-full rounded-[18px] border border-[rgba(80,105,127,0.14)] bg-white px-3 py-2.5 text-sm outline-hidden focus:border-[rgba(182,232,44,0.65)] focus:ring-4 focus:ring-[rgba(182,232,44,0.18)]"
+                  >
+                    <option value="" disabled>{{ field.placeholder ?? 'Select an option' }}</option>
+                    <option
+                      v-for="option in field.options ?? []"
+                      :key="option.value"
+                      :value="option.value"
+                    >
+                      {{ option.label }}
+                    </option>
+                  </select>
                   <input
                     v-else
                     v-model="form[field.key]"

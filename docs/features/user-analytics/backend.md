@@ -22,9 +22,9 @@
 - `GET /api/agents/<cluster>/user/<username>/metrics/history`
 - `GET /api/agents/<cluster>/associations`
 
-`tools/analysis` 的工具分类统计以 `user_tool_daily_stats` 为返回来源。接口收到 `start` / `end` 后，只按时间窗覆盖到的 UTC 自然日读取 `user_tool_daily_stats` 并汇总返回；查询多天时会把多天日表记录按样本数加权合并。该请求路径不实时扫描 `job_snapshots` 或 SlurmDB。`user_tool_daily_stats` 由后台当前日聚合线程和维护脚本 `slurmweb/rebuild-user-tool.py` 负责生成或修复。
+`tools/analysis` 的工具分类统计以 `user_tool_daily_stats` 为返回来源。接口收到 `start` / `end` 后，只按时间窗覆盖到的 UTC 自然日读取 `user_tool_daily_stats` 并汇总返回；查询多天时，内存与 CPU 均值按 `sum(day.avg * day.jobs_count) / sum(day.jobs_count)` 合并。该请求路径不实时扫描 `job_snapshots` 或 SlurmDB。历史错误日表可通过维护脚本 `slurmweb/repair-user-tool-daily-stats.py` 按日期范围和可选用户重建。
 
-后台线程按 `[user_metrics].aggregation_interval` 配置周期执行，启动时先执行一次，然后按间隔更新当天 UTC 自然日的终态作业统计。后台聚合与 `slurmweb/rebuild-user-tool.py` 复用同一套聚合函数，保持工具归类、空值过滤、资源样本数和插入字段一致。
+后台线程按 `[user_metrics].aggregation_interval` 配置周期执行，启动时先执行一次，然后按间隔更新当天 UTC 自然日的终态作业统计。后台聚合与维护脚本复用同一套聚合函数，保持工具归类、空值过滤和插入字段一致。
 
 `user_tool_daily_stats` 按 `(activity_date, user_id, tool)` 保存每日工具统计：
 
@@ -36,7 +36,7 @@
 - `cpu_samples`
 - `runtime_samples`
 
-其中 `memory_samples` / `cpu_samples` / `runtime_samples` 用于跨多日聚合时按真实样本数加权，避免只有部分作业存在资源数据时平均值被 `jobs_count` 拉偏。
+其中 `memory_samples` / `cpu_samples` / `runtime_samples` 仅作为诊断字段保留；`tools/analysis` 跨多日返回的 `avg_max_memory_gb` 与 `avg_cpu_cores` 按每日 `jobs_count` 加权，但只有当天存在对应资源样本时，该日才会进入对应资源均值统计。旧日表中 `avg_max_memory_gb` 或 `avg_cpu_cores` 为 `NULL`，且对应样本数为 `0` 时，该日不会进入对应资源均值分母。
 
 `tools/analysis` 当前固定要求：
 
@@ -69,11 +69,23 @@
 
 - 只统计已完成或终态作业。
 - `tools/analysis` 会按 `start` / `end` 覆盖到的 UTC 日期读取日聚合表；该接口的工具统计粒度为日，且请求时不实时重建日聚合表。
-- 日聚合写入会过滤没有 `user_id` 或没有完成时间兜底值 `COALESCE(end_time, last_seen)` 的作业；资源字段为空时只跳过对应资源样本，不影响 `jobs_count`。
-- 内存均值优先按 `job_snapshots.used_memory_gb` 计算；若历史行该字段为空，回退到 `usage_stats.memory.value_gb`；若 Slurm step 级实际内存仍缺失，再按 `tres_allocated` / `tres_requested` / TRES 字符串中的 `mem` 作为配置内存兜底，避免有内存 TRES 但无 step `consumed.max.mem` 的作业返回空值。接口同时保留 `avg_max_memory_mb` 作为前端兼容字段。
-- CPU 均值优先按 `job_snapshots.used_cpu_cores_avg` 计算；兼容历史行中的 `used_cpu_core_avg`，若顶层字段为空，回退到 `usage_stats.cpu.estimated_cores_avg`。
+- 日聚合写入会过滤没有 `user_id` 或没有完成时间兜底值 `COALESCE(end_time, last_seen)` 的作业；资源字段为空、非法、负数或 `0` 时只跳过对应资源样本，不影响 `jobs_count`。
+- 当天日聚合按 `activity_date + user_id + tool` 分组，只统计终态作业。
+- 当天 `avg_max_memory_gb` 只使用 `job_snapshots.used_memory_gb > 0` 的样本求平均；`None`、`0`、负数和非法数值不参与平均；同组没有有效内存样本时保存 `0`。接口同时保留 `avg_max_memory_mb` 作为前端兼容字段。
+- 当天 `avg_cpu_cores` 只使用 `job_snapshots.used_cpu_cores_avg > 0` 的样本求平均；`None`、`0`、负数和非法数值不参与平均；同组没有有效 CPU 样本时保存 `0`。
+- 跨多天查询按日表行合并：`avg_max_memory_gb = sum(day.avg_max_memory_gb * day.jobs_count) / sum(day.jobs_count)`，`avg_cpu_cores` 同理；但只有当天 `memory_samples > 0` 或 `cpu_samples > 0` 时，该日才参与对应资源均值的分母。
+- 当整个时间窗内某项资源总样本数为 `0` 时，跨天返回该资源均值为 `0`。
 - 运行时间优先按 `end_time - start_time` 计算，并返回 `avg_runtime_hours`；兼容保留 `avg_runtime_seconds`。
 - 终态判断按 `UPPER(job_state)` 匹配，避免 `completed` / `COMPLETED` 大小写差异导致统计为空。
+
+维护脚本：
+
+```powershell
+.venv\Scripts\python.exe slurmweb\repair-user-tool-daily-stats.py --start 2026-05-01 --end 2026-05-06 --dry-run
+.venv\Scripts\python.exe slurmweb\repair-user-tool-daily-stats.py --start 2026-05-01 --end 2026-05-06 --user alice
+```
+
+脚本默认删除目标日期范围内的旧 `user_tool_daily_stats`，再按当前口径从 `job_snapshots` 重建；`--dry-run` 只输出将处理的作业数、将删除的旧行数和将写入的新行数，不写数据库。
 
 `metrics/history` 当前返回：
 

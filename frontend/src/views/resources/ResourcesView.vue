@@ -14,7 +14,7 @@ import type { LocationQueryRaw } from 'vue-router'
 import { useRuntimeStore } from '@/stores/runtime'
 import { isFiltersClusterNodeMainState } from '@/stores/runtime/resources'
 import { useClusterDataPoller } from '@/composables/DataPoller'
-import { getMBHumanUnit, getNodeGPU, useGatewayAPI } from '@/composables/GatewayAPI'
+import { getMBHumanUnit, getNodeGPU } from '@/composables/GatewayAPI'
 import type { ClusterNode } from '@/composables/GatewayAPI'
 import ResourcesDiagramThumbnail from '@/components/resources/ResourcesDiagramThumbnail.vue'
 import NodeMainState from '@/components/resources/NodeMainState.vue'
@@ -28,7 +28,6 @@ import ErrorAlert from '@/components/ErrorAlert.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import TableSkeletonRows from '@/components/TableSkeletonRows.vue'
 import PaginationControls from '@/components/PaginationControls.vue'
-import ActionDialog from '@/components/operations/ActionDialog.vue'
 import { lastPage, parsePageSize, parsePositivePage, type PageSizeOption } from '@/composables/Pagination'
 import { ChevronRightIcon, MagnifyingGlassPlusIcon } from '@heroicons/vue/20/solid'
 import { EyeIcon, EyeSlashIcon } from '@heroicons/vue/24/outline'
@@ -37,14 +36,9 @@ const { cluster } = defineProps<{ cluster: string }>()
 
 const foldedNodesShow: Ref<Record<string, boolean>> = ref({})
 const runtimeStore = useRuntimeStore()
-const gateway = useGatewayAPI()
 const route = useRoute()
 const router = useRouter()
 const hydratingQuery = ref(false)
-const deleteOpen = ref(false)
-const deleteTarget = ref<ClusterNode | null>(null)
-const operationBusy = ref(false)
-const operationError = ref<string | null>(null)
 const { data, unable, loaded, initialLoading, setCluster } = useClusterDataPoller<ClusterNode[]>(
   cluster,
   'nodes',
@@ -116,7 +110,6 @@ const pagedFoldedNodes = computed(() => {
   const end = start + runtimeStore.resources.pageSize
   return foldedNodes.value.slice(start, end)
 })
-const canDeleteNode = computed(() => runtimeStore.hasRoutePermission(cluster, 'resources', 'delete'))
 
 function updateQueryParameters() {
   router.push({ name: 'resources', query: runtimeStore.resources.query() as LocationQueryRaw })
@@ -137,27 +130,6 @@ function updatePageSize(pageSize: PageSizeOption) {
   runtimeStore.resources.pageSize = pageSize
   runtimeStore.resources.page = 1
   updateQueryParameters()
-}
-
-function openDeleteDialog(node: ClusterNode) {
-  deleteTarget.value = node
-  operationError.value = null
-  deleteOpen.value = true
-}
-
-async function deleteNode() {
-  if (!deleteTarget.value) return
-  operationBusy.value = true
-  operationError.value = null
-  try {
-    await gateway.delete_node(cluster, deleteTarget.value.name)
-    runtimeStore.reportInfo(`Node ${deleteTarget.value.name} deletion requested.`)
-    deleteOpen.value = false
-  } catch (error: unknown) {
-    operationError.value = error instanceof Error ? error.message : String(error)
-  } finally {
-    operationBusy.value = false
-  }
 }
 
 watch(
@@ -287,7 +259,6 @@ watch(totalPages, (newLastPage) => {
                   <th scope="col" class="px-3 py-3.5 text-left">Memory</th>
                   <th scope="col" class="px-3 py-3.5 text-left">GPU</th>
                   <th scope="col" class="px-3 py-3.5 text-left">Partitions</th>
-                  <th scope="col" class="py-3.5 pr-4 pl-3 text-right sm:pr-6 lg:pr-8">Actions</th>
                 </tr>
               </thead>
               <tbody
@@ -363,31 +334,6 @@ watch(totalPages, (newLastPage) => {
                         {{ partition }}
                       </span>
                     </td>
-                    <td class="py-3 pl-3 text-right whitespace-nowrap sm:pr-6 lg:pr-8">
-                      <div v-if="node.number === 1" class="flex flex-wrap items-center justify-end gap-2">
-                        <RouterLink
-                          class="ui-button-secondary"
-                          :to="{
-                            name: 'node',
-                            params: { cluster: cluster, nodeName: node.name },
-                            query: { returnTo: 'resources' }
-                          }"
-                        >
-                          Manage
-                        </RouterLink>
-                        <button
-                          v-if="canDeleteNode"
-                          type="button"
-                          class="ui-button-secondary"
-                          @click="openDeleteDialog(node)"
-                        >
-                          Delete
-                        </button>
-                      </div>
-                      <span v-else class="text-xs text-[var(--color-brand-muted)]">
-                        Expand to manage individual nodes
-                      </span>
-                    </td>
                   </tr>
                   <template v-if="node.number > 1">
                     <Transition
@@ -399,7 +345,7 @@ watch(totalPages, (newLastPage) => {
                       leave-to-class="-translate-y-6 opacity-0"
                     >
                       <tr v-show="foldedNodesShow[node.name]">
-                        <td colspan="9" class="z-0 bg-[rgba(239,244,246,0.92)]">
+                        <td colspan="8" class="z-0 bg-[rgba(239,244,246,0.92)]">
                           <ul
                             role="list"
                             class="m-4 grid grid-cols-1 gap-5 sm:grid-cols-2 sm:gap-4 md:grid-cols-4 xl:grid-cols-8 2xl:grid-cols-16"
@@ -435,7 +381,7 @@ watch(totalPages, (newLastPage) => {
               </tbody>
               <TableSkeletonRows
                 v-else
-                :columns="9"
+                :columns="8"
                 :rows="8"
                 first-cell-class="sm:pl-6 lg:pl-8"
                 cell-class="px-3"
@@ -454,17 +400,5 @@ watch(totalPages, (newLastPage) => {
         </div>
       </div>
     </div>
-
-    <ActionDialog
-      :open="deleteOpen"
-      title="Delete Node"
-      :description="deleteTarget ? `Delete node ${deleteTarget.name}. This action is destructive.` : ''"
-      submit-label="Delete node"
-      :loading="operationBusy"
-      :error="operationError"
-      :fields="[]"
-      @close="deleteOpen = false"
-      @submit="deleteNode"
-    />
   </ClusterMainLayout>
 </template>

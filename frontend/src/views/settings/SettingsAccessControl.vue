@@ -507,7 +507,7 @@ onMounted(async () => {
                   <button
                     v-if="canManage"
                     type="button"
-                    class="ui-button-secondary"
+                    class="ui-button-warning"
                     @click="editRole(role)"
                   >
                     Edit
@@ -515,7 +515,7 @@ onMounted(async () => {
                   <button
                     v-if="canDelete"
                     type="button"
-                    class="ui-button-secondary"
+                    class="ui-button-danger"
                     @click="removeRole(role)"
                   >
                     Delete
@@ -725,7 +725,7 @@ onMounted(async () => {
               <div class="flex flex-wrap gap-3">
                 <button
                   type="submit"
-                  class="ui-button-primary"
+                  :class="roleForm.id === null ? 'ui-button-primary' : 'ui-button-warning'"
                   :disabled="!canManage || rolesSubmitting"
                 >
                   {{ roleForm.id === null ? 'Create Role' : 'Save Role' }}
@@ -963,7 +963,7 @@ onMounted(async () => {
               <div class="mt-5 flex flex-wrap gap-3">
                 <button
                   type="button"
-                  class="ui-button-primary"
+                  class="ui-button-warning"
                   :disabled="!canManage || userAssignmentSaving"
                   @click="saveUserRoles"
                 >

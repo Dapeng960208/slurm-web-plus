@@ -184,7 +184,7 @@ watch(totalPages, (newLastPage) => {
               @update:sort="sortHistory($event)"
               @update:order="sortHistory(undefined, $event)"
             />
-            <button type="button" class="ui-button-primary" @click="filtersOpen = true">
+            <button type="button" class="ui-button-secondary" @click="filtersOpen = true">
               <PlusSmallIcon class="-ml-0.5 h-5 w-5" aria-hidden="true" />
               Add filters
             </button>
@@ -216,8 +216,8 @@ watch(totalPages, (newLastPage) => {
                   <th scope="col" class="hidden px-3 py-3.5 text-left xl:table-cell">QOS</th>
                   <th scope="col" class="hidden px-3 py-3.5 text-center sm:table-cell">Priority</th>
                   <th scope="col" class="hidden px-3 py-3.5 text-left 2xl:table-cell">Reason</th>
-                  <th scope="col" class="py-3.5 pr-4 pl-3 sm:pr-6 lg:pr-8">
-                    <span class="sr-only">View</span>
+                  <th scope="col" class="py-3.5 pr-4 pl-3 text-right sm:pr-6 lg:pr-8">
+                    Actions
                   </th>
                 </tr>
               </thead>
@@ -260,14 +260,23 @@ watch(totalPages, (newLastPage) => {
                       {{ job.state_reason }}
                     </template>
                   </td>
-                  <td class="h-full text-right font-medium">
-                    <RouterLink
-                      :to="{ name: 'job-history', params: { cluster: cluster, id: job.id } }"
-                      class="text-[var(--color-brand-blue)] transition hover:text-[var(--color-brand-ink-strong)]"
-                    >
-                      <WindowIcon class="mr-4 inline-block h-5 w-5 lg:mr-6" aria-hidden="true" />
-                      <span class="sr-only">View {{ job.job_id }}</span>
-                    </RouterLink>
+                  <td class="h-full py-3 text-right font-medium">
+                    <div class="flex flex-wrap justify-end gap-2 pr-4 sm:pr-6 lg:pr-8">
+                      <RouterLink
+                        :to="{ name: 'job', params: { cluster: cluster, id: job.job_id } }"
+                        class="ui-button-secondary"
+                      >
+                        <WindowIcon class="h-4 w-4" aria-hidden="true" />
+                        Live job
+                      </RouterLink>
+                      <RouterLink
+                        :to="{ name: 'job-history', params: { cluster: cluster, id: job.id } }"
+                        class="ui-button-secondary"
+                      >
+                        <WindowIcon class="h-4 w-4" aria-hidden="true" />
+                        History
+                      </RouterLink>
+                    </div>
                   </td>
                 </tr>
               </tbody>

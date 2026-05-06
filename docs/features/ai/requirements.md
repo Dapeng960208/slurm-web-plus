@@ -75,6 +75,11 @@ AI 当前按数据库能力自动启用：
   - 先查 `job`
   - 再查 `jobs/history`
   - 最后汇总回答
+- 对单个作业查询，模型必须理解实时 `job` 数据和历史 `jobs/history` 数据的边界：
+  - `job` 来自实时 Slurm 作业详情，作业完成后可能不可用或字段不完整
+  - `jobs/history` 与 `jobs/history/detail` 来自持久化历史存储，字段与作业详情接近
+  - 已完成作业的历史记录可保留 `used_memory_gb` 最大内存和 `used_cpu_cores_avg` 平均 CPU 使用核心数
+  - 当实时 `job` 查询缺失、不足，或问题明确涉及已完成作业时，应补查 `jobs/history` 或 `jobs/history/detail`
 - 系统提示词不再把“某个问题必须调用某个接口”写死，而是要求模型基于信息缺口自行选择接口
 - 模型不得编造集群数据；若现有接口信息不足，必须明确说明不确定性
 

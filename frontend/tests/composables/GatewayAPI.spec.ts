@@ -874,6 +874,22 @@ describe('gateway data APIs', () => {
     expect(result.id).toBe(12)
   })
 
+  test('deletes account-user association with payload body', async () => {
+    mockRestAPI.delete.mockResolvedValue({
+      operation: 'accounts.associations.delete',
+      supported: true
+    })
+
+    const gateway = useGatewayAPI()
+    await gateway.delete_association('cluster', {
+      associations: [{ account: 'science', user: 'alice' }]
+    })
+
+    expect(mockRestAPI.delete).toHaveBeenCalledWith('/agents/cluster/associations', {
+      associations: [{ account: 'science', user: 'alice' }]
+    })
+  })
+
   test('requests node instant metrics', async () => {
     mockRestAPI.get.mockResolvedValue({
       cpu_usage: 0.2,

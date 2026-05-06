@@ -622,6 +622,21 @@ class TestAIService(TestCase):
         self.assertIn("avg_max_memory_mb", system_prompt)
         self.assertIn("Never expose internal tool-call metadata", system_prompt)
 
+    def test_planner_prompt_describes_persisted_job_history_usage_fields(self):
+        self._create_model()
+
+        planner_messages = self.service._build_planner_messages(
+            self.user,
+            {"system_prompt": None},
+            [{"role": "user", "content": "What happened to job 123?"}],
+        )
+
+        system_prompt = planner_messages[0]["content"]
+        self.assertIn("Job history is persisted storage", system_prompt)
+        self.assertIn("used_memory_gb", system_prompt)
+        self.assertIn("used_cpu_cores_avg", system_prompt)
+        self.assertIn("jobs/history", system_prompt)
+
     def test_stream_chat_ignores_internal_tool_request_envelope_in_final_output(self):
         self._create_model()
         provider = mock.Mock()

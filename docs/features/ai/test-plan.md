@@ -102,6 +102,10 @@ npm --prefix frontend run test:unit
   - 先调 `job`
   - 再调 `jobs/history`
   - 最后汇总 live + history 信息
+- 单个作业查询场景需要验证：
+  - prompt 和接口说明明确 `jobs/history` 是持久化历史存储
+  - prompt 和接口说明明确已完成历史作业可保留 `used_memory_gb` 与 `used_cpu_cores_avg`
+  - 实时 `job` 不足或作业已完成时，模型会被引导补查 `jobs/history` 或 `jobs/history/detail`
 - 资源推荐问题优先使用 `user/tools/analysis`
 - 仅当 `user/tools/analysis` 聚合证据不足时，才继续补查 `jobs/history`
 - 若第二个接口仍不足，允许继续追加，但总轮次仍受 `ai.max_rounds` 控制
@@ -180,6 +184,7 @@ npm --prefix frontend run test:unit
 - 在对话页切换模型并确认实际调用配置生效
 - 提问作业 ID / 节点指标 / 历史作业，确认 AI 仅通过 Agent 接口返回事实数据
 - 提问单个作业详情时，确认 AI 可以按需串联 `job` + `jobs/history`
+- 提问已完成作业的资源用量时，确认回答优先引用历史记录中的 `used_memory_gb` 和 `used_cpu_cores_avg`
 - 检查执行轨迹默认仅展示接口名 / 状态码 / 耗时，点击后才显示参数和摘要
 - 让模型返回 Markdown 列表、引用、代码块和链接，确认页面按安全 Markdown 正常显示
 - 在普通 AI 页面确认不展示模型、stream、persistence 等配置块

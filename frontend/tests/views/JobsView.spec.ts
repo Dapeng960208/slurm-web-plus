@@ -1,8 +1,9 @@
 import { describe, test, expect, beforeEach, vi } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { flushPromises, mount } from '@vue/test-utils'
 import { useRuntimeStore } from '@/stores/runtime'
 import { useAuthStore } from '@/stores/auth'
 import JobsView from '@/views/JobsView.vue'
+import ActionDialog from '@/components/operations/ActionDialog.vue'
 import { init_plugins, getMockClusterDataPoller } from '../lib/common'
 import type { ClusterJob } from '@/composables/GatewayAPI'
 import ErrorAlert from '@/components/ErrorAlert.vue'
@@ -70,6 +71,7 @@ describe('JobsView.vue', () => {
     mockClusterDataPoller.unable.value = false
     mockClusterDataPoller.loaded.value = true
     mockClusterDataPoller.initialLoading.value = false
+    document.body.innerHTML = ''
   })
 
   test('displays jobs with the actions column and no batch controls', () => {
@@ -78,6 +80,15 @@ describe('JobsView.vue', () => {
     const wrapper = mount(JobsView, {
       props: {
         cluster: 'foo'
+      },
+      global: {
+        stubs: {
+          Dialog: { template: '<div><slot /></div>' },
+          DialogPanel: { template: '<div><slot /></div>' },
+          DialogTitle: { template: '<div><slot /></div>' },
+          TransitionChild: { template: '<div><slot /></div>' },
+          TransitionRoot: { template: '<div><slot /></div>' }
+        }
       }
     })
 
@@ -167,5 +178,55 @@ describe('JobsView.vue', () => {
     expect(rows[1].text()).not.toContain('Edit')
     expect(rows[1].text()).not.toContain('Cancel')
     expect(wrapper.text()).not.toContain('Batch cancel')
+  })
+
+  test('submits memory per CPU when editing a job', async () => {
+    useRuntimeStore().availableClusters = [
+      {
+        name: 'foo',
+        permissions: {
+          roles: [],
+          actions: [],
+          rules: ['jobs:view:*', 'jobs:edit:*']
+        },
+        racksdb: true,
+        infrastructure: 'foo',
+        metrics: true,
+        cache: true
+      }
+    ]
+    mockGatewayAPI.update_job.mockResolvedValue({ operation: 'jobs.update' })
+    mockClusterDataPoller.data.value = [buildJob(101, 'alice')]
+
+    const wrapper = mount(JobsView, {
+      attachTo: document.body,
+      props: {
+        cluster: 'foo'
+      }
+    })
+
+    await wrapper.findAll('tbody button').find((button) => button.text() === 'Edit')!.trigger('click')
+    await flushPromises()
+    wrapper
+      .findAllComponents(ActionDialog)
+      .find((dialog) => dialog.props('title') === 'Edit Job')!
+      .vm.$emit('submit', {
+        partition: 'normal',
+        qos: 'normal',
+        priority: '100',
+        memory_per_cpu_mb: '2048',
+        time_limit: '',
+        comment: ''
+      })
+    await flushPromises()
+
+    expect(mockGatewayAPI.update_job).toHaveBeenCalledWith(
+      'foo',
+      101,
+      expect.objectContaining({
+        memory_per_cpu: { set: true, infinite: false, number: 2048 }
+      })
+    )
+    wrapper.unmount()
   })
 })

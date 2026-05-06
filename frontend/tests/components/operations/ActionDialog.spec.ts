@@ -50,4 +50,50 @@ describe('ActionDialog.vue', () => {
     await wrapper.get('form').trigger('submit')
     expect(wrapper.emitted('submit')?.[1]).toEqual([{}])
   })
+
+  test('renders select fields and submits selected values', async () => {
+    const wrapper = mount(ActionDialog, {
+      global: {
+        stubs: {
+          Dialog: { template: '<div><slot /></div>' },
+          DialogPanel: { template: '<div><slot /></div>' },
+          DialogTitle: { template: '<div><slot /></div>' },
+          TransitionChild: { template: '<div><slot /></div>' },
+          TransitionRoot: { template: '<div><slot /></div>' }
+        }
+      },
+      props: {
+        open: true,
+        title: 'Edit node',
+        submitLabel: 'Save',
+        fields: [
+          {
+            key: 'state',
+            label: 'State',
+            type: 'select',
+            required: true,
+            options: [
+              { label: 'DRAIN', value: 'DRAIN' },
+              { label: 'RESUME', value: 'RESUME' }
+            ]
+          }
+        ],
+        initialValues: {
+          state: 'DRAIN'
+        }
+      }
+    })
+
+    expect(wrapper.get('select').element.value).toBe('DRAIN')
+    expect(wrapper.findAll('option').map((option) => option.text())).toEqual([
+      'Select an option',
+      'DRAIN',
+      'RESUME'
+    ])
+
+    await wrapper.get('select').setValue('RESUME')
+    await wrapper.get('form').trigger('submit')
+
+    expect(wrapper.emitted('submit')?.[0]).toEqual([{ state: 'RESUME' }])
+  })
 })

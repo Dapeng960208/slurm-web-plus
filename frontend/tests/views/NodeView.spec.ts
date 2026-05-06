@@ -11,12 +11,15 @@ import nodeAllocated from '../assets/node-allocated.json'
 import jobsNode from '../assets/jobs-node.json'
 import { nextTick } from 'vue'
 import PanelSkeleton from '@/components/PanelSkeleton.vue'
+import ActionDialog from '@/components/operations/ActionDialog.vue'
 
 const mockNodeDataPoller = getMockClusterDataPoller<ClusterNode>()
 const mockJobsDataPoller = getMockClusterDataPoller<ClusterJob[]>()
 const mockGatewayAPI = {
   node_metrics: vi.fn(),
-  node_metrics_history: vi.fn()
+  node_metrics_history: vi.fn(),
+  update_node: vi.fn(),
+  delete_node: vi.fn()
 }
 
 const useClusterDataPoller = vi.hoisted(() => vi.fn())
@@ -41,6 +44,8 @@ describe('NodeView.vue', () => {
       memory_usage: [[1748004750000, 45.6]],
       disk_usage: [[1748004750000, 22.1]]
     })
+    mockGatewayAPI.update_node.mockResolvedValue({})
+    mockGatewayAPI.delete_node.mockResolvedValue({})
     useClusterDataPoller.mockReset()
     useRuntimeStore().availableClusters = [
       {
@@ -322,5 +327,57 @@ describe('NodeView.vue', () => {
 
     expect(wrapper.text()).toContain('Node cn1')
     expect(wrapper.findComponent(PanelSkeleton).exists()).toBe(true)
+  })
+
+  test('edits node state with a select field', async () => {
+    useRuntimeStore().availableClusters = [
+      {
+        ...useRuntimeStore().availableClusters[0],
+        permissions: {
+          roles: [],
+          actions: [],
+          rules: ['resources:edit:*']
+        }
+      }
+    ]
+    useClusterDataPoller.mockReturnValueOnce(mockNodeDataPoller)
+    useClusterDataPoller.mockReturnValueOnce(mockJobsDataPoller)
+    mockNodeDataPoller.data.value = nodeAllocated
+    mockJobsDataPoller.data.value = jobsNode
+
+    const wrapper = mount(NodeView, {
+      props: {
+        cluster: 'foo',
+        nodeName: 'cn1'
+      }
+    })
+    await flushPromises()
+
+    const editButton = wrapper
+      .findAll('button[type="button"]')
+      .find((button) => button.text().trim() === 'Edit')
+    if (!editButton) {
+      throw new Error('Edit button not found')
+    }
+    await editButton.trigger('click')
+    await flushPromises()
+
+    const editDialog = wrapper
+      .findAllComponents(ActionDialog)
+      .find((dialog) => dialog.props('title') === 'Edit Node')
+    if (!editDialog) {
+      throw new Error('Edit node dialog not found')
+    }
+    const stateField = editDialog.props('fields').find((field) => field.key === 'state')
+    expect(stateField?.type).toBe('select')
+    expect(stateField?.options?.map((option) => option.value)).toContain('UNDRAIN')
+
+    await editDialog.vm.$emit('submit', { state: 'UNDRAIN', reason: 'back online' })
+    await flushPromises()
+
+    expect(mockGatewayAPI.update_node).toHaveBeenCalledWith('foo', 'cn1', {
+      state: 'UNDRAIN',
+      reason: 'back online'
+    })
   })
 })

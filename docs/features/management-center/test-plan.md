@@ -84,11 +84,21 @@
 覆盖以下场景：
 
 - `ClusterAnalysisView` 请求并展示 `Ping` / `Diag`
+- `ClusterAnalysis` 内存容量详情以 GB 展示，评分和百分比继续使用 MB 原始值计算
 - `JobsView` 在 `jobs:view|edit|delete:self` 下只对本人作业显示 `Edit/Cancel`
 - `JobView` 在 `self` 下只对本人作业显示 `Edit/Cancel`
+- `JobsView` / `JobView` 编辑作业时，填写 `Memory per CPU (MB)` 会提交 `memory_per_cpu: { set: true, infinite: false, number }`
+- `UserFilterSelector` 支持手动输入用户名并点击 `Add username` 加入 `runtimeStore.jobs.filters.users`
+- `UserFilterSelector` 不添加空用户名，也不会重复添加已存在用户名
+- `JobsHistoryView` / `JobHistoryView` 的实时作业入口使用 Slurm `job_id` 跳转到 `job` 路由
+- `JobsHistoryView` / `JobHistoryView` 不直接提供历史记录 Edit/Cancel 写操作
+- `AccountView` 可增加 account-user association、编辑 association QOS/default QOS、删除 association，payload 复用现有 associations 写接口
+- `UserView` 编辑用户时提交 `default_qos` 和逗号分隔解析后的 `qos`
+- 触达页面的按钮样式按操作语义区分：创建/提交 primary，编辑 warning，删除/取消 danger，查看/返回/筛选 secondary
 - 默认 `admin` 用户可见编辑入口，但删除入口仍继续受 `delete` 权限控制
 - 页面无批量取消入口
-- `ResourcesView` 无批量节点操作入口
+- `ResourcesView` 不再渲染节点行尾 `Manage` / `Delete` 按钮，节点名称仍可跳转详情
+- `NodeView` 的 Edit Node 中 `state` 渲染为下拉框，并按所选状态提交 `update_node`
 
 对应重点：
 
@@ -105,6 +115,8 @@
 - 不再暴露 `admin/system/*`
 - 新写接口路径与方法
 - `RESTAPI.delete()` 支持 body
+- 前端 `delete_association(cluster, payload)` 使用 `DELETE /agents/:cluster/associations` 并保留请求 body
+- `JobUpdatePayload.memory_per_cpu` 与 `ClusterAssociation.default.qos` 类型契约可被页面使用
 
 对应重点：
 
@@ -118,5 +130,12 @@
 - `npm --prefix frontend run type-check`
 - `cd frontend && npx vitest run`
 - `.venv\Scripts\python.exe -m pytest -q slurmweb/tests`
+
+本轮定向验证可先执行：
+
+- `cd frontend && npx vitest run tests/views/JobsView.spec.ts tests/views/JobView.spec.ts tests/views/JobsHistoryView.spec.ts tests/views/JobHistoryView.spec.ts tests/views/AccountView.spec.ts tests/views/UserView.spec.ts tests/composables/GatewayAPI.spec.ts tests/composables/ClusterAnalysis.spec.ts tests/components/operations/ActionDialog.spec.ts`
+- `cd frontend && npx vitest run tests/views/resources/ResourcesView.spec.ts tests/views/NodeView.spec.ts tests/components/operations/ActionDialog.spec.ts tests/components/jobs/UserFilterSelector.spec.ts`
+- `npm --prefix frontend run type-check`
+- `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/apps/test_ai_service.py slurmweb/tests/slurmrestd/test_slurmrestd_write_operations.py slurmweb/tests/views/test_agent_operations.py`
 
 若存在失败，需要在 `docs/tracking/current-release.md` 记录失败项和结论。

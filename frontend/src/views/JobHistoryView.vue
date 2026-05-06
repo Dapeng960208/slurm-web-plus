@@ -373,11 +373,18 @@ watch(
           description="Recorded timeline, scheduler context and resource details captured for this finished job."
         >
           <template #actions>
-            <JobStatusBadge
-              v-if="job"
-              :status="splitJobHistoryState(job.job_state)"
-              :large="true"
-            />
+            <div v-if="job" class="flex flex-wrap items-center justify-end gap-3">
+              <JobStatusBadge
+                :status="splitJobHistoryState(job.job_state)"
+                :large="true"
+              />
+              <RouterLink
+                :to="{ name: 'job', params: { cluster, id: job.job_id } }"
+                class="ui-button-secondary"
+              >
+                Live job
+              </RouterLink>
+            </div>
             <div
               v-else-if="initialLoading"
               class="h-10 w-28 animate-pulse rounded-full bg-[rgba(80,105,127,0.12)]"

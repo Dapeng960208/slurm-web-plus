@@ -92,6 +92,15 @@ describe('JobsHistoryView.vue', () => {
     expect(wrapper.text()).toContain('QOS')
     expect(wrapper.text()).toContain('Priority')
     expect(wrapper.text()).toContain('Reason')
+    const links = wrapper.findAllComponents({ name: 'RouterLink' })
+    expect(links.some((link) => JSON.stringify(link.props('to')) === JSON.stringify({
+      name: 'job',
+      params: { cluster: 'foo', id: 1234 }
+    }))).toBe(true)
+    expect(links.some((link) => JSON.stringify(link.props('to')) === JSON.stringify({
+      name: 'job-history',
+      params: { cluster: 'foo', id: 1 }
+    }))).toBe(true)
     expect(wrapper.text()).toContain('debug')
     expect(wrapper.text()).toContain('-')
     expect(mockGatewayAPI.jobs_history).toHaveBeenCalledWith(
