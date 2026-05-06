@@ -17,6 +17,24 @@
 
 ## 条目
 
+### 2026-05-06：`QosView` 弹窗错误提示测试不能从页面总文本断言
+
+- 场景：为 `QosView` 创建 QOS 的 `MaxWallDurationPerJob` 非法输入补 Vitest 回归。
+- 现象：`npx vitest run tests/views/QosView.spec.ts tests/views/AccountView.spec.ts tests/composables/GatewayAPI.spec.ts` 中 `rejects invalid qos wall duration before submitting` 失败，页面总文本没有包含预期错误文案。
+- 复现：挂载 `QosView`，打开 `Create QOS` 弹框，通过 `ActionDialog` 组件触发 submit，并直接对 `wrapper.text()` 断言错误信息。
+- 根因：测试操作的是 `ActionDialog` 组件事件，错误状态通过 `error` prop 传回弹窗；在当前 Headless UI/Dialog 测试结构下，弹窗文本不稳定出现在 `wrapper.text()` 中。
+- 解决：断言改为定位标题为 `Create QOS` 的 `ActionDialog` 组件，并检查其 `error` prop 是否为 `MaxWallDurationPerJob must use days-hh:mm:ss or hh:mm:ss.`。
+- 预防：后续测试共享弹窗错误状态时，优先断言组件 prop 或 emit 行为，不用页面总文本承载弹窗内部状态。
+
+### 2026-05-06：当前 Windows PowerShell 的 `Format-Hex` 不支持 `-Count`
+
+- 场景：排查 `docs/overview/latest-features.md` 补丁上下文不匹配，尝试查看文件开头字节。
+- 现象：执行 `Format-Hex -Path docs/overview/latest-features.md -Count 32` 报 `A parameter cannot be found that matches parameter name 'Count'.`
+- 复现：在当前 PowerShell 环境执行带 `-Count` 参数的 `Format-Hex`。
+- 根因：当前 PowerShell 版本中的 `Format-Hex` cmdlet 没有 `-Count` 参数，不能按较新示例使用该参数。
+- 解决：改用 `Get-Content -Encoding UTF8` 检查文件开头，并用更窄的 `apply_patch` 上下文插入文档内容。
+- 预防：后续在 Windows PowerShell 使用 cmdlet 参数前先考虑版本差异；若只是检查 Markdown 内容，优先用 `Get-Content -Encoding UTF8`。
+
 ### 2026-05-06：Headless UI Teleport 残留 DOM 导致前端弹窗表单测试提交错对象
 
 - 场景：为 `JobsView`、`JobView`、`AccountView` 补作业内存和 association QOS 写操作前端单测。

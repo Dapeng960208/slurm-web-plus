@@ -33,6 +33,9 @@ if t.TYPE_CHECKING:
 
 class Slurmrestd:
     WRITE_SUPPORTED_VERSIONS = {"0.0.41", "0.0.42", "0.0.43", "0.0.44"}
+    DEFAULT_QOS_MAX_SUBMIT_JOBS_PER_USER = 100
+    DEFAULT_QOS_MAX_JOBS_PER_USER = 10
+    DEFAULT_QOS_MAX_WALL_DURATION_PER_JOB = 8640
 
     def __init__(
         self,
@@ -252,6 +255,137 @@ class Slurmrestd:
             for association in associations
         ]
         return normalized
+
+    @staticmethod
+    def _qos_limit(value: t.Any) -> t.Dict[str, t.Any]:
+        if isinstance(value, dict):
+            return value
+        return {"set": True, "infinite": False, "number": value}
+
+    @staticmethod
+    def _nested_dict(root: t.Dict[str, t.Any], *keys: str) -> t.Dict[str, t.Any]:
+        current = root
+        for key in keys:
+            value = current.get(key)
+            if not isinstance(value, dict):
+                value = {}
+                current[key] = value
+            current = value
+        return current
+
+    @staticmethod
+    def _has_limit(root: t.Dict[str, t.Any], *keys: str) -> bool:
+        current: t.Any = root
+        for key in keys:
+            if not isinstance(current, dict) or key not in current:
+                return False
+            current = current[key]
+        return isinstance(current, dict) and (
+            "set" in current or "infinite" in current or "number" in current
+        )
+
+    @staticmethod
+    def _pop_first(qos: t.Dict[str, t.Any], aliases: t.Tuple[str, ...]) -> t.Any:
+        for alias in aliases:
+            if alias in qos:
+                value = qos.pop(alias)
+                if value not in ("", None):
+                    return value
+        return None
+
+    def _set_qos_limit_if_missing(
+        self,
+        qos: t.Dict[str, t.Any],
+        value: t.Any,
+        default: int,
+        path: t.Tuple[str, ...],
+    ) -> None:
+        limits = self._nested_dict(qos, "limits")
+        if self._has_limit(limits, *path):
+            return
+        parent = self._nested_dict(limits, *path[:-1])
+        parent[path[-1]] = self._qos_limit(default if value is None else value)
+
+    def _normalize_single_qos(self, qos: t.Any) -> t.Any:
+        if not isinstance(qos, dict):
+            return qos
+        normalized = dict(qos)
+        max_submit_jobs_per_user = self._pop_first(
+            normalized,
+            (
+                "max_submit_jobs_per_user",
+                "MaxSubmitJobsPerUser",
+                "maxSubmitJobsPerUser",
+            ),
+        )
+        max_jobs_per_user = self._pop_first(
+            normalized,
+            ("max_jobs_per_user", "MaxJobsPerUser", "maxJobsPerUser"),
+        )
+        max_wall_duration_per_job = self._pop_first(
+            normalized,
+            (
+                "max_wall_duration_per_job",
+                "MaxWallDurationPerJob",
+                "maxWallDurationPerJob",
+            ),
+        )
+        self._set_qos_limit_if_missing(
+            normalized,
+            max_submit_jobs_per_user,
+            self.DEFAULT_QOS_MAX_SUBMIT_JOBS_PER_USER,
+            ("max", "jobs", "per", "user"),
+        )
+        self._set_qos_limit_if_missing(
+            normalized,
+            max_jobs_per_user,
+            self.DEFAULT_QOS_MAX_JOBS_PER_USER,
+            ("max", "jobs", "active_jobs", "per", "user"),
+        )
+        self._set_qos_limit_if_missing(
+            normalized,
+            max_wall_duration_per_job,
+            self.DEFAULT_QOS_MAX_WALL_DURATION_PER_JOB,
+            ("max", "wall_clock", "per", "job"),
+        )
+        return normalized
+
+    def _normalize_qos_payload(self, payload: t.Dict[str, t.Any]) -> t.Dict[str, t.Any]:
+        if not isinstance(payload, dict):
+            return payload
+        qos_entries = payload.get("qos")
+        if isinstance(qos_entries, list):
+            normalized = dict(payload)
+            normalized["qos"] = [
+                self._normalize_single_qos(qos) for qos in qos_entries
+            ]
+            return normalized
+        return {"qos": [self._normalize_single_qos(payload)]}
+
+    def _normalize_accounts_payload(self, payload: t.Dict[str, t.Any]) -> t.Dict[str, t.Any]:
+        if not isinstance(payload, dict):
+            return payload
+        account_entries = payload.get("accounts")
+        if isinstance(account_entries, list):
+            return payload
+        return {"accounts": [payload]}
+
+    def _association_delete_query(self, payload: t.Dict[str, t.Any]) -> t.Dict[str, str]:
+        normalized = self._normalize_associations_payload(payload)
+        if not isinstance(normalized, dict):
+            raise ValueError("Association delete payload must be a dictionary")
+        associations = normalized.get("associations")
+        if not isinstance(associations, list) or len(associations) != 1:
+            raise ValueError("Association delete requires exactly one association")
+        association = associations[0]
+        if not isinstance(association, dict):
+            raise ValueError("Association delete entry must be a dictionary")
+        account = association.get("account")
+        user = association.get("user")
+        cluster = association.get("cluster") or self._current_cluster_name()
+        if not account or not user or not cluster:
+            raise ValueError("Association delete requires account, user and cluster")
+        return {"account": account, "user": user, "cluster": cluster}
 
     def discover(self) -> t.Tuple[str, str, str]:
         """Discover the actual slurmrestd API version and Slurm version by trying
@@ -556,7 +690,12 @@ class Slurmrestd:
         return self._request("slurmdb", f"account/{account_name}", "accounts")[0]
 
     def accounts_update(self, payload: t.Dict[str, t.Any]):
-        return self.request_json("POST", "slurmdb", "accounts", payload=payload)
+        return self.request_json(
+            "POST",
+            "slurmdb",
+            "accounts",
+            payload=self._normalize_accounts_payload(payload),
+        )
 
     def account_delete(self, account_name: str):
         return self.request_json("DELETE", "slurmdb", f"account/{account_name}")
@@ -586,11 +725,13 @@ class Slurmrestd:
             "DELETE",
             "slurmdb",
             "association",
-            payload=self._normalize_associations_payload(payload),
+            query=self._association_delete_query(payload),
         )
 
     def qos_update(self, payload: t.Dict[str, t.Any]):
-        return self.request_json("POST", "slurmdb", "qos", payload=payload)
+        return self.request_json(
+            "POST", "slurmdb", "qos", payload=self._normalize_qos_payload(payload)
+        )
 
     def qos_delete(self, qos_name: str):
         return self.request_json("DELETE", "slurmdb", f"qos/{qos_name}")

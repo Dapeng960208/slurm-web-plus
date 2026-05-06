@@ -21,6 +21,7 @@
 - Resources 列表移除节点行尾管理按钮，节点状态编辑改为详情页下拉选择
 - Jobs 用户筛选支持直接输入用户名并加入筛选
 - 修正 `user_tool_daily_stats` 当天与跨天聚合口径，避免 `avg_max_memory_gb` / `avg_cpu_cores` 返回空值
+- 修复 QOS 创建 payload 包装、QOS 默认限制补齐，以及 account-user association 删除条件过宽问题
 
 ## 2. 已完成项
 
@@ -101,6 +102,11 @@
 - `AccountsView` / `AccountView` 已补创建、更新、删除
 - `UserView` 已补 SlurmDB 用户更新、删除
 - `QosView` 已补创建、更新、删除
+- QOS 写入 payload 已在后端统一规范化：
+  - 轻量 `{ name, description, priority }` 会包装为 SlurmDB 需要的 `{ qos: [...] }`
+  - 未显式传入常用限制时，后端默认补 `MaxSubmitJobsPerUser=100`、`MaxJobsPerUser=10`、`MaxWallDurationPerJob=1440`
+  - AI 直接调用 `qos/update` 与前端创建 QOS 复用同一后端默认逻辑
+- `QosView` 创建 QOS 弹框已显示并预填 `MaxSubmitJobsPerUser`、`MaxJobsPerUser`、`MaxWallDurationPerJob`
 - `slurmweb.slurmrestd` 已扩展为通用 `GET/POST/DELETE` 请求层
 - Gateway -> Agent -> `slurmrestd` 已支持 `DELETE` body
 - `jobs self` 后端校验已落地：
@@ -210,6 +216,8 @@
   - 行级 `Edit QOS`
   - 行级 `Delete`
 - 前端 Gateway 已新增 `delete_association(cluster, payload)`，复用 `DELETE /agents/:cluster/associations`
+- account-user association 删除在 `slurmrestd` 层已改为按单条 association payload 生成 `account/user/cluster` query 参数，避免底层 `DELETE /slurmdb/.../association` 忽略 request body 后形成宽范围删除
+- `AccountView` 删除 association 时只提交目标 `account` 与 `user`，不再携带空 `qos/default` 字段
 - `ClusterAssociation` 前端类型已新增可选 `default.qos`
 - `ClusterAnalysis` 内存容量详情已改为 GB 展示，评分和百分比计算仍使用原始 MB 数值
 - `JobsView` 与 `JobView` 的编辑作业弹框已新增 `Memory per CPU (MB)`，空值不发送，正整数提交为 Slurm REST `memory_per_cpu` 对象
@@ -234,6 +242,7 @@
 - 无数据库部署下，普通用户不再有自有 Jobs 的旧动作兜底；该差异需要部署文档显式说明
 - 当前仓库内置 AI 仍不能直接读取 GitHub Actions run；本轮只打通“结构化结果可查询”，未实现自动修复
 - 当前 `association/update` 修复已通过适配层和缓存层单元测试；真实集群端到端仍需在具备 SlurmDB 写权限的环境手工复验
+- 当前 QOS 创建和 association 删除修复已通过前后端定向单元测试；真实 SlurmDB 写权限环境仍需手工复验端到端创建/删除结果
 - 当前用户分析的真实集群时间窗仍需结合数据库时区与旧快照字段完整性复验；代码已对缺失 `submit_time` 与小写终态做兼容
 - 当前 `tool_mapping_file` demo 只提供常见工具归类示例，不会默认启用；生产环境仍需按实际集群命名规则调整
 - 当前 AI token 计数为前端估算，不等同于 provider 真实 usage 或计费 token；若后续需要精确计量，需要扩展后端 provider 返回与持久化结构
@@ -267,6 +276,9 @@
 
 已通过：
 
+- `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/slurmrestd/test_slurmrestd_write_operations.py`
+- `cd frontend && npx vitest run tests/views/QosView.spec.ts tests/views/AccountView.spec.ts tests/composables/GatewayAPI.spec.ts`
+- `npm --prefix frontend run type-check`
 - `cd frontend && npx vitest run tests/components/operations/ActionDialog.spec.ts`
 - `cd frontend && npx vitest run tests/components/operations/ActionDialog.spec.ts tests/composables/GatewayAPI.spec.ts tests/views/UserAnalysisView.spec.ts tests/views/ClusterAnalysisView.spec.ts tests/views/NodeView.spec.ts tests/views/settings/SettingsAI.spec.ts tests/components/MainMenu.spec.ts`
 - `npm --prefix frontend run type-check`

@@ -61,6 +61,11 @@ const deleteOpen = ref(false)
 const selectedQos = ref<ClusterQos | null>(null)
 const operationBusy = ref(false)
 const operationError = ref<string | null>(null)
+const createQosInitialValues = {
+  max_submit_jobs_per_user: '100',
+  max_jobs_per_user: '10',
+  max_wall_duration_per_job: '6-00:00:00'
+}
 
 const pagedQos = computed(() => {
   const items = data.value ?? []
@@ -116,6 +121,58 @@ function openDeleteDialog(qos: ClusterQos) {
   deleteOpen.value = true
 }
 
+function parseOptionalPositiveInteger(value: string): number | undefined {
+  const trimmed = value.trim()
+  if (!trimmed) return undefined
+  const parsed = Number(trimmed)
+  if (!Number.isInteger(parsed) || parsed < 0) {
+    throw new Error('QOS job limits must be positive integer values.')
+  }
+  return parsed
+}
+
+function parseWallDurationMinutes(value: string): number | undefined {
+  const trimmed = value.trim()
+  if (!trimmed) return undefined
+  const match = trimmed.match(/^(?:(\d+)-)?(\d{1,2}):(\d{2}):(\d{2})$/)
+  if (!match) {
+    throw new Error('MaxWallDurationPerJob must use days-hh:mm:ss or hh:mm:ss.')
+  }
+  const days = match[1] ? Number(match[1]) : 0
+  const hours = Number(match[2])
+  const minutes = Number(match[3])
+  const seconds = Number(match[4])
+  if (hours > 23 || minutes > 59 || seconds > 59) {
+    throw new Error('MaxWallDurationPerJob must use valid hours, minutes and seconds.')
+  }
+  return days * 24 * 60 + hours * 60 + minutes + (seconds > 0 ? 1 : 0)
+}
+
+function optionalNumberInput(value?: ClusterOptionalNumber): string {
+  if (!value?.set || value.infinite) return ''
+  return String(value.number)
+}
+
+function optionalWallDurationInput(value?: ClusterOptionalNumber): string {
+  if (!value?.set || value.infinite) return ''
+  const totalMinutes = value.number
+  const days = Math.floor(totalMinutes / 1440)
+  const hours = Math.floor((totalMinutes % 1440) / 60)
+  const minutes = totalMinutes % 60
+  return `${days}-${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:00`
+}
+
+function qosLimitPayload(payload: Record<string, string>) {
+  const maxSubmitJobsPerUser = parseOptionalPositiveInteger(payload.max_submit_jobs_per_user)
+  const maxJobsPerUser = parseOptionalPositiveInteger(payload.max_jobs_per_user)
+  const maxWallDurationPerJob = parseWallDurationMinutes(payload.max_wall_duration_per_job)
+  return {
+    max_submit_jobs_per_user: maxSubmitJobsPerUser,
+    max_jobs_per_user: maxJobsPerUser,
+    max_wall_duration_per_job: maxWallDurationPerJob
+  }
+}
+
 async function createQos(payload: Record<string, string>) {
   operationBusy.value = true
   operationError.value = null
@@ -123,7 +180,8 @@ async function createQos(payload: Record<string, string>) {
     await gateway.save_qos(cluster, {
       name: payload.name || undefined,
       description: payload.description || null,
-      priority: payload.priority ? Number(payload.priority) : undefined
+      priority: payload.priority ? Number(payload.priority) : undefined,
+      ...qosLimitPayload(payload)
     })
     runtimeStore.reportInfo(`QOS ${payload.name || ''} creation requested.`)
     createOpen.value = false
@@ -142,7 +200,8 @@ async function updateQos(payload: Record<string, string>) {
     await gateway.save_qos(cluster, {
       name: selectedQos.value.name,
       description: payload.description || null,
-      priority: payload.priority ? Number(payload.priority) : undefined
+      priority: payload.priority ? Number(payload.priority) : undefined,
+      ...qosLimitPayload(payload)
     })
     runtimeStore.reportInfo(`QOS ${selectedQos.value.name} update requested.`)
     editOpen.value = false
@@ -375,10 +434,28 @@ if (route.query.page_size) {
       submit-label="Create QOS"
       :loading="operationBusy"
       :error="operationError"
+      :initial-values="createQosInitialValues"
       :fields="[
         { key: 'name', label: 'Name', required: true },
         { key: 'description', label: 'Description', type: 'textarea' },
-        { key: 'priority', label: 'Priority', type: 'number' }
+        { key: 'priority', label: 'Priority', type: 'number' },
+        {
+          key: 'max_submit_jobs_per_user',
+          label: 'MaxSubmitJobsPerUser',
+          type: 'number',
+          hint: 'Current submitted jobs per user, including running and pending jobs.'
+        },
+        {
+          key: 'max_jobs_per_user',
+          label: 'MaxJobsPerUser',
+          type: 'number',
+          hint: 'Maximum concurrently running jobs per user.'
+        },
+        {
+          key: 'max_wall_duration_per_job',
+          label: 'MaxWallDurationPerJob',
+          hint: 'Single-job maximum runtime as days-hh:mm:ss.'
+        }
       ]"
       @close="createOpen = false"
       @submit="createQos"
@@ -393,11 +470,31 @@ if (route.query.page_size) {
       :error="operationError"
       :initial-values="{
         description: selectedQos?.description ?? '',
-        priority: selectedQos?.priority?.set ? String(selectedQos.priority.number) : ''
+        priority: selectedQos?.priority?.set ? String(selectedQos.priority.number) : '',
+        max_submit_jobs_per_user: optionalNumberInput(selectedQos?.limits.max.jobs.per.user),
+        max_jobs_per_user: optionalNumberInput(selectedQos?.limits.max.jobs.active_jobs.per.user),
+        max_wall_duration_per_job: optionalWallDurationInput(selectedQos?.limits.max.wall_clock.per.job)
       }"
       :fields="[
         { key: 'description', label: 'Description', type: 'textarea' },
-        { key: 'priority', label: 'Priority', type: 'number' }
+        { key: 'priority', label: 'Priority', type: 'number' },
+        {
+          key: 'max_submit_jobs_per_user',
+          label: 'MaxSubmitJobsPerUser',
+          type: 'number',
+          hint: 'Current submitted jobs per user, including running and pending jobs.'
+        },
+        {
+          key: 'max_jobs_per_user',
+          label: 'MaxJobsPerUser',
+          type: 'number',
+          hint: 'Maximum concurrently running jobs per user.'
+        },
+        {
+          key: 'max_wall_duration_per_job',
+          label: 'MaxWallDurationPerJob',
+          hint: 'Single-job maximum runtime as days-hh:mm:ss.'
+        }
       ]"
       @close="editOpen = false"
       @submit="updateQos"

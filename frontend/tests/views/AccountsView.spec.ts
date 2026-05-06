@@ -1,6 +1,7 @@
 import { describe, test, expect, beforeEach, vi } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { flushPromises, mount } from '@vue/test-utils'
 import AccountsView from '@/views/AccountsView.vue'
+import ActionDialog from '@/components/operations/ActionDialog.vue'
 import { init_plugins, getMockClusterDataPoller } from '../lib/common'
 import { useRuntimeStore } from '@/stores/runtime'
 import type { ClusterAssociation } from '@/composables/GatewayAPI'
@@ -11,14 +12,26 @@ import PanelSkeleton from '@/components/PanelSkeleton.vue'
 import AccountTreeNode from '@/components/accounts/AccountTreeNode.vue'
 
 const mockClusterDataPoller = getMockClusterDataPoller<ClusterAssociation[]>()
+const mockGatewayAPI = {
+  save_account: vi.fn()
+}
 
 vi.mock('@/composables/DataPoller', () => ({
   useClusterDataPoller: () => mockClusterDataPoller
 }))
 
+vi.mock('@/composables/GatewayAPI', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/composables/GatewayAPI')>()
+  return {
+    ...actual,
+    useGatewayAPI: () => mockGatewayAPI
+  }
+})
+
 describe('AccountsView.vue', () => {
   beforeEach(() => {
     init_plugins()
+    vi.clearAllMocks()
     useRuntimeStore().availableClusters = [
       {
         name: 'foo',
@@ -33,6 +46,7 @@ describe('AccountsView.vue', () => {
     mockClusterDataPoller.unable.value = false
     mockClusterDataPoller.loaded.value = false
     mockClusterDataPoller.initialLoading.value = false
+    document.body.innerHTML = ''
   })
 
   test('displays accounts page', () => {
@@ -101,5 +115,53 @@ describe('AccountsView.vue', () => {
     const infoAlert = wrapper.getComponent(InfoAlert)
     expect(infoAlert.text()).toContain('No association defined on cluster')
     expect(infoAlert.text()).toContain('foo')
+  })
+
+  test('creates account with light payload', async () => {
+    useRuntimeStore().availableClusters = [
+      {
+        name: 'foo',
+        permissions: {
+          roles: [],
+          actions: [],
+          rules: ['accounts:view:*', 'accounts:edit:*']
+        },
+        racksdb: true,
+        infrastructure: 'foo',
+        metrics: true,
+        cache: true
+      }
+    ]
+    mockClusterDataPoller.loaded.value = true
+    mockClusterDataPoller.initialLoading.value = false
+    mockClusterDataPoller.data.value = associations
+    mockGatewayAPI.save_account.mockResolvedValue({ operation: 'accounts.update' })
+
+    const wrapper = mount(AccountsView, {
+      attachTo: document.body,
+      props: {
+        cluster: 'foo'
+      }
+    })
+
+    await wrapper.findAll('button').find((button) => button.text() === 'Create account')!.trigger('click')
+    wrapper
+      .findAllComponents(ActionDialog)
+      .find((component) => component.props('title') === 'Create Account')!
+      .vm.$emit('submit', {
+        name: 'science',
+        description: 'Science',
+        parent_account: 'root',
+        qos: 'normal,study'
+      })
+    await flushPromises()
+
+    expect(mockGatewayAPI.save_account).toHaveBeenCalledWith('foo', {
+      name: 'science',
+      description: 'Science',
+      parent_account: 'root',
+      qos: ['normal', 'study']
+    })
+    wrapper.unmount()
   })
 })

@@ -1,24 +1,38 @@
 import { describe, test, expect, beforeEach, vi } from 'vitest'
 import { RouterLink } from 'vue-router'
-import { mount } from '@vue/test-utils'
+import { flushPromises, mount } from '@vue/test-utils'
 import QosView from '@/views/QosView.vue'
 import QosHelpModal from '@/components/qos/QosHelpModal.vue'
 import ErrorAlert from '@/components/ErrorAlert.vue'
 import InfoAlert from '@/components/InfoAlert.vue'
+import ActionDialog from '@/components/operations/ActionDialog.vue'
 import { init_plugins, getMockClusterDataPoller } from '../lib/common'
 import { useRuntimeStore } from '@/stores/runtime'
 import type { ClusterQos } from '@/composables/GatewayAPI'
 import qos from '../assets/qos.json'
 
 const mockClusterDataPoller = getMockClusterDataPoller<ClusterQos[]>()
+const mockGatewayAPI = {
+  save_qos: vi.fn(),
+  delete_qos: vi.fn()
+}
 
 vi.mock('@/composables/DataPoller', () => ({
   useClusterDataPoller: () => mockClusterDataPoller
 }))
 
+vi.mock('@/composables/GatewayAPI', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/composables/GatewayAPI')>()
+  return {
+    ...actual,
+    useGatewayAPI: () => mockGatewayAPI
+  }
+})
+
 describe('QosView.vue', () => {
   beforeEach(() => {
     init_plugins()
+    vi.clearAllMocks()
     useRuntimeStore().availableClusters = [
       {
         name: 'foo',
@@ -31,6 +45,9 @@ describe('QosView.vue', () => {
     ]
     // Reset mockClusterDataPoller unable to its default value before every tests.
     mockClusterDataPoller.unable.value = false
+    mockClusterDataPoller.loaded.value = true
+    mockClusterDataPoller.data.value = qos
+    document.body.innerHTML = ''
   })
   test('display qos', () => {
     mockClusterDataPoller.data.value = qos
@@ -109,5 +126,159 @@ describe('QosView.vue', () => {
         query: { qos: qos[i].name }
       })
     }
+  })
+  test('creates qos with default common limits', async () => {
+    useRuntimeStore().availableClusters = [
+      {
+        name: 'foo',
+        permissions: {
+          roles: [],
+          actions: [],
+          rules: ['qos:view:*', 'qos:edit:*']
+        },
+        racksdb: true,
+        infrastructure: 'foo',
+        metrics: true,
+        cache: true
+      }
+    ]
+    mockGatewayAPI.save_qos.mockResolvedValue({ operation: 'qos.update' })
+    const wrapper = mount(QosView, {
+      attachTo: document.body,
+      props: {
+        cluster: 'foo'
+      }
+    })
+
+    await wrapper.findAll('button').find((button) => button.text() === 'Create QOS')!.trigger('click')
+    const dialog = wrapper
+      .findAllComponents(ActionDialog)
+      .find((component) => component.props('title') === 'Create QOS')!
+
+    expect(dialog.props('initialValues')).toStrictEqual({
+      max_submit_jobs_per_user: '100',
+      max_jobs_per_user: '10',
+      max_wall_duration_per_job: '6-00:00:00'
+    })
+
+    dialog.vm.$emit('submit', {
+      name: 'debug',
+      description: 'Debug QOS',
+      priority: '5',
+      max_submit_jobs_per_user: '100',
+      max_jobs_per_user: '10',
+      max_wall_duration_per_job: '6-00:00:00'
+    })
+    await flushPromises()
+
+    expect(mockGatewayAPI.save_qos).toHaveBeenCalledWith('foo', {
+      name: 'debug',
+      description: 'Debug QOS',
+      priority: 5,
+      max_submit_jobs_per_user: 100,
+      max_jobs_per_user: 10,
+      max_wall_duration_per_job: 8640
+    })
+    wrapper.unmount()
+  })
+
+  test('edits qos common limits', async () => {
+    useRuntimeStore().availableClusters = [
+      {
+        name: 'foo',
+        permissions: {
+          roles: [],
+          actions: [],
+          rules: ['qos:view:*', 'qos:edit:*']
+        },
+        racksdb: true,
+        infrastructure: 'foo',
+        metrics: true,
+        cache: true
+      }
+    ]
+    mockGatewayAPI.save_qos.mockResolvedValue({ operation: 'qos.update' })
+    const wrapper = mount(QosView, {
+      attachTo: document.body,
+      props: {
+        cluster: 'foo'
+      }
+    })
+
+    await wrapper.findAll('button').filter((button) => button.text() === 'Edit')[1].trigger('click')
+    const dialog = wrapper
+      .findAllComponents(ActionDialog)
+      .find((component) => component.props('title') === 'Edit QOS')!
+
+    expect(dialog.props('initialValues')).toMatchObject({
+      max_submit_jobs_per_user: '20',
+      max_jobs_per_user: '10',
+      max_wall_duration_per_job: '0-08:00:00'
+    })
+
+    dialog.vm.$emit('submit', {
+      description: 'Updated QOS',
+      priority: '7',
+      max_submit_jobs_per_user: '40',
+      max_jobs_per_user: '12',
+      max_wall_duration_per_job: '6-00:00:00'
+    })
+    await flushPromises()
+
+    expect(mockGatewayAPI.save_qos).toHaveBeenCalledWith('foo', {
+      name: 'study',
+      description: 'Updated QOS',
+      priority: 7,
+      max_submit_jobs_per_user: 40,
+      max_jobs_per_user: 12,
+      max_wall_duration_per_job: 8640
+    })
+    wrapper.unmount()
+  })
+
+  test('rejects invalid qos wall duration before submitting', async () => {
+    useRuntimeStore().availableClusters = [
+      {
+        name: 'foo',
+        permissions: {
+          roles: [],
+          actions: [],
+          rules: ['qos:view:*', 'qos:edit:*']
+        },
+        racksdb: true,
+        infrastructure: 'foo',
+        metrics: true,
+        cache: true
+      }
+    ]
+    const wrapper = mount(QosView, {
+      attachTo: document.body,
+      props: {
+        cluster: 'foo'
+      }
+    })
+
+    await wrapper.findAll('button').find((button) => button.text() === 'Create QOS')!.trigger('click')
+    wrapper
+      .findAllComponents(ActionDialog)
+      .find((component) => component.props('title') === 'Create QOS')!
+      .vm.$emit('submit', {
+        name: 'debug',
+        description: '',
+        priority: '',
+        max_submit_jobs_per_user: '100',
+        max_jobs_per_user: '10',
+        max_wall_duration_per_job: 'tomorrow'
+      })
+    await flushPromises()
+
+    expect(mockGatewayAPI.save_qos).not.toHaveBeenCalled()
+    expect(
+      wrapper
+        .findAllComponents(ActionDialog)
+        .find((component) => component.props('title') === 'Create QOS')!
+        .props('error')
+    ).toBe('MaxWallDurationPerJob must use days-hh:mm:ss or hh:mm:ss.')
+    wrapper.unmount()
   })
 })

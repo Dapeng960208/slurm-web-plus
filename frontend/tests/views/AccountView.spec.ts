@@ -330,9 +330,7 @@ describe('AccountView.vue', () => {
       associations: [
         {
           account: 'root',
-          user: 'alice',
-          qos: undefined,
-          default: undefined
+          user: 'alice'
         }
       ]
     })

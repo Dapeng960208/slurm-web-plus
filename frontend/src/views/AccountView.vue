@@ -133,15 +133,19 @@ function associationPayload(association: {
   qos?: string[]
   default_qos?: string
 }) {
+  const item: {
+    account: string
+    user?: string
+    qos?: string[]
+    default?: { qos: string }
+  } = {
+    account: association.account
+  }
+  if (association.user) item.user = association.user
+  if (association.qos !== undefined) item.qos = association.qos
+  if (association.default_qos) item.default = { qos: association.default_qos }
   return {
-    associations: [
-      {
-        account: association.account,
-        user: association.user || undefined,
-        qos: association.qos ?? undefined,
-        default: association.default_qos ? { qos: association.default_qos } : undefined
-      }
-    ]
+    associations: [item]
   }
 }
 
