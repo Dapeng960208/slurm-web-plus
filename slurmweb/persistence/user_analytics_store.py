@@ -409,16 +409,21 @@ def _aggregate_daily_stat_rows(rows):
         summary["jobs"] += jobs
         memory_value = _positive_numeric_value(avg_memory_gb)
         cpu_value = _positive_numeric_value(avg_cpu_cores)
-        if memory_value is not None and memory_samples > 0:
-            bucket["memory_total"] += memory_value * jobs
-            bucket["memory_samples"] += jobs
-            summary["memory_total"] += memory_value * jobs
-            summary["memory_samples"] += jobs
-        if cpu_value is not None and cpu_samples > 0:
-            bucket["cpu_total"] += cpu_value * jobs
-            bucket["cpu_samples"] += jobs
-            summary["cpu_total"] += cpu_value * jobs
-            summary["cpu_samples"] += jobs
+        # Legacy daily rows may have avg values but missing sample counters.
+        # In that case, keep those rows in cross-day resource averages by
+        # weighting them with jobs_count.
+        memory_weight = jobs if memory_value is not None else 0
+        cpu_weight = jobs if cpu_value is not None else 0
+        if memory_value is not None and memory_weight > 0:
+            bucket["memory_total"] += memory_value * memory_weight
+            bucket["memory_samples"] += memory_weight
+            summary["memory_total"] += memory_value * memory_weight
+            summary["memory_samples"] += memory_weight
+        if cpu_value is not None and cpu_weight > 0:
+            bucket["cpu_total"] += cpu_value * cpu_weight
+            bucket["cpu_samples"] += cpu_weight
+            summary["cpu_total"] += cpu_value * cpu_weight
+            summary["cpu_samples"] += cpu_weight
         if avg_runtime_seconds is not None:
             samples = runtime_samples or jobs
             bucket["runtime_total"] += float(avg_runtime_seconds) * samples

@@ -44,7 +44,7 @@
 - Jobs 用户筛选保留 `/users` 查询建议，同时支持直接输入用户名并点击 `Add username` 加入筛选；空值不添加，重复用户名不重复添加，添加后清空输入。
 - 用户工具当天日聚合按 `activity_date + user_id + tool` 分组，只纳入终态作业。
 - 当天 `avg_max_memory_gb` 只平均 `used_memory_gb > 0`；当天 `avg_cpu_cores` 只平均 `used_cpu_cores_avg > 0`；`0` 不再计入资源均值；无有效样本时写入 `0`，不再写入或返回 `NULL`。
-- `user/<username>/tools/analysis` 继续只读取 `user_tool_daily_stats`，跨多天按 `sum(day.avg * day.jobs_count) / sum(day.jobs_count)` 合并内存和 CPU 均值；但只有当天存在对应资源样本时，该日才进入对应资源均值分母，`totals` 层使用同样口径。
+- `user/<username>/tools/analysis` 继续只读取 `user_tool_daily_stats`，跨多天按 `sum(day.avg * day.jobs_count) / sum(day.jobs_count)` 合并内存和 CPU 均值；只要当天对应 `avg_*` 是有效正值，该日就进入对应资源均值分母，`totals` 层使用同样口径。
 - 旧日表中 `avg_max_memory_gb` 或 `avg_cpu_cores` 为 `NULL` 时，查询返回按 `0` 处理。
 - 新增维护脚本 `slurmweb/repair-user-tool-daily-stats.py`，支持 `--start`、`--end`、可选 `--user` 和 `--dry-run`，用于按新口径从 `job_snapshots` 重建 `user_tool_daily_stats`。
 

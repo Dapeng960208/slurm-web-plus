@@ -189,7 +189,7 @@
   - `avg_runtime_hours` 来自 `end_time - start_time`
   - `avg_cpu_cores` 只平均 `used_cpu_cores_avg > 0`
   - `None`、`0`、负数和非法资源值不参与当天资源平均；无有效样本时保存并返回 `0`
-  - 跨多天同工具合并按 `sum(day.avg * day.jobs_count) / sum(day.jobs_count)` 计算，但只有当天存在对应资源样本时，该日才参与对应资源均值分母；`totals` 层使用相同口径
+  - 跨多天同工具合并按 `sum(day.avg * day.jobs_count) / sum(day.jobs_count)` 计算；只要当天对应 `avg_*` 是有效正值，该日就参与对应资源均值分母，`totals` 层使用相同口径
   - 继续保留 `avg_max_memory_mb` 与 `avg_runtime_seconds` 兼容字段
 - 新增维护脚本 `slurmweb/repair-user-tool-daily-stats.py`，支持 `--start YYYY-MM-DD`、`--end YYYY-MM-DD`、可选 `--user <username>` 和 `--dry-run`
 - `Submission Activity` 的提交时间线在 `submit_time` 缺失时会回退到 `start_time` / `last_seen`

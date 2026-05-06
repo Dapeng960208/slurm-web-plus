@@ -36,7 +36,7 @@
 - `cpu_samples`
 - `runtime_samples`
 
-其中 `memory_samples` / `cpu_samples` / `runtime_samples` 仅作为诊断字段保留；`tools/analysis` 跨多日返回的 `avg_max_memory_gb` 与 `avg_cpu_cores` 按每日 `jobs_count` 加权，但只有当天存在对应资源样本时，该日才会进入对应资源均值统计。旧日表中 `avg_max_memory_gb` 或 `avg_cpu_cores` 为 `NULL`，且对应样本数为 `0` 时，该日不会进入对应资源均值分母。
+其中 `memory_samples` / `cpu_samples` / `runtime_samples` 仅作为诊断字段保留；`tools/analysis` 跨多日返回的 `avg_max_memory_gb` 与 `avg_cpu_cores` 始终按每日 `jobs_count` 加权。只要某日 `avg_max_memory_gb` 或 `avg_cpu_cores` 本身是有效正值，该日就会进入对应资源均值统计；旧日表即使样本数字段缺失，也不会因此被误排除。
 
 `tools/analysis` 当前固定要求：
 
@@ -73,7 +73,7 @@
 - 当天日聚合按 `activity_date + user_id + tool` 分组，只统计终态作业。
 - 当天 `avg_max_memory_gb` 只使用 `job_snapshots.used_memory_gb > 0` 的样本求平均；`None`、`0`、负数和非法数值不参与平均；同组没有有效内存样本时保存 `0`。接口同时保留 `avg_max_memory_mb` 作为前端兼容字段。
 - 当天 `avg_cpu_cores` 只使用 `job_snapshots.used_cpu_cores_avg > 0` 的样本求平均；`None`、`0`、负数和非法数值不参与平均；同组没有有效 CPU 样本时保存 `0`。
-- 跨多天查询按日表行合并：`avg_max_memory_gb = sum(day.avg_max_memory_gb * day.jobs_count) / sum(day.jobs_count)`，`avg_cpu_cores` 同理；但只有当天 `memory_samples > 0` 或 `cpu_samples > 0` 时，该日才参与对应资源均值的分母。
+- 跨多天查询按日表行合并：`avg_max_memory_gb = sum(day.avg_max_memory_gb * day.jobs_count) / sum(day.jobs_count)`，`avg_cpu_cores` 同理；只要当天对应 `avg_*` 是有效正值，该日就参与对应资源均值分母。
 - 当整个时间窗内某项资源总样本数为 `0` 时，跨天返回该资源均值为 `0`。
 - 运行时间优先按 `end_time - start_time` 计算，并返回 `avg_runtime_hours`；兼容保留 `avg_runtime_seconds`。
 - 终态判断按 `UPPER(job_state)` 匹配，避免 `completed` / `COMPLETED` 大小写差异导致统计为空。

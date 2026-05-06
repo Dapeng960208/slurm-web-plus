@@ -364,6 +364,19 @@ class TestUserMetricsAggregation(unittest.TestCase):
         self.assertAlmostEqual(result["totals"]["avg_max_memory_gb"], 4.0)
         self.assertAlmostEqual(result["totals"]["avg_cpu_cores"], 8.0)
 
+    def test_aggregate_daily_stat_rows_uses_jobs_weight_for_legacy_rows_without_samples(self):
+        result = _aggregate_daily_stat_rows(
+            [
+                ("blast", 2, 4.0, 8.0, 3600.0, 0, 0, 2),
+                ("blast", 1, 10.0, 2.0, 7200.0, 0, 0, 1),
+            ]
+        )
+
+        self.assertAlmostEqual(result["tool_breakdown"][0]["avg_max_memory_gb"], 6.0)
+        self.assertAlmostEqual(result["tool_breakdown"][0]["avg_cpu_cores"], 6.0)
+        self.assertAlmostEqual(result["totals"]["avg_max_memory_gb"], 6.0)
+        self.assertAlmostEqual(result["totals"]["avg_cpu_cores"], 6.0)
+
 
 class TestUserMetricsTimeline(unittest.TestCase):
     def test_align_bucket(self):
@@ -659,6 +672,24 @@ class TestUserMetricsQueries(unittest.TestCase):
         self.assertAlmostEqual(result["totals"]["avg_cpu_cores"], 8.0)
         self.assertAlmostEqual(result["tool_breakdown"][0]["avg_max_memory_gb"], 4.0)
         self.assertAlmostEqual(result["tool_breakdown"][0]["avg_cpu_cores"], 8.0)
+
+    def test_user_tool_daily_summary_uses_jobs_weight_for_legacy_rows_without_samples(self):
+        self.cursor.fetchall.return_value = [
+            ("blast", 2, 4.0, 8.0, 3600.0, 0, 0, 2),
+            ("blast", 1, 10.0, 2.0, 7200.0, 0, 0, 1),
+        ]
+
+        result = self.store._user_tool_daily_summary(
+            "alice",
+            date(2026, 4, 24),
+            date(2026, 4, 25),
+        )
+
+        self.assertEqual(result["totals"]["completed_jobs"], 3)
+        self.assertAlmostEqual(result["totals"]["avg_max_memory_gb"], 6.0)
+        self.assertAlmostEqual(result["totals"]["avg_cpu_cores"], 6.0)
+        self.assertAlmostEqual(result["tool_breakdown"][0]["avg_max_memory_gb"], 6.0)
+        self.assertAlmostEqual(result["tool_breakdown"][0]["avg_cpu_cores"], 6.0)
 
     def test_completed_jobs_window_query_filters_by_time_range(self):
         start_time = datetime(2026, 4, 24, 0, 0, tzinfo=timezone.utc)
