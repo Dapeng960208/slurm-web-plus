@@ -18,6 +18,8 @@ import {
   getMBHumanUnit,
   getNodeGPU,
   getNodeGPUFromGres,
+  getNodeAllocationState,
+  getNodeMainState,
   isMetricRange,
   useGatewayAPI
 } from '@/composables/GatewayAPI'
@@ -255,14 +257,43 @@ const canDeleteNode = computed(() =>
 
 function nodeEditInitialState(state: string[] | undefined): string {
   if (!state || state.length === 0) return ''
-  if (state.includes('DRAIN') && state.includes('IDLE')) return 'DRAINED'
   if (state.includes('DRAIN')) return 'DRAIN'
   if (state.includes('DOWN')) return 'DOWN'
   if (state.includes('FAIL')) return 'FAIL'
   if (state.includes('FUTURE')) return 'FUTURE'
-  if (state.includes('MIXED')) return 'MIXED'
   if (state.includes('IDLE')) return 'IDLE'
   return ''
+}
+
+function nodeCurrentStateLabel(state: string[] | undefined): string {
+  if (!state || state.length === 0) return 'UNKNOWN'
+  const mainState = getNodeMainState(state)
+  switch (mainState) {
+    case 'down':
+      return 'DOWN'
+    case 'error':
+      return 'ERROR'
+    case 'drain':
+      return 'DRAIN'
+    case 'drained':
+      return 'DRAINED'
+    case 'draining':
+      return 'DRAINING'
+    case 'fail':
+      return 'FAIL'
+    case 'failing':
+      return 'FAILING'
+    case 'future':
+      return 'FUTURE'
+    default: {
+      const allocationState = getNodeAllocationState(state)
+      if (allocationState === 'mixed') return 'MIXED'
+      if (allocationState === 'allocated') return 'ALLOCATED'
+      if (allocationState === 'planned') return 'PLANNED'
+      if (allocationState === 'idle') return 'IDLE'
+      return 'UP'
+    }
+  }
 }
 
 async function saveNode(payload: Record<string, string>) {
@@ -883,8 +914,6 @@ onUnmounted(() => {
           required: true,
           placeholder: 'Select node state',
           options: [
-            { label: 'MIXED (current state)', value: 'MIXED', disabled: true },
-            { label: 'DRAINED (current state)', value: 'DRAINED', disabled: true },
             { label: 'DRAIN', value: 'DRAIN' },
             { label: 'RESUME', value: 'RESUME' },
             { label: 'UNDRAIN', value: 'UNDRAIN' },
@@ -893,7 +922,7 @@ onUnmounted(() => {
             { label: 'FAIL', value: 'FAIL' },
             { label: 'FUTURE', value: 'FUTURE' }
           ],
-          hint: 'Select the Slurm state action to apply to this node. Disabled entries only describe the current node state.',
+          hint: `Current node state: ${nodeCurrentStateLabel(node.data.value?.state)}. Select the Slurm state action to apply to this node.`,
           tooltip:
             'Use DRAIN to start draining a node. Slurm may later report the node as DRAINING or DRAINED depending on running jobs.'
         },

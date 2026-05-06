@@ -371,7 +371,7 @@ describe('NodeView.vue', () => {
     }
     const stateField = editDialog.props('fields').find((field) => field.key === 'state')
     expect(stateField?.type).toBe('select')
-    expect(stateField?.options?.map((option) => option.value)).toContain('MIXED')
+    expect(stateField?.options?.map((option) => option.value)).not.toContain('MIXED')
     expect(stateField?.options?.map((option) => option.value)).toContain('UNDRAIN')
 
     await editDialog.vm.$emit('submit', { state: 'UNDRAIN', reason: 'back online' })
@@ -423,12 +423,10 @@ describe('NodeView.vue', () => {
       throw new Error('Edit node dialog not found')
     }
 
-    expect(editDialog.props('initialValues')).toMatchObject({ state: 'MIXED' })
-    const mixedOption = editDialog
-      .props('fields')
-      .find((field) => field.key === 'state')
-      ?.options?.find((option) => option.value === 'MIXED')
-    expect(mixedOption?.disabled).toBe(true)
+    expect(editDialog.props('initialValues')).toMatchObject({ state: '' })
+    const stateField = editDialog.props('fields').find((field) => field.key === 'state')
+    expect(stateField?.hint).toContain('Current node state: MIXED.')
+    expect(stateField?.options?.some((option) => option.value === 'MIXED')).toBe(false)
   })
 
   test('shows drained as current state while keeping drain as the writable action', async () => {
@@ -474,11 +472,58 @@ describe('NodeView.vue', () => {
       throw new Error('Edit node dialog not found')
     }
 
-    expect(editDialog.props('initialValues')).toMatchObject({ state: 'DRAINED' })
+    expect(editDialog.props('initialValues')).toMatchObject({ state: 'DRAIN' })
     const stateField = editDialog.props('fields').find((field) => field.key === 'state')
-    const drainedOption = stateField?.options?.find((option) => option.value === 'DRAINED')
-    const drainOption = stateField?.options?.find((option) => option.value === 'DRAIN')
-    expect(drainedOption?.disabled).toBe(true)
-    expect(drainOption?.disabled).not.toBe(true)
+    expect(stateField?.hint).toContain('Current node state: DRAINED.')
+    expect(stateField?.options?.some((option) => option.value === 'DRAINED')).toBe(false)
+    expect(stateField?.options?.some((option) => option.value === 'DRAIN')).toBe(true)
+  })
+
+  test('shows idle as current state for idle nodes', async () => {
+    useRuntimeStore().availableClusters = [
+      {
+        ...useRuntimeStore().availableClusters[0],
+        permissions: {
+          roles: [],
+          actions: [],
+          rules: ['resources:edit:*']
+        }
+      }
+    ]
+    useClusterDataPoller.mockReturnValueOnce(mockNodeDataPoller)
+    useClusterDataPoller.mockReturnValueOnce(mockJobsDataPoller)
+    mockNodeDataPoller.data.value = {
+      ...nodeAllocated,
+      state: ['IDLE']
+    }
+    mockJobsDataPoller.data.value = jobsNode
+
+    const wrapper = mount(NodeView, {
+      props: {
+        cluster: 'foo',
+        nodeName: 'cn4'
+      }
+    })
+    await flushPromises()
+
+    const editButton = wrapper
+      .findAll('button[type="button"]')
+      .find((button) => button.text().trim() === 'Edit')
+    if (!editButton) {
+      throw new Error('Edit button not found')
+    }
+    await editButton.trigger('click')
+    await flushPromises()
+
+    const editDialog = wrapper
+      .findAllComponents(ActionDialog)
+      .find((dialog) => dialog.props('title') === 'Edit Node')
+    if (!editDialog) {
+      throw new Error('Edit node dialog not found')
+    }
+
+    expect(editDialog.props('initialValues')).toMatchObject({ state: 'IDLE' })
+    const stateField = editDialog.props('fields').find((field) => field.key === 'state')
+    expect(stateField?.hint).toContain('Current node state: IDLE.')
   })
 })

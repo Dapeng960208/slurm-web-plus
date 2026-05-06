@@ -25,6 +25,7 @@
 - `NodeView`、Resources 和节点状态 badge 现在会把 `['IDLE', 'DRAIN']` 明确展示为 `DRAINED`，不再和管理员提交的 `DRAIN` 动作混淆。
 - `MIXED` 在编辑表单中只作为当前状态占位显示，不作为可提交的状态动作；实际可编辑动作仍保持 `DRAIN`、`RESUME`、`UNDRAIN`、`DOWN`、`IDLE`、`FAIL`、`FUTURE`。
 - 节点编辑表单对 `DRAINED` 也只作为禁用的当前状态占位显示；实际可提交动作仍使用 `DRAIN`，由 Slurm 自行过渡到 `DRAINING` 或 `DRAINED`。
+- 节点编辑下拉框现在只保留可提交动作，`Current node state` 改为独立 hint 展示，避免 idle 节点被旧的禁用占位逻辑误判成 `DRAINED` 并卡住动作选择。
 - 共享 `ActionDialog` 不再在弹窗保持打开期间因为后台轮询刷新 `initialValues` 而重置用户已输入的表单内容。
 - `ActionDialog` 现在只会在弹窗重新打开，或同一弹窗实例切换到另一种操作时重新初始化表单，避免 Accounts、QOS、Jobs、Node 等页面编辑时输入被后台刷新覆盖。
 

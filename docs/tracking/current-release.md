@@ -103,6 +103,7 @@
 - `NodeView` 的 Edit Node 中 `state` 已改为下拉框，选项为 `DRAIN`、`RESUME`、`UNDRAIN`、`DOWN`、`IDLE`、`FAIL`、`FUTURE`
 - mixed 节点打开 `Edit Node` 时，表单会额外显示禁用的 `MIXED` 当前态占位，避免当前状态缺失；实际提交动作仍使用显式 Slurm 状态操作值
 - drained 节点现在会在状态 badge 和节点详情中明确显示为 `DRAINED`；编辑表单会显示禁用的 `DRAINED` 当前态占位，但仍通过 `DRAIN` 作为可提交动作请求 Slurm 状态变更
+- 节点编辑表单已进一步收口为“下拉框只展示可提交动作，当前状态单独显示为 hint”，避免 idle 节点因当前态占位逻辑误判为 `DRAINED`
 - `ReservationsView` 已补创建、更新、删除
 - `AccountsView` / `AccountView` 已补创建、更新、删除
 - `UserView` 已补 SlurmDB 用户更新、删除
