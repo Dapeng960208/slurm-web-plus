@@ -67,6 +67,7 @@
   - 输入框不再跨越右侧 `Execution trace` 栏
   - 左侧聊天工作区可完整占满可用宽度
   - 流式回复和 trace 更新时不再把对话面板整体向下挤动
+- `AssistantView` 右侧 `Execution trace` 当前只展示最近 5 条 tool call，避免长会话侧栏被历史轨迹完全占满
 - `analysis` 页的 `ping` / `diag` 已从原始 JSON 文本改为结构化字段展示
 - 用户分析历史接口与前端图表已扩展为：
   - 每时间桶提交作业数

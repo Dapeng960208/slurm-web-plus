@@ -450,4 +450,88 @@ describe('views/AssistantView.vue', () => {
     expect(composer.element.parentElement).toBe(chatColumn.element)
     expect(messageScroller.element.parentElement).toBe(chatColumn.element)
   })
+
+  test('shows only the latest five tool calls in execution trace', async () => {
+    mockGatewayAPI.ai_configs.mockResolvedValue([
+      {
+        id: 1,
+        name: 'qwen-prod',
+        provider: 'qwen',
+        provider_label: 'Qwen',
+        model: 'qwen3-coder',
+        display_name: 'Qwen Prod',
+        enabled: true,
+        is_default: true,
+        sort_order: 10,
+        base_url: null,
+        deployment: null,
+        api_version: null,
+        request_timeout: null,
+        temperature: null,
+        system_prompt: null,
+        extra_options: {},
+        secret_configured: true,
+        secret_mask: '***1234',
+        last_validated_at: null,
+        last_validation_error: null
+      }
+    ])
+    mockGatewayAPI.ai_conversations.mockResolvedValue([
+      {
+        id: 9,
+        title: 'Trace trimming',
+        created_at: '2026-04-24T10:00:00Z',
+        updated_at: '2026-04-24T10:05:00Z',
+        last_message: 'Rendered trace',
+        model_config_id: 1
+      }
+    ])
+    mockGatewayAPI.ai_conversation.mockResolvedValue({
+      id: 9,
+      title: 'Trace trimming',
+      created_at: '2026-04-24T10:00:00Z',
+      updated_at: '2026-04-24T10:05:00Z',
+      model_config_id: 1,
+      tool_calls: Array.from({ length: 7 }, (_, index) => ({
+        id: index + 1,
+        tool_name: `tool-${index + 1}`,
+        interface_key: `interface-${index + 1}`,
+        status_code: 200,
+        status: 'ok',
+        duration_ms: index + 1,
+        input_payload: { index: index + 1 },
+        result_summary: `result-${index + 1}`
+      })),
+      messages: [
+        {
+          id: 100,
+          role: 'user',
+          content: 'Show trace',
+          created_at: '2026-04-24T10:00:00Z',
+          model_config_id: 1,
+          metadata: {}
+        },
+        {
+          id: 101,
+          role: 'assistant',
+          content: 'Trace ready.',
+          created_at: '2026-04-24T10:00:05Z',
+          model_config_id: 1,
+          metadata: {}
+        }
+      ]
+    })
+
+    const wrapper = mountAssistantView()
+
+    await flushPromises()
+
+    expect(wrapper.text()).not.toContain('interface-1')
+    expect(wrapper.text()).not.toContain('interface-2')
+    expect(wrapper.text()).toContain('interface-3')
+    expect(wrapper.text()).toContain('interface-7')
+
+    const detailButtons = wrapper.findAll('button').filter((button) => button.text().includes('View details'))
+    expect(detailButtons).toHaveLength(5)
+  })
 })

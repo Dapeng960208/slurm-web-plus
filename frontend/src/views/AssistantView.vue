@@ -44,6 +44,7 @@ type ToolRun = {
 
 const DEFAULT_TOKEN_LIMIT = 8192
 const TOKEN_LIMIT_OPTION_KEYS = ['max_context_tokens', 'context_limit', 'token_limit', 'max_tokens']
+const MAX_VISIBLE_TOOL_RUNS = 5
 
 const { cluster } = defineProps<{ cluster: string }>()
 
@@ -122,7 +123,9 @@ const renderedMessages = computed<AIConversationMessage[]>(() => {
 const historicalToolRuns = computed<ToolRun[]>(() =>
   (selectedConversation.value?.tool_calls ?? []).map((toolCall) => normalizeToolRunFromHistory(toolCall))
 )
-const displayToolRuns = computed<ToolRun[]>(() => [...historicalToolRuns.value, ...toolRuns.value])
+const displayToolRuns = computed<ToolRun[]>(() =>
+  [...historicalToolRuns.value, ...toolRuns.value].slice(-MAX_VISIBLE_TOOL_RUNS)
+)
 const tokenLimit = computed(() => readTokenLimit(selectedModelConfig.value) ?? DEFAULT_TOKEN_LIMIT)
 const draftTokenCount = computed(() => estimateTokens(draft.value.trim()))
 const conversationTokenCount = computed(() => {
