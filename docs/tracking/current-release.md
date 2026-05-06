@@ -22,9 +22,11 @@
 - 修复节点状态编辑缺少 `MIXED` 当前态展示，以及共享表单在后台轮询刷新期间重置输入的问题
 - 修复节点状态展示把 `DRAIN` 动作与 `DRAINED` 结果态混淆的问题
 - Jobs 用户筛选支持直接输入用户名并加入筛选
-- 修正 `user_tool_daily_stats` 当天与跨天聚合口径，避免 `avg_max_memory_gb` / `avg_cpu_cores` 返回空值
+- 修正 `user_tool_daily_stats` 当天与跨天聚合口径，避免 `jobs_count > 0` 但资源均值为 `0` 的脏统计继续返回
 - 修复 QOS 创建 payload 包装、QOS 默认限制补齐、accounts 创建 payload 包装，以及 account-user association 删除条件过宽问题
+- 修复 account 创建轻量 payload 未补 `organization`，导致 `slurmrestd` 按官方 schema 拒绝创建的问题
 - 修复 AI 对话页左侧聊天工作区未撑满和对话过程中面板下移的问题
+- 收紧 AI 写接口 payload 校验，避免 `account/update` 和 `qos/update` 继续绕过前端表单必填约束
 
 ## 2. 已完成项
 
@@ -55,6 +57,10 @@
 - AI 执行轨迹已补接口级审计字段：
   - `interface_key`
   - `status_code`
+- AI 写接口 payload 已补前移校验：
+  - `account/update` 现在要求显式提交 `organization`
+  - `qos/update` 现在要求显式提交 `max_submit_jobs_per_user`、`max_jobs_per_user`、`max_wall_duration_per_job`
+  - 缺失上述前端必填字段时，AI 接口层直接返回 `400`，不再把后端默认补值当作主流程
 - AI 会话详情接口已返回历史 `tool_calls`
 - `AssistantView` 的 `Execution trace` 已改为默认简版：
   - 仅显示工具名 / 接口名 / 状态码 / 耗时
@@ -116,12 +122,15 @@
 - `QosView` 已补创建、更新、删除
 - QOS 写入 payload 已在后端统一规范化：
   - 轻量 `{ name, description, priority }` 会包装为 SlurmDB 需要的 `{ qos: [...] }`
-  - 未显式传入常用限制时，后端默认补 `MaxSubmitJobsPerUser=100`、`MaxJobsPerUser=10`、`MaxWallDurationPerJob=1440`
-  - AI 直接调用 `qos/update` 与前端创建 QOS 复用同一后端默认逻辑
+  - 前端创建/编辑 QOS 已显式预填并要求提交 `MaxSubmitJobsPerUser=100`、`MaxJobsPerUser=10`、`MaxWallDurationPerJob=6-00:00:00`
+  - 后端默认补值仅保留为兼容旧调用方的兜底，不再作为前端主流程依赖
+  - AI 直接调用 `qos/update` 仍可复用同一后端兼容逻辑
 - Accounts 写入 payload 已在后端统一规范化：
+  - 前端创建/编辑 account 已显式收集并提交 `organization`
   - 轻量 `{ name, description, organization }` 会包装为 SlurmDB 需要的 `{ accounts: [...] }`
+  - 后端缺省补 `organization` 仅保留为兼容旧调用方的兜底，不再作为前端主流程依赖
   - 前端创建 account 与 AI 直接调用 `accounts/update` 复用同一后端包装逻辑
-- `QosView` 创建 QOS 弹框已显示并预填 `MaxSubmitJobsPerUser`、`MaxJobsPerUser`、`MaxWallDurationPerJob`
+- `QosView` 创建/编辑 QOS 弹框已显式预填并要求提交 `MaxSubmitJobsPerUser`、`MaxJobsPerUser`、`MaxWallDurationPerJob`
 - `slurmweb.slurmrestd` 已扩展为通用 `GET/POST/DELETE` 请求层
 - Gateway -> Agent -> `slurmrestd` 已支持 `DELETE` body
 - `jobs self` 后端校验已落地：
@@ -241,7 +250,7 @@
 ## 3. 进行中项
 
 - 评估是否需要为 AI 写接口补更细的接口级 allowlist，作为现有接口权限校验之外的额外约束
-- 对齐 `accounts/users/qos/reservation` 的轻量前端表单字段与官方 JSON 结构边界
+- 继续审计 `accounts/users/qos/reservation` 之外的 AI 写 payload 与前端表单字段一致性
 - 视 Linux/CI 环境情况补全更大范围后端回归
 - 评估后续是否需要把 `CI Triage` 结果继续接给外部 AI agent 做只读诊断
 - 评估是否需要为结构化 CI 结果补 GitHub issue / PR comment 自动摘要
@@ -342,6 +351,8 @@
 - `cd frontend && npx vitest run tests/views/JobsView.spec.ts tests/views/JobView.spec.ts tests/views/JobsHistoryView.spec.ts tests/views/JobHistoryView.spec.ts tests/views/AccountView.spec.ts tests/views/UserView.spec.ts tests/composables/GatewayAPI.spec.ts tests/composables/ClusterAnalysis.spec.ts tests/components/operations/ActionDialog.spec.ts`
 - `npm --prefix frontend run type-check`
 - `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/apps/test_ai_service.py slurmweb/tests/slurmrestd/test_slurmrestd_write_operations.py slurmweb/tests/views/test_agent_operations.py`
+- `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/apps/test_ai_service.py`
+- `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/slurmrestd/test_slurmrestd_write_operations.py slurmweb/tests/views/test_agent_operations.py`
 - `cd frontend && npx vitest run tests/views/resources/ResourcesView.spec.ts tests/views/NodeView.spec.ts tests/components/operations/ActionDialog.spec.ts tests/components/jobs/UserFilterSelector.spec.ts`
 - `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/apps/test_user_analytics_store.py`
 - `cd frontend && npx vitest run tests/views/AssistantView.spec.ts`

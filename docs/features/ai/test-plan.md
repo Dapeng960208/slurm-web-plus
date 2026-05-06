@@ -25,6 +25,7 @@
 - AI 工具层改为经 `slurmweb/ai/agent_interfaces.py` 访问 Agent 接口语义，而不是在工具注册表内直连底层实现
 - 查询接口权限映射与拒绝逻辑（不允许通过 AI 绕过 `self` / `*` 规则）
 - 写接口继续复用 Agent 现有接口权限与 owner-aware 逻辑，拒绝结果要回传给 AI
+- AI 写接口的 payload 契约需要与前端主表单保持一致，缺少前端显式必填字段时应在 AI 接口层返回 400，而不是依赖后端隐藏默认值
 - 同一 `jwt.key` 下派生出的 AI secret 加密密钥跨重启保持稳定
 
 ## 2. 前端覆盖点
@@ -179,6 +180,16 @@ npm --prefix frontend run test:unit
 - 写入 account/user/association/qos 后，应失效相关 `accounts` / `associations` 缓存
 - 后续账户页或 association 查询应重新读取底层状态，不能继续展示旧缓存
 
+### 3.12 AI 写 payload 与前端表单契约一致性
+
+- `account/update`
+  - 缺少 `organization` 时，AI 工具调用返回 `400`
+  - 显式提交 `organization` 时，调用继续成功
+- `qos/update`
+  - 缺少 `max_submit_jobs_per_user`、`max_jobs_per_user`、`max_wall_duration_per_job` 任一字段时，AI 工具调用返回 `400`
+  - 三项字段都显式提交时，调用继续成功
+- 上述失败路径应写入 `ai_tool_calls` 审计，状态为 `error`，并保留 `status_code=400`
+
 ## 4. 手工验证场景（建议）
 
 - 配置 Qwen/DeepSeek/Kimi（兼容路径）、Ollama、本地 OpenAI-compatible 服务
@@ -191,6 +202,7 @@ npm --prefix frontend run test:unit
 - 在普通 AI 页面确认不展示模型、stream、persistence 等配置块
 - 删除一个普通用户会话，确认普通用户不可见、管理员审计可见
 - 让 AI 执行“给 `ip-user` 添加用户 `guojianpeng`”，确认接口返回、账户页和集群管理端结果一致
+- 让 AI 执行 account 或 qos 写操作时，故意省略前端必填字段，确认 AI 直接收到 400，而不是由后端静默补默认值
 
 ## 5. 相关测试文件（已存在）
 

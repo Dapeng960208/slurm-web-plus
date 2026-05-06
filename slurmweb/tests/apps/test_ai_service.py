@@ -373,6 +373,10 @@ class DummySlurmrestd:
         return {"updated": True, "payload": payload, "warnings": [], "errors": []}
 
     @staticmethod
+    def accounts_update(payload):
+        return {"updated": True, "payload": payload, "warnings": [], "errors": []}
+
+    @staticmethod
     def associations_update(payload):
         return {"updated": True, "payload": payload, "warnings": [], "errors": []}
 
@@ -823,3 +827,117 @@ class TestAIService(TestCase):
 
         self.assertEqual(result["interface_key"], "association/update")
         self.assertEqual(result["status_code"], 200)
+
+    def test_account_update_requires_organization_in_ai_payload(self):
+        self._create_model()
+        self.app.policy = DummyPolicy({"accounts:edit:*"})
+        self.service.tools.app = self.app
+
+        with self.assertRaises(AIToolExecutionError) as ctx:
+            self.service.tools.execute(
+                self.user,
+                conversation_id=1,
+                tool_name="mutate_agent_interface",
+                arguments={
+                    "interface_key": "account/update",
+                    "arguments": {
+                        "payload": {
+                            "name": "research",
+                            "description": "science"
+                        }
+                    },
+                },
+                message_id=1,
+            )
+
+        self.assertEqual(ctx.exception.status_code, 400)
+        self.assertIn("organization is required", str(ctx.exception))
+        self.assertEqual(self.conversation_store.tool_calls[-1]["interface_key"], "account/update")
+        self.assertEqual(self.conversation_store.tool_calls[-1]["status"], "error")
+        self.assertEqual(self.conversation_store.tool_calls[-1]["status_code"], 400)
+
+    def test_account_update_accepts_explicit_organization_in_ai_payload(self):
+        self._create_model()
+        self.app.policy = DummyPolicy({"accounts:edit:*"})
+        self.service.tools.app = self.app
+
+        result = self.service.tools.execute(
+            self.user,
+            conversation_id=1,
+            tool_name="mutate_agent_interface",
+            arguments={
+                "interface_key": "account/update",
+                "arguments": {
+                    "payload": {
+                        "name": "research",
+                        "description": "science",
+                        "organization": "science"
+                    }
+                },
+            },
+            message_id=1,
+        )
+
+        self.assertEqual(result["interface_key"], "account/update")
+        self.assertEqual(result["status_code"], 200)
+        self.assertEqual(result["result"]["result"]["payload"]["organization"], "science")
+
+    def test_qos_update_requires_frontend_required_limits_in_ai_payload(self):
+        self._create_model()
+        self.app.policy = DummyPolicy({"qos:edit:*"})
+        self.service.tools.app = self.app
+
+        with self.assertRaises(AIToolExecutionError) as ctx:
+            self.service.tools.execute(
+                self.user,
+                conversation_id=1,
+                tool_name="mutate_agent_interface",
+                arguments={
+                    "interface_key": "qos/update",
+                    "arguments": {
+                        "payload": {
+                            "name": "normal",
+                            "description": "default",
+                            "max_submit_jobs_per_user": 100,
+                            "max_jobs_per_user": 10
+                        }
+                    },
+                },
+                message_id=1,
+            )
+
+        self.assertEqual(ctx.exception.status_code, 400)
+        self.assertIn("max_wall_duration_per_job is required", str(ctx.exception))
+        self.assertEqual(self.conversation_store.tool_calls[-1]["interface_key"], "qos/update")
+        self.assertEqual(self.conversation_store.tool_calls[-1]["status"], "error")
+        self.assertEqual(self.conversation_store.tool_calls[-1]["status_code"], 400)
+
+    def test_qos_update_accepts_frontend_required_limits_in_ai_payload(self):
+        self._create_model()
+        self.app.policy = DummyPolicy({"qos:edit:*"})
+        self.service.tools.app = self.app
+
+        result = self.service.tools.execute(
+            self.user,
+            conversation_id=1,
+            tool_name="mutate_agent_interface",
+            arguments={
+                "interface_key": "qos/update",
+                "arguments": {
+                    "payload": {
+                        "name": "normal",
+                        "description": "default",
+                        "max_submit_jobs_per_user": 100,
+                        "max_jobs_per_user": 10,
+                        "max_wall_duration_per_job": 360
+                    }
+                },
+            },
+            message_id=1,
+        )
+
+        self.assertEqual(result["interface_key"], "qos/update")
+        self.assertEqual(result["status_code"], 200)
+        self.assertEqual(result["result"]["result"]["payload"]["max_submit_jobs_per_user"], 100)
+        self.assertEqual(result["result"]["result"]["payload"]["max_jobs_per_user"], 10)
+        self.assertEqual(result["result"]["result"]["payload"]["max_wall_duration_per_job"], 360)

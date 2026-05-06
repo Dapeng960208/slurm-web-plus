@@ -118,6 +118,10 @@ AI 当前按数据库能力自动启用：
   - `admin` 默认的 `*:edit:*` 可通过 AI 执行对应 `edit` 类写接口
   - `delete`、`self` 等边界继续按当前用户实际规则与 owner-aware 逻辑判断
   - 普通用户若没有对应接口权限，AI 调用会收到拒绝响应，不能绕过接口层限制
+- AI 写接口的 payload 契约也必须与前端主表单保持一致，不能依赖 `slurmrestd` 适配层的隐藏默认值作为主流程：
+  - `account/update` 的每个 account entry 必须显式提交 `name` 和 `organization`
+  - `qos/update` 的每个 qos entry 必须显式提交 `name`、`max_submit_jobs_per_user`、`max_jobs_per_user`、`max_wall_duration_per_job`
+  - 后端对缺失字段的默认补值仅保留为兼容旧调用方或历史轻量 payload 的兜底，不视为 AI 主写链路契约
 - 密钥只返回掩码和配置状态
 - 会话默认仅允许当前用户读取自己的记录
 - 普通对话页不展示模型、stream、persistence 等运行配置；模型配置查看与维护统一收口到 `/:cluster/admin/ai`
@@ -208,3 +212,18 @@ AI 写接口调用 `association/update` 时继续复用 Agent 写接口权限，
 
 - association payload 缺少 `cluster` 时，`slurmrestd` 适配层会按当前集群补齐。
 - account/user/association/qos 写入或删除后，缓存层会失效 `accounts` 与 `associations` 等相关 key，避免后续页面读取旧缓存。
+
+## 10. AI 写 payload 与前端表单一致性
+
+本轮补充收紧了 AI 写接口 payload 校验，重点覆盖最容易被模型或脚本绕过前端表单约束的管理写链路：
+
+- `account/update`
+  - AI payload 缺少 `organization` 时，接口层直接返回 `400`
+  - 不再把“由后端按 `description/name` 自动补 `organization`”当作 AI 主流程
+- `qos/update`
+  - AI payload 缺少 `max_submit_jobs_per_user`、`max_jobs_per_user`、`max_wall_duration_per_job` 任一字段时，接口层直接返回 `400`
+  - 不再把后端默认限制补值当作 AI 主流程
+
+保留边界：
+
+- `association/update` 自动补 `cluster` 仍然保留，因为它属于路由上下文注入，不是前端表单漏填的业务字段。

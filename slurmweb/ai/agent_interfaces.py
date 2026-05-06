@@ -300,7 +300,7 @@ class AIAgentInterfaceRegistry:
                 key="account/update",
                 method="POST",
                 description="Create or update accounts using the agent accounts payload.",
-                arguments_description="Required: payload.",
+                arguments_description="Required: payload. Each account entry must include name and organization, matching the account create/edit form contract.",
                 write=True,
                 handler=self._accounts_update,
             ),
@@ -348,7 +348,7 @@ class AIAgentInterfaceRegistry:
                 key="qos/update",
                 method="POST",
                 description="Create or update QoS using the agent qos payload.",
-                arguments_description="Required: payload.",
+                arguments_description="Required: payload. Each qos entry must include name, max_submit_jobs_per_user, max_jobs_per_user, and max_wall_duration_per_job, matching the QOS create/edit form contract.",
                 write=True,
                 handler=self._qos_update,
             ),
@@ -460,6 +460,49 @@ class AIAgentInterfaceRegistry:
         payload = arguments.get("payload")
         if not isinstance(payload, dict):
             raise AIAgentInterfaceError(400, "payload must be an object")
+        return payload
+
+    @staticmethod
+    def _payload_entries(payload: dict, key: str) -> list[dict]:
+        entries = payload.get(key)
+        if isinstance(entries, list):
+            return entries
+        return [payload]
+
+    @staticmethod
+    def _required_nonempty_string(value) -> bool:
+        return isinstance(value, str) and bool(value.strip())
+
+    def _validate_accounts_payload(self, payload: dict) -> dict:
+        for index, account in enumerate(self._payload_entries(payload, "accounts")):
+            if not isinstance(account, dict):
+                raise AIAgentInterfaceError(400, f"accounts[{index}] must be an object")
+            if not self._required_nonempty_string(account.get("name")):
+                raise AIAgentInterfaceError(400, f"accounts[{index}].name is required")
+            if not self._required_nonempty_string(account.get("organization")):
+                raise AIAgentInterfaceError(
+                    400,
+                    f"accounts[{index}].organization is required and must match the account form payload",
+                )
+        return payload
+
+    def _validate_qos_payload(self, payload: dict) -> dict:
+        required_fields = (
+            "max_submit_jobs_per_user",
+            "max_jobs_per_user",
+            "max_wall_duration_per_job",
+        )
+        for index, qos in enumerate(self._payload_entries(payload, "qos")):
+            if not isinstance(qos, dict):
+                raise AIAgentInterfaceError(400, f"qos[{index}] must be an object")
+            if not self._required_nonempty_string(qos.get("name")):
+                raise AIAgentInterfaceError(400, f"qos[{index}].name is required")
+            for field in required_fields:
+                if qos.get(field) in (None, ""):
+                    raise AIAgentInterfaceError(
+                        400,
+                        f"qos[{index}].{field} is required and must match the QOS form payload",
+                    )
         return payload
 
     @staticmethod
@@ -835,10 +878,11 @@ class AIAgentInterfaceRegistry:
     def _accounts_update(self, user, arguments: dict):
         self._require_permission(user, "accounts", "edit", "*")
         self._ensure_write_supported("accounts.update")
+        request_payload = self._validate_accounts_payload(self._payload_argument(arguments))
         payload, status_code = self._normalize_operation_result(
             "accounts.update",
             None,
-            self.app.slurmrestd.accounts_update(self._payload_argument(arguments)),
+            self.app.slurmrestd.accounts_update(request_payload),
         )
         return self._result("account/update", payload, status_code=status_code)
 
@@ -897,10 +941,11 @@ class AIAgentInterfaceRegistry:
     def _qos_update(self, user, arguments: dict):
         self._require_permission(user, "qos", "edit", "*")
         self._ensure_write_supported("qos.update")
+        request_payload = self._validate_qos_payload(self._payload_argument(arguments))
         payload, status_code = self._normalize_operation_result(
             "qos.update",
             None,
-            self.app.slurmrestd.qos_update(self._payload_argument(arguments)),
+            self.app.slurmrestd.qos_update(request_payload),
         )
         return self._result("qos/update", payload, status_code=status_code)
 

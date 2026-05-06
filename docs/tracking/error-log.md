@@ -26,6 +26,50 @@
 - 解决：`slurmweb/slurmrestd/__init__.py` 新增 `accounts` payload 规范化，把轻量对象自动包装为 `{ "accounts": [payload] }`；并补 `slurmweb/tests/slurmrestd/test_slurmrestd_write_operations.py` 与 `frontend/tests/views/AccountsView.spec.ts` 回归。
 - 预防：后续新增或封装 SlurmDB 写接口时，先按官方 OpenAPI 核对 request body 顶层 schema，不能假设单对象接口接受裸 payload；前端轻量表单与后端 Slurm schema 之间必须始终保留适配层。
 
+### 2026-05-06：创建 account 时缺少 `organization` 被 `slurmrestd` 拒绝
+
+- 场景：从 Accounts 页面或 AI 调用 `accounts/update` 创建 account，前端继续发送轻量 payload `{ name, description, parent_account, qos }`。
+- 现象：`slurmrestd` 返回 `Missing required field 'organization' in dictionary (#/accounts[0]/organization/) [Unable to resolve path/9200]`，创建失败。
+- 复现：向 `POST /slurmdb/v0.0.44/accounts/` 发送 `{ "accounts": [{ "name": "science", "description": "Science" }] }`。
+- 根因：虽然上一轮已经把轻量 payload 包装成了官方要求的 `accounts` 数组，但没有继续按官方 OpenAPI / accounting 接口要求补齐 account 对象的必填字段 `organization`。
+- 解决：
+  - `slurmweb/slurmrestd/__init__.py` 的 accounts payload 规范化新增 `_normalize_single_account()`。
+  - 前端 `AccountsView` / `AccountView` 已补 `organization` 必填字段，并在创建/编辑请求中显式提交该值。
+  - 后端仅在缺少 `organization` 时按 `description -> name -> "unknown"` 顺序补默认值，作为兼容旧调用方的兜底。
+  - 补 `slurmweb/tests/slurmrestd/test_slurmrestd_write_operations.py`、`slurmweb/tests/views/test_agent_operations.py`、`frontend/tests/views/AccountsView.spec.ts` 与 `frontend/tests/views/AccountView.spec.ts` 回归。
+- 预防：后续封装 SlurmDB 写接口时，除了检查 request body 顶层 schema，还必须把 required 字段同步到前端表单和前端 payload 校验；后端默认补值只能作为兼容兜底，不能替代前端契约。
+
+### 2026-05-06：QOS 常用限制值仍主要依赖后端默认补全，前后端契约不一致
+
+- 场景：`QosView` 创建或编辑 QOS 时，前端弹框虽然预填了 `MaxSubmitJobsPerUser`、`MaxJobsPerUser`、`MaxWallDurationPerJob`，但字段本身不是必填；如果被清空，最终仍主要依赖后端默认补值。
+- 现象：用户在前端看不到“这些值不能为空”的约束，但后端又会把空值改写成默认值，导致表单行为与实际写入契约不一致。
+- 复现：
+  - 打开 `Create QOS` 或 `Edit QOS` 弹框。
+  - 清空常用限制字段后提交；前端不会因必填失败阻止提交，后端仍可能按默认值补齐。
+- 根因：前端只做了“预填默认值”，没有把这组默认值提升为显式表单契约；后端默认补值被错误地承担了主流程责任。
+- 解决：
+  - `QosView` 的创建/编辑弹框把 `MaxSubmitJobsPerUser`、`MaxJobsPerUser`、`MaxWallDurationPerJob` 全部设为必填。
+  - 编辑弹框若后端当前值未设置，则回退到前端默认值，避免出现空表单。
+  - 保留后端默认补值仅作为兼容旧调用方和历史 payload 的兜底。
+  - 补 `frontend/tests/views/QosView.spec.ts` 回归，断言这三项字段为 `required: true`，且编辑时缺失值会回退到前端默认值。
+- 预防：凡是后端存在“默认补值”的高频写表单字段，前端如果要支持该能力，就必须同时显式展示、预填并校验；不能只做 UI 提示而把实际约束留给后端。
+
+### 2026-05-06：AI 写接口 payload 直接透传时会绕过前端表单必填约束
+
+- 场景：AI 或脚本直接调用 `account/update`、`qos/update` 这类管理写接口。
+- 现象：即使前端已经把 `organization`、`max_submit_jobs_per_user`、`max_jobs_per_user`、`max_wall_duration_per_job` 设为显式必填，AI 路径仍可省略这些字段并依赖后端默认补值成功写入。
+- 复现：
+  - 调用 `mutate_agent_interface(account/update)`，payload 只传 `{ name, description }`。
+  - 调用 `mutate_agent_interface(qos/update)`，payload 只传 `{ name, description }` 或缺失三项常用限制字段中的任意一项。
+- 根因：`slurmweb/ai/agent_interfaces.py` 之前只做 `payload must be an object` 这类通用校验，随后就把对象原样透传给 `slurmrestd`；而 `slurmrestd` 适配层为了兼容旧调用方又会补默认字段，导致 AI 主写链路和前端主表单契约分叉。
+- 解决：
+  - `slurmweb/ai/agent_interfaces.py` 新增 AI 层 payload 校验。
+  - `account/update` 的每个 account entry 现在要求显式提交 `name` 和 `organization`。
+  - `qos/update` 的每个 qos entry 现在要求显式提交 `name`、`max_submit_jobs_per_user`、`max_jobs_per_user`、`max_wall_duration_per_job`。
+  - 缺失这些字段时，AI 接口层直接返回 `400`，并写入 `ai_tool_calls` 错误审计。
+  - 补 `slurmweb/tests/apps/test_ai_service.py` 回归，覆盖通过与拒绝路径。
+- 预防：后续审 AI 写接口时，不能只看权限是否复用 Agent；还要逐条对照前端表单契约，凡是前端已经定义为显式必填的业务字段，AI 主写链路也必须在接口层显式校验，不能继续依赖后端隐藏默认值。
+
 ### 2026-05-06：`QosView` 弹窗错误提示测试不能从页面总文本断言
 
 - 场景：为 `QosView` 创建 QOS 的 `MaxWallDurationPerJob` 非法输入补 Vitest 回归。
@@ -465,6 +509,25 @@
   - 后台当前日查询改为 UTC 自然日，并过滤 `user_id IS NULL` 与 `COALESCE(end_time, last_seen) IS NULL` 的行。
   - `tools/analysis` 保持只读 `user_tool_daily_stats`，多日查询由 `_aggregate_daily_stat_rows()` 按 `memory_samples` / `cpu_samples` / `runtime_samples` 加权合并。
 - 预防：后续修改日聚合字段、工具归类或资源解析时，只改共享聚合函数，并补后台路径与维护脚本一致性的测试。
+
+### 2026-05-06：`tools/analysis` 可返回 `jobs_count > 0` 但资源均值为 `0`
+
+- 场景：用户分析页或 AI 工具调用查询 `user/<username>/tools/analysis?start=<iso>&end=<iso>`，时间窗内 `user_tool_daily_stats` 已存在旧日聚合行，且部分行只有 `jobs_count`，没有有效的 `avg_max_memory_gb` / `avg_cpu_cores`。
+- 现象：接口会返回 `completed_jobs` 或 `tool_breakdown[].jobs` 大于 `0`，但同一条统计的 `avg_max_memory_gb`、`avg_cpu_cores` 显示为 `0`，与“只把有效资源统计当作推荐证据”的预期不一致。
+- 复现：
+  - 先写入或保留一条 `user_tool_daily_stats` 行，其中 `jobs_count > 0`，但 `avg_max_memory_gb` / `avg_cpu_cores` 为 `0`、`NULL` 或其他非法值。
+  - 调用 `GET /user/<username>/tools/analysis?start=<iso>&end=<iso>`，可观察到接口继续把该行计入 `completed_jobs` 或工具级 `jobs`。
+  - 对当天数据按 `[user_metrics].aggregation_interval` 周期刷新时，如果新 payload 为空，原实现只做 upsert、不做 delete，当天旧脏行会继续残留。
+- 根因：
+  - 日聚合写入阶段此前把无有效资源对的作业也累加进 `jobs_count`，并把资源均值写成 `0`。
+  - 跨天读取 `_aggregate_daily_stat_rows()` 又会继续把这些 `0`/`NULL` 资源日行计入 `completed_jobs`。
+  - 当前日后台刷新只做 upsert，没有在重算当天前删除旧日行，导致按间隔刷新后脏行仍可能保留。
+- 解决：
+  - `aggregate_user_tool_daily_rows()` 只纳入 `used_memory_gb > 0` 且 `used_cpu_cores_avg > 0` 的作业；不再为无效资源对写入 `jobs_count` 或 `avg_* = 0` 行。
+  - `_aggregate_daily_stat_rows()` 读取日表时直接跳过 `jobs_count <= 0` 或资源均值不是有效正数的旧行，不再让这些旧行贡献接口的 `completed_jobs`、工具列表或资源均值。
+  - 当前日后台刷新改为“先删当天旧行，再写当天新 payload”，确保按聚合间隔刷新时不会残留旧脏统计。
+  - 补充聚合、当前日刷新和 repair/rebuild 脚本回归测试，覆盖“无有效资源对时不写行”和“旧 0 行不再被接口读出”。
+- 预防：后续只要 `jobs_count` 的定义依赖某组资源字段，就必须在“日写入”和“跨日读取”两层保持同一过滤口径；后台按周期重算某天统计时必须替换整天数据，而不是只做 upsert。
 
 ### 2026-05-06：前端单测入口误用 `npm test` 与 `npm run test:unit -- --run ...`
 

@@ -1,5 +1,19 @@
 ﻿# 最新功能
 
+## 本轮：AI 写接口 payload 收紧到与前端表单一致
+
+本轮专门收紧了 AI 写接口最容易绕过前端表单约束的两条管理写链路：
+
+- `account/update` 现在要求 AI payload 显式提交 `organization`，缺失时直接返回 `400`，不再把后端按 `description/name` 自动补值当作 AI 主流程。
+- `qos/update` 现在要求 AI payload 显式提交 `max_submit_jobs_per_user`、`max_jobs_per_user`、`max_wall_duration_per_job`，缺失任一字段时直接返回 `400`。
+- `association/update` 继续保留自动补 `cluster`，因为这属于路由上下文注入，不是前端表单漏填的业务字段。
+- AI 接口目录说明和定向后端测试已同步更新，确保 AI 写链路与前端主表单契约一致。
+
+本轮新增验证：
+
+- `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/apps/test_ai_service.py`
+- `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/slurmrestd/test_slurmrestd_write_operations.py slurmweb/tests/views/test_agent_operations.py`
+
 ## 本轮：AI 对话页布局稳定性修复
 
 本轮修复普通 AI 对话页的两个前端布局问题：
@@ -21,8 +35,8 @@
 
 - `slurmrestd` QOS 写入会把轻量 payload 统一包装为 `{ qos: [...] }`，避免创建 QOS 时触发 `Missing required field 'qos'`。
 - `slurmrestd` Accounts 写入会把轻量 payload 统一包装为 `{ accounts: [...] }`，避免创建 account 时触发 `Missing required field 'accounts'`。
-- 后端在 QOS 创建/更新 payload 缺少常用限制时自动补默认值：`MaxSubmitJobsPerUser=100`、`MaxJobsPerUser=10`、`MaxWallDurationPerJob=1440` 分钟；AI 直接调用 `qos/update` 也走同一默认逻辑。
-- `QosView` 创建弹框显示并预填 `MaxSubmitJobsPerUser`、`MaxJobsPerUser`、`MaxWallDurationPerJob`，其中 walltime 输入使用 `days-hh:mm:ss` 并在前端转换为分钟。
+- `QosView` 创建/编辑弹框会显式预填并要求提交 `MaxSubmitJobsPerUser=100`、`MaxJobsPerUser=10`、`MaxWallDurationPerJob=6-00:00:00`，walltime 输入使用 `days-hh:mm:ss` 并在前端转换为分钟。
+- 后端对 QOS 常用限制的默认补值仅保留为兼容旧调用方的兜底，不再作为前端主流程依赖。
 - account-user association 删除不再依赖 `DELETE` request body 作为 SlurmDB 删除条件，后端会把单条 association payload 转换为 `account/user/cluster` query 参数，避免删除条件被忽略后命中过宽范围。
 - `AccountView` 删除 association 时只提交目标 `account` 与 `user`，不再携带空的 `qos/default` 字段。
 
@@ -58,9 +72,10 @@
 - `ActionDialog` 增加 `select` 字段类型，支持通用操作弹窗渲染下拉选项。
 - Jobs 用户筛选保留 `/users` 查询建议，同时支持直接输入用户名并点击 `Add username` 加入筛选；空值不添加，重复用户名不重复添加，添加后清空输入。
 - 用户工具当天日聚合按 `activity_date + user_id + tool` 分组，只纳入终态作业。
-- 当天 `avg_max_memory_gb` 只平均 `used_memory_gb > 0`；当天 `avg_cpu_cores` 只平均 `used_cpu_cores_avg > 0`；`0` 不再计入资源均值；无有效样本时写入 `0`，不再写入或返回 `NULL`。
-- `user/<username>/tools/analysis` 继续只读取 `user_tool_daily_stats`，跨多天按 `sum(day.avg * day.jobs_count) / sum(day.jobs_count)` 合并内存和 CPU 均值；只要当天对应 `avg_*` 是有效正值，该日就进入对应资源均值分母，`totals` 层使用同样口径。
-- 旧日表中 `avg_max_memory_gb` 或 `avg_cpu_cores` 为 `NULL` 时，查询返回按 `0` 处理。
+- 日聚合只统计 `used_memory_gb > 0` 且 `used_cpu_cores_avg > 0` 的完成作业；`jobs_count` 语义同步收紧为“同时具备有效内存和 CPU 统计的作业数”。
+- 后台按 `[user_metrics].aggregation_interval` 周期刷新当天日表时，会先删除当天旧 `user_tool_daily_stats` 行，再写入新的有效统计，避免旧的 `jobs_count > 0 / avg_* = 0` 脏行残留。
+- `user/<username>/tools/analysis` 继续只读取 `user_tool_daily_stats`，跨多天按 `sum(day.avg * day.jobs_count) / sum(day.jobs_count)` 合并内存和 CPU 均值；旧日表中的 `0`、`NULL` 或其他非法资源均值不再继续贡献 `completed_jobs`、工具列表或资源均值。
+- 当时间窗内没有任何有效资源对作业时，接口返回空工具列表，`totals.completed_jobs = 0`，资源均值为 `null`。
 - 新增维护脚本 `slurmweb/repair-user-tool-daily-stats.py`，支持 `--start`、`--end`、可选 `--user` 和 `--dry-run`，用于按新口径从 `job_snapshots` 重建 `user_tool_daily_stats`。
 
 本轮新增验证：
