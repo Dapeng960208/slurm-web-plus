@@ -403,27 +403,27 @@ def _aggregate_daily_stat_rows(rows):
         memory_samples = int(memory_samples or 0)
         cpu_samples = int(cpu_samples or 0)
         runtime_samples = int(runtime_samples or 0)
+        memory_value = _positive_numeric_value(avg_memory_gb)
+        cpu_value = _positive_numeric_value(avg_cpu_cores)
+        if jobs <= 0 or memory_value is None or cpu_value is None:
+            continue
 
         bucket = tools[tool]
         bucket["jobs"] += jobs
         summary["jobs"] += jobs
-        memory_value = _positive_numeric_value(avg_memory_gb)
-        cpu_value = _positive_numeric_value(avg_cpu_cores)
         # Legacy daily rows may have avg values but missing sample counters.
         # In that case, keep those rows in cross-day resource averages by
         # weighting them with jobs_count.
-        memory_weight = jobs if memory_value is not None else 0
-        cpu_weight = jobs if cpu_value is not None else 0
-        if memory_value is not None and memory_weight > 0:
-            bucket["memory_total"] += memory_value * memory_weight
-            bucket["memory_samples"] += memory_weight
-            summary["memory_total"] += memory_value * memory_weight
-            summary["memory_samples"] += memory_weight
-        if cpu_value is not None and cpu_weight > 0:
-            bucket["cpu_total"] += cpu_value * cpu_weight
-            bucket["cpu_samples"] += cpu_weight
-            summary["cpu_total"] += cpu_value * cpu_weight
-            summary["cpu_samples"] += cpu_weight
+        memory_weight = jobs
+        cpu_weight = jobs
+        bucket["memory_total"] += memory_value * memory_weight
+        bucket["memory_samples"] += memory_weight
+        summary["memory_total"] += memory_value * memory_weight
+        summary["memory_samples"] += memory_weight
+        bucket["cpu_total"] += cpu_value * cpu_weight
+        bucket["cpu_samples"] += cpu_weight
+        summary["cpu_total"] += cpu_value * cpu_weight
+        summary["cpu_samples"] += cpu_weight
         if avg_runtime_seconds is not None:
             samples = runtime_samples or jobs
             bucket["runtime_total"] += float(avg_runtime_seconds) * samples
@@ -433,7 +433,7 @@ def _aggregate_daily_stat_rows(rows):
 
     tool_breakdown = []
     for tool, values in tools.items():
-        avg_memory_gb = _avg_or_zero(values["memory_total"], values["memory_samples"])
+        avg_memory_gb = _avg(values["memory_total"], values["memory_samples"])
         avg_runtime_seconds = _avg(
             values["runtime_total"], values["runtime_samples"]
         )
@@ -443,7 +443,7 @@ def _aggregate_daily_stat_rows(rows):
                 "jobs": values["jobs"],
                 "avg_max_memory_gb": avg_memory_gb,
                 "avg_max_memory_mb": _memory_mb(avg_memory_gb),
-                "avg_cpu_cores": _avg_or_zero(values["cpu_total"], values["cpu_samples"]),
+                "avg_cpu_cores": _avg(values["cpu_total"], values["cpu_samples"]),
                 "avg_runtime_hours": _runtime_hours(avg_runtime_seconds),
                 "avg_runtime_seconds": avg_runtime_seconds,
             }
@@ -452,9 +452,7 @@ def _aggregate_daily_stat_rows(rows):
 
     busiest_tool = tool_breakdown[0]["tool"] if tool_breakdown else None
     busiest_tool_jobs = tool_breakdown[0]["jobs"] if tool_breakdown else 0
-    avg_summary_memory_gb = _avg_or_zero(
-        summary["memory_total"], summary["memory_samples"]
-    )
+    avg_summary_memory_gb = _avg(summary["memory_total"], summary["memory_samples"])
     avg_summary_runtime_seconds = _avg(
         summary["runtime_total"], summary["runtime_samples"]
     )
@@ -464,9 +462,7 @@ def _aggregate_daily_stat_rows(rows):
             "active_tools": len(tool_breakdown),
             "avg_max_memory_gb": avg_summary_memory_gb,
             "avg_max_memory_mb": _memory_mb(avg_summary_memory_gb),
-            "avg_cpu_cores": _avg_or_zero(
-                summary["cpu_total"], summary["cpu_samples"]
-            ),
+            "avg_cpu_cores": _avg(summary["cpu_total"], summary["cpu_samples"]),
             "avg_runtime_hours": _runtime_hours(avg_summary_runtime_seconds),
             "avg_runtime_seconds": avg_summary_runtime_seconds,
             "busiest_tool": busiest_tool,
@@ -535,15 +531,15 @@ def aggregate_user_tool_daily_rows(
         )
         key = (activity_date, user_id, tool)
         bucket = buckets[key]
-        bucket["jobs_count"] += 1
         memory_value = _positive_numeric_value(row.get("used_memory_gb"))
-        if memory_value is not None:
-            bucket["memory_total"] += memory_value
-            bucket["memory_samples"] += 1
         cpu_value = _positive_numeric_value(row.get("used_cpu_cores_avg"))
-        if cpu_value is not None:
-            bucket["cpu_total"] += cpu_value
-            bucket["cpu_samples"] += 1
+        if memory_value is None or cpu_value is None:
+            continue
+        bucket["jobs_count"] += 1
+        bucket["memory_total"] += memory_value
+        bucket["memory_samples"] += 1
+        bucket["cpu_total"] += cpu_value
+        bucket["cpu_samples"] += 1
         runtime_value = _runtime_seconds(row)
         if runtime_value is not None:
             bucket["runtime_total"] += float(runtime_value)
@@ -551,16 +547,18 @@ def aggregate_user_tool_daily_rows(
 
     payload = []
     for (activity_date, user_id, tool), values in buckets.items():
+        if values["jobs_count"] <= 0:
+            continue
         payload.append(
             {
                 "activity_date": activity_date,
                 "user_id": user_id,
                 "tool": tool,
                 "jobs_count": values["jobs_count"],
-                "avg_max_memory_gb": _avg_or_zero(
+                "avg_max_memory_gb": _avg(
                     values["memory_total"], values["memory_samples"]
                 ),
-                "avg_cpu_cores": _avg_or_zero(
+                "avg_cpu_cores": _avg(
                     values["cpu_total"], values["cpu_samples"]
                 ),
                 "avg_runtime_seconds": _avg(
@@ -959,7 +957,7 @@ class UserAnalyticsStore:
     def refresh_current_day_summary(self):
         rows = self._current_day_completed_rows()
         payload = self._aggregate_daily_rows(rows)
-        self._upsert_current_day_summary(payload)
+        self._replace_current_day_summary(payload)
 
     def _aggregate_daily_rows(self, rows):
         return aggregate_user_tool_daily_rows(
@@ -1236,12 +1234,19 @@ class UserAnalyticsStore:
         finally:
             self._release_conn(conn)
 
-    def _upsert_current_day_summary(self, payload):
+    def _replace_current_day_summary(self, payload):
         from psycopg2.extras import execute_values
 
         conn = self._get_conn()
         try:
             with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    DELETE FROM user_tool_daily_stats
+                    WHERE activity_date = %s
+                    """,
+                    (_now_utc().date(),),
+                )
                 if payload:
                     execute_values(
                         cur,
