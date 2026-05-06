@@ -175,6 +175,7 @@ async function createAccount(payload: Record<string, string>) {
     await gateway.save_account(cluster, {
       name: payload.name || undefined,
       description: payload.description || null,
+      organization: payload.organization || undefined,
       parent_account: payload.parent_account || undefined,
       qos: parseCsvList(payload.qos)
     })
@@ -281,6 +282,7 @@ if (route.query.page_size) {
       :fields="[
         { key: 'name', label: 'Account name', required: true },
         { key: 'description', label: 'Description', type: 'textarea' },
+        { key: 'organization', label: 'Organization', required: true },
         { key: 'parent_account', label: 'Parent account' },
         { key: 'qos', label: 'QOS (comma separated)' }
       ]"

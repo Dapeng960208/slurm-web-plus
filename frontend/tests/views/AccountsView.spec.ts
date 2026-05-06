@@ -117,7 +117,7 @@ describe('AccountsView.vue', () => {
     expect(infoAlert.text()).toContain('foo')
   })
 
-  test('creates account with light payload', async () => {
+  test('creates account with organization field', async () => {
     useRuntimeStore().availableClusters = [
       {
         name: 'foo',
@@ -151,6 +151,7 @@ describe('AccountsView.vue', () => {
       .vm.$emit('submit', {
         name: 'science',
         description: 'Science',
+        organization: 'Biology Lab',
         parent_account: 'root',
         qos: 'normal,study'
       })
@@ -159,6 +160,7 @@ describe('AccountsView.vue', () => {
     expect(mockGatewayAPI.save_account).toHaveBeenCalledWith('foo', {
       name: 'science',
       description: 'Science',
+      organization: 'Biology Lab',
       parent_account: 'root',
       qos: ['normal', 'study']
     })

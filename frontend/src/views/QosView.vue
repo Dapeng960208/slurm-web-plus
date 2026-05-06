@@ -123,7 +123,6 @@ function openDeleteDialog(qos: ClusterQos) {
 
 function parseOptionalPositiveInteger(value: string): number | undefined {
   const trimmed = value.trim()
-  if (!trimmed) return undefined
   const parsed = Number(trimmed)
   if (!Number.isInteger(parsed) || parsed < 0) {
     throw new Error('QOS job limits must be positive integer values.')
@@ -133,7 +132,6 @@ function parseOptionalPositiveInteger(value: string): number | undefined {
 
 function parseWallDurationMinutes(value: string): number | undefined {
   const trimmed = value.trim()
-  if (!trimmed) return undefined
   const match = trimmed.match(/^(?:(\d+)-)?(\d{1,2}):(\d{2}):(\d{2})$/)
   if (!match) {
     throw new Error('MaxWallDurationPerJob must use days-hh:mm:ss or hh:mm:ss.')
@@ -443,17 +441,20 @@ if (route.query.page_size) {
           key: 'max_submit_jobs_per_user',
           label: 'MaxSubmitJobsPerUser',
           type: 'number',
+          required: true,
           hint: 'Current submitted jobs per user, including running and pending jobs.'
         },
         {
           key: 'max_jobs_per_user',
           label: 'MaxJobsPerUser',
           type: 'number',
+          required: true,
           hint: 'Maximum concurrently running jobs per user.'
         },
         {
           key: 'max_wall_duration_per_job',
           label: 'MaxWallDurationPerJob',
+          required: true,
           hint: 'Single-job maximum runtime as days-hh:mm:ss.'
         }
       ]"
@@ -471,9 +472,15 @@ if (route.query.page_size) {
       :initial-values="{
         description: selectedQos?.description ?? '',
         priority: selectedQos?.priority?.set ? String(selectedQos.priority.number) : '',
-        max_submit_jobs_per_user: optionalNumberInput(selectedQos?.limits.max.jobs.per.user),
-        max_jobs_per_user: optionalNumberInput(selectedQos?.limits.max.jobs.active_jobs.per.user),
-        max_wall_duration_per_job: optionalWallDurationInput(selectedQos?.limits.max.wall_clock.per.job)
+        max_submit_jobs_per_user:
+          optionalNumberInput(selectedQos?.limits.max.jobs.per.user) ||
+          createQosInitialValues.max_submit_jobs_per_user,
+        max_jobs_per_user:
+          optionalNumberInput(selectedQos?.limits.max.jobs.active_jobs.per.user) ||
+          createQosInitialValues.max_jobs_per_user,
+        max_wall_duration_per_job:
+          optionalWallDurationInput(selectedQos?.limits.max.wall_clock.per.job) ||
+          createQosInitialValues.max_wall_duration_per_job
       }"
       :fields="[
         { key: 'description', label: 'Description', type: 'textarea' },
@@ -482,17 +489,20 @@ if (route.query.page_size) {
           key: 'max_submit_jobs_per_user',
           label: 'MaxSubmitJobsPerUser',
           type: 'number',
+          required: true,
           hint: 'Current submitted jobs per user, including running and pending jobs.'
         },
         {
           key: 'max_jobs_per_user',
           label: 'MaxJobsPerUser',
           type: 'number',
+          required: true,
           hint: 'Maximum concurrently running jobs per user.'
         },
         {
           key: 'max_wall_duration_per_job',
           label: 'MaxWallDurationPerJob',
+          required: true,
           hint: 'Single-job maximum runtime as days-hh:mm:ss.'
         }
       ]"

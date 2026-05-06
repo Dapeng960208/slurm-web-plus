@@ -15,6 +15,7 @@ import PanelSkeleton from '@/components/PanelSkeleton.vue'
 
 const mockClusterDataPoller = getMockClusterDataPoller<ClusterAssociation[]>()
 const mockGatewayAPI = {
+  account: vi.fn(),
   save_account: vi.fn(),
   delete_account: vi.fn(),
   save_association: vi.fn(),
@@ -51,6 +52,11 @@ describe('AccountView.vue', () => {
     mockClusterDataPoller.unable.value = false
     mockClusterDataPoller.loaded.value = false
     mockClusterDataPoller.initialLoading.value = false
+    mockGatewayAPI.account.mockResolvedValue({
+      name: 'root',
+      description: 'Root account',
+      organization: 'Core HPC'
+    })
     document.body.innerHTML = ''
   })
 
@@ -333,6 +339,65 @@ describe('AccountView.vue', () => {
           user: 'alice'
         }
       ]
+    })
+    wrapper.unmount()
+  })
+
+  test('edits account with organization field', async () => {
+    useRuntimeStore().availableClusters = [
+      {
+        name: 'foo',
+        permissions: {
+          roles: [],
+          actions: [],
+          rules: ['accounts:view:*', 'accounts:edit:*']
+        },
+        racksdb: true,
+        infrastructure: 'foo',
+        metrics: true,
+        cache: true
+      }
+    ]
+    mockGatewayAPI.save_account.mockResolvedValue({ operation: 'accounts.update' })
+    mockClusterDataPoller.loaded.value = true
+    mockClusterDataPoller.initialLoading.value = false
+    mockClusterDataPoller.data.value = [
+      {
+        ...(associations as ClusterAssociation[])[0],
+        account: 'root',
+        user: '',
+        qos: ['normal']
+      }
+    ] as ClusterAssociation[]
+
+    const wrapper = mount(AccountView, {
+      attachTo: document.body,
+      props: {
+        cluster: 'foo',
+        account: 'root'
+      }
+    })
+    await flushPromises()
+
+    await wrapper.findAll('button').find((button) => button.text() === 'Edit')!.trigger('click')
+    await nextTick()
+    wrapper
+      .findAllComponents(ActionDialog)
+      .find((dialog) => dialog.props('title') === 'Edit Account')!
+      .vm.$emit('submit', {
+        description: 'Root account',
+        organization: 'Platform Team',
+        parent_account: '',
+        qos: 'normal'
+      })
+    await flushPromises()
+
+    expect(mockGatewayAPI.save_account).toHaveBeenCalledWith('foo', {
+      name: 'root',
+      description: 'Root account',
+      organization: 'Platform Team',
+      parent_account: undefined,
+      qos: ['normal']
     })
     wrapper.unmount()
   })

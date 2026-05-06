@@ -479,6 +479,8 @@ export interface UserDescription {
 
 export interface AccountDescription {
   name: string
+  description?: string | null
+  organization?: string | null
 }
 
 interface GatewayLoginResponse extends UserDescription {
@@ -1245,6 +1247,7 @@ export interface ReservationPayload extends Record<string, unknown> {
 export interface SlurmdbObjectPayload extends Record<string, unknown> {
   name?: string
   description?: string | null
+  organization?: string | null
 }
 
 type CachedLdapUsersAPIResponse = CachedLdapUser[] | CachedLdapUsersResponse
@@ -1803,6 +1806,10 @@ export function useGatewayAPI() {
     return await restAPI.post<ClusterOperationResult>(`/agents/${cluster}/accounts`, payload)
   }
 
+  async function account(cluster: string, accountName: string): Promise<AccountDescription> {
+    return await restAPI.get<AccountDescription>(`/agents/${cluster}/account/${encodeURIComponent(accountName)}`)
+  }
+
   async function delete_account(
     cluster: string,
     accountName: string
@@ -2359,6 +2366,7 @@ export function useGatewayAPI() {
     delete_reservation,
     accounts,
     save_account,
+    account,
     delete_account,
     associations,
     save_association,

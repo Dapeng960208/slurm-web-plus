@@ -7,7 +7,7 @@
 -->
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, ref, watch, onMounted } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { ChevronLeftIcon } from '@heroicons/vue/20/solid'
 import ClusterMainLayout from '@/components/ClusterMainLayout.vue'
@@ -17,7 +17,7 @@ import PageHeader from '@/components/PageHeader.vue'
 import AccountBreadcrumb from '@/components/accounts/AccountBreadcrumb.vue'
 import { useClusterDataPoller } from '@/composables/DataPoller'
 import { useGatewayAPI } from '@/composables/GatewayAPI'
-import type { ClusterAssociation } from '@/composables/GatewayAPI'
+import type { AccountDescription, ClusterAssociation } from '@/composables/GatewayAPI'
 import DetailSkeletonList from '@/components/DetailSkeletonList.vue'
 import PanelSkeleton from '@/components/PanelSkeleton.vue'
 import StatCardSkeleton from '@/components/StatCardSkeleton.vue'
@@ -46,6 +46,7 @@ const editUserQosOpen = ref(false)
 const deleteAssociationOpen = ref(false)
 const operationBusy = ref(false)
 const operationError = ref<string | null>(null)
+const accountDetails = ref<AccountDescription | null>(null)
 const selectedAssociation = ref<ClusterAssociation | null>(null)
 const { data, unable, loaded, initialLoading, setCluster } = useClusterDataPoller<ClusterAssociation[]>(
   cluster,
@@ -57,6 +58,23 @@ watch(
   () => cluster,
   (newCluster) => {
     setCluster(newCluster)
+  }
+)
+
+async function loadAccountDetails() {
+  try {
+    accountDetails.value = await gateway.account(cluster, account)
+  } catch {
+    accountDetails.value = null
+  }
+}
+
+onMounted(loadAccountDetails)
+
+watch(
+  () => [cluster, account] as const,
+  () => {
+    loadAccountDetails()
   }
 )
 
@@ -156,10 +174,12 @@ async function saveAccount(payload: Record<string, string>) {
     await gateway.save_account(cluster, {
       name: account,
       description: payload.description || null,
+      organization: payload.organization || undefined,
       parent_account: payload.parent_account || undefined,
       qos: parseCsvList(payload.qos)
     })
     runtimeStore.reportInfo(`Account ${account} update requested.`)
+    await loadAccountDetails()
     editOpen.value = false
   } catch (error: unknown) {
     operationError.value = error instanceof Error ? error.message : String(error)
@@ -693,12 +713,14 @@ function hasDifferentQos(userAssociation: ClusterAssociation): boolean {
       :loading="operationBusy"
       :error="operationError"
       :initial-values="{
-        description: '',
+        description: accountDetails?.description ?? '',
+        organization: accountDetails?.organization ?? '',
         parent_account: accountAssociation?.parent_account ?? '',
         qos: stringifyList(accountAssociation?.qos)
       }"
       :fields="[
         { key: 'description', label: 'Description', type: 'textarea' },
+        { key: 'organization', label: 'Organization', required: true },
         { key: 'parent_account', label: 'Parent account' },
         { key: 'qos', label: 'QOS (comma separated)' }
       ]"

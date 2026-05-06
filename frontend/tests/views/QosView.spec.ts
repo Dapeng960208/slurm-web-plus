@@ -160,6 +160,13 @@ describe('QosView.vue', () => {
       max_jobs_per_user: '10',
       max_wall_duration_per_job: '6-00:00:00'
     })
+    expect(dialog.props('fields')).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ key: 'max_submit_jobs_per_user', required: true }),
+        expect.objectContaining({ key: 'max_jobs_per_user', required: true }),
+        expect.objectContaining({ key: 'max_wall_duration_per_job', required: true })
+      ])
+    )
 
     dialog.vm.$emit('submit', {
       name: 'debug',
@@ -215,6 +222,13 @@ describe('QosView.vue', () => {
       max_jobs_per_user: '10',
       max_wall_duration_per_job: '0-08:00:00'
     })
+    expect(dialog.props('fields')).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ key: 'max_submit_jobs_per_user', required: true }),
+        expect.objectContaining({ key: 'max_jobs_per_user', required: true }),
+        expect.objectContaining({ key: 'max_wall_duration_per_job', required: true })
+      ])
+    )
 
     dialog.vm.$emit('submit', {
       description: 'Updated QOS',
@@ -232,6 +246,73 @@ describe('QosView.vue', () => {
       max_submit_jobs_per_user: 40,
       max_jobs_per_user: 12,
       max_wall_duration_per_job: 8640
+    })
+    wrapper.unmount()
+  })
+
+  test('edits qos falls back to frontend defaults when backend limits are unset', async () => {
+    useRuntimeStore().availableClusters = [
+      {
+        name: 'foo',
+        permissions: {
+          roles: [],
+          actions: [],
+          rules: ['qos:view:*', 'qos:edit:*']
+        },
+        racksdb: true,
+        infrastructure: 'foo',
+        metrics: true,
+        cache: true
+      }
+    ]
+    mockClusterDataPoller.data.value = [
+      {
+        ...qos[1],
+        limits: {
+          ...qos[1].limits,
+          max: {
+            ...qos[1].limits.max,
+            jobs: {
+              ...qos[1].limits.max.jobs,
+              per: {
+                ...qos[1].limits.max.jobs.per,
+                user: { set: false, infinite: true, number: 0 }
+              },
+              active_jobs: {
+                ...qos[1].limits.max.jobs.active_jobs,
+                per: {
+                  ...qos[1].limits.max.jobs.active_jobs.per,
+                  user: { set: false, infinite: true, number: 0 }
+                }
+              }
+            },
+            wall_clock: {
+              ...qos[1].limits.max.wall_clock,
+              per: {
+                ...qos[1].limits.max.wall_clock.per,
+                job: { set: false, infinite: true, number: 0 }
+              }
+            }
+          }
+        }
+      }
+    ]
+    const wrapper = mount(QosView, {
+      attachTo: document.body,
+      props: {
+        cluster: 'foo'
+      }
+    })
+
+    await wrapper.findAll('button').filter((button) => button.text() === 'Edit')[0].trigger('click')
+    const dialog = wrapper
+      .findAllComponents(ActionDialog)
+      .find((component) => component.props('title') === 'Edit QOS')!
+
+    expect(dialog.props('initialValues')).toMatchObject({
+      max_submit_jobs_per_user: '100',
+      max_jobs_per_user: '10',
+      max_wall_duration_per_job: '6-00:00:00'
     })
     wrapper.unmount()
   })

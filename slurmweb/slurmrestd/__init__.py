@@ -367,8 +367,24 @@ class Slurmrestd:
             return payload
         account_entries = payload.get("accounts")
         if isinstance(account_entries, list):
+            normalized = dict(payload)
+            normalized["accounts"] = [
+                self._normalize_single_account(account) for account in account_entries
+            ]
+            return normalized
+        return {"accounts": [self._normalize_single_account(payload)]}
+
+    def _normalize_single_account(self, payload: t.Dict[str, t.Any]) -> t.Dict[str, t.Any]:
+        if not isinstance(payload, dict):
             return payload
-        return {"accounts": [payload]}
+        normalized = dict(payload)
+        if not normalized.get("organization"):
+            normalized["organization"] = (
+                normalized.get("description")
+                or normalized.get("name")
+                or "unknown"
+            )
+        return normalized
 
     def _association_delete_query(self, payload: t.Dict[str, t.Any]) -> t.Dict[str, str]:
         normalized = self._normalize_associations_payload(payload)

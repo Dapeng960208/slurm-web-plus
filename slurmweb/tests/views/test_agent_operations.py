@@ -125,3 +125,22 @@ class TestAgentOperations(TestAgentBase):
 
         self.assertEqual(response.status_code, 501)
         self.assertFalse(response.json["supported"])
+
+    def test_accounts_update_accepts_light_payload(self):
+        self.setup_client()
+        self._set_supported_write_version()
+        self._enable_self_rules("accounts:edit:*")
+        self.app.slurmrestd.accounts_update = mock.Mock(
+            return_value={"warnings": [], "errors": [], "accounts": []}
+        )
+
+        response = self.client.post(
+            f"/v{get_version()}/accounts",
+            json={"name": "science", "description": "Science"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json["operation"], "accounts.update")
+        self.app.slurmrestd.accounts_update.assert_called_once_with(
+            {"name": "science", "description": "Science"}
+        )

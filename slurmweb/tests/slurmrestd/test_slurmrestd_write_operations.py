@@ -256,8 +256,37 @@ class TestSlurmrestdWriteOperations(TestSlurmrestdBase):
                     {
                         "name": "science",
                         "description": "Science",
+                        "organization": "Science",
                     }
                 ]
             },
             params=None,
+        )
+
+    def test_accounts_update_defaults_organization_to_name_when_description_missing(self):
+        self.setup_slurmrestd("25.11.0", "0.0.44")
+        response = mock.create_autospec(requests.Response)
+        response.url = "/mocked/query"
+        response.status_code = 200
+        response.headers = {"content-type": "application/json"}
+        response.json.return_value = {
+            "warnings": [],
+            "errors": [],
+            "accounts": [],
+        }
+        self.slurmrestd.session.request = mock.Mock(return_value=response)
+
+        self.slurmrestd.accounts_update({"name": "science"})
+
+        sent_payload = self.slurmrestd.session.request.call_args.kwargs["json"]
+        self.assertEqual(
+            sent_payload,
+            {
+                "accounts": [
+                    {
+                        "name": "science",
+                        "organization": "science",
+                    }
+                ]
+            },
         )
