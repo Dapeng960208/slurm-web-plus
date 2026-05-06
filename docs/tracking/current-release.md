@@ -349,6 +349,9 @@
 
 待同步：
 
+- 2026-05-06：本轮 AI trace 展示收口已完成本地提交 `b4eca6f fix(ai): limit visible tool calls`
+- 同日连续两次执行 `git push` 失败，远端返回 `Recv failure: Connection was reset`
+- 当前状态：本地 `main` 包含该提交，待网络恢复后重新 push
 - 2026-05-06：本轮前端修复已完成本地提交 `0b5e52c fix(frontend): preserve form input during polling`
 - 同日第一次执行 `git push origin main` 失败，远端返回 `Recv failure: Connection was reset`
 - 当前状态：本地 `main` 相对 `origin/main` ahead 1，待网络恢复后重新 push
