@@ -1,10 +1,11 @@
 ﻿# 最新功能
 
-## 本轮：QOS 创建与 account-user association 删除修复
+## 本轮：QOS、Accounts 与 account-user association 写路径修复
 
-本轮修复 SlurmDB 写路径中的两个管理操作问题，并统一 QOS 创建默认限制：
+本轮修复 SlurmDB 写路径中的三个管理操作问题，并统一 QOS 创建默认限制：
 
 - `slurmrestd` QOS 写入会把轻量 payload 统一包装为 `{ qos: [...] }`，避免创建 QOS 时触发 `Missing required field 'qos'`。
+- `slurmrestd` Accounts 写入会把轻量 payload 统一包装为 `{ accounts: [...] }`，避免创建 account 时触发 `Missing required field 'accounts'`。
 - 后端在 QOS 创建/更新 payload 缺少常用限制时自动补默认值：`MaxSubmitJobsPerUser=100`、`MaxJobsPerUser=10`、`MaxWallDurationPerJob=1440` 分钟；AI 直接调用 `qos/update` 也走同一默认逻辑。
 - `QosView` 创建弹框显示并预填 `MaxSubmitJobsPerUser`、`MaxJobsPerUser`、`MaxWallDurationPerJob`，其中 walltime 输入使用 `days-hh:mm:ss` 并在前端转换为分钟。
 - account-user association 删除不再依赖 `DELETE` request body 作为 SlurmDB 删除条件，后端会把单条 association payload 转换为 `account/user/cluster` query 参数，避免删除条件被忽略后命中过宽范围。
@@ -13,7 +14,7 @@
 本轮新增验证：
 
 - `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/slurmrestd/test_slurmrestd_write_operations.py`
-- `cd frontend && npx vitest run tests/views/QosView.spec.ts tests/views/AccountView.spec.ts tests/composables/GatewayAPI.spec.ts`
+- `cd frontend && npx vitest run tests/views/QosView.spec.ts tests/views/AccountView.spec.ts tests/views/AccountsView.spec.ts tests/composables/GatewayAPI.spec.ts`
 - `npm --prefix frontend run type-check`
 
 ## 本轮：Resource、Jobs Filter 与用户工具聚合修正

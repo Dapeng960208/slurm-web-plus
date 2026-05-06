@@ -21,7 +21,7 @@
 - Resources 列表移除节点行尾管理按钮，节点状态编辑改为详情页下拉选择
 - Jobs 用户筛选支持直接输入用户名并加入筛选
 - 修正 `user_tool_daily_stats` 当天与跨天聚合口径，避免 `avg_max_memory_gb` / `avg_cpu_cores` 返回空值
-- 修复 QOS 创建 payload 包装、QOS 默认限制补齐，以及 account-user association 删除条件过宽问题
+- 修复 QOS 创建 payload 包装、QOS 默认限制补齐、accounts 创建 payload 包装，以及 account-user association 删除条件过宽问题
 
 ## 2. 已完成项
 
@@ -106,6 +106,9 @@
   - 轻量 `{ name, description, priority }` 会包装为 SlurmDB 需要的 `{ qos: [...] }`
   - 未显式传入常用限制时，后端默认补 `MaxSubmitJobsPerUser=100`、`MaxJobsPerUser=10`、`MaxWallDurationPerJob=1440`
   - AI 直接调用 `qos/update` 与前端创建 QOS 复用同一后端默认逻辑
+- Accounts 写入 payload 已在后端统一规范化：
+  - 轻量 `{ name, description, organization }` 会包装为 SlurmDB 需要的 `{ accounts: [...] }`
+  - 前端创建 account 与 AI 直接调用 `accounts/update` 复用同一后端包装逻辑
 - `QosView` 创建 QOS 弹框已显示并预填 `MaxSubmitJobsPerUser`、`MaxJobsPerUser`、`MaxWallDurationPerJob`
 - `slurmweb.slurmrestd` 已扩展为通用 `GET/POST/DELETE` 请求层
 - Gateway -> Agent -> `slurmrestd` 已支持 `DELETE` body
@@ -242,7 +245,7 @@
 - 无数据库部署下，普通用户不再有自有 Jobs 的旧动作兜底；该差异需要部署文档显式说明
 - 当前仓库内置 AI 仍不能直接读取 GitHub Actions run；本轮只打通“结构化结果可查询”，未实现自动修复
 - 当前 `association/update` 修复已通过适配层和缓存层单元测试；真实集群端到端仍需在具备 SlurmDB 写权限的环境手工复验
-- 当前 QOS 创建和 association 删除修复已通过前后端定向单元测试；真实 SlurmDB 写权限环境仍需手工复验端到端创建/删除结果
+- 当前 QOS 创建、accounts 创建和 association 删除修复已通过前后端定向单元测试；真实 SlurmDB 写权限环境仍需手工复验端到端创建/删除结果
 - 当前用户分析的真实集群时间窗仍需结合数据库时区与旧快照字段完整性复验；代码已对缺失 `submit_time` 与小写终态做兼容
 - 当前 `tool_mapping_file` demo 只提供常见工具归类示例，不会默认启用；生产环境仍需按实际集群命名规则调整
 - 当前 AI token 计数为前端估算，不等同于 provider 真实 usage 或计费 token；若后续需要精确计量，需要扩展后端 provider 返回与持久化结构
@@ -332,6 +335,9 @@
 
 待同步：
 
+- 2026-05-06：本轮修复已完成本地提交 `964b88e fix(management): normalize qos and accounts writes`
+- 同日执行 `git push origin main` 失败，远端返回 `Failed to connect to github.com port 443 after 21074 ms: Could not connect to server`
+- 当前状态：本地 `main` 相对 `origin/main` ahead 1，待网络恢复后重新 push
 - 2026-04-28：本轮改动已完成本地提交 `cbc4f6d feat(ai): add audit and analytics improvements`
 - 同日第一次执行 `git push origin main` 失败，远端返回 `Recv failure: Connection was reset`
 - 同日第二次执行 `git push origin main` 失败，远端返回 `Failed to connect to github.com port 443`

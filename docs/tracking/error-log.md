@@ -17,6 +17,15 @@
 
 ## 条目
 
+### 2026-05-06：创建 account 时向 SlurmDB 发送裸对象会触发 `Missing required field 'accounts'`
+
+- 场景：从管理页面或 AI 调用 `accounts/update` 创建 Slurm 账户。
+- 现象：`slurmrestd` 返回 `Missing required field 'accounts' in dictionary (#/accounts/) [Unable to resolve path/9200]`，创建账户失败。
+- 复现：向 `POST /slurmdb/v0.0.44/accounts/` 发送轻量 payload，例如 `{ "name": "science", "description": "Science" }`。
+- 根因：官方 Slurm REST 文档定义该接口的 request body 为 `v0.0.44_openapi_accounts_resp`，顶层必须带 `accounts` 数组；本地适配层之前把前端轻量对象直接透传给 `slurmrestd`。
+- 解决：`slurmweb/slurmrestd/__init__.py` 新增 `accounts` payload 规范化，把轻量对象自动包装为 `{ "accounts": [payload] }`；并补 `slurmweb/tests/slurmrestd/test_slurmrestd_write_operations.py` 与 `frontend/tests/views/AccountsView.spec.ts` 回归。
+- 预防：后续新增或封装 SlurmDB 写接口时，先按官方 OpenAPI 核对 request body 顶层 schema，不能假设单对象接口接受裸 payload；前端轻量表单与后端 Slurm schema 之间必须始终保留适配层。
+
 ### 2026-05-06：`QosView` 弹窗错误提示测试不能从页面总文本断言
 
 - 场景：为 `QosView` 创建 QOS 的 `MaxWallDurationPerJob` 非法输入补 Vitest 回归。
