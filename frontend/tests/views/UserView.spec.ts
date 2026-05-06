@@ -12,7 +12,7 @@ import PanelSkeleton from '@/components/PanelSkeleton.vue'
 
 const mockClusterDataPoller = getMockClusterDataPoller<ClusterAssociation[]>()
 const analyticsPanelsStub = {
-  template: '<div>Tool Analysis</div>'
+  template: '<div>Completed Job Tool Analysis</div>'
 }
 
 vi.mock('@/composables/DataPoller', () => ({
@@ -109,7 +109,7 @@ describe('UserView.vue', () => {
     await flushPromises()
 
     expect(wrapper.text()).toContain('Submission and tool analytics')
-    expect(wrapper.text()).toContain('Tool Analysis')
+    expect(wrapper.text()).toContain('Completed Job Tool Analysis')
   })
 
   test('shows history jobs shortcut when permission is granted', async () => {

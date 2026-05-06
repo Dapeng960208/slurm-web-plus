@@ -152,13 +152,15 @@
 - 新增 `MetricRangeSelector` 自定义时间窗弹框能力，节点详情和用户工具分析共用按钮触发交互
 - `MetricRangeSelector` 弹框已补 `1 day`、`3 days`、`7 days`、`15 days`、`1 month` 快捷窗口，可回填起止时间
 - `NodeView` 的 `Real Metrics` 已支持 `start` / `end` 自定义窗口并同步 URL query
-- 用户工具分析页已从常驻时间输入改为按钮弹框，提交活动、使用画像、工具分析和 Top Tools 继续共享同一窗口
+- 用户工具分析页已从常驻时间输入改为按钮弹框，提交活动、使用画像和已完成作业工具分析继续共享同一窗口
+- 用户详情分析页已将原 `Tool Analysis` 与 `Top Tools` 合并为 `Completed Job Tool Analysis` 单一栏目，集中展示已完成作业的工具维度图表与资源汇总
 - 用户数据分析页已移除重复用户名卡片，用户姓名、LDAP 组和更新时间改为时间范围栏内的紧凑上下文标签
 - 集群页与 Settings 页已统一为主内容区独立滚动，内容超过视口时在内容区域内滚动，底部固定保留 `2rem` 边缘留白
-- `user/<username>/tools/analysis` 已改为先把时间窗覆盖的 UTC 日期写入 `user_tool_daily_stats`，再从该表返回工具分类统计
+- `user/<username>/tools/analysis` 已改为只按时间窗覆盖的 UTC 日期读取 `user_tool_daily_stats` 并返回工具分类统计，查询多天时按样本数合并多天日表记录，请求路径不实时扫描 `job_snapshots` 或 SlurmDB
+- 后台用户工具日聚合已按 `[user_metrics].aggregation_interval` 周期更新当天 UTC 自然日统计，并与 `slurmweb/rebuild-user-tool.py` 复用同一套聚合函数，保持工具归类、空值过滤和插入口径一致
 - `user_tool_daily_stats` 已补 `memory_samples`、`cpu_samples`、`runtime_samples`，用于多日汇总时按真实资源样本数加权
 - 用户工具分析聚合已明确按已完成作业统计：
-  - `avg_max_memory_gb` 优先来自 `used_memory_gb`，为空时回退 `usage_stats.memory.value_gb`
+  - `avg_max_memory_gb` 优先来自 `used_memory_gb`，为空时回退 `usage_stats.memory.value_gb`；若 Slurm step 级实际内存缺失，再从 `tres_allocated` / `tres_requested` / TRES 字符串中的 `mem` 兜底
   - `avg_runtime_hours` 来自 `end_time - start_time`
   - `avg_cpu_cores` 优先来自 `used_cpu_cores_avg`，为空时回退 `usage_stats.cpu.estimated_cores_avg`
   - 继续保留 `avg_max_memory_mb` 与 `avg_runtime_seconds` 兼容字段

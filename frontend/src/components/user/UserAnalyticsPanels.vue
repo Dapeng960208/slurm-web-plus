@@ -346,7 +346,7 @@ onUnmounted(() => {
         <div class="min-w-0">
           <div class="ui-stat-label">Analysis Window</div>
           <div class="mt-2 text-sm text-[var(--color-brand-muted)]">
-            Use one shared window for submissions, usage profile, tool analysis and top tools.
+            Use one shared window for submissions, usage profile and completed job tool analysis.
           </div>
           <div
             v-if="userFullnameLabel || userGroupsLabel || userProfileStatusLabel || userMetricsGeneratedAtLabel"
@@ -498,71 +498,69 @@ onUnmounted(() => {
       </div>
     </div>
 
-    <div
-      v-if="userMetricsReady"
-      class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(320px,0.86fr)]"
-    >
-      <div class="ui-panel ui-section">
-        <div class="mb-3">
-          <h2 class="ui-panel-title">Tool Analysis</h2>
-          <p class="ui-panel-description mt-2">
-            Dual horizontal bars compare average memory footprint and completed job volume for the
-            most active tools recorded in the selected time range.
-          </p>
-        </div>
-
-        <p
-          v-if="topTools.length === 0"
-          class="ui-panel-soft px-4 py-5 text-sm text-[var(--color-brand-muted)]"
-        >
-          No tool activity has been recorded for this user yet.
+    <div v-if="userMetricsReady" class="ui-panel ui-section">
+      <div class="mb-3">
+        <h2 class="ui-panel-title">Completed Job Tool Analysis</h2>
+        <p class="ui-panel-description mt-2">
+          Tool-level analysis for completed jobs in the selected time range, combining completed
+          job volume with memory, CPU and runtime averages.
         </p>
-        <UserToolAnalysisChart v-else :tools="topTools" />
       </div>
 
-      <div class="ui-panel ui-section">
-        <div class="mb-3">
-          <h2 class="ui-panel-title">Top Tools</h2>
-          <p class="ui-panel-description mt-2">
-            Tool roll-up for memory, CPU, runtime and completed jobs in the selected time range.
-          </p>
+      <p
+        v-if="topTools.length === 0"
+        class="ui-panel-soft px-4 py-5 text-sm text-[var(--color-brand-muted)]"
+      >
+        No completed job tool activity has been recorded for this user yet.
+      </p>
+      <div v-else class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(320px,0.86fr)]">
+        <div>
+          <div class="mb-3">
+            <h3 class="ui-stat-label">Memory and Volume</h3>
+          </div>
+          <UserToolAnalysisChart :tools="topTools" />
         </div>
 
-        <div class="space-y-3">
-          <div v-for="tool in topTools" :key="tool.tool" class="ui-panel-soft px-4 py-3">
-            <div class="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <div class="font-semibold text-[var(--color-brand-ink-strong)]">
-                  {{ tool.tool }}
+        <div>
+          <div class="mb-3">
+            <h3 class="ui-stat-label">Resource Roll-up</h3>
+          </div>
+          <div class="space-y-3">
+            <div v-for="tool in topTools" :key="tool.tool" class="ui-panel-soft px-4 py-3">
+              <div class="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <div class="font-semibold text-[var(--color-brand-ink-strong)]">
+                    {{ tool.tool }}
+                  </div>
+                  <div class="mt-1 text-sm text-[var(--color-brand-muted)]">
+                    {{ tool.jobs }} completed job(s)
+                  </div>
                 </div>
-                <div class="mt-1 text-sm text-[var(--color-brand-muted)]">
-                  {{ tool.jobs }} completed job(s)
+                <span class="ui-chip">{{ tool.jobs }} jobs</span>
+              </div>
+              <div class="mt-3 grid gap-2 text-sm text-[var(--color-brand-muted)] sm:grid-cols-3">
+                <div>
+                  Memory:
+                  {{
+                    tool.avg_max_memory_gb != null
+                      ? formatGb(tool.avg_max_memory_gb)
+                      : tool.avg_max_memory_mb != null
+                        ? getMBHumanUnit(tool.avg_max_memory_mb)
+                        : '--'
+                  }}
                 </div>
-              </div>
-              <span class="ui-chip">{{ tool.jobs }} jobs</span>
-            </div>
-            <div class="mt-3 grid gap-2 text-sm text-[var(--color-brand-muted)] sm:grid-cols-3">
-              <div>
-                Memory:
-                {{
-                  tool.avg_max_memory_gb != null
-                    ? formatGb(tool.avg_max_memory_gb)
-                    : tool.avg_max_memory_mb != null
-                      ? getMBHumanUnit(tool.avg_max_memory_mb)
-                      : '--'
-                }}
-              </div>
-              <div>
-                CPU:
-                {{ tool.avg_cpu_cores != null ? `${tool.avg_cpu_cores.toFixed(1)} cores` : '--' }}
-              </div>
-              <div>
-                Runtime:
-                {{
-                  tool.avg_runtime_hours != null
-                    ? formatHours(tool.avg_runtime_hours)
-                    : formatDuration(tool.avg_runtime_seconds)
-                }}
+                <div>
+                  CPU:
+                  {{ tool.avg_cpu_cores != null ? `${tool.avg_cpu_cores.toFixed(1)} cores` : '--' }}
+                </div>
+                <div>
+                  Runtime:
+                  {{
+                    tool.avg_runtime_hours != null
+                      ? formatHours(tool.avg_runtime_hours)
+                      : formatDuration(tool.avg_runtime_seconds)
+                  }}
+                </div>
               </div>
             </div>
           </div>

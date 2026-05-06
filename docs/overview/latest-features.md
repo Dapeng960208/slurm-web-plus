@@ -10,11 +10,13 @@
 - 时间范围弹框新增 `1 day`、`3 days`、`7 days`、`15 days`、`1 month` 快捷窗口
 - 用户数据分析页移除了重复的用户名信息卡，LDAP 姓名、组和更新时间压缩到时间范围栏中
 - 集群页与 Settings 页主内容区改为独立滚动区域，底部保留固定 `2rem` 浏览器边缘留白
-- 用户分析的 `Submission Activity`、`Usage Profile`、`Tool Analysis` 与 `Top Tools` 继续共享同一时间窗
-- `user/<username>/tools/analysis` 会先将时间窗覆盖的 UTC 日期聚合写入 `user_tool_daily_stats`，再从该表汇总返回工具分类统计
+- 用户分析的 `Submission Activity`、`Usage Profile` 与 `Completed Job Tool Analysis` 继续共享同一时间窗
+- 用户详情分析页已将原 `Tool Analysis` 与 `Top Tools` 合并为一个 `Completed Job Tool Analysis` 栏目，集中展示已完成作业的工具维度数据分析
+- `user/<username>/tools/analysis` 只按时间窗覆盖的 UTC 日期读取 `user_tool_daily_stats` 并汇总返回工具分类统计；查询多天时按样本数合并多天日表记录，请求路径不实时扫描 `job_snapshots` 或 SlurmDB
+- 后台用户工具日聚合按 `[user_metrics].aggregation_interval` 周期更新当天 UTC 自然日统计，并与 `slurmweb/rebuild-user-tool.py` 复用同一套聚合函数，保持工具归类、空值过滤和插入口径一致
 - `user_tool_daily_stats` 补充资源样本数字段，用于跨多日工具统计时准确加权内存、CPU 与运行时间均值
 - 用户分析资源统计明确按已完成作业计算：
-  - 平均最大内存：优先使用 `used_memory_gb`，为空时回退 `usage_stats.memory.value_gb`，返回 GB 与兼容 MB 字段
+  - 平均最大内存：优先使用 `used_memory_gb`，为空时回退 `usage_stats.memory.value_gb`；若 Slurm step 实际内存缺失，再从 `tres_allocated` / `tres_requested` / TRES 字符串中的 `mem` 兜底，返回 GB 与兼容 MB 字段
   - 平均运行时间：`end_time - start_time`，返回小时与兼容秒字段
   - 平均 CPU 核数：优先使用 `used_cpu_cores_avg`，为空时回退 `usage_stats.cpu.estimated_cores_avg`
 - `Submission Activity` 的提交时间线在 `submit_time` 缺失时会回退到 `start_time` / `last_seen`

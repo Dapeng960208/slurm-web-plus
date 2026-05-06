@@ -145,18 +145,59 @@ def _numeric_value(value):
         return None
 
 
+def _json_mapping(value):
+    if isinstance(value, dict):
+        return value
+    return None
+
+
+def _tres_memory_gb_from_list(values):
+    if not isinstance(values, list):
+        return None
+    for item in values:
+        if not isinstance(item, dict) or item.get("type") != "mem":
+            continue
+        memory_mb = _numeric_value(item.get("count"))
+        if memory_mb is not None and memory_mb >= 0:
+            return memory_mb / 1024.0
+    return None
+
+
+def _tres_memory_gb_from_string(value):
+    if not value:
+        return None
+    for item in str(value).split(","):
+        key, separator, raw_value = item.partition("=")
+        if separator and key.strip().lower() == "mem":
+            memory_mb = _numeric_value(raw_value.strip())
+            if memory_mb is not None and memory_mb >= 0:
+                return memory_mb / 1024.0
+    return None
+
+
 def _memory_gb(row: dict):
     memory_value = _numeric_value(row.get("used_memory_gb"))
     if memory_value is not None:
         return memory_value
 
-    usage_stats = row.get("usage_stats")
-    if not isinstance(usage_stats, dict):
-        return None
-    memory_stats = usage_stats.get("memory")
-    if not isinstance(memory_stats, dict):
-        return None
-    return _numeric_value(memory_stats.get("value_gb"))
+    usage_stats = _json_mapping(row.get("usage_stats"))
+    if usage_stats is not None:
+        memory_stats = _json_mapping(usage_stats.get("memory"))
+        if memory_stats is not None:
+            memory_value = _numeric_value(memory_stats.get("value_gb"))
+            if memory_value is not None:
+                return memory_value
+
+    for key in ("tres_allocated", "tres_requested"):
+        memory_value = _tres_memory_gb_from_list(row.get(key))
+        if memory_value is not None:
+            return memory_value
+
+    for key in ("tres_req_str", "tres_per_job", "tres_per_node"):
+        memory_value = _tres_memory_gb_from_string(row.get(key))
+        if memory_value is not None:
+            return memory_value
+    return None
 
 
 def _cpu_cores_avg(row: dict):
@@ -165,11 +206,11 @@ def _cpu_cores_avg(row: dict):
         if cpu_value is not None:
             return cpu_value
 
-    usage_stats = row.get("usage_stats")
-    if not isinstance(usage_stats, dict):
+    usage_stats = _json_mapping(row.get("usage_stats"))
+    if usage_stats is None:
         return None
-    cpu_stats = usage_stats.get("cpu")
-    if not isinstance(cpu_stats, dict):
+    cpu_stats = _json_mapping(usage_stats.get("cpu"))
+    if cpu_stats is None:
         return None
     return _numeric_value(cpu_stats.get("estimated_cores_avg"))
 
@@ -412,6 +453,102 @@ def _aggregate_daily_stat_rows(rows):
     }
 
 
+def _classify_daily_tool(
+    row,
+    mapped_mapper,
+    raw_mapper=None,
+    rewrite_pattern=None,
+    rewrite_tool=None,
+):
+    mapped_tool = mapped_mapper.classify(
+        job_name=row.get("job_name"),
+        command=row.get("command"),
+        submit_line=row.get("submit_line"),
+    )
+    if rewrite_pattern is None:
+        return mapped_tool
+
+    raw_mapper = raw_mapper or ToolNameMapper()
+    raw_tool = raw_mapper.classify(
+        job_name=row.get("job_name"),
+        command=row.get("command"),
+        submit_line=row.get("submit_line"),
+    )
+    if rewrite_pattern.search(mapped_tool) or rewrite_pattern.search(raw_tool):
+        return rewrite_tool
+    return mapped_tool
+
+
+def aggregate_user_tool_daily_rows(
+    rows,
+    mapper,
+    raw_mapper=None,
+    rewrite_pattern=None,
+    rewrite_tool=None,
+):
+    buckets = defaultdict(
+        lambda: {
+            "jobs_count": 0,
+            "memory_total": 0.0,
+            "memory_samples": 0,
+            "cpu_total": 0.0,
+            "cpu_samples": 0,
+            "runtime_total": 0.0,
+            "runtime_samples": 0,
+        }
+    )
+    for row in rows:
+        activity_date = row.get("activity_date")
+        user_id = row.get("user_id")
+        if activity_date is None or user_id is None:
+            continue
+
+        tool = _classify_daily_tool(
+            row,
+            mapper,
+            raw_mapper=raw_mapper,
+            rewrite_pattern=rewrite_pattern,
+            rewrite_tool=rewrite_tool,
+        )
+        key = (activity_date, user_id, tool)
+        bucket = buckets[key]
+        bucket["jobs_count"] += 1
+        memory_value = _memory_gb(row)
+        if memory_value is not None:
+            bucket["memory_total"] += memory_value
+            bucket["memory_samples"] += 1
+        cpu_value = _cpu_cores_avg(row)
+        if cpu_value is not None:
+            bucket["cpu_total"] += cpu_value
+            bucket["cpu_samples"] += 1
+        runtime_value = _runtime_seconds(row)
+        if runtime_value is not None:
+            bucket["runtime_total"] += float(runtime_value)
+            bucket["runtime_samples"] += 1
+
+    payload = []
+    for (activity_date, user_id, tool), values in buckets.items():
+        payload.append(
+            {
+                "activity_date": activity_date,
+                "user_id": user_id,
+                "tool": tool,
+                "jobs_count": values["jobs_count"],
+                "avg_max_memory_gb": _avg(
+                    values["memory_total"], values["memory_samples"]
+                ),
+                "avg_cpu_cores": _avg(values["cpu_total"], values["cpu_samples"]),
+                "avg_runtime_seconds": _avg(
+                    values["runtime_total"], values["runtime_samples"]
+                ),
+                "memory_samples": values["memory_samples"],
+                "cpu_samples": values["cpu_samples"],
+                "runtime_samples": values["runtime_samples"],
+            }
+        )
+    return payload
+
+
 class UserAnalyticsStore:
     def __init__(self, settings, users_store=None):
         self._settings = settings
@@ -420,6 +557,15 @@ class UserAnalyticsStore:
         self._thread = None
         self._stop_event = threading.Event()
         self._tool_mapper = ToolNameMapper(getattr(settings, "tool_mapping_file", None))
+        self._raw_tool_mapper = ToolNameMapper()
+        rewrite_pattern = getattr(
+            settings, "tool_rewrite_pattern", r"^regr([_-].*)?$"
+        )
+        self._tool_rewrite_pattern = (
+            re.compile(str(rewrite_pattern)) if rewrite_pattern else None
+        )
+        rewrite_tool = getattr(settings, "tool_rewrite_tool", "regr")
+        self._tool_rewrite_tool = (_normalize_candidate(rewrite_tool) or "regr")
 
     def _init_pool(self):
         import psycopg2.pool
@@ -647,7 +793,6 @@ class UserAnalyticsStore:
         profile = (
             self._users_store.get_ldap_user(username) if self._users_store is not None else None
         )
-        self._refresh_user_tool_daily_stats(username, start_date, end_date)
         aggregated = self._user_tool_daily_summary(username, start_date, end_date)
         return {
             "username": username,
@@ -792,60 +937,13 @@ class UserAnalyticsStore:
         self._upsert_current_day_summary(payload)
 
     def _aggregate_daily_rows(self, rows):
-        buckets = defaultdict(
-            lambda: {
-                "jobs_count": 0,
-                "memory_total": 0.0,
-                "memory_samples": 0,
-                "cpu_total": 0.0,
-                "cpu_samples": 0,
-                "runtime_total": 0.0,
-                "runtime_samples": 0,
-            }
+        return aggregate_user_tool_daily_rows(
+            rows,
+            self._tool_mapper,
+            raw_mapper=self._raw_tool_mapper,
+            rewrite_pattern=self._tool_rewrite_pattern,
+            rewrite_tool=self._tool_rewrite_tool,
         )
-        for row in rows:
-            tool = self._tool_mapper.classify(
-                job_name=row.get("job_name"),
-                command=row.get("command"),
-                submit_line=row.get("submit_line"),
-            )
-            key = (row["activity_date"], row["user_id"], tool)
-            bucket = buckets[key]
-            bucket["jobs_count"] += 1
-            memory_value = _memory_gb(row)
-            if memory_value is not None:
-                bucket["memory_total"] += memory_value
-                bucket["memory_samples"] += 1
-            cpu_value = _cpu_cores_avg(row)
-            if cpu_value is not None:
-                bucket["cpu_total"] += cpu_value
-                bucket["cpu_samples"] += 1
-            runtime_value = _runtime_seconds(row)
-            if runtime_value is not None:
-                bucket["runtime_total"] += float(runtime_value)
-                bucket["runtime_samples"] += 1
-
-        payload = []
-        for (activity_date, user_id, tool), values in buckets.items():
-            payload.append(
-                {
-                    "activity_date": activity_date,
-                    "user_id": user_id,
-                    "tool": tool,
-                    "jobs_count": values["jobs_count"],
-                    "avg_max_memory_gb": _avg(
-                        values["memory_total"], values["memory_samples"]
-                    ),
-                    "avg_cpu_cores": _avg(values["cpu_total"], values["cpu_samples"]),
-                    "avg_runtime_seconds": _avg(
-                        values["runtime_total"], values["runtime_samples"]
-                    ),
-                    "memory_samples": values["memory_samples"],
-                    "cpu_samples": values["cpu_samples"],
-                    "runtime_samples": values["runtime_samples"],
-                }
-            )
-        return payload
 
     def _refresh_user_tool_daily_stats(self, username, start_date, end_date):
         rows = self._completed_jobs_rows_for_activity_dates(
@@ -892,6 +990,11 @@ class UserAnalyticsStore:
                     SELECT DISTINCT ON (js.job_id, js.submit_time)
                         js.job_name,
                         js.command,
+                        js.tres_req_str,
+                        js.tres_per_job,
+                        js.tres_per_node,
+                        js.tres_requested,
+                        js.tres_allocated,
                         js.used_memory_gb,
                         js.used_cpu_cores_avg,
                         js.start_time,
@@ -928,6 +1031,11 @@ class UserAnalyticsStore:
                     SELECT DISTINCT ON (js.job_id, js.submit_time)
                         js.job_name,
                         js.command,
+                        js.tres_req_str,
+                        js.tres_per_job,
+                        js.tres_per_node,
+                        js.tres_requested,
+                        js.tres_allocated,
                         js.used_memory_gb,
                         js.used_cpu_cores_avg,
                         js.start_time,
@@ -967,6 +1075,11 @@ class UserAnalyticsStore:
                         js.user_id,
                         js.job_name,
                         js.command,
+                        js.tres_req_str,
+                        js.tres_per_job,
+                        js.tres_per_node,
+                        js.tres_requested,
+                        js.tres_allocated,
                         js.used_memory_gb,
                         js.used_cpu_cores_avg,
                         js.start_time,
@@ -1002,10 +1115,15 @@ class UserAnalyticsStore:
                 cur.execute(
                     """
                     SELECT DISTINCT ON (js.job_id, js.submit_time)
-                        DATE(COALESCE(js.end_time, js.last_seen)) AS activity_date,
+                        DATE(COALESCE(js.end_time, js.last_seen) AT TIME ZONE 'UTC') AS activity_date,
                         js.user_id,
                         js.job_name,
                         js.command,
+                        js.tres_req_str,
+                        js.tres_per_job,
+                        js.tres_per_node,
+                        js.tres_requested,
+                        js.tres_allocated,
                         js.used_memory_gb,
                         js.used_cpu_cores_avg,
                         js.start_time,
@@ -1013,7 +1131,9 @@ class UserAnalyticsStore:
                         js.last_seen,
                         js.usage_stats
                     FROM job_snapshots js
-                    WHERE DATE(COALESCE(js.end_time, js.last_seen)) = CURRENT_DATE
+                    WHERE js.user_id IS NOT NULL
+                      AND COALESCE(js.end_time, js.last_seen) IS NOT NULL
+                      AND DATE(COALESCE(js.end_time, js.last_seen) AT TIME ZONE 'UTC') = (NOW() AT TIME ZONE 'UTC')::date
                       AND (
                     """
                     + where_terminal

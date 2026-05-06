@@ -100,7 +100,8 @@ describe('UserAnalysisView.vue', () => {
 
     expect(wrapper.text()).toContain('User Analysis')
     expect(wrapper.text()).toContain('Submission Activity')
-    expect(wrapper.text()).toContain('Tool Analysis')
+    expect(wrapper.text()).toContain('Completed Job Tool Analysis')
+    expect(wrapper.text()).not.toContain('Top Tools')
     expect(wrapper.text()).toContain('Analysis Window')
     expect(wrapper.text()).toContain('Root User')
     expect(wrapper.text()).toContain('Groups: admins, science')

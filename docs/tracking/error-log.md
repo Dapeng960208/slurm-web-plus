@@ -391,3 +391,54 @@
   - CPU 优先使用 `used_cpu_cores_avg`，兼容 `used_cpu_core_avg`，为空时回退 `usage_stats.cpu.estimated_cores_avg`。
   - 当前日定时写入 `user_tool_daily_stats` 使用同一口径。
 - 预防：后续新增由采集程序派生出的统计字段时，聚合层必须同时检查“规范化顶层列”和“原始/派生 `usage_stats`”两条数据路径，并用单测覆盖顶层列为空的历史数据。
+
+### 2026-05-06：用户工具分析在 Slurm step 级内存缺失时 `avg_max_memory_gb` 仍为空
+
+- 场景：用户工具分析页或 AI 工具调用查询 `user/<username>/tools/analysis?start=<iso>&end=<iso>`，时间窗内作业存在 `tres_allocated` / `tres_requested` 内存 TRES，但 SlurmDB step 的 `consumed.max.mem` 为空。
+- 现象：接口返回的 `avg_max_memory_gb` 仍为 `null`，前端 `tools/analysis` 的内存均值为空。
+- 复现：构造 `job_snapshots.used_memory_gb IS NULL`、`usage_stats.memory.value_gb IS NULL`，但 `tres_allocated` 或 `tres_requested` 中存在 `{type: "mem", count: <MiB>}` 的终态作业，再查询用户工具分析接口。
+- 根因：前一轮只补了 `used_memory_gb` 与 `usage_stats.memory.value_gb` 两条实际用量路径；部分 SlurmDB 返回的 step `consumed.max.mem` 为空，但 job 级 `tres.allocated/requested` 仍有内存配置，聚合 SQL 又没有把这些 TRES 字段取出，导致日表重建时内存样本数仍为 0。
+- 解决：
+  - `user_analytics_store` 的聚合查询补取 `tres_req_str`、`tres_per_job`、`tres_per_node`、`tres_requested`、`tres_allocated`。
+  - 内存解析在实际用量缺失后，从 `tres_allocated`、`tres_requested` 的 `mem` TRES（MiB）兜底，再从 TRES 字符串中的 `mem=<MiB>` 兜底。
+  - `rebuild-user-tool.py` 使用同一口径，避免维护脚本重建 `user_tool_daily_stats` 后再次写入空值。
+  - 新增聚合和当前日刷新回归测试，覆盖 TRES list 与 TRES string 两类兜底。
+- 预防：后续排查资源均值为空时，需要同时检查 step 实际用量和 job 级 TRES 配置；维护脚本必须与在线聚合保持字段选择和解析口径一致。
+
+### 2026-05-06：`tools/analysis` 请求链路误触发日表重建
+
+- 场景：排查 `avg_max_memory_gb` 为空时，直接在 `user_tool_analysis()` 请求路径调用 `_refresh_user_tool_daily_stats()`，先从 `job_snapshots` 聚合写入 `user_tool_daily_stats`，再读日表返回。
+- 现象：`tools/analysis` 虽然最终读的是 `user_tool_daily_stats`，但每次接口请求都会同步扫描历史作业快照并重写时间窗内日聚合数据，不符合“前端接口只查 `UserToolDailyStat`”的设计要求。
+- 复现：调用 `GET /user/<username>/tools/analysis?start=<iso>&end=<iso>`，可观察到请求链路执行 `_refresh_user_tool_daily_stats()`，并对 `user_tool_daily_stats` 做删除和插入。
+- 根因：将数据修复职责放进了在线查询路径；没有把“日聚合表生成/修复”和“接口读取日聚合表”两个职责分开。
+- 解决：
+  - `user_tool_analysis()` 移除 `_refresh_user_tool_daily_stats()` 调用，只执行 `_user_tool_daily_summary()`。
+  - 保留后台当前日聚合和 `rebuild-user-tool.py` 的资源解析修复，负责生成或修复 `user_tool_daily_stats`。
+  - 单测改为断言 `user_tool_analysis()` 只读取日聚合摘要。
+- 预防：后续调整 `tools/analysis` 返回字段时，接口层只能读 `user_tool_daily_stats`；如需补历史数据，应通过后台聚合任务、迁移或维护脚本完成。
+
+### 2026-05-06：后台日聚合与 `rebuild-user-tool.py` 聚合口径漂移
+
+- 场景：要求 `user_analytics_store` 的后台聚合与 `slurmweb/rebuild-user-tool.py` 的数据聚合和插入逻辑保持一致，并由 `tools/analysis` 只读 `UserToolDailyStat` 后多日合并返回。
+- 现象：后台当前日聚合与重建脚本存在重复实现，后台按数据库本地 `CURRENT_DATE` 取当天，重建脚本按 UTC 日期取数；`regr_*` 工具归并只在重建脚本中存在。
+- 复现：分别执行后台当前日聚合和维护脚本重建同一天数据，在数据库 timezone 非 UTC 或工具名为 `regr_foo` / `regr-bar` 时，可能写出不同的 `activity_date` 或 `tool`。
+- 根因：聚合、工具归类和时间口径分散在两个文件中维护，缺少共享函数和回归测试。
+- 解决：
+  - `user_analytics_store` 新增共享 `aggregate_user_tool_daily_rows()`，负责日聚合、资源空值过滤、样本数统计与工具归类。
+  - 后台 `_aggregate_daily_rows()` 与 `rebuild-user-tool.py` 均复用该共享函数。
+  - 后台当前日查询改为 UTC 自然日，并过滤 `user_id IS NULL` 与 `COALESCE(end_time, last_seen) IS NULL` 的行。
+  - `tools/analysis` 保持只读 `user_tool_daily_stats`，多日查询由 `_aggregate_daily_stat_rows()` 按 `memory_samples` / `cpu_samples` / `runtime_samples` 加权合并。
+- 预防：后续修改日聚合字段、工具归类或资源解析时，只改共享聚合函数，并补后台路径与维护脚本一致性的测试。
+
+### 2026-05-06：前端单测入口误用 `npm test` 与 `npm run test:unit -- --run ...`
+
+- 场景：验证用户分析页面合并 `Tool Analysis` 与 `Top Tools` 栏目时，先执行 `npm test -- --run ...`，随后执行 `npm run test:unit -- --run ...`。
+- 现象：
+  - `npm test -- --run ...` 报 `Missing script: "test"`。
+  - `npm run test:unit -- --run ...` 在当前环境超时，没有输出有效失败详情。
+- 复现：
+  - 在 `frontend/` 下执行 `npm test -- --run tests/views/UserAnalysisView.spec.ts`。
+  - 在 `frontend/` 下执行 `npm run test:unit -- --run tests/views/UserAnalysisView.spec.ts tests/views/UserView.spec.ts tests/components/user/UserToolAnalysisChart.spec.ts`。
+- 根因：前端 `package.json` 没有 `test` 脚本，实际单测脚本为 `test:unit`；在当前环境中直接用 `npx vitest run ...` 跑目标 spec 更稳定。
+- 解决：改用 `npx vitest run tests/views/UserAnalysisView.spec.ts tests/views/UserView.spec.ts tests/components/user/UserToolAnalysisChart.spec.ts`，目标测试通过。
+- 预防：后续前端定向单测优先使用 `npx vitest run <spec...>`；需要通过 npm 脚本时先检查 `frontend/package.json` 的 scripts。

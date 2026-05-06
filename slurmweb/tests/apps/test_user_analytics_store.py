@@ -7,6 +7,7 @@
 from datetime import date, datetime, timedelta, timezone
 from types import SimpleNamespace
 import os
+import re
 import tempfile
 import types
 import unittest
@@ -15,6 +16,7 @@ from unittest import mock
 from slurmweb.persistence.user_analytics_store import (
     _aggregate_daily_stat_rows,
     _aggregate_rows,
+    aggregate_user_tool_daily_rows,
     normalize_tool_name,
     ToolNameMapper,
     UserAnalyticsStore,
@@ -162,6 +164,96 @@ class TestUserMetricsAggregation(unittest.TestCase):
         self.assertEqual(result["tool_breakdown"][0]["avg_max_memory_gb"], 12.5)
         self.assertEqual(result["tool_breakdown"][0]["avg_cpu_cores"], 6.25)
 
+    def test_aggregate_rows_falls_back_to_tres_memory_when_usage_is_missing(self):
+        result = _aggregate_rows(
+            [
+                {
+                    "job_name": "blast",
+                    "command": "blastp",
+                    "submit_line": None,
+                    "tres_req_str": "cpu=16,mem=4096,node=1",
+                    "tres_per_job": None,
+                    "tres_per_node": None,
+                    "tres_requested": [{"type": "mem", "count": 8192}],
+                    "tres_allocated": [{"type": "mem", "count": 16384}],
+                    "used_memory_gb": None,
+                    "used_cpu_cores_avg": None,
+                    "start_time": datetime(2026, 4, 24, 1, 0, tzinfo=timezone.utc),
+                    "end_time": datetime(2026, 4, 24, 3, 0, tzinfo=timezone.utc),
+                    "usage_stats": {"memory": {"value_gb": None}},
+                }
+            ]
+        )
+
+        self.assertEqual(result["totals"]["avg_max_memory_gb"], 16.0)
+        self.assertEqual(result["tool_breakdown"][0]["avg_max_memory_gb"], 16.0)
+
+    def test_aggregate_rows_falls_back_to_tres_string_memory(self):
+        result = _aggregate_rows(
+            [
+                {
+                    "job_name": "blast",
+                    "command": "blastp",
+                    "submit_line": None,
+                    "tres_req_str": "cpu=16,mem=4096,node=1",
+                    "tres_per_job": None,
+                    "tres_per_node": None,
+                    "tres_requested": None,
+                    "tres_allocated": None,
+                    "used_memory_gb": None,
+                    "used_cpu_cores_avg": None,
+                    "start_time": datetime(2026, 4, 24, 1, 0, tzinfo=timezone.utc),
+                    "end_time": datetime(2026, 4, 24, 3, 0, tzinfo=timezone.utc),
+                    "usage_stats": None,
+                }
+            ]
+        )
+
+        self.assertEqual(result["totals"]["avg_max_memory_gb"], 4.0)
+
+    def test_daily_aggregation_collapses_regr_tools_like_rebuild_script(self):
+        rows = [
+            {
+                "activity_date": date(2026, 4, 24),
+                "user_id": 1,
+                "job_name": "regr_foo",
+                "command": "python task.py",
+                "submit_line": None,
+                "used_memory_gb": 8.0,
+                "used_cpu_cores_avg": 2.0,
+                "start_time": datetime(2026, 4, 24, 1, 0, tzinfo=timezone.utc),
+                "end_time": datetime(2026, 4, 24, 2, 0, tzinfo=timezone.utc),
+                "usage_stats": None,
+            },
+            {
+                "activity_date": date(2026, 4, 24),
+                "user_id": 1,
+                "job_name": "regr-bar",
+                "command": "python task.py",
+                "submit_line": None,
+                "used_memory_gb": None,
+                "used_cpu_cores_avg": None,
+                "start_time": datetime(2026, 4, 24, 2, 0, tzinfo=timezone.utc),
+                "end_time": datetime(2026, 4, 24, 4, 0, tzinfo=timezone.utc),
+                "usage_stats": None,
+            },
+        ]
+
+        payload = aggregate_user_tool_daily_rows(
+            rows,
+            ToolNameMapper(),
+            raw_mapper=ToolNameMapper(),
+            rewrite_pattern=re.compile(r"^regr([_-].*)?$"),
+            rewrite_tool="regr",
+        )
+
+        self.assertEqual(len(payload), 1)
+        self.assertEqual(payload[0]["tool"], "regr")
+        self.assertEqual(payload[0]["jobs_count"], 2)
+        self.assertEqual(payload[0]["avg_max_memory_gb"], 8.0)
+        self.assertEqual(payload[0]["memory_samples"], 1)
+        self.assertEqual(payload[0]["runtime_samples"], 2)
+
     def test_aggregate_daily_stat_rows_weights_persisted_tool_stats(self):
         result = _aggregate_daily_stat_rows(
             [
@@ -207,7 +299,6 @@ class TestUserMetricsTimeline(unittest.TestCase):
             "ldap_synced_at": datetime(2026, 4, 24, 9, 0, tzinfo=timezone.utc),
         }
         store = UserAnalyticsStore(settings=settings, users_store=users_store)
-        store._refresh_user_tool_daily_stats = mock.Mock()
         store._user_tool_daily_summary = mock.Mock(
             return_value={
                 "totals": {
@@ -247,11 +338,6 @@ class TestUserMetricsTimeline(unittest.TestCase):
         self.assertEqual(result["totals"]["completed_jobs"], 1)
         self.assertEqual(result["tool_breakdown"][0]["tool"], "blast")
         self.assertEqual(result["window"]["start"], "2026-04-24T00:00:00+00:00")
-        store._refresh_user_tool_daily_stats.assert_called_once_with(
-            "alice",
-            date(2026, 4, 24),
-            date(2026, 4, 24),
-        )
         store._user_tool_daily_summary.assert_called_once_with(
             "alice",
             date(2026, 4, 24),
@@ -290,6 +376,8 @@ class TestUserMetricsQueries(unittest.TestCase):
         sql = self.cursor.execute.call_args.args[0]
         self.assertNotIn("js.submit_line", sql)
         self.assertIn("js.command", sql)
+        self.assertIn("js.tres_allocated", sql)
+        self.assertIn("js.tres_requested", sql)
 
     def test_current_day_query_does_not_select_submit_line(self):
         self.store._current_day_completed_rows()
@@ -297,6 +385,11 @@ class TestUserMetricsQueries(unittest.TestCase):
         sql = self.cursor.execute.call_args.args[0]
         self.assertNotIn("js.submit_line", sql)
         self.assertIn("js.command", sql)
+        self.assertIn("js.tres_allocated", sql)
+        self.assertIn("js.tres_requested", sql)
+        self.assertIn("AT TIME ZONE 'UTC'", sql)
+        self.assertIn("js.user_id IS NOT NULL", sql)
+        self.assertIn("COALESCE(js.end_time, js.last_seen) IS NOT NULL", sql)
 
     def test_refresh_current_day_summary_handles_rows_without_submit_line(self):
         self.store._current_day_completed_rows = mock.Mock(
@@ -353,6 +446,36 @@ class TestUserMetricsQueries(unittest.TestCase):
         self.assertEqual(payload[0]["avg_cpu_cores"], 8.0)
         self.assertEqual(payload[0]["memory_samples"], 1)
         self.assertEqual(payload[0]["cpu_samples"], 1)
+
+    def test_refresh_current_day_summary_uses_tres_memory_fallback(self):
+        self.store._current_day_completed_rows = mock.Mock(
+            return_value=[
+                {
+                    "activity_date": date(2026, 4, 24),
+                    "user_id": 1,
+                    "job_name": "blast",
+                    "command": "blastp",
+                    "tres_req_str": "cpu=16,mem=4096,node=1",
+                    "tres_per_job": None,
+                    "tres_per_node": None,
+                    "tres_requested": [{"type": "mem", "count": 8192}],
+                    "tres_allocated": [{"type": "mem", "count": 16384}],
+                    "used_memory_gb": None,
+                    "used_cpu_cores_avg": None,
+                    "start_time": datetime(2026, 4, 24, 8, 0, tzinfo=timezone.utc),
+                    "end_time": datetime(2026, 4, 24, 9, 0, tzinfo=timezone.utc),
+                    "last_seen": datetime(2026, 4, 24, 9, 0, tzinfo=timezone.utc),
+                    "usage_stats": None,
+                }
+            ]
+        )
+        self.store._upsert_current_day_summary = mock.Mock()
+
+        self.store.refresh_current_day_summary()
+
+        payload = self.store._upsert_current_day_summary.call_args.args[0]
+        self.assertEqual(payload[0]["avg_max_memory_gb"], 16.0)
+        self.assertEqual(payload[0]["memory_samples"], 1)
 
     def test_refresh_user_tool_daily_stats_replaces_persisted_rows(self):
         self.store._completed_jobs_rows_for_activity_dates = mock.Mock(

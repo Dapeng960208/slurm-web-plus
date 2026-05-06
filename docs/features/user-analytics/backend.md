@@ -22,7 +22,9 @@
 - `GET /api/agents/<cluster>/user/<username>/metrics/history`
 - `GET /api/agents/<cluster>/associations`
 
-`tools/analysis` 的工具分类统计以 `user_tool_daily_stats` 为返回来源。接口收到 `start` / `end` 后，会先把时间窗覆盖到的 UTC 自然日从 `job_snapshots` 重新聚合写入 `user_tool_daily_stats`，再从该表读取并汇总返回。
+`tools/analysis` 的工具分类统计以 `user_tool_daily_stats` 为返回来源。接口收到 `start` / `end` 后，只按时间窗覆盖到的 UTC 自然日读取 `user_tool_daily_stats` 并汇总返回；查询多天时会把多天日表记录按样本数加权合并。该请求路径不实时扫描 `job_snapshots` 或 SlurmDB。`user_tool_daily_stats` 由后台当前日聚合线程和维护脚本 `slurmweb/rebuild-user-tool.py` 负责生成或修复。
+
+后台线程按 `[user_metrics].aggregation_interval` 配置周期执行，启动时先执行一次，然后按间隔更新当天 UTC 自然日的终态作业统计。后台聚合与 `slurmweb/rebuild-user-tool.py` 复用同一套聚合函数，保持工具归类、空值过滤、资源样本数和插入字段一致。
 
 `user_tool_daily_stats` 按 `(activity_date, user_id, tool)` 保存每日工具统计：
 
@@ -66,8 +68,9 @@
 统计口径：
 
 - 只统计已完成或终态作业。
-- `tools/analysis` 会按 `start` / `end` 覆盖到的 UTC 日期读取日聚合表；该接口的工具统计粒度为日。
-- 内存均值优先按 `job_snapshots.used_memory_gb` 计算；若历史行该字段为空，回退到 `usage_stats.memory.value_gb`。接口同时保留 `avg_max_memory_mb` 作为前端兼容字段。
+- `tools/analysis` 会按 `start` / `end` 覆盖到的 UTC 日期读取日聚合表；该接口的工具统计粒度为日，且请求时不实时重建日聚合表。
+- 日聚合写入会过滤没有 `user_id` 或没有完成时间兜底值 `COALESCE(end_time, last_seen)` 的作业；资源字段为空时只跳过对应资源样本，不影响 `jobs_count`。
+- 内存均值优先按 `job_snapshots.used_memory_gb` 计算；若历史行该字段为空，回退到 `usage_stats.memory.value_gb`；若 Slurm step 级实际内存仍缺失，再按 `tres_allocated` / `tres_requested` / TRES 字符串中的 `mem` 作为配置内存兜底，避免有内存 TRES 但无 step `consumed.max.mem` 的作业返回空值。接口同时保留 `avg_max_memory_mb` 作为前端兼容字段。
 - CPU 均值优先按 `job_snapshots.used_cpu_cores_avg` 计算；兼容历史行中的 `used_cpu_core_avg`，若顶层字段为空，回退到 `usage_stats.cpu.estimated_cores_avg`。
 - 运行时间优先按 `end_time - start_time` 计算，并返回 `avg_runtime_hours`；兼容保留 `avg_runtime_seconds`。
 - 终态判断按 `UPPER(job_state)` 匹配，避免 `completed` / `COMPLETED` 大小写差异导致统计为空。
@@ -166,5 +169,5 @@
   - `1 month`
 - 页面首次进入时若 query 缺失或非法，会自动回填“当天 00:00 -> 当前时间”
 - 前端发送请求前会把本地 `datetime-local` 转成带时区的 UTC ISO 8601
-- `Tool Analysis`、`Top Tools`、`Usage Profile` 与趋势图共用同一时间窗
+- 页面将原 `Tool Analysis` 与 `Top Tools` 合并为 `Completed Job Tool Analysis` 栏目，集中展示已完成作业的工具维度数据分析；该栏目与 `Usage Profile`、趋势图共用同一时间窗。
 - `start >= end` 时前端直接 inline 报错且不发请求
