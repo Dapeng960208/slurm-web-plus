@@ -253,6 +253,17 @@ const canDeleteNode = computed(() =>
   runtimeStore.hasRoutePermission(cluster, 'resources', 'delete')
 )
 
+function nodeEditInitialState(state: string[] | undefined): string {
+  if (!state || state.length === 0) return ''
+  if (state.includes('DRAIN')) return 'DRAIN'
+  if (state.includes('DOWN')) return 'DOWN'
+  if (state.includes('FAIL')) return 'FAIL'
+  if (state.includes('FUTURE')) return 'FUTURE'
+  if (state.includes('MIXED')) return 'MIXED'
+  if (state.includes('IDLE')) return 'IDLE'
+  return ''
+}
+
 async function saveNode(payload: Record<string, string>) {
   operationBusy.value = true
   operationError.value = null
@@ -860,7 +871,7 @@ onUnmounted(() => {
       :loading="operationBusy"
       :error="operationError"
       :initial-values="{
-        state: node.data.value?.state?.join(',') ?? '',
+        state: nodeEditInitialState(node.data.value?.state),
         reason: node.data.value?.reason ?? ''
       }"
       :fields="[
@@ -871,6 +882,7 @@ onUnmounted(() => {
           required: true,
           placeholder: 'Select node state',
           options: [
+            { label: 'MIXED (current state)', value: 'MIXED', disabled: true },
             { label: 'DRAIN', value: 'DRAIN' },
             { label: 'RESUME', value: 'RESUME' },
             { label: 'UNDRAIN', value: 'UNDRAIN' },

@@ -14,11 +14,17 @@ import FormFieldLabel from '@/components/forms/FormFieldLabel.vue'
 export type ActionFieldType = 'text' | 'textarea' | 'number' | 'select'
 export type ActionSubmitVariant = 'primary' | 'warning' | 'danger'
 
+export interface ActionFieldOption {
+  label: string
+  value: string
+  disabled?: boolean
+}
+
 export interface ActionField {
   key: string
   label: string
   type?: ActionFieldType
-  options?: { label: string; value: string }[]
+  options?: ActionFieldOption[]
   placeholder?: string
   required?: boolean
   hint?: string
@@ -44,6 +50,11 @@ const emit = defineEmits<{
 }>()
 
 const form = reactive<Record<string, string>>({})
+const fieldsSignature = computed(() =>
+  props.fields
+    .map((field) => `${field.key}:${field.type ?? 'text'}:${field.options?.map((option) => option.value).join(',') ?? ''}`)
+    .join('|')
+)
 
 const resolvedSubmitVariant = computed<ActionSubmitVariant>(() => {
   if (props.submitVariant) return props.submitVariant
@@ -84,11 +95,18 @@ const canSubmit = computed(() =>
 )
 
 watch(
-  () => [props.open, props.initialValues, props.fields] as const,
-  () => {
-    if (props.open) resetForm()
+  () => props.open,
+  (open) => {
+    if (open) resetForm()
   },
   { immediate: true }
+)
+
+watch(
+  () => [props.title, props.submitLabel, fieldsSignature.value] as const,
+  () => {
+    if (props.open) resetForm()
+  }
 )
 </script>
 
@@ -157,6 +175,7 @@ watch(
                       v-for="option in field.options ?? []"
                       :key="option.value"
                       :value="option.value"
+                      :disabled="option.disabled"
                     >
                       {{ option.label }}
                     </option>

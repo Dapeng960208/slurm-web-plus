@@ -8,6 +8,7 @@ import type { ClusterJob, ClusterNode } from '@/composables/GatewayAPI'
 import * as GatewayAPI from '@/composables/GatewayAPI'
 import NodeMainState from '@/components/resources/NodeMainState.vue'
 import nodeAllocated from '../assets/node-allocated.json'
+import nodeMixed from '../assets/node-mixed.json'
 import jobsNode from '../assets/jobs-node.json'
 import { nextTick } from 'vue'
 import PanelSkeleton from '@/components/PanelSkeleton.vue'
@@ -370,6 +371,7 @@ describe('NodeView.vue', () => {
     }
     const stateField = editDialog.props('fields').find((field) => field.key === 'state')
     expect(stateField?.type).toBe('select')
+    expect(stateField?.options?.map((option) => option.value)).toContain('MIXED')
     expect(stateField?.options?.map((option) => option.value)).toContain('UNDRAIN')
 
     await editDialog.vm.$emit('submit', { state: 'UNDRAIN', reason: 'back online' })
@@ -379,5 +381,53 @@ describe('NodeView.vue', () => {
       state: 'UNDRAIN',
       reason: 'back online'
     })
+  })
+
+  test('preserves mixed node status in edit dialog without turning it into a writable action', async () => {
+    useRuntimeStore().availableClusters = [
+      {
+        ...useRuntimeStore().availableClusters[0],
+        permissions: {
+          roles: [],
+          actions: [],
+          rules: ['resources:edit:*']
+        }
+      }
+    ]
+    useClusterDataPoller.mockReturnValueOnce(mockNodeDataPoller)
+    useClusterDataPoller.mockReturnValueOnce(mockJobsDataPoller)
+    mockNodeDataPoller.data.value = nodeMixed
+    mockJobsDataPoller.data.value = jobsNode
+
+    const wrapper = mount(NodeView, {
+      props: {
+        cluster: 'foo',
+        nodeName: 'cn2'
+      }
+    })
+    await flushPromises()
+
+    const editButton = wrapper
+      .findAll('button[type="button"]')
+      .find((button) => button.text().trim() === 'Edit')
+    if (!editButton) {
+      throw new Error('Edit button not found')
+    }
+    await editButton.trigger('click')
+    await flushPromises()
+
+    const editDialog = wrapper
+      .findAllComponents(ActionDialog)
+      .find((dialog) => dialog.props('title') === 'Edit Node')
+    if (!editDialog) {
+      throw new Error('Edit node dialog not found')
+    }
+
+    expect(editDialog.props('initialValues')).toMatchObject({ state: 'MIXED' })
+    const mixedOption = editDialog
+      .props('fields')
+      .find((field) => field.key === 'state')
+      ?.options?.find((option) => option.value === 'MIXED')
+    expect(mixedOption?.disabled).toBe(true)
   })
 })

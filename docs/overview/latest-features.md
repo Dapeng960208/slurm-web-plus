@@ -17,6 +17,20 @@
 - `cd frontend && npx vitest run tests/views/QosView.spec.ts tests/views/AccountView.spec.ts tests/views/AccountsView.spec.ts tests/composables/GatewayAPI.spec.ts`
 - `npm --prefix frontend run type-check`
 
+## 本轮：节点状态编辑与共享表单重置修复
+
+本轮修复节点编辑和共享操作弹窗的两个前端交互问题：
+
+- `NodeView` 的节点状态编辑下拉框已补 `MIXED` 当前态展示，避免 mixed 节点打开编辑弹窗时缺少对应状态。
+- `MIXED` 在编辑表单中只作为当前状态占位显示，不作为可提交的状态动作；实际可编辑动作仍保持 `DRAIN`、`RESUME`、`UNDRAIN`、`DOWN`、`IDLE`、`FAIL`、`FUTURE`。
+- 共享 `ActionDialog` 不再在弹窗保持打开期间因为后台轮询刷新 `initialValues` 而重置用户已输入的表单内容。
+- `ActionDialog` 现在只会在弹窗重新打开，或同一弹窗实例切换到另一种操作时重新初始化表单，避免 Accounts、QOS、Jobs、Node 等页面编辑时输入被后台刷新覆盖。
+
+本轮新增验证：
+
+- `cd frontend && npx vitest run tests/components/operations/ActionDialog.spec.ts tests/views/NodeView.spec.ts`
+- `npm --prefix frontend run type-check`
+
 ## 本轮：Resource、Jobs Filter 与用户工具聚合修正
 
 本轮继续在现有资源、作业筛选和用户分析链路上做收口：

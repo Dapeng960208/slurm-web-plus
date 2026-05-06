@@ -96,4 +96,45 @@ describe('ActionDialog.vue', () => {
 
     expect(wrapper.emitted('submit')?.[0]).toEqual([{ state: 'RESUME' }])
   })
+
+  test('does not reset user edits when initial values refresh while dialog stays open', async () => {
+    const wrapper = mount(ActionDialog, {
+      global: {
+        stubs: {
+          Dialog: { template: '<div><slot /></div>' },
+          DialogPanel: { template: '<div><slot /></div>' },
+          DialogTitle: { template: '<div><slot /></div>' },
+          TransitionChild: { template: '<div><slot /></div>' },
+          TransitionRoot: { template: '<div><slot /></div>' }
+        }
+      },
+      props: {
+        open: true,
+        title: 'Edit account',
+        submitLabel: 'Save',
+        fields: [
+          {
+            key: 'description',
+            label: 'Description'
+          }
+        ],
+        initialValues: {
+          description: 'Original'
+        }
+      }
+    })
+
+    await wrapper.get('input').setValue('Typing in progress')
+    await wrapper.setProps({
+      initialValues: {
+        description: 'Refreshed from poller'
+      }
+    })
+    await nextTick()
+
+    expect((wrapper.get('input').element as HTMLInputElement).value).toBe('Typing in progress')
+
+    await wrapper.get('form').trigger('submit')
+    expect(wrapper.emitted('submit')?.[0]).toEqual([{ description: 'Typing in progress' }])
+  })
 })

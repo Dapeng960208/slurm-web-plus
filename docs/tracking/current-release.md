@@ -19,6 +19,7 @@
 - 扩展用户默认 QOS、用户分配 QOS、account-user association QOS/default QOS 管理能力
 - 作业编辑支持提交 Slurm REST `memory_per_cpu`，首版单位为 MB
 - Resources 列表移除节点行尾管理按钮，节点状态编辑改为详情页下拉选择
+- 修复节点状态编辑缺少 `MIXED` 当前态展示，以及共享表单在后台轮询刷新期间重置输入的问题
 - Jobs 用户筛选支持直接输入用户名并加入筛选
 - 修正 `user_tool_daily_stats` 当天与跨天聚合口径，避免 `avg_max_memory_gb` / `avg_cpu_cores` 返回空值
 - 修复 QOS 创建 payload 包装、QOS 默认限制补齐、accounts 创建 payload 包装，以及 account-user association 删除条件过宽问题
@@ -86,6 +87,7 @@
 - 发布后代码审查已补共享写操作对话框回归修复：
   - `ActionDialog` 复用时会先清空旧表单键，避免编辑/提交残留字段泄漏到后续删除/取消请求体
   - 已补对应前端组件回归测试
+- `ActionDialog` 在弹窗已打开期间不再因 `initialValues` 被后台轮询刷新而重置用户输入；现在只会在重新打开弹窗或切换到另一种操作时重建表单
 - 新增集群级 `/:cluster/admin` 路由与 `Admin` 菜单入口
 - 旧 `/settings/ai|access-control|cache|ldap-cache` 已重定向到 `admin/*`
 - `Admin` 页面已统一承载：
@@ -98,6 +100,7 @@
 - `ResourcesView` 列表页不再显示节点行尾 `Manage` / `Delete` 按钮，节点名称仍可进入详情
 - `NodeView` 详情页继续保留单节点更新、删除
 - `NodeView` 的 Edit Node 中 `state` 已改为下拉框，选项为 `DRAIN`、`RESUME`、`UNDRAIN`、`DOWN`、`IDLE`、`FAIL`、`FUTURE`
+- mixed 节点打开 `Edit Node` 时，表单会额外显示禁用的 `MIXED` 当前态占位，避免当前状态缺失；实际提交动作仍使用显式 Slurm 状态操作值
 - `ReservationsView` 已补创建、更新、删除
 - `AccountsView` / `AccountView` 已补创建、更新、删除
 - `UserView` 已补 SlurmDB 用户更新、删除
