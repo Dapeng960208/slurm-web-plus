@@ -43,6 +43,7 @@ npm --prefix frontend run test:unit
 - `SettingsAI` 的配置管理流程
 - `AssistantView` 的普通对话、流式渲染、安全 Markdown 消息展示、历史 trace 回放、折叠式工具轨迹展示、消息复制与逻辑删除
 - `AssistantView` 的 token 估算展示、模型配置限制读取和超限阻止发送
+- `AssistantView` 的左侧聊天列布局稳定性：消息区需撑满左侧工作区，输入框保持在同列内，流式更新时不发生整体下移
 - 普通对话页不展示模型、stream、persistence 等运行配置；相关配置只在 `/:cluster/admin/ai` 查看和维护
 - `SettingsAI` 的弹窗式配置管理、标签式配置列表和配置删除
 - `SettingsAI` 的 Conversation Audit 列表、用户名/关键字过滤与点击后加载详情

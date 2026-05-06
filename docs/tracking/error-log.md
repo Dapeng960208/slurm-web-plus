@@ -478,3 +478,18 @@
 - 根因：前端 `package.json` 没有 `test` 脚本，实际单测脚本为 `test:unit`；在当前环境中直接用 `npx vitest run ...` 跑目标 spec 更稳定。
 - 解决：改用 `npx vitest run tests/views/UserAnalysisView.spec.ts tests/views/UserView.spec.ts tests/components/user/UserToolAnalysisChart.spec.ts`，目标测试通过。
 - 预防：后续前端定向单测优先使用 `npx vitest run <spec...>`；需要通过 npm 脚本时先检查 `frontend/package.json` 的 scripts。
+
+### 2026-05-06：AI 对话页输入框脱离左侧聊天列，流式对话时面板整体下移
+
+- 场景：在普通 AI 对话页持续发送消息，或等待 assistant 流式回复并同时查看右侧 `Execution trace`。
+- 现象：
+  - 左侧聊天区没有完整撑满工作区宽度，输入框显示在左右两列下方而不是左侧对话列内。
+  - 对话过程中消息区会被整体向下挤动，视觉上像整个聊天框下沉。
+- 复现：打开 `/:cluster/ai`，在有右侧 trace 栏的情况下发送消息，观察消息区和输入框布局；当消息数增长或 trace 更新时，左侧面板位置发生跳动。
+- 根因：`AssistantView` 把消息滚动区放在左右两列 grid 内，但把 composer `form` 放在 grid 外，导致输入框跨越整行；消息区又使用内容驱动的 `min/max-height` 与空态 `justify-between`，在流式更新和右侧栏高度变化时容易触发重新布局。
+- 解决：
+  - 把消息滚动区和 composer 一起收进左侧单独的 `flex flex-col` 容器。
+  - 给消息滚动区稳定高度和 `min-w-0`，避免左右列互相挤压时触发宽度和高度漂移。
+  - 空态快捷按钮改为 `mt-auto` 贴底，保持仍在消息区内部，但不再依赖 `justify-between` 撑满整块容器。
+  - 补 `AssistantView.spec.ts` 结构回归测试，断言 message scroller 和 composer 同属左侧聊天列。
+- 预防：后续做双列聊天页布局时，输入组件必须跟消息滚动容器处于同一列容器内；对流式内容区域优先使用稳定高度或 `flex-1/min-h-0` 结构，避免把输入区挂在外层 grid 之后。

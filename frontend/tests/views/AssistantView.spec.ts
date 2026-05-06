@@ -409,4 +409,45 @@ describe('views/AssistantView.vue', () => {
     expect(mockGatewayAPI.stream_ai_chat).not.toHaveBeenCalled()
     expect(wrapper.text()).toContain('Estimated token usage exceeds the current limit')
   })
+
+  test('keeps the composer inside the left chat column', async () => {
+    mockGatewayAPI.ai_configs.mockResolvedValue([
+      {
+        id: 1,
+        name: 'qwen-prod',
+        provider: 'qwen',
+        provider_label: 'Qwen',
+        model: 'qwen3-coder',
+        display_name: 'Qwen Prod',
+        enabled: true,
+        is_default: true,
+        sort_order: 10,
+        base_url: null,
+        deployment: null,
+        api_version: null,
+        request_timeout: null,
+        temperature: null,
+        system_prompt: null,
+        extra_options: {},
+        secret_configured: true,
+        secret_mask: '***1234',
+        last_validated_at: null,
+        last_validation_error: null
+      }
+    ])
+    mockGatewayAPI.ai_conversations.mockResolvedValue([])
+
+    const wrapper = mountAssistantView()
+
+    await flushPromises()
+
+    const chatColumn = wrapper.get('[data-testid="assistant-chat-column"]')
+    const messageScroller = wrapper.get('[data-testid="assistant-message-scroller"]')
+    const composer = wrapper.get('[data-testid="assistant-composer"]')
+
+    expect(chatColumn.classes()).toEqual(expect.arrayContaining(['flex', 'min-w-0', 'flex-col']))
+    expect(messageScroller.classes()).toEqual(expect.arrayContaining(['h-[30rem]', 'min-w-0', 'overflow-y-auto']))
+    expect(composer.element.parentElement).toBe(chatColumn.element)
+    expect(messageScroller.element.parentElement).toBe(chatColumn.element)
+  })
 })

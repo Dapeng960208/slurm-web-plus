@@ -627,82 +627,116 @@ watch(
             </InfoAlert>
 
             <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
-              <div
-                ref="messageScroller"
-                class="min-h-[30rem] max-h-[38rem] overflow-y-auto rounded-[28px] border border-[rgba(80,105,127,0.12)] bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(239,244,246,0.84))] px-4 py-4 sm:px-5"
-              >
-                <div v-if="selectedConversationLoading || configsLoading" class="text-[var(--color-brand-muted)]">
-                  <LoadingSpinner :size="5" />
-                  Loading AI workspace...
-                </div>
-
-                <div v-else-if="renderedMessages.length === 0" class="flex h-full flex-col justify-between gap-6">
-                  <div class="rounded-[24px] border border-[rgba(80,105,127,0.12)] bg-white/80 px-5 py-5">
-                    <p class="ui-page-kicker">Ready</p>
-                    <h3 class="text-base font-semibold text-[var(--color-brand-ink-strong)]">
-                      Ask about jobs, nodes, partitions, or metrics in this cluster
-                    </h3>
-                    <p class="mt-3 text-sm leading-6 text-[var(--color-brand-muted)]">
-                      Example topics include job state analysis, idle node ranking, and cluster resource summaries.
-                    </p>
+              <div data-testid="assistant-chat-column" class="flex min-w-0 flex-col gap-4">
+                <div
+                  ref="messageScroller"
+                  data-testid="assistant-message-scroller"
+                  class="h-[30rem] min-w-0 overflow-y-auto rounded-[28px] border border-[rgba(80,105,127,0.12)] bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(239,244,246,0.84))] px-4 py-4 sm:px-5 lg:h-[38rem]"
+                >
+                  <div v-if="selectedConversationLoading || configsLoading" class="text-[var(--color-brand-muted)]">
+                    <LoadingSpinner :size="5" />
+                    Loading AI workspace...
                   </div>
-                  <div class="flex flex-wrap gap-2">
-                    <button type="button" class="ui-button-ghost" @click="draft = 'Summarize current cluster load and queue pressure.'">
-                      Summarize cluster
-                    </button>
-                    <button type="button" class="ui-button-ghost" @click="draft = 'Which node has the most remaining resources right now?'">
-                      Best node now
-                    </button>
-                    <button type="button" class="ui-button-ghost" @click="draft = 'Explain the current state of job 12345 and possible reasons.'">
-                      Analyze job 12345
-                    </button>
-                  </div>
-                </div>
 
-                <div v-else class="space-y-4">
-                  <article
-                    v-for="message in renderedMessages"
-                    :key="message.id"
-                    class="flex"
-                    :class="message.role === 'user' ? 'justify-end' : 'justify-start'"
-                  >
-                    <div
-                      class="max-w-3xl rounded-[24px] px-4 py-3 shadow-[var(--shadow-soft)]"
-                      :class="
-                        message.role === 'user'
-                          ? 'bg-[linear-gradient(135deg,rgba(182,232,44,0.92),rgba(152,201,31,0.92))] text-[var(--color-brand-deep)]'
-                          : 'border border-[rgba(80,105,127,0.12)] bg-white text-[var(--color-brand-ink-strong)]'
-                      "
-                    >
-                      <div class="flex items-center justify-between gap-3 text-xs font-semibold tracking-[0.12em] uppercase">
-                        <span>{{ message.role }}</span>
-                        <div class="flex items-center gap-2">
-                          <span class="opacity-70">{{ formatTimestamp(message.created_at) }}</span>
-                          <button
-                            type="button"
-                            class="rounded-full p-1.5 opacity-70 transition hover:bg-black/5 hover:opacity-100"
-                            :title="copiedMessageId === message.id ? 'Copied' : 'Copy message'"
-                            @click="copyMessage(message)"
-                          >
-                            <ClipboardDocumentIcon class="h-4 w-4" aria-hidden="true" />
-                          </button>
-                        </div>
-                      </div>
-                      <p
-                        v-if="message.id === '__pending-assistant__' && !message.content"
-                        class="mt-3 animate-pulse text-sm text-[var(--color-brand-muted)]"
-                      >
-                        Generating response...
+                  <div v-else-if="renderedMessages.length === 0" class="flex h-full flex-col gap-6">
+                    <div class="rounded-[24px] border border-[rgba(80,105,127,0.12)] bg-white/80 px-5 py-5">
+                      <p class="ui-page-kicker">Ready</p>
+                      <h3 class="text-base font-semibold text-[var(--color-brand-ink-strong)]">
+                        Ask about jobs, nodes, partitions, or metrics in this cluster
+                      </h3>
+                      <p class="mt-3 text-sm leading-6 text-[var(--color-brand-muted)]">
+                        Example topics include job state analysis, idle node ranking, and cluster resource summaries.
                       </p>
-                      <MarkdownMessage
-                        v-else
-                        class="mt-3 text-sm leading-6"
-                        :content="message.content"
-                        :role="message.role"
-                      />
                     </div>
-                  </article>
+                    <div class="mt-auto flex flex-wrap gap-2">
+                      <button type="button" class="ui-button-ghost" @click="draft = 'Summarize current cluster load and queue pressure.'">
+                        Summarize cluster
+                      </button>
+                      <button type="button" class="ui-button-ghost" @click="draft = 'Which node has the most remaining resources right now?'">
+                        Best node now
+                      </button>
+                      <button type="button" class="ui-button-ghost" @click="draft = 'Explain the current state of job 12345 and possible reasons.'">
+                        Analyze job 12345
+                      </button>
+                    </div>
+                  </div>
+
+                  <div v-else class="space-y-4">
+                    <article
+                      v-for="message in renderedMessages"
+                      :key="message.id"
+                      class="flex"
+                      :class="message.role === 'user' ? 'justify-end' : 'justify-start'"
+                    >
+                      <div
+                        class="max-w-3xl rounded-[24px] px-4 py-3 shadow-[var(--shadow-soft)]"
+                        :class="
+                          message.role === 'user'
+                            ? 'bg-[linear-gradient(135deg,rgba(182,232,44,0.92),rgba(152,201,31,0.92))] text-[var(--color-brand-deep)]'
+                            : 'border border-[rgba(80,105,127,0.12)] bg-white text-[var(--color-brand-ink-strong)]'
+                        "
+                      >
+                        <div class="flex items-center justify-between gap-3 text-xs font-semibold tracking-[0.12em] uppercase">
+                          <span>{{ message.role }}</span>
+                          <div class="flex items-center gap-2">
+                            <span class="opacity-70">{{ formatTimestamp(message.created_at) }}</span>
+                            <button
+                              type="button"
+                              class="rounded-full p-1.5 opacity-70 transition hover:bg-black/5 hover:opacity-100"
+                              :title="copiedMessageId === message.id ? 'Copied' : 'Copy message'"
+                              @click="copyMessage(message)"
+                            >
+                              <ClipboardDocumentIcon class="h-4 w-4" aria-hidden="true" />
+                            </button>
+                          </div>
+                        </div>
+                        <p
+                          v-if="message.id === '__pending-assistant__' && !message.content"
+                          class="mt-3 animate-pulse text-sm text-[var(--color-brand-muted)]"
+                        >
+                          Generating response...
+                        </p>
+                        <MarkdownMessage
+                          v-else
+                          class="mt-3 text-sm leading-6"
+                          :content="message.content"
+                          :role="message.role"
+                        />
+                      </div>
+                    </article>
+                  </div>
                 </div>
+
+                <form data-testid="assistant-composer" class="space-y-3" @submit.prevent="submitMessage">
+                  <textarea
+                    v-model="draft"
+                    rows="5"
+                    :disabled="!canView || enabledModels.length === 0 || sending"
+                    class="block w-full rounded-[28px] border border-[rgba(80,105,127,0.16)] bg-white px-5 py-4 text-sm leading-6 text-[var(--color-brand-ink-strong)] shadow-[var(--shadow-soft)] outline-hidden focus:border-[rgba(182,232,44,0.65)] focus:ring-4 focus:ring-[rgba(182,232,44,0.18)]"
+                    placeholder="Ask about a job, node resources, partitions, or another read-only cluster question."
+                  />
+                  <div class="flex flex-wrap items-center justify-between gap-3">
+                    <div class="text-sm text-[var(--color-brand-muted)]">
+                      <span
+                        class="font-semibold"
+                        :class="tokenLimitExceeded ? 'text-red-600' : 'text-[var(--color-brand-ink-strong)]'"
+                      >
+                        Estimated tokens {{ estimatedTokenCount }} / {{ tokenLimit }}
+                      </span>
+                      <p v-if="tokenLimitExceeded" class="mt-1 text-red-600">
+                        Token estimate exceeds the current limit. Shorten the prompt or start a new chat.
+                      </p>
+                    </div>
+                    <div class="flex flex-wrap gap-2">
+                      <button type="button" class="ui-button-secondary" :disabled="sending" @click="draft = ''">
+                        Clear
+                      </button>
+                      <button type="submit" class="ui-button-primary" :disabled="!canSend">
+                        Send
+                      </button>
+                    </div>
+                  </div>
+                </form>
               </div>
 
               <aside class="space-y-4">
@@ -784,37 +818,6 @@ watch(
                 </div>
               </aside>
             </div>
-
-            <form class="space-y-3" @submit.prevent="submitMessage">
-              <textarea
-                v-model="draft"
-                rows="5"
-                :disabled="!canView || enabledModels.length === 0 || sending"
-                class="block w-full rounded-[28px] border border-[rgba(80,105,127,0.16)] bg-white px-5 py-4 text-sm leading-6 text-[var(--color-brand-ink-strong)] shadow-[var(--shadow-soft)] outline-hidden focus:border-[rgba(182,232,44,0.65)] focus:ring-4 focus:ring-[rgba(182,232,44,0.18)]"
-                placeholder="Ask about a job, node resources, partitions, or another read-only cluster question."
-              />
-              <div class="flex flex-wrap items-center justify-between gap-3">
-                <div class="text-sm text-[var(--color-brand-muted)]">
-                  <span
-                    class="font-semibold"
-                    :class="tokenLimitExceeded ? 'text-red-600' : 'text-[var(--color-brand-ink-strong)]'"
-                  >
-                    Estimated tokens {{ estimatedTokenCount }} / {{ tokenLimit }}
-                  </span>
-                  <p v-if="tokenLimitExceeded" class="mt-1 text-red-600">
-                    Token estimate exceeds the current limit. Shorten the prompt or start a new chat.
-                  </p>
-                </div>
-                <div class="flex flex-wrap gap-2">
-                  <button type="button" class="ui-button-secondary" :disabled="sending" @click="draft = ''">
-                    Clear
-                  </button>
-                  <button type="submit" class="ui-button-primary" :disabled="!canSend">
-                    Send
-                  </button>
-                </div>
-              </div>
-            </form>
           </section>
         </div>
       </template>

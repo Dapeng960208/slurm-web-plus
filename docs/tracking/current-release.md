@@ -24,6 +24,7 @@
 - Jobs 用户筛选支持直接输入用户名并加入筛选
 - 修正 `user_tool_daily_stats` 当天与跨天聚合口径，避免 `avg_max_memory_gb` / `avg_cpu_cores` 返回空值
 - 修复 QOS 创建 payload 包装、QOS 默认限制补齐、accounts 创建 payload 包装，以及 account-user association 删除条件过宽问题
+- 修复 AI 对话页左侧聊天工作区未撑满和对话过程中面板下移的问题
 
 ## 2. 已完成项
 
@@ -62,6 +63,10 @@
   - `assistant` 与 `user` 消息统一按 Markdown 展示
   - 原始 HTML 不会作为真实 DOM 节点渲染
   - 外链默认新标签打开并带 `rel="noopener noreferrer"`
+- `AssistantView` 的消息区与输入框已固定在左侧同一列：
+  - 输入框不再跨越右侧 `Execution trace` 栏
+  - 左侧聊天工作区可完整占满可用宽度
+  - 流式回复和 trace 更新时不再把对话面板整体向下挤动
 - `analysis` 页的 `ping` / `diag` 已从原始 JSON 文本改为结构化字段展示
 - 用户分析历史接口与前端图表已扩展为：
   - 每时间桶提交作业数
@@ -338,6 +343,8 @@
 - `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/apps/test_ai_service.py slurmweb/tests/slurmrestd/test_slurmrestd_write_operations.py slurmweb/tests/views/test_agent_operations.py`
 - `cd frontend && npx vitest run tests/views/resources/ResourcesView.spec.ts tests/views/NodeView.spec.ts tests/components/operations/ActionDialog.spec.ts tests/components/jobs/UserFilterSelector.spec.ts`
 - `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/apps/test_user_analytics_store.py`
+- `cd frontend && npx vitest run tests/views/AssistantView.spec.ts`
+- `npm --prefix frontend run type-check`
 
 待同步：
 

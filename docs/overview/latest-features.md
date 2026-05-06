@@ -1,5 +1,19 @@
 ﻿# 最新功能
 
+## 本轮：AI 对话页布局稳定性修复
+
+本轮修复普通 AI 对话页的两个前端布局问题：
+
+- `AssistantView` 的消息区和输入框现在固定收口在左侧同一列，输入框不再脱离对话区跑到整行底部，左侧聊天工作区可完整撑满可用宽度。
+- 消息滚动区域改为稳定高度容器，发送消息、流式回复和右侧 `Execution trace` 更新时，不再把对话框整体向下挤动。
+- 空对话态的快捷问题按钮改为贴底布局，但仍保持在消息区内部，不再影响整体对话面板位置。
+- 前端单测新增布局结构回归检查，确保 composer 与 message scroller 继续同属左侧聊天列。
+
+本轮新增验证：
+
+- `cd frontend && npx vitest run tests/views/AssistantView.spec.ts`
+- `npm --prefix frontend run type-check`
+
 ## 本轮：QOS、Accounts 与 account-user association 写路径修复
 
 本轮修复 SlurmDB 写路径中的三个管理操作问题，并统一 QOS 创建默认限制：
