@@ -227,7 +227,7 @@ def replace_target_rows(conn, start_date, end_date, payload, username=None):
 def rebuild(conn, args, db_settings):
     mapper = ToolNameMapper(db_settings.tool_mapping_file)
     raw_mapper = ToolNameMapper()
-    payload = aggregate_user_tool_daily_rows(
+    payload, _ = aggregate_user_tool_daily_rows(
         completed_rows(conn, args.start, args.end, username=args.user),
         mapper,
         raw_mapper=raw_mapper,

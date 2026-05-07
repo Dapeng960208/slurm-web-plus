@@ -39,6 +39,21 @@
   - 补 `slurmweb/tests/slurmrestd/test_slurmrestd_write_operations.py`、`slurmweb/tests/views/test_agent_operations.py`、`frontend/tests/views/AccountsView.spec.ts` 与 `frontend/tests/views/AccountView.spec.ts` 回归。
 - 预防：后续封装 SlurmDB 写接口时，除了检查 request body 顶层 schema，还必须把 required 字段同步到前端表单和前端 payload 校验；后端默认补值只能作为兼容兜底，不能替代前端契约。
 
+### 2026-05-06：创建 account 成功后前端列表仍不显示新账户
+
+- 场景：在 `AccountsView` 创建 account，后端返回成功，但列表里看不到刚创建的账户。
+- 现象：前端提示创建成功，但账户树没有出现新条目，容易误判为创建失败。
+- 复现：
+  - 通过 `Create Account` 创建一个新的 account。
+  - 底层 `accounts` 已存在新对象，但 `associations` 还没有对应 account-level association 行时，账户页仍为空或不显示新账户。
+- 根因：`AccountsView` 之前只用 `associations` 构建账户树；而新建 account 是否立刻出现在 `associations` 里并不稳定，导致页面数据源与实际账户主数据脱节。
+- 解决：
+  - `AccountsView` 改为以 `accounts` 为主数据源构建账户树，再用 `associations` 补用户、QOS 和限制信息。
+  - 创建成功后主动刷新 `accounts` 与 `associations` 两条 poller 链路。
+  - 同时把 `description` 调整为创建 account 的前端显式必填字段。
+  - 补 `frontend/tests/views/AccountsView.spec.ts` 回归，覆盖“无 association 也能显示新账户”。
+- 预防：后续账户列表、树和导航类页面，主对象列表必须优先绑定对象主数据源，不能只依赖 association、metrics 或其他附属视图来判断对象是否存在。
+
 ### 2026-05-06：QOS 常用限制值仍主要依赖后端默认补全，前后端契约不一致
 
 - 场景：`QosView` 创建或编辑 QOS 时，前端弹框虽然预填了 `MaxSubmitJobsPerUser`、`MaxJobsPerUser`、`MaxWallDurationPerJob`，但字段本身不是必填；如果被清空，最终仍主要依赖后端默认补值。
@@ -481,7 +496,7 @@
 - 解决：
   - `user_analytics_store` 的聚合查询补取 `tres_req_str`、`tres_per_job`、`tres_per_node`、`tres_requested`、`tres_allocated`。
   - 内存解析在实际用量缺失后，从 `tres_allocated`、`tres_requested` 的 `mem` TRES（MiB）兜底，再从 TRES 字符串中的 `mem=<MiB>` 兜底。
-  - `rebuild-user-tool.py` 使用同一口径，避免维护脚本重建 `user_tool_daily_stats` 后再次写入空值。
+  - `scripts/rebuild-user-tool.py` 使用同一口径，避免维护脚本重建 `user_tool_daily_stats` 后再次写入空值。
   - 新增聚合和当前日刷新回归测试，覆盖 TRES list 与 TRES string 两类兜底。
 - 预防：后续排查资源均值为空时，需要同时检查 step 实际用量和 job 级 TRES 配置；维护脚本必须与在线聚合保持字段选择和解析口径一致。
 
@@ -493,19 +508,19 @@
 - 根因：将数据修复职责放进了在线查询路径；没有把“日聚合表生成/修复”和“接口读取日聚合表”两个职责分开。
 - 解决：
   - `user_tool_analysis()` 移除 `_refresh_user_tool_daily_stats()` 调用，只执行 `_user_tool_daily_summary()`。
-  - 保留后台当前日聚合和 `rebuild-user-tool.py` 的资源解析修复，负责生成或修复 `user_tool_daily_stats`。
+  - 保留后台当前日聚合和 `scripts/rebuild-user-tool.py` 的资源解析修复，负责生成或修复 `user_tool_daily_stats`。
   - 单测改为断言 `user_tool_analysis()` 只读取日聚合摘要。
 - 预防：后续调整 `tools/analysis` 返回字段时，接口层只能读 `user_tool_daily_stats`；如需补历史数据，应通过后台聚合任务、迁移或维护脚本完成。
 
-### 2026-05-06：后台日聚合与 `rebuild-user-tool.py` 聚合口径漂移
+### 2026-05-06：后台日聚合与 `scripts/rebuild-user-tool.py` 聚合口径漂移
 
-- 场景：要求 `user_analytics_store` 的后台聚合与 `slurmweb/rebuild-user-tool.py` 的数据聚合和插入逻辑保持一致，并由 `tools/analysis` 只读 `UserToolDailyStat` 后多日合并返回。
+- 场景：要求 `user_analytics_store` 的后台聚合与 `scripts/rebuild-user-tool.py` 的数据聚合和插入逻辑保持一致，并由 `tools/analysis` 只读 `UserToolDailyStat` 后多日合并返回。
 - 现象：后台当前日聚合与重建脚本存在重复实现，后台按数据库本地 `CURRENT_DATE` 取当天，重建脚本按 UTC 日期取数；`regr_*` 工具归并只在重建脚本中存在。
 - 复现：分别执行后台当前日聚合和维护脚本重建同一天数据，在数据库 timezone 非 UTC 或工具名为 `regr_foo` / `regr-bar` 时，可能写出不同的 `activity_date` 或 `tool`。
 - 根因：聚合、工具归类和时间口径分散在两个文件中维护，缺少共享函数和回归测试。
 - 解决：
   - `user_analytics_store` 新增共享 `aggregate_user_tool_daily_rows()`，负责日聚合、资源空值过滤、样本数统计与工具归类。
-  - 后台 `_aggregate_daily_rows()` 与 `rebuild-user-tool.py` 均复用该共享函数。
+  - 后台 `_aggregate_daily_rows()` 与 `scripts/rebuild-user-tool.py` 均复用该共享函数。
   - 后台当前日查询改为 UTC 自然日，并过滤 `user_id IS NULL` 与 `COALESCE(end_time, last_seen) IS NULL` 的行。
   - `tools/analysis` 保持只读 `user_tool_daily_stats`，多日查询由 `_aggregate_daily_stat_rows()` 按 `memory_samples` / `cpu_samples` / `runtime_samples` 加权合并。
 - 预防：后续修改日聚合字段、工具归类或资源解析时，只改共享聚合函数，并补后台路径与维护脚本一致性的测试。
@@ -528,6 +543,25 @@
   - 当前日后台刷新改为“先删当天旧行，再写当天新 payload”，确保按聚合间隔刷新时不会残留旧脏统计。
   - 补充聚合、当前日刷新和 repair/rebuild 脚本回归测试，覆盖“无有效资源对时不写行”和“旧 0 行不再被接口读出”。
 - 预防：后续只要 `jobs_count` 的定义依赖某组资源字段，就必须在“日写入”和“跨日读取”两层保持同一过滤口径；后台按周期重算某天统计时必须替换整天数据，而不是只做 upsert。
+
+### 2026-05-07：用户工具日聚合把缺 CPU 样本的完成作业整条丢弃
+
+- 场景：排查 `tools/analysis` 全空时，发现某些完成作业已经有 `used_memory_gb > 0`，但没有 `used_cpu_cores_avg`，导致整条作业没有进入 `user_tool_daily_stats`。
+- 现象：
+  - 用户明明有完成作业和有效内存数据，但 `tools/analysis` 仍可能返回空列表或 `completed_jobs = 0`。
+  - 后台聚合线程缺少每轮核心计数日志，无法快速判断是“完全没作业”还是“作业被过滤掉”。
+- 复现：
+  - 写入一条终态 `job_snapshots`，其中 `used_memory_gb > 0`，`used_cpu_cores_avg` 为 `NULL` 或 `0`。
+  - 执行后台当天聚合或 `repair-user-tool-daily-stats.py`，原实现不会为该作业生成日表统计。
+- 根因：
+  - `aggregate_user_tool_daily_rows()` 把 `used_memory_gb` 和 `used_cpu_cores_avg` 同时视为写表硬门槛。
+  - 聚合线程没有输出每轮扫描数、跳过数和写入数，排障只能靠手工 SQL 对比。
+- 解决：
+  - 日聚合写表改为只强制 `used_memory_gb > 0`；`used_cpu_cores_avg` 缺失时仍保留该作业的 `jobs_count`、内存均值和运行时样本。
+  - `avg_cpu_cores` 与 `cpu_samples` 仅统计有有效 CPU 样本的子集；跨天 `tools/analysis` 只对这类日行合并 CPU 均值。
+  - `refresh_current_day_summary()` 增加每轮聚合汇总日志，记录扫描作业数、缺内存跳过数、缺 CPU 样本数和最终写入行数。
+  - `repair-user-tool-daily-stats.py` 与 `scripts/rebuild-user-tool.py` 同步新口径，用于重建历史 `user_tool_daily_stats`。
+- 预防：后续只要调整 `jobs_count`、`avg_cpu_cores` 或样本数字段语义，必须同时更新在线聚合、跨天汇总、维护脚本和诊断日志，并补对应回归测试。
 
 ### 2026-05-06：前端单测入口误用 `npm test` 与 `npm run test:unit -- --run ...`
 

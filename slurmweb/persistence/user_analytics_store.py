@@ -405,7 +405,7 @@ def _aggregate_daily_stat_rows(rows):
         runtime_samples = int(runtime_samples or 0)
         memory_value = _positive_numeric_value(avg_memory_gb)
         cpu_value = _positive_numeric_value(avg_cpu_cores)
-        if jobs <= 0 or memory_value is None or cpu_value is None:
+        if jobs <= 0 or memory_value is None:
             continue
 
         bucket = tools[tool]
@@ -415,15 +415,16 @@ def _aggregate_daily_stat_rows(rows):
         # In that case, keep those rows in cross-day resource averages by
         # weighting them with jobs_count.
         memory_weight = jobs
-        cpu_weight = jobs
         bucket["memory_total"] += memory_value * memory_weight
         bucket["memory_samples"] += memory_weight
         summary["memory_total"] += memory_value * memory_weight
         summary["memory_samples"] += memory_weight
-        bucket["cpu_total"] += cpu_value * cpu_weight
-        bucket["cpu_samples"] += cpu_weight
-        summary["cpu_total"] += cpu_value * cpu_weight
-        summary["cpu_samples"] += cpu_weight
+        if cpu_value is not None:
+            cpu_weight = jobs
+            bucket["cpu_total"] += cpu_value * cpu_weight
+            bucket["cpu_samples"] += cpu_weight
+            summary["cpu_total"] += cpu_value * cpu_weight
+            summary["cpu_samples"] += cpu_weight
         if avg_runtime_seconds is not None:
             samples = runtime_samples or jobs
             bucket["runtime_total"] += float(avg_runtime_seconds) * samples
@@ -516,10 +517,20 @@ def aggregate_user_tool_daily_rows(
             "runtime_samples": 0,
         }
     )
+    stats = {
+        "rows_seen": 0,
+        "rows_missing_identity": 0,
+        "rows_skipped_memory": 0,
+        "rows_skipped_cpu": 0,
+        "rows_counted": 0,
+        "runtime_samples": 0,
+    }
     for row in rows:
+        stats["rows_seen"] += 1
         activity_date = row.get("activity_date")
         user_id = row.get("user_id")
         if activity_date is None or user_id is None:
+            stats["rows_missing_identity"] += 1
             continue
 
         tool = _classify_daily_tool(
@@ -532,18 +543,24 @@ def aggregate_user_tool_daily_rows(
         key = (activity_date, user_id, tool)
         bucket = buckets[key]
         memory_value = _positive_numeric_value(row.get("used_memory_gb"))
-        cpu_value = _positive_numeric_value(row.get("used_cpu_cores_avg"))
-        if memory_value is None or cpu_value is None:
+        if memory_value is None:
+            stats["rows_skipped_memory"] += 1
             continue
         bucket["jobs_count"] += 1
         bucket["memory_total"] += memory_value
         bucket["memory_samples"] += 1
-        bucket["cpu_total"] += cpu_value
-        bucket["cpu_samples"] += 1
+        stats["rows_counted"] += 1
+        cpu_value = _positive_numeric_value(row.get("used_cpu_cores_avg"))
+        if cpu_value is not None:
+            bucket["cpu_total"] += cpu_value
+            bucket["cpu_samples"] += 1
+        else:
+            stats["rows_skipped_cpu"] += 1
         runtime_value = _runtime_seconds(row)
         if runtime_value is not None:
             bucket["runtime_total"] += float(runtime_value)
             bucket["runtime_samples"] += 1
+            stats["runtime_samples"] += 1
 
     payload = []
     for (activity_date, user_id, tool), values in buckets.items():
@@ -569,7 +586,7 @@ def aggregate_user_tool_daily_rows(
                 "runtime_samples": values["runtime_samples"],
             }
         )
-    return payload
+    return payload, stats
 
 
 class UserAnalyticsStore:
@@ -956,7 +973,19 @@ class UserAnalyticsStore:
 
     def refresh_current_day_summary(self):
         rows = self._current_day_completed_rows()
-        payload = self._aggregate_daily_rows(rows)
+        payload, stats = self._aggregate_daily_rows(rows)
+        logger.info(
+            "User tool daily aggregation refreshed for %s: scanned=%d counted=%d "
+            "missing_identity=%d skipped_memory=%d skipped_cpu=%d runtime_samples=%d rows=%d",
+            _now_utc().date().isoformat(),
+            stats["rows_seen"],
+            stats["rows_counted"],
+            stats["rows_missing_identity"],
+            stats["rows_skipped_memory"],
+            stats["rows_skipped_cpu"],
+            stats["runtime_samples"],
+            len(payload),
+        )
         self._replace_current_day_summary(payload)
 
     def _aggregate_daily_rows(self, rows):
@@ -974,7 +1003,7 @@ class UserAnalyticsStore:
             end_date=end_date,
             username=username,
         )
-        payload = self._aggregate_daily_rows(rows)
+        payload, _ = self._aggregate_daily_rows(rows)
         self._replace_user_tool_daily_stats(username, start_date, end_date, payload)
 
     def _submitted_jobs_today(self, username):

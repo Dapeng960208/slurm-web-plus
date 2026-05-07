@@ -29,8 +29,8 @@ def parse_args():
     parser = argparse.ArgumentParser(
         description=(
             "Delete all user_tool_daily_stats rows and rebuild daily tool stats "
-            "from job_snapshots. Run from the backend directory with: "
-            "python rebuild-user-tool.py"
+            "from job_snapshots. Run from the repository root with: "
+            "python scripts/rebuild-user-tool.py"
         )
     )
     parser.add_argument(
@@ -151,13 +151,14 @@ def completed_rows_for_date(conn, activity_date):
 
 
 def aggregate_daily_rows(rows, mapped_mapper, raw_mapper, rewrite_pattern, rewrite_tool):
-    return aggregate_user_tool_daily_rows(
+    payload, _ = aggregate_user_tool_daily_rows(
         rows,
         mapped_mapper,
         raw_mapper=raw_mapper,
         rewrite_pattern=rewrite_pattern,
         rewrite_tool=rewrite_tool,
     )
+    return payload
 
 
 def count_existing_rows(conn):
