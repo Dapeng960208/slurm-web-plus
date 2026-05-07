@@ -22,19 +22,19 @@
 - 用户分析前端已增加 Average Memory、Peak Memory、Median Memory 展示，工具级面板和图表同步改为使用新字段。
 - 全表重建后，跨多天 `tools/analysis` 仍只读 `user_tool_daily_stats`：`jobs_count` 表示提交时间落在当天、状态为 `COMPLETED` 且 `used_memory_gb` 非空的作业数，平均内存按日表 `jobs_count` 加权，峰值内存取窗口最大值，中位数内存按日中位数加权近似。
 - 日聚合内存样本只以 `used_memory_gb` 为准；`used_memory_gb` 为空的作业会被跳过，不再用 `usage_stats` 或 TRES fallback 代替该字段。
-- `rebuild-user-tool.py` 支持 `--date 20260504 --user lizenghui --dry-run` 定位单日单用户，并输出每条源作业的 `decision=counted/skipped` 诊断日志。
+- `rebuild-user-tool.py` 支持 `--date 20260504 --user lizenghui --dry-run` 定位单日单用户；默认只输出查询、日摘要、聚合行和总预览这几类核心日志。
 
-## 本轮：`rebuild-user-tool.py` 默认输出逐条重建明细日志
+## 本轮：`rebuild-user-tool.py` 默认只输出核心聚合日志
 
-本轮增强了 `slurmweb/scripts/rebuild-user-tool.py` 的可观测性，方便排查 `user_tool_daily_stats` 的历史重建结果：
+本轮收口了 `slurmweb/scripts/rebuild-user-tool.py` 的默认日志量，避免全量历史重建时控制台被逐作业明细刷满：
 
 - 脚本现在会按 `activity_date + user_id + tool` 逐条打印将写入 `user_tool_daily_stats` 的日聚合明细。
 - 脚本逐日重建时会在聚合前把每条源行的 `activity_date` 固定为当前重建日期，确保写库日期就是该 UTC 日期的年月日。
 - 每条日志会带 `date`、`user_id`、`username`、`tool`、`jobs_count`、内存指标、`avg_cpu_cores` 和 `avg_runtime_seconds`。
-- 每个 UTC 日期会先输出当天扫描到的 `source_jobs` 和当天将写入的聚合行数，再输出逐条行日志。
+- 每个 UTC 日期会先输出当天扫描到的 `source_jobs` 和当天将写入的聚合行数，再输出聚合行日志。
 - 每日摘要现在同时输出 `counted`、`skipped_memory`、`missing_identity`、`cpu_missing`、`runtime_missing`，其中 `skipped_memory` 表示 `used_memory_gb` 为空而未计入 `jobs_count` 的源作业数。
 - 在真正删除旧表数据并写入新数据前，脚本还会打印一次全表预览摘要，包含日期范围、扫描天数、源作业数、待删除旧行数和待写入新行数。
-- 详细日志默认总是输出，不依赖额外开关；因此全量历史重建时控制台日志会明显增加。
+- 默认不再打印每条源作业的 `user_tool_daily_stats job:` 诊断日志，只保留查询、日摘要、聚合行和总预览这几类核心日志。
 
 ## 本轮：用户工具日聚合改为按提交时间统计 `COMPLETED` 且内存非空作业
 

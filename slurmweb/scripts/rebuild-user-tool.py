@@ -346,43 +346,6 @@ def _job_decision(row):
     return "counted", "ok"
 
 
-def print_rebuild_job(row, mapped_mapper, raw_mapper, rewrite_pattern, rewrite_tool):
-    tool = mapped_mapper.classify(
-        job_name=row.get("job_name"),
-        command=row.get("command"),
-        submit_line=row.get("submit_line"),
-    )
-    raw_tool = raw_mapper.classify(
-        job_name=row.get("job_name"),
-        command=row.get("command"),
-        submit_line=row.get("submit_line"),
-    )
-    if rewrite_pattern.search(tool) or rewrite_pattern.search(raw_tool):
-        tool = rewrite_tool
-    decision, reason = _job_decision(row)
-    print(
-        "user_tool_daily_stats job: date={date} job_id={job_id} submit_time={submit_time} "
-        "state={state} user_id={user_id} username={username} tool={tool} "
-        "memory_source=used_memory_gb used_memory_gb={memory} "
-        "used_cpu_cores_avg={cpu} "
-        "runtime_seconds={runtime} decision={decision} "
-        "reason={reason}".format(
-            date=row.get("activity_date") or "-",
-            job_id=row.get("job_id") or "-",
-            submit_time=_format_time(row.get("submit_time")),
-            state=row.get("job_state") or "-",
-            user_id=row.get("user_id") if row.get("user_id") is not None else "-",
-            username=row.get("username") or "-",
-            tool=tool,
-            memory=_format_metric(row.get("used_memory_gb")),
-            cpu=_format_metric(row.get("used_cpu_cores_avg")),
-            runtime=_format_metric(_runtime_seconds(row)),
-            decision=decision,
-            reason=reason,
-        )
-    )
-
-
 def print_rebuild_row(item):
     print(
         "user_tool_daily_stats row: date={date} user_id={user_id} username={username} "
@@ -465,8 +428,6 @@ def rebuild(conn, args):
             user_id=requested_user_id,
         )
         print_rebuild_query(cursor, requested_user, requested_user_id, len(rows))
-        for row in rows:
-            print_rebuild_job(row, mapped_mapper, raw_mapper, rewrite_pattern, rewrite_tool)
         source_jobs += len(rows)
         day_payload, day_stats = aggregate_daily_rows(
             rows,

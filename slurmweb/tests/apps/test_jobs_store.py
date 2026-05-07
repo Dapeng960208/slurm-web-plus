@@ -16,6 +16,7 @@ from slurmweb.persistence.jobs_store import (
     _extract,
     _extract_detail,
     _max_memory_gb,
+    _prepare_db_row,
     _ts,
     normalize_history_exit_code,
 )
@@ -956,9 +957,23 @@ class TestJobsStorePersistenceUsageEnrichment(unittest.TestCase):
 
         slurmrestd.job.assert_called_once_with(996542)
         self.assertEqual(len(rows), 1)
-        self.assertEqual(rows[0]["used_memory_gb"], 2.3984947204589844)
-        self.assertEqual(rows[0]["used_cpu_cores_avg"], 0.8976744186046511)
+        self.assertEqual(rows[0]["used_memory_gb"], 2.4)
+        self.assertEqual(rows[0]["used_cpu_cores_avg"], 0.9)
         self.assertIsNone(rows[0]["usage_stats"])
+
+    def test_prepare_db_row_rounds_usage_metrics_to_two_decimals(self):
+        prepared = _prepare_db_row(
+            {
+                "used_memory_gb": 2.3984947204589844,
+                "used_cpu_cores_avg": 0.8976744186046511,
+                "tres_requested": None,
+                "tres_allocated": None,
+                "usage_stats": None,
+            }
+        )
+
+        self.assertEqual(prepared["used_memory_gb"], 2.4)
+        self.assertEqual(prepared["used_cpu_cores_avg"], 0.9)
 
     def test_prepare_rows_keeps_original_snapshot_when_detail_lookup_fails(self):
         slurmrestd = mock.Mock()

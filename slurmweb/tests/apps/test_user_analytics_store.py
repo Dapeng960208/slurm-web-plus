@@ -1290,13 +1290,7 @@ class TestRebuildUserToolScript(unittest.TestCase):
             "source_jobs=1",
             printed,
         )
-        self.assertIn(
-            "user_tool_daily_stats job: date=2026-04-24 job_id=101 submit_time=2026-04-24T08:00:00+00:00 "
-            "state=COMPLETED user_id=1 username=alice tool=blast memory_source=used_memory_gb "
-            "used_memory_gb=4.0 used_cpu_cores_avg=2.0 runtime_seconds=3600.0 "
-            "decision=counted reason=ok",
-            printed,
-        )
+        self.assertNotIn("user_tool_daily_stats job:", printed)
 
     def test_rebuild_skips_rows_without_used_memory_gb_even_with_fallback_memory(self):
         script = self._load_script()
@@ -1354,7 +1348,7 @@ class TestRebuildUserToolScript(unittest.TestCase):
             printed,
         )
         self.assertNotIn("user_tool_daily_stats row:", printed)
-        self.assertIn("decision=skipped reason=missing_used_memory_gb", printed)
+        self.assertNotIn("user_tool_daily_stats job:", printed)
 
     def test_rebuild_write_mode_prints_multiple_row_logs_and_commits(self):
         script = self._load_script()
@@ -1493,13 +1487,7 @@ class TestRebuildUserToolScript(unittest.TestCase):
             "source_jobs=1",
             printed,
         )
-        self.assertIn(
-            "user_tool_daily_stats job: date=2026-05-04 job_id=2001 submit_time=2026-05-04T12:00:00+00:00 "
-            "state=COMPLETED user_id=21 username=lizenghui tool=regr memory_source=used_memory_gb "
-            "used_memory_gb=null used_cpu_cores_avg=0.98 runtime_seconds=600.0 "
-            "decision=skipped reason=missing_used_memory_gb",
-            printed,
-        )
+        self.assertNotIn("user_tool_daily_stats job:", printed)
 
     def test_rebuild_scoped_user_with_no_jobs_does_not_delete_all_rows(self):
         script = self._load_script()

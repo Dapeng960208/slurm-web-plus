@@ -59,6 +59,7 @@
 - `job_snapshots` 资源字段补齐链路已前移：
   - `COMPLETED` 作业持久化入库前，如果 `used_memory_gb` 或 `used_cpu_cores_avg` 缺失，会同步调用 Slurm REST detail 计算资源字段
   - 持久化补齐只写入 `used_memory_gb` 与 `used_cpu_cores_avg`，不补写 `usage_stats`
+  - 两个资源字段在最终写入 `job_snapshots` 前统一四舍五入保留两位小数
   - detail 查询失败、404、`submit_time` 不匹配或 detail 仍缺资源字段时，不阻断原始快照入库
 - 新增历史补数脚本 `slurmweb/scripts/backfill-job-snapshot-usage.py`：
   - 默认扫描 `job_state = COMPLETED` 且 `used_memory_gb IS NULL OR used_cpu_cores_avg IS NULL` 的 `job_snapshots`
@@ -66,14 +67,14 @@
   - 每条记录输出 `job_snapshot_usage row:` 单行日志，记录旧值、新值、更新或跳过原因
   - 脚本只更新 `job_snapshots.used_memory_gb` 与 `used_cpu_cores_avg`，不更新 `usage_stats`
 - `user_tool_daily_stats` 日聚合和 `rebuild-user-tool.py` 保持只读 `job_snapshots` 当前资源字段，不再在统计链路临时调用 Slurm REST enrich
-- `slurmweb/scripts/rebuild-user-tool.py` 现在默认输出逐条重建明细日志：
+- `slurmweb/scripts/rebuild-user-tool.py` 现在默认只输出核心聚合日志：
   - 每个 UTC 日期会先打印 `source_jobs` 与当天聚合行数
   - 可通过 `--date 20260504` 或 `--date 2026-05-04` 只重建单日，通过 `--user <username>` 或 `--user-id <id>` 定位用户；指定日期或用户时只删除目标范围旧行
   - 每日重建会在聚合前把源行 `activity_date` 固定为当前重建日期，确保写入日表的 `activity_date` 是当天年月日
-  - 每条源作业会打印 `user_tool_daily_stats job:` 诊断日志，包含 `job_id`、`submit_time`、`state`、用户、工具、内存、CPU、runtime、`decision` 与跳过原因
   - 每日摘要会打印 `counted`、`skipped_memory`、`missing_identity`、`cpu_missing`、`runtime_missing`；其中 `skipped_memory` 表示 `used_memory_gb` 为空而未进入 `jobs_count` 的源作业数
   - 每条将写入 `user_tool_daily_stats` 的日聚合行会打印 `date/user_id/username/tool/jobs_count` 以及内存、CPU、runtime 关键指标
   - 全表写入前会再打印一次总预览摘要，包含日期范围、扫描天数、源作业数、将删除旧行数和将写入新行数
+  - 默认不再打印每条源作业的 `user_tool_daily_stats job:` 诊断日志，避免全量重建时控制台噪音过大
 - 本轮数据库执行顺序应固定为：
   - `alembic upgrade head`
   - `python slurmweb/scripts/backfill-job-snapshot-usage.py --dry-run`

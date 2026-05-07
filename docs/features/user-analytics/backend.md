@@ -28,7 +28,7 @@
 
 `job_snapshots` 是 `user_tool_daily_stats` 的唯一资源事实来源。日聚合和 `rebuild-user-tool.py` 插入日表时只读取 `job_snapshots.used_memory_gb` 与 `job_snapshots.used_cpu_cores_avg`，不会在统计链路临时调用 Slurm REST detail 补齐资源字段。若历史快照中资源字段为空，需要先运行 `slurmweb/scripts/backfill-job-snapshot-usage.py` 补齐 `job_snapshots`，再执行 `rebuild-user-tool.py` 重建日表。
 
-作业快照持久化阶段会对 `COMPLETED` 且 `used_memory_gb` 或 `used_cpu_cores_avg` 缺失的作业同步查询 Slurm REST detail，并只把计算出的 `used_memory_gb`、`used_cpu_cores_avg` 写入待持久化行；不会在该阶段补写 `usage_stats`。detail 查询失败、404、`submit_time` 不匹配或 detail 仍缺少资源字段时，原始快照继续入库，并记录日志用于后续补数排查。
+作业快照持久化阶段会对 `COMPLETED` 且 `used_memory_gb` 或 `used_cpu_cores_avg` 缺失的作业同步查询 Slurm REST detail，并只把计算出的 `used_memory_gb`、`used_cpu_cores_avg` 写入待持久化行；不会在该阶段补写 `usage_stats`。detail 查询失败、404、`submit_time` 不匹配或 detail 仍缺少资源字段时，原始快照继续入库，并记录日志用于后续补数排查。`job_snapshots` 持久化写库前，这两个资源字段会统一四舍五入保留两位小数。
 
 `user_tool_daily_stats` 按 `(activity_date, user_id, tool)` 保存每日工具统计：
 
@@ -99,7 +99,7 @@
 
 脚本默认删除目标日期范围内的旧 `user_tool_daily_stats`，再按当前口径从 `job_snapshots` 重建；`--dry-run` 只输出将处理的作业数、将删除的旧行数和将写入的新行数，不写数据库。
 
-全表重建脚本 `slurmweb/scripts/rebuild-user-tool.py` 现在默认输出逐条重建明细日志。脚本逐日调用 `JobsStore.completed_job_rows_for_activity_date(<date>)` 读取提交时间落在该 UTC 日期内的 `COMPLETED` 作业，并在聚合前把源行 `activity_date` 固定为正在重建的年月日，避免源行携带的旧日期或测试 mock 影响最终写库日期。脚本支持 `--date 20260504` 或 `--date 2026-05-04` 只重建单日，支持 `--user <username>` 按用户名查询，支持 `--user-id <id>` 在查询后按用户 ID 过滤；指定日期或用户时只删除对应目标范围内的旧 `user_tool_daily_stats` 行，不删除全表。日表输入链路已去掉 `tres_req_str`、`tres_per_job`、`tres_per_node`、`tres_requested`、`tres_allocated` 这组冗余字段，只保留 `activity_date`、`job_id`、`job_state`、`submit_time`、`user_id`、`username`、`job_name`、`command`、`used_memory_gb`、`used_cpu_cores_avg`、`start_time`、`end_time`、`last_seen`、`usage_stats`。每日摘要会输出 `memory_source=used_memory_gb`、`source_jobs`、`counted`、`skipped_memory`、`missing_identity`、`cpu_missing`、`runtime_missing` 与写入行数；其中 `skipped_memory` 表示 `used_memory_gb` 为空而未进入 `jobs_count` 的源作业数。每个源作业会先打印 `user_tool_daily_stats job:` 单行诊断日志，包含 `job_id`、`submit_time`、`state`、用户、工具、`used_memory_gb`、CPU、运行时、`decision=counted/skipped` 与跳过原因。每个 `activity_date + user_id + tool` 日聚合行在写库前都会打印单行日志，至少包含：
+全表重建脚本 `slurmweb/scripts/rebuild-user-tool.py` 现在默认只输出核心聚合日志，不再打印每条源作业的逐条诊断日志。脚本逐日调用 `JobsStore.completed_job_rows_for_activity_date(<date>)` 读取提交时间落在该 UTC 日期内的 `COMPLETED` 作业，并在聚合前把源行 `activity_date` 固定为正在重建的年月日，避免源行携带的旧日期或测试 mock 影响最终写库日期。脚本支持 `--date 20260504` 或 `--date 2026-05-04` 只重建单日，支持 `--user <username>` 按用户名查询，支持 `--user-id <id>` 在查询后按用户 ID 过滤；指定日期或用户时只删除对应目标范围内的旧 `user_tool_daily_stats` 行，不删除全表。日表输入链路已去掉 `tres_req_str`、`tres_per_job`、`tres_per_node`、`tres_requested`、`tres_allocated` 这组冗余字段，只保留 `activity_date`、`job_id`、`job_state`、`submit_time`、`user_id`、`username`、`job_name`、`command`、`used_memory_gb`、`used_cpu_cores_avg`、`start_time`、`end_time`、`last_seen`、`usage_stats`。每日摘要会输出 `memory_source=used_memory_gb`、`source_jobs`、`counted`、`skipped_memory`、`missing_identity`、`cpu_missing`、`runtime_missing` 与写入行数；其中 `skipped_memory` 表示 `used_memory_gb` 为空而未进入 `jobs_count` 的源作业数。每个 `activity_date + user_id + tool` 日聚合行在写库前都会打印单行日志，至少包含：
 
 - `activity_date`
 - `user_id`
@@ -112,7 +112,7 @@
 - `avg_cpu_cores`
 - `avg_runtime_seconds`
 
-脚本同时会按日打印 `source_jobs` 与将写入的聚合行数，并在全表写入前打印总预览摘要。由于默认总是输出逐条明细，全量历史重建时日志量会显著增加，主要用于核对关键时间、用户、工具和资源统计是否符合预期。
+脚本同时会按日打印 `source_jobs` 与将写入的聚合行数，并在全表写入前打印总预览摘要。当前默认只保留查询、日摘要、聚合行和总预览这几类核心日志，避免全量历史重建时输出逐作业日志导致控制台噪音过大。
 
 `metrics/history` 当前返回：
 

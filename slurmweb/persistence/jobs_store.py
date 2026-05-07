@@ -17,6 +17,7 @@ import re
 import threading
 import time
 from datetime import datetime, timedelta, timezone
+from decimal import Decimal, ROUND_HALF_UP
 from typing import Optional
 
 import sqlalchemy as sa
@@ -657,6 +658,13 @@ def _extract_detail(job: dict, fallback: Optional[dict] = None) -> dict:
     return row
 
 
+def _round_metric(value, digits=2):
+    if value is None:
+        return None
+    quantizer = Decimal("1").scaleb(-digits)
+    return float(Decimal(str(value)).quantize(quantizer, rounding=ROUND_HALF_UP))
+
+
 def _dedup(rows: list) -> list:
     """Keep only the last occurrence of each (job_id, submit_time) in a batch."""
     seen = {}
@@ -682,6 +690,10 @@ def _prepare_db_row(row: dict) -> dict:
     from psycopg2.extras import Json
 
     data = dict(row)
+    for key in ("used_memory_gb", "used_cpu_cores_avg"):
+        value = data.get(key)
+        if value is not None:
+            data[key] = _round_metric(value)
     for key in ("tres_requested", "tres_allocated", "usage_stats"):
         if data.get(key) is not None:
             data[key] = Json(data[key])
@@ -1093,6 +1105,8 @@ class JobsStore:
                 "Completed job %s detail did not include missing usage fields",
                 row.get("job_id"),
             )
+        for field in ("used_memory_gb", "used_cpu_cores_avg"):
+            row[field] = _round_metric(row.get(field))
         return row
 
     def _queue_rows(self, rows: list):
