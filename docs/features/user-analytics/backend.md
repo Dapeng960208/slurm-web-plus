@@ -90,7 +90,7 @@
 
 脚本默认删除目标日期范围内的旧 `user_tool_daily_stats`，再按当前口径从 `job_snapshots` 重建；`--dry-run` 只输出将处理的作业数、将删除的旧行数和将写入的新行数，不写数据库。
 
-全表重建脚本 `slurmweb/scripts/rebuild-user-tool.py` 现在默认输出逐条重建明细日志。脚本逐日调用 `JobsStore.completed_job_rows_for_activity_date(<date>)` 读取提交时间落在该 UTC 日期内的 `COMPLETED` 作业，并在聚合前把源行 `activity_date` 固定为正在重建的年月日，避免源行携带的旧日期或测试 mock 影响最终写库日期。每日摘要会输出 `source_jobs`、`counted`、`skipped_memory`、`missing_identity`、`cpu_missing`、`runtime_missing` 与写入行数，用于判断源作业为何未进入 `jobs_count`。每个 `activity_date + user_id + tool` 日聚合行在写库前都会打印单行日志，至少包含：
+全表重建脚本 `slurmweb/scripts/rebuild-user-tool.py` 现在默认输出逐条重建明细日志。脚本逐日调用 `JobsStore.completed_job_rows_for_activity_date(<date>)` 读取提交时间落在该 UTC 日期内的 `COMPLETED` 作业，并在聚合前把源行 `activity_date` 固定为正在重建的年月日，避免源行携带的旧日期或测试 mock 影响最终写库日期。每日摘要会输出 `memory_source=used_memory_gb`、`source_jobs`、`counted`、`skipped_memory`、`missing_identity`、`cpu_missing`、`runtime_missing` 与写入行数；其中 `skipped_memory` 表示 `used_memory_gb` 为空而未进入 `jobs_count` 的源作业数。每个 `activity_date + user_id + tool` 日聚合行在写库前都会打印单行日志，至少包含：
 
 - `activity_date`
 - `user_id`

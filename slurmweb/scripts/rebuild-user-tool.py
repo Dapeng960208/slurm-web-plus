@@ -171,7 +171,8 @@ def _format_metric(value):
 def print_rebuild_day_summary(activity_date, source_rows, rows_to_insert, stats=None):
     stats = stats or {}
     print(
-        "user_tool_daily_stats day: date={date} source_jobs={source_jobs} counted={counted} "
+        "user_tool_daily_stats day: date={date} memory_source=used_memory_gb "
+        "source_jobs={source_jobs} counted={counted} "
         "skipped_memory={skipped_memory} missing_identity={missing_identity} "
         "cpu_missing={cpu_missing} runtime_missing={runtime_missing} rows={rows}".format(
             date=activity_date,

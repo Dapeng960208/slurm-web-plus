@@ -20,7 +20,7 @@
 - 脚本逐日重建时会在聚合前把每条源行的 `activity_date` 固定为当前重建日期，确保写库日期就是该 UTC 日期的年月日。
 - 每条日志会带 `date`、`user_id`、`username`、`tool`、`jobs_count`、内存指标、`avg_cpu_cores` 和 `avg_runtime_seconds`。
 - 每个 UTC 日期会先输出当天扫描到的 `source_jobs` 和当天将写入的聚合行数，再输出逐条行日志。
-- 每日摘要现在同时输出 `counted`、`skipped_memory`、`missing_identity`、`cpu_missing`、`runtime_missing`，用于直接定位源作业未计入的原因。
+- 每日摘要现在同时输出 `counted`、`skipped_memory`、`missing_identity`、`cpu_missing`、`runtime_missing`，其中 `skipped_memory` 表示 `used_memory_gb` 为空而未计入 `jobs_count` 的源作业数。
 - 在真正删除旧表数据并写入新数据前，脚本还会打印一次全表预览摘要，包含日期范围、扫描天数、源作业数、待删除旧行数和待写入新行数。
 - 详细日志默认总是输出，不依赖额外开关；因此全量历史重建时控制台日志会明显增加。
 

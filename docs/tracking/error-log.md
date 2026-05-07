@@ -17,6 +17,18 @@
 
 ## 条目
 
+### 2026-05-07：按 `used_memory_gb` 单字段口径同步 rebuild 时旧测试仍断言 fallback
+
+- 场景：按要求把 `rebuild-user-tool.py` 同步到“`used_memory_gb` 只可能大于 0 或为空，日表只跳过空值”的口径，并运行用户分析单测。
+- 现象：`.venv\Scripts\python.exe -m pytest -q slurmweb/tests/apps/test_user_analytics_store.py` 初次失败，旧断言仍要求 `_aggregate_rows()` 和日表聚合使用 `usage_stats` / TRES fallback，且旧测试仍把 `0`、负数和字符串当作日表输入。
+- 复现：在 `aggregate_user_tool_daily_rows()` 只读取 `row["used_memory_gb"]` 后运行上述 pytest，可看到 fallback 相关用例和 CPU missing 计数断言失败。
+- 根因：测试夹具没有同步新的字段域假设：`used_memory_gb` 在日表重建输入中只会是正数或 `None`；`usage_stats` / TRES 不能再作为 `jobs_count` 的替代来源。
+- 解决：
+  - 更新用户分析聚合测试，明确 `used_memory_gb is None` 时跳过，即使 `usage_stats` / TRES 有内存也不写入 `user_tool_daily_stats`。
+  - 更新 `rebuild-user-tool.py` 脚本测试，覆盖 dry-run 下 fallback 内存存在但 `used_memory_gb` 为空时只输出 `skipped_memory=1`，不输出日表行。
+  - 修正 CPU missing 断言，保持 `avg_cpu_cores` 仍以 `jobs_count` 为分母，缺失或非法 CPU 按 `0` 计入。
+- 预防：后续调整日表输入字段域时，必须同时更新聚合测试夹具，不要用超出真实字段域的 `0`、负数或 fallback 字段推导 `jobs_count`。
+
 ### 2026-05-06：创建 account 时向 SlurmDB 发送裸对象会触发 `Missing required field 'accounts'`
 
 - 场景：从管理页面或 AI 调用 `accounts/update` 创建 Slurm 账户。

@@ -427,7 +427,7 @@ def _aggregate_rows(rows, mapper=None):
             command=row.get("command"),
             submit_line=row.get("submit_line"),
         )
-        memory_value = _positive_numeric_value(_memory_gb(row))
+        memory_value = row.get("used_memory_gb")
         if memory_value is None:
             continue
         bucket = tools[tool]
@@ -435,7 +435,7 @@ def _aggregate_rows(rows, mapper=None):
         bucket["memory_total"] += memory_value
         bucket["memory_weight"] += 1
         bucket["memory_values"].append(memory_value)
-        cpu_value = _positive_numeric_value(_cpu_cores_avg(row))
+        cpu_value = row.get('used_cpu_cores_avg')
         if cpu_value is not None:
             bucket["cpu_total"] += cpu_value
             bucket["cpu_weight"] += 1
@@ -564,9 +564,7 @@ def aggregate_user_tool_daily_rows(
         bucket = buckets[key]
         if bucket["username"] is None:
             bucket["username"] = row.get("username")
-        memory_value = _numeric_value(row.get("used_memory_gb"))
-        if memory_value is not None and (not math.isfinite(memory_value) or memory_value <= 0):
-            memory_value = None
+        memory_value = row.get("used_memory_gb")
         if memory_value is None:
             stats["rows_skipped_memory"] += 1
             continue
