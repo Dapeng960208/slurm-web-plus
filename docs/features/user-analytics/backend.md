@@ -73,10 +73,10 @@
 - `tools/analysis` 会按 `start` / `end` 覆盖到的 UTC 日期读取日聚合表；该接口的工具统计粒度为日，且请求时不实时重建日聚合表。
 - 日聚合写入会过滤没有 `user_id` 或没有 `submit_time` 的作业；目标日期按 `submit_time` 的 UTC 日期计算。
 - 当天日聚合按 `activity_date + user_id + tool` 分组，只统计提交时间落在当天范围内且状态为 `COMPLETED` 的作业；写入的 `activity_date` 固定为本轮统计日期的年月日。
-- 当天 `jobs_count` 只统计该组中 `used_memory_gb > 0` 的作业；`avg_memory_gb`、`max_memory_gb`、`median_memory_gb` 基于同一批正内存样本计算；`avg_cpu_cores` 以 `jobs_count` 为分母，缺失或非法 `used_cpu_cores_avg` 按 `0` 计入。
+- 当天 `jobs_count` 只统计该组中 `used_memory_gb` 非空的作业；当前字段域假设是 `used_memory_gb` 只会大于 `0` 或为空；`avg_memory_gb`、`max_memory_gb`、`median_memory_gb` 基于同一批内存样本计算；`avg_cpu_cores` 以 `jobs_count` 为分母，缺失或非法 `used_cpu_cores_avg` 按 `0` 计入。
 - 写入 `user_tool_daily_stats` 前，`avg_memory_gb`、`max_memory_gb`、`median_memory_gb`、`avg_cpu_cores`、`avg_runtime_seconds` 会统一四舍五入到两位小数再入库。
 - 跨多天查询按日表行合并：`avg_memory_gb = sum(day.avg_memory_gb * day.jobs_count) / sum(day.jobs_count)`；`avg_cpu_cores` 使用同一 `jobs_count` 加权口径；`max_memory_gb` 取时间窗内各日 `max_memory_gb` 的最大值；`median_memory_gb` 按 `sum(day.median_memory_gb * day.jobs_count) / sum(day.jobs_count)` 近似。
-- 当整个时间窗内没有任何 `used_memory_gb > 0` 的 `COMPLETED` 作业时，跨天返回该资源均值为 `null`，`completed_jobs` 为 `0`，工具列表为空。
+- 当整个时间窗内没有任何 `used_memory_gb` 非空的 `COMPLETED` 作业时，跨天返回该资源均值为 `null`，`completed_jobs` 为 `0`，工具列表为空。
 - 运行时间优先按 `end_time - start_time` 计算，并返回 `avg_runtime_hours`；兼容保留 `avg_runtime_seconds`。日表写入时 `avg_runtime_seconds` 也以 `jobs_count` 为分母，缺失运行时间按 `0` 计入。
 - 状态判断按 `UPPER(job_state) = 'COMPLETED'` 匹配，避免 `completed` / `COMPLETED` 大小写差异导致统计为空。
 - 后台聚合线程每轮刷新会输出汇总日志，记录扫描作业数、纳入统计作业数、缺身份跳过数、缺内存跳过数、缺 CPU 样本数、运行时样本数和写入日行数，便于排查 `tools/analysis` 返回空或 CPU 均值缺失。
@@ -86,11 +86,12 @@
 ```powershell
 .venv\Scripts\python.exe slurmweb\scripts\repair-user-tool-daily-stats.py --start 2026-05-01 --end 2026-05-06 --dry-run
 .venv\Scripts\python.exe slurmweb\scripts\repair-user-tool-daily-stats.py --start 2026-05-01 --end 2026-05-06 --user alice
+.venv\Scripts\python.exe slurmweb\scripts\rebuild-user-tool.py --date 20260504 --user lizenghui --dry-run
 ```
 
 脚本默认删除目标日期范围内的旧 `user_tool_daily_stats`，再按当前口径从 `job_snapshots` 重建；`--dry-run` 只输出将处理的作业数、将删除的旧行数和将写入的新行数，不写数据库。
 
-全表重建脚本 `slurmweb/scripts/rebuild-user-tool.py` 现在默认输出逐条重建明细日志。脚本逐日调用 `JobsStore.completed_job_rows_for_activity_date(<date>)` 读取提交时间落在该 UTC 日期内的 `COMPLETED` 作业，并在聚合前把源行 `activity_date` 固定为正在重建的年月日，避免源行携带的旧日期或测试 mock 影响最终写库日期。每日摘要会输出 `memory_source=used_memory_gb`、`source_jobs`、`counted`、`skipped_memory`、`missing_identity`、`cpu_missing`、`runtime_missing` 与写入行数；其中 `skipped_memory` 表示 `used_memory_gb` 为空而未进入 `jobs_count` 的源作业数。每个 `activity_date + user_id + tool` 日聚合行在写库前都会打印单行日志，至少包含：
+全表重建脚本 `slurmweb/scripts/rebuild-user-tool.py` 现在默认输出逐条重建明细日志。脚本逐日调用 `JobsStore.completed_job_rows_for_activity_date(<date>)` 读取提交时间落在该 UTC 日期内的 `COMPLETED` 作业，并在聚合前把源行 `activity_date` 固定为正在重建的年月日，避免源行携带的旧日期或测试 mock 影响最终写库日期。脚本支持 `--date 20260504` 或 `--date 2026-05-04` 只重建单日，支持 `--user <username>` 按用户名查询，支持 `--user-id <id>` 在查询后按用户 ID 过滤；指定日期或用户时只删除对应目标范围内的旧 `user_tool_daily_stats` 行，不删除全表。日表输入链路已去掉 `tres_req_str`、`tres_per_job`、`tres_per_node`、`tres_requested`、`tres_allocated` 这组冗余字段，只保留 `activity_date`、`job_id`、`job_state`、`submit_time`、`user_id`、`username`、`job_name`、`command`、`used_memory_gb`、`used_cpu_cores_avg`、`start_time`、`end_time`、`last_seen`、`usage_stats`。每日摘要会输出 `memory_source=used_memory_gb`、`source_jobs`、`counted`、`skipped_memory`、`missing_identity`、`cpu_missing`、`runtime_missing` 与写入行数；其中 `skipped_memory` 表示 `used_memory_gb` 为空而未进入 `jobs_count` 的源作业数。每个源作业会先打印 `user_tool_daily_stats job:` 单行诊断日志，包含 `job_id`、`submit_time`、`state`、用户、工具、`used_memory_gb`、CPU、运行时、`decision=counted/skipped` 与跳过原因。每个 `activity_date + user_id + tool` 日聚合行在写库前都会打印单行日志，至少包含：
 
 - `activity_date`
 - `user_id`

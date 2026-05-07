@@ -172,55 +172,6 @@ class TestUserMetricsAggregation(unittest.TestCase):
         self.assertIsNone(result["totals"]["avg_max_memory_gb"])
         self.assertEqual(result["tool_breakdown"], [])
 
-    def test_aggregate_rows_falls_back_to_tres_memory_when_usage_is_missing(self):
-        result = _aggregate_rows(
-            [
-                {
-                    "job_name": "blast",
-                    "command": "blastp",
-                    "submit_line": None,
-                    "tres_req_str": "cpu=16,mem=4096,node=1",
-                    "tres_per_job": None,
-                    "tres_per_node": None,
-                    "tres_requested": [{"type": "mem", "count": 8192}],
-                    "tres_allocated": [{"type": "mem", "count": 16384}],
-                    "used_memory_gb": None,
-                    "used_cpu_cores_avg": None,
-                    "start_time": datetime(2026, 4, 24, 1, 0, tzinfo=timezone.utc),
-                    "end_time": datetime(2026, 4, 24, 3, 0, tzinfo=timezone.utc),
-                    "usage_stats": {"memory": {"value_gb": None}},
-                }
-            ]
-        )
-
-        self.assertEqual(result["totals"]["completed_jobs"], 0)
-        self.assertIsNone(result["totals"]["avg_max_memory_gb"])
-        self.assertEqual(result["tool_breakdown"], [])
-
-    def test_aggregate_rows_falls_back_to_tres_string_memory(self):
-        result = _aggregate_rows(
-            [
-                {
-                    "job_name": "blast",
-                    "command": "blastp",
-                    "submit_line": None,
-                    "tres_req_str": "cpu=16,mem=4096,node=1",
-                    "tres_per_job": None,
-                    "tres_per_node": None,
-                    "tres_requested": None,
-                    "tres_allocated": None,
-                    "used_memory_gb": None,
-                    "used_cpu_cores_avg": None,
-                    "start_time": datetime(2026, 4, 24, 1, 0, tzinfo=timezone.utc),
-                    "end_time": datetime(2026, 4, 24, 3, 0, tzinfo=timezone.utc),
-                    "usage_stats": None,
-                }
-            ]
-        )
-
-        self.assertEqual(result["totals"]["completed_jobs"], 0)
-        self.assertIsNone(result["totals"]["avg_max_memory_gb"])
-
     def test_daily_aggregation_collapses_regr_tools_like_rebuild_script(self):
         rows = [
             {
@@ -374,7 +325,6 @@ class TestUserMetricsAggregation(unittest.TestCase):
                 "user_id": 1,
                 "job_name": "blast",
                 "command": "blastp",
-                "tres_allocated": [{"type": "mem", "count": 8192}],
                 "used_memory_gb": None,
                 "used_cpu_cores_avg": None,
                 "start_time": datetime(2026, 4, 24, 10, 0, tzinfo=timezone.utc),
@@ -386,7 +336,6 @@ class TestUserMetricsAggregation(unittest.TestCase):
                 "user_id": 1,
                 "job_name": "blast",
                 "command": "blastp",
-                "tres_req_str": "cpu=4,mem=12288",
                 "used_memory_gb": None,
                 "used_cpu_cores_avg": 1.0,
                 "start_time": datetime(2026, 4, 24, 12, 0, tzinfo=timezone.utc),
@@ -884,11 +833,6 @@ class TestUserMetricsQueries(unittest.TestCase):
                     "user_id": 1,
                     "job_name": "blast",
                     "command": "blastp",
-                    "tres_req_str": "cpu=16,mem=4096,node=1",
-                    "tres_per_job": None,
-                    "tres_per_node": None,
-                    "tres_requested": [{"type": "mem", "count": 8192}],
-                    "tres_allocated": [{"type": "mem", "count": 16384}],
                     "used_memory_gb": None,
                     "used_cpu_cores_avg": None,
                     "start_time": datetime(2026, 4, 24, 8, 0, tzinfo=timezone.utc),
@@ -1271,9 +1215,15 @@ class TestRebuildUserToolScript(unittest.TestCase):
             rewrite_pattern=r"^regr([_-].*)?$",
             rewrite_tool="regr",
             dry_run=True,
+            date=None,
+            user=None,
+            user_id=None,
         )
         row = {
             "activity_date": date(2026, 4, 23),
+            "job_id": 101,
+            "job_state": "COMPLETED",
+            "submit_time": datetime(2026, 4, 24, 8, 0, tzinfo=timezone.utc),
             "user_id": 1,
             "username": "alice",
             "job_name": "blast",
@@ -1311,7 +1261,7 @@ class TestRebuildUserToolScript(unittest.TestCase):
                 "rows_inserted": 1,
             },
         )
-        completed_rows.assert_called_once_with(date(2026, 4, 24))
+        completed_rows.assert_called_once_with(date(2026, 4, 24), username=None)
         replace_all_rows.assert_not_called()
         conn.commit.assert_not_called()
         printed = "\n".join(str(call.args[0]) for call in mock_print.call_args_list)
@@ -1334,6 +1284,18 @@ class TestRebuildUserToolScript(unittest.TestCase):
         self.assertIn("median_memory_gb=4.0", printed)
         self.assertIn("avg_cpu_cores=2.0", printed)
         self.assertIn("avg_runtime_seconds=3600.0", printed)
+        self.assertIn(
+            "user_tool_daily_stats query: date=2026-04-24 user=- user_id=- "
+            "submit_start=2026-04-24T00:00:00+00:00 submit_end=2026-04-25T00:00:00+00:00 "
+            "source_jobs=1",
+            printed,
+        )
+        self.assertIn(
+            "user_tool_daily_stats job: date=2026-04-24 job_id=101 submit_time=2026-04-24T08:00:00+00:00 "
+            "state=COMPLETED user_id=1 username=alice tool=blast memory_source=used_memory_gb "
+            "used_memory_gb=4.0 used_cpu_cores_avg=2.0 runtime_seconds=3600.0 decision=counted reason=ok",
+            printed,
+        )
 
     def test_rebuild_skips_rows_without_used_memory_gb_even_with_fallback_memory(self):
         script = self._load_script()
@@ -1343,10 +1305,16 @@ class TestRebuildUserToolScript(unittest.TestCase):
             rewrite_pattern=r"^regr([_-].*)?$",
             rewrite_tool="regr",
             dry_run=True,
+            date=None,
+            user=None,
+            user_id=None,
         )
         rows = [
             {
                 "activity_date": date(2026, 4, 24),
+                "job_id": 102,
+                "job_state": "COMPLETED",
+                "submit_time": datetime(2026, 4, 24, 8, 0, tzinfo=timezone.utc),
                 "user_id": 1,
                 "username": "alice",
                 "job_name": "blast",
@@ -1356,7 +1324,6 @@ class TestRebuildUserToolScript(unittest.TestCase):
                 "start_time": datetime(2026, 4, 24, 8, 0, tzinfo=timezone.utc),
                 "end_time": datetime(2026, 4, 24, 9, 0, tzinfo=timezone.utc),
                 "usage_stats": {"memory": {"value_gb": 16.0}},
-                "tres_allocated": [{"type": "mem", "count": 16384}],
             }
         ]
 
@@ -1386,6 +1353,7 @@ class TestRebuildUserToolScript(unittest.TestCase):
             printed,
         )
         self.assertNotIn("user_tool_daily_stats row:", printed)
+        self.assertIn("decision=skipped reason=missing_used_memory_gb", printed)
 
     def test_rebuild_write_mode_prints_multiple_row_logs_and_commits(self):
         script = self._load_script()
@@ -1395,6 +1363,9 @@ class TestRebuildUserToolScript(unittest.TestCase):
             rewrite_pattern=r"^regr([_-].*)?$",
             rewrite_tool="regr",
             dry_run=False,
+            date=None,
+            user=None,
+            user_id=None,
         )
         rows = [
             {
@@ -1452,3 +1423,113 @@ class TestRebuildUserToolScript(unittest.TestCase):
         self.assertIn("tool=bwa", printed)
         self.assertIn("avg_runtime_seconds=3600.0", printed)
         self.assertIn("avg_runtime_seconds=7200.0", printed)
+
+    def test_rebuild_date_and_user_filters_query_single_day(self):
+        script = self._load_script()
+        conn = mock.Mock()
+        args = SimpleNamespace(
+            mapping_file=None,
+            rewrite_pattern=r"^regr([_-].*)?$",
+            rewrite_tool="regr",
+            dry_run=True,
+            date="20260504",
+            user="lizenghui",
+            user_id=None,
+        )
+        rows = [
+            {
+                "activity_date": date(2026, 5, 4),
+                "job_id": 2001,
+                "job_state": "COMPLETED",
+                "submit_time": datetime(2026, 5, 4, 12, 0, tzinfo=timezone.utc),
+                "user_id": 21,
+                "username": "lizenghui",
+                "job_name": "regr-test",
+                "command": "run-regr",
+                "used_memory_gb": None,
+                "used_cpu_cores_avg": 0.98,
+                "start_time": datetime(2026, 5, 4, 12, 0, tzinfo=timezone.utc),
+                "end_time": datetime(2026, 5, 4, 12, 10, tzinfo=timezone.utc),
+                "usage_stats": None,
+            }
+        ]
+
+        with mock.patch.object(
+            script, "load_settings", return_value=SimpleNamespace(tool_mapping_file=None)
+        ), mock.patch(
+            "slurmweb.persistence.jobs_store.JobsStore.completed_date_bounds"
+        ) as completed_date_bounds, mock.patch(
+            "slurmweb.persistence.jobs_store.JobsStore.completed_job_rows_for_activity_date",
+            return_value=rows,
+        ) as completed_rows, mock.patch.object(
+            script, "count_existing_rows"
+        ) as count_existing_rows, mock.patch.object(
+            script, "count_target_rows", return_value=10
+        ) as count_target_rows, mock.patch.object(
+            script, "replace_all_rows"
+        ) as replace_all_rows, mock.patch("builtins.print") as mock_print:
+            result = script.rebuild(conn, args)
+
+        completed_date_bounds.assert_not_called()
+        completed_rows.assert_called_once_with(date(2026, 5, 4), username="lizenghui")
+        count_existing_rows.assert_not_called()
+        count_target_rows.assert_called_once_with(
+            conn,
+            date(2026, 5, 4),
+            date(2026, 5, 4),
+            username="lizenghui",
+            user_id=None,
+        )
+        replace_all_rows.assert_not_called()
+        self.assertEqual(result["start_date"], date(2026, 5, 4))
+        self.assertEqual(result["end_date"], date(2026, 5, 4))
+        self.assertEqual(result["source_jobs"], 1)
+        self.assertEqual(result["rows_inserted"], 0)
+        printed = "\n".join(str(call.args[0]) for call in mock_print.call_args_list)
+        self.assertIn(
+            "user_tool_daily_stats query: date=2026-05-04 user=lizenghui user_id=- "
+            "submit_start=2026-05-04T00:00:00+00:00 submit_end=2026-05-05T00:00:00+00:00 "
+            "source_jobs=1",
+            printed,
+        )
+        self.assertIn(
+            "user_tool_daily_stats job: date=2026-05-04 job_id=2001 submit_time=2026-05-04T12:00:00+00:00 "
+            "state=COMPLETED user_id=21 username=lizenghui tool=regr memory_source=used_memory_gb "
+            "used_memory_gb=null used_cpu_cores_avg=0.98 runtime_seconds=600.0 decision=skipped "
+            "reason=missing_used_memory_gb",
+            printed,
+        )
+
+    def test_rebuild_scoped_user_with_no_jobs_does_not_delete_all_rows(self):
+        script = self._load_script()
+        conn = mock.Mock()
+        args = SimpleNamespace(
+            mapping_file=None,
+            rewrite_pattern=r"^regr([_-].*)?$",
+            rewrite_tool="regr",
+            dry_run=False,
+            date=None,
+            user="missing-user",
+            user_id=None,
+        )
+
+        with mock.patch.object(
+            script, "load_settings", return_value=SimpleNamespace(tool_mapping_file=None)
+        ), mock.patch(
+            "slurmweb.persistence.jobs_store.JobsStore.completed_date_bounds",
+            return_value=(None, None),
+        ), mock.patch.object(
+            script, "count_existing_rows"
+        ) as count_existing_rows, mock.patch.object(
+            script, "replace_all_rows"
+        ) as replace_all_rows, mock.patch.object(
+            script, "replace_target_rows"
+        ) as replace_target_rows:
+            result = script.rebuild(conn, args)
+
+        self.assertEqual(result["rows_deleted"], 0)
+        self.assertEqual(result["rows_inserted"], 0)
+        count_existing_rows.assert_not_called()
+        replace_all_rows.assert_not_called()
+        replace_target_rows.assert_not_called()
+        conn.commit.assert_not_called()

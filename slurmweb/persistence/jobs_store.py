@@ -880,15 +880,13 @@ class JobsStore:
             raise ValueError("activity_date must be provided for daily aggregation rows")
         return {
             "activity_date": activity_date,
+            "job_id": getattr(snapshot, "job_id", None),
+            "job_state": getattr(snapshot, "job_state", None),
+            "submit_time": snapshot.submit_time,
             "user_id": snapshot.user_id,
             "username": username,
             "job_name": snapshot.job_name,
             "command": snapshot.command,
-            "tres_req_str": snapshot.tres_req_str,
-            "tres_per_job": snapshot.tres_per_job,
-            "tres_per_node": snapshot.tres_per_node,
-            "tres_requested": snapshot.tres_requested,
-            "tres_allocated": snapshot.tres_allocated,
             "used_memory_gb": snapshot.used_memory_gb,
             "used_cpu_cores_avg": snapshot.used_cpu_cores_avg,
             "start_time": snapshot.start_time,

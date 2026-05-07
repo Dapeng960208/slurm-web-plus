@@ -41,13 +41,14 @@
   - 冗余字段 `memory_samples`、`cpu_samples`、`runtime_samples` 已从模型和迁移中移除
   - 新增 Alembic revision `20260507_0011_user_tool_daily_memory_stats.py`
   - 升级后需执行 `slurmweb/scripts/rebuild-user-tool.py` 全表重建 `user_tool_daily_stats`
-- 用户工具日聚合已修正为“按提交时间统计 `COMPLETED` 正内存作业”口径：
+- 用户工具日聚合已修正为“按提交时间统计 `COMPLETED` 且 `used_memory_gb` 非空作业”口径：
   - 聚合链路改为先按 `submit_time` 的 UTC 当天范围读取 `job_state = COMPLETED` 作业，再在 Python 中按 `activity_date + user_id + tool` 分类
-  - `user_tool_daily_stats.jobs_count` 现在表示提交时间落在该 UTC 日期内、状态为 `COMPLETED` 且 `used_memory_gb > 0` 的作业数
-  - `avg_memory_gb`、`max_memory_gb`、`median_memory_gb` 基于同一批正内存样本计算
+  - `user_tool_daily_stats.jobs_count` 现在表示提交时间落在该 UTC 日期内、状态为 `COMPLETED` 且 `used_memory_gb` 非空的作业数
+  - 当前字段域假设是 `used_memory_gb` 只会大于 `0` 或为空，聚合只跳过空值
+  - `avg_memory_gb`、`max_memory_gb`、`median_memory_gb` 基于同一批内存样本计算
   - `avg_cpu_cores` 以 `jobs_count` 为分母，缺失或非法 `used_cpu_cores_avg` 按 `0` 计入
   - `avg_runtime_seconds` 同样以 `jobs_count` 为分母，缺失运行时间按 `0` 计入
-  - 没有正内存样本的作业不会写入 `user_tool_daily_stats`
+  - `used_memory_gb` 为空的作业不会写入 `user_tool_daily_stats`
 - `tools/analysis` 跨天汇总继续只读 `user_tool_daily_stats`：
   - `avg_memory_gb` 继续按日行 `jobs_count` 加权
   - `max_memory_gb` 取时间窗内日峰值最大值
@@ -57,7 +58,9 @@
 - `slurmweb/scripts/repair-user-tool-daily-stats.py` 与 `slurmweb/scripts/rebuild-user-tool.py` 已同步新返回值和聚合口径，可用于历史日表重建
 - `slurmweb/scripts/rebuild-user-tool.py` 现在默认输出逐条重建明细日志：
   - 每个 UTC 日期会先打印 `source_jobs` 与当天聚合行数
+  - 可通过 `--date 20260504` 或 `--date 2026-05-04` 只重建单日，通过 `--user <username>` 或 `--user-id <id>` 定位用户；指定日期或用户时只删除目标范围旧行
   - 每日重建会在聚合前把源行 `activity_date` 固定为当前重建日期，确保写入日表的 `activity_date` 是当天年月日
+  - 每条源作业会打印 `user_tool_daily_stats job:` 诊断日志，包含 `job_id`、`submit_time`、`state`、用户、工具、内存、CPU、runtime、`decision` 与跳过原因
   - 每日摘要会打印 `counted`、`skipped_memory`、`missing_identity`、`cpu_missing`、`runtime_missing`；其中 `skipped_memory` 表示 `used_memory_gb` 为空而未进入 `jobs_count` 的源作业数
   - 每条将写入 `user_tool_daily_stats` 的日聚合行会打印 `date/user_id/username/tool/jobs_count` 以及内存、CPU、runtime 关键指标
   - 全表写入前会再打印一次总预览摘要，包含日期范围、扫描天数、源作业数、将删除旧行数和将写入新行数
@@ -237,12 +240,12 @@
 - `user_tool_daily_stats` 已重构为 `jobs_count + avg/max/median memory + avg_cpu_cores + avg_runtime_seconds`；跨多天返回的内存与 CPU 均值按每日 `jobs_count` 加权
 - 用户工具分析聚合已明确按已完成作业统计：
   - 当天日聚合按 `activity_date + user_id + tool` 分组
-  - `avg_memory_gb` 只平均 `used_memory_gb > 0` 的正内存样本
+  - `avg_memory_gb` 只平均 `used_memory_gb` 非空的内存样本
   - `max_memory_gb` 取同组作业的最大内存
   - `median_memory_gb` 取同组作业的中位数内存
   - `avg_runtime_hours` 来自 `end_time - start_time`
   - `avg_cpu_cores` 以 `jobs_count` 为分母，缺失或非法 `used_cpu_cores_avg` 按 `0` 计入
-  - 无法解析出正内存的作业不参与当天资源平均；无有效样本时返回 `null`
+  - `used_memory_gb` 为空的作业不参与当天资源平均；无有效样本时返回 `null`
   - 跨多天同工具合并按 `sum(day.avg * day.jobs_count) / sum(day.jobs_count)` 计算；只要当天对应 `avg_*` 是有效正值，该日就参与对应资源均值分母，`totals` 层使用相同口径
   - 继续保留 `avg_max_memory_mb` 与 `avg_runtime_seconds` 兼容字段
 - 新增维护脚本 `slurmweb/scripts/repair-user-tool-daily-stats.py`，支持 `--start YYYY-MM-DD`、`--end YYYY-MM-DD`、可选 `--user <username>` 和 `--dry-run`

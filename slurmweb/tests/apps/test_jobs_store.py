@@ -859,7 +859,15 @@ class TestJobsStoreCompletedAggregationSource(unittest.TestCase):
         )
 
         self.assertEqual(row["activity_date"], date(2026, 4, 24))
+        self.assertIsNone(row["job_id"])
+        self.assertIsNone(row["job_state"])
+        self.assertEqual(row["submit_time"], datetime(2026, 4, 24, 23, 30, tzinfo=timezone.utc))
         self.assertEqual(row["username"], "alice")
+        self.assertNotIn("tres_req_str", row)
+        self.assertNotIn("tres_per_job", row)
+        self.assertNotIn("tres_per_node", row)
+        self.assertNotIn("tres_requested", row)
+        self.assertNotIn("tres_allocated", row)
 
     def test_activity_date_is_required_for_daily_rows(self):
         store = JobsStore(settings=mock.Mock(), slurmrestd=None)

@@ -4,7 +4,7 @@
 import argparse
 import re
 import sys
-from datetime import timedelta
+from datetime import datetime, time, timedelta, timezone
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -65,6 +65,19 @@ def parse_args():
         action="store_true",
         help="Print what would change without deleting or writing stats",
     )
+    parser.add_argument(
+        "--date",
+        help="Only rebuild one UTC activity date. Accepts YYYYMMDD or YYYY-MM-DD.",
+    )
+    parser.add_argument(
+        "--user",
+        help="Only scan jobs for this username.",
+    )
+    parser.add_argument(
+        "--user-id",
+        type=int,
+        help="Only keep source jobs for this user_id after querying.",
+    )
     return parser.parse_args()
 
 
@@ -103,10 +116,29 @@ def aggregate_daily_rows(rows, mapped_mapper, raw_mapper, rewrite_pattern, rewri
     return payload, stats
 
 
-def completed_rows_for_rebuild_day(jobs_store, activity_date):
-    rows = jobs_store.completed_job_rows_for_activity_date(activity_date)
+def _parse_activity_date(value):
+    if value is None:
+        return None
+    raw = str(value).strip()
+    for fmt in ("%Y%m%d", "%Y-%m-%d"):
+        try:
+            return datetime.strptime(raw, fmt).date()
+        except ValueError:
+            continue
+    raise ValueError("--date must use YYYYMMDD or YYYY-MM-DD")
+
+
+def _day_bounds(activity_date):
+    start_time = datetime.combine(activity_date, time.min, tzinfo=timezone.utc)
+    return start_time, start_time + timedelta(days=1)
+
+
+def completed_rows_for_rebuild_day(jobs_store, activity_date, username=None, user_id=None):
+    rows = jobs_store.completed_job_rows_for_activity_date(activity_date, username=username)
     normalized_rows = []
     for row in rows:
+        if user_id is not None and row.get("user_id") != user_id:
+            continue
         normalized_row = dict(row)
         normalized_row["activity_date"] = activity_date
         normalized_rows.append(normalized_row)
@@ -116,6 +148,30 @@ def completed_rows_for_rebuild_day(jobs_store, activity_date):
 def count_existing_rows(conn):
     with conn.cursor() as cur:
         cur.execute("SELECT COUNT(*)::int FROM user_tool_daily_stats")
+        return cur.fetchone()[0]
+
+
+def count_target_rows(conn, start_date, end_date, username=None, user_id=None):
+    filters = []
+    params = []
+    if username:
+        filters.append("u.username = %s")
+        params.append(username)
+    if user_id is not None:
+        filters.append("uds.user_id = %s")
+        params.append(user_id)
+    filters.extend(["uds.activity_date >= %s", "uds.activity_date <= %s"])
+    params.extend([start_date, end_date])
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT COUNT(*)::int
+            FROM user_tool_daily_stats uds
+            INNER JOIN users u ON u.id = uds.user_id
+            WHERE {filters}
+            """.format(filters=" AND ".join(filters)),
+            params,
+        )
         return cur.fetchone()[0]
 
 
@@ -162,10 +218,94 @@ def replace_all_rows(conn, payload):
     return rows_deleted
 
 
+def replace_target_rows(conn, start_date, end_date, payload, username=None, user_id=None):
+    from psycopg2.extras import execute_values
+
+    filters = []
+    params = []
+    if username:
+        filters.append("u.username = %s")
+        params.append(username)
+    if user_id is not None:
+        filters.append("uds.user_id = %s")
+        params.append(user_id)
+    filters.extend(["uds.activity_date >= %s", "uds.activity_date <= %s"])
+    params.extend([start_date, end_date])
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            DELETE FROM user_tool_daily_stats uds
+            USING users u
+            WHERE u.id = uds.user_id
+              AND {filters}
+            """.format(filters=" AND ".join(filters)),
+            params,
+        )
+        rows_deleted = cur.rowcount
+        if payload:
+            execute_values(
+                cur,
+                """
+                INSERT INTO user_tool_daily_stats (
+                    activity_date,
+                    user_id,
+                    tool,
+                    jobs_count,
+                    avg_memory_gb,
+                    max_memory_gb,
+                    median_memory_gb,
+                    avg_cpu_cores,
+                    avg_runtime_seconds,
+                    created_at,
+                    updated_at
+                ) VALUES %s
+                ON CONFLICT (activity_date, user_id, tool) DO UPDATE SET
+                    jobs_count = EXCLUDED.jobs_count,
+                    avg_memory_gb = EXCLUDED.avg_memory_gb,
+                    max_memory_gb = EXCLUDED.max_memory_gb,
+                    median_memory_gb = EXCLUDED.median_memory_gb,
+                    avg_cpu_cores = EXCLUDED.avg_cpu_cores,
+                    avg_runtime_seconds = EXCLUDED.avg_runtime_seconds,
+                    updated_at = NOW()
+                """,
+                payload,
+                template=(
+                    "(%(activity_date)s, %(user_id)s, %(tool)s, %(jobs_count)s, "
+                    "%(avg_memory_gb)s, %(max_memory_gb)s, %(median_memory_gb)s, "
+                    "%(avg_cpu_cores)s, %(avg_runtime_seconds)s, NOW(), NOW())"
+                ),
+                page_size=1000,
+            )
+    return rows_deleted
+
+
 def _format_metric(value):
     if value is None:
         return "null"
     return str(value)
+
+
+def _format_time(value):
+    if value is None:
+        return "null"
+    if hasattr(value, "isoformat"):
+        return value.isoformat()
+    return str(value)
+
+
+def print_rebuild_query(activity_date, username, user_id, source_rows):
+    start_time, end_time = _day_bounds(activity_date)
+    print(
+        "user_tool_daily_stats query: date={date} user={user} user_id={user_id} "
+        "submit_start={start} submit_end={end} source_jobs={source_jobs}".format(
+            date=activity_date,
+            user=username or "-",
+            user_id=user_id if user_id is not None else "-",
+            start=start_time.isoformat(),
+            end=end_time.isoformat(),
+            source_jobs=source_rows,
+        )
+    )
 
 
 def print_rebuild_day_summary(activity_date, source_rows, rows_to_insert, stats=None):
@@ -183,6 +323,58 @@ def print_rebuild_day_summary(activity_date, source_rows, rows_to_insert, stats=
             cpu_missing=stats.get("cpu_missing", "-"),
             runtime_missing=stats.get("runtime_missing", "-"),
             rows=len(rows_to_insert),
+        )
+    )
+
+
+def _runtime_seconds(row):
+    start_time = row.get("start_time")
+    end_time = row.get("end_time")
+    if start_time is None or end_time is None:
+        return None
+    return (end_time - start_time).total_seconds()
+
+
+def _job_decision(row):
+    if row.get("activity_date") is None or row.get("user_id") is None:
+        return "skipped", "missing_identity"
+    if row.get("used_memory_gb") is None:
+        return "skipped", "missing_used_memory_gb"
+    return "counted", "ok"
+
+
+def print_rebuild_job(row, mapped_mapper, raw_mapper, rewrite_pattern, rewrite_tool):
+    tool = mapped_mapper.classify(
+        job_name=row.get("job_name"),
+        command=row.get("command"),
+        submit_line=row.get("submit_line"),
+    )
+    raw_tool = raw_mapper.classify(
+        job_name=row.get("job_name"),
+        command=row.get("command"),
+        submit_line=row.get("submit_line"),
+    )
+    if rewrite_pattern.search(tool) or rewrite_pattern.search(raw_tool):
+        tool = rewrite_tool
+    decision, reason = _job_decision(row)
+    print(
+        "user_tool_daily_stats job: date={date} job_id={job_id} submit_time={submit_time} "
+        "state={state} user_id={user_id} username={username} tool={tool} "
+        "memory_source=used_memory_gb used_memory_gb={memory} "
+        "used_cpu_cores_avg={cpu} runtime_seconds={runtime} decision={decision} "
+        "reason={reason}".format(
+            date=row.get("activity_date") or "-",
+            job_id=row.get("job_id") or "-",
+            submit_time=_format_time(row.get("submit_time")),
+            state=row.get("job_state") or "-",
+            user_id=row.get("user_id") if row.get("user_id") is not None else "-",
+            username=row.get("username") or "-",
+            tool=tool,
+            memory=_format_metric(row.get("used_memory_gb")),
+            cpu=_format_metric(row.get("used_cpu_cores_avg")),
+            runtime=_format_metric(_runtime_seconds(row)),
+            decision=decision,
+            reason=reason,
         )
     )
 
@@ -229,11 +421,23 @@ def rebuild(conn, args):
     rewrite_tool = args.rewrite_tool.strip().lower() or "regr"
     mapped_mapper = ToolNameMapper(db_settings.tool_mapping_file)
     raw_mapper = ToolNameMapper()
+    requested_date = _parse_activity_date(getattr(args, "date", None))
+    requested_user = getattr(args, "user", None) or None
+    requested_user_id = getattr(args, "user_id", None)
+    scoped_rebuild = (
+        requested_date is not None
+        or requested_user is not None
+        or requested_user_id is not None
+    )
 
-    first_date, last_date = jobs_store.completed_date_bounds()
+    if requested_date is not None:
+        first_date = requested_date
+        last_date = requested_date
+    else:
+        first_date, last_date = jobs_store.completed_date_bounds(username=requested_user)
     if first_date is None or last_date is None:
-        rows_deleted = count_existing_rows(conn)
-        if not args.dry_run:
+        rows_deleted = 0 if scoped_rebuild else count_existing_rows(conn)
+        if not args.dry_run and not scoped_rebuild:
             rows_deleted = replace_all_rows(conn, [])
             conn.commit()
         return {
@@ -250,7 +454,15 @@ def rebuild(conn, args):
     cursor = first_date
     days = 0
     while cursor <= last_date:
-        rows = completed_rows_for_rebuild_day(jobs_store, cursor)
+        rows = completed_rows_for_rebuild_day(
+            jobs_store,
+            cursor,
+            username=requested_user,
+            user_id=requested_user_id,
+        )
+        print_rebuild_query(cursor, requested_user, requested_user_id, len(rows))
+        for row in rows:
+            print_rebuild_job(row, mapped_mapper, raw_mapper, rewrite_pattern, rewrite_tool)
         source_jobs += len(rows)
         day_payload, day_stats = aggregate_daily_rows(
             rows,
@@ -266,10 +478,29 @@ def rebuild(conn, args):
         cursor += timedelta(days=1)
         days += 1
 
-    rows_deleted = count_existing_rows(conn)
+    if scoped_rebuild:
+        rows_deleted = count_target_rows(
+            conn,
+            first_date,
+            last_date,
+            username=requested_user,
+            user_id=requested_user_id,
+        )
+    else:
+        rows_deleted = count_existing_rows(conn)
     print_rebuild_preview(first_date, last_date, days, source_jobs, rows_deleted, len(payload))
     if not args.dry_run:
-        rows_deleted = replace_all_rows(conn, payload)
+        if scoped_rebuild:
+            rows_deleted = replace_target_rows(
+                conn,
+                first_date,
+                last_date,
+                payload,
+                username=requested_user,
+                user_id=requested_user_id,
+            )
+        else:
+            rows_deleted = replace_all_rows(conn, payload)
         conn.commit()
 
     return {
