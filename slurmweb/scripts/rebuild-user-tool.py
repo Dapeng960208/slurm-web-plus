@@ -86,7 +86,7 @@ def load_settings(args):
 
 
 def aggregate_daily_rows(rows, mapped_mapper, raw_mapper, rewrite_pattern, rewrite_tool):
-    payload, _ = aggregate_user_tool_daily_rows(
+    payload, stats = aggregate_user_tool_daily_rows(
         rows,
         mapped_mapper,
         raw_mapper=raw_mapper,
@@ -100,7 +100,7 @@ def aggregate_daily_rows(rows, mapped_mapper, raw_mapper, rewrite_pattern, rewri
             usernames[row.get("user_id")] = username
     for item in payload:
         item["username"] = usernames.get(item["user_id"])
-    return payload
+    return payload, stats
 
 
 def completed_rows_for_rebuild_day(jobs_store, activity_date):
@@ -168,11 +168,19 @@ def _format_metric(value):
     return str(value)
 
 
-def print_rebuild_day_summary(activity_date, source_rows, rows_to_insert):
+def print_rebuild_day_summary(activity_date, source_rows, rows_to_insert, stats=None):
+    stats = stats or {}
     print(
-        "user_tool_daily_stats day: date={date} source_jobs={source_jobs} rows={rows}".format(
+        "user_tool_daily_stats day: date={date} source_jobs={source_jobs} counted={counted} "
+        "skipped_memory={skipped_memory} missing_identity={missing_identity} "
+        "cpu_missing={cpu_missing} runtime_missing={runtime_missing} rows={rows}".format(
             date=activity_date,
             source_jobs=source_rows,
+            counted=stats.get("rows_counted", "-"),
+            skipped_memory=stats.get("rows_skipped_memory", "-"),
+            missing_identity=stats.get("rows_missing_identity", "-"),
+            cpu_missing=stats.get("cpu_missing", "-"),
+            runtime_missing=stats.get("runtime_missing", "-"),
             rows=len(rows_to_insert),
         )
     )
@@ -243,14 +251,14 @@ def rebuild(conn, args):
     while cursor <= last_date:
         rows = completed_rows_for_rebuild_day(jobs_store, cursor)
         source_jobs += len(rows)
-        day_payload = aggregate_daily_rows(
+        day_payload, day_stats = aggregate_daily_rows(
             rows,
             mapped_mapper,
             raw_mapper,
             rewrite_pattern,
             rewrite_tool,
         )
-        print_rebuild_day_summary(cursor, len(rows), day_payload)
+        print_rebuild_day_summary(cursor, len(rows), day_payload, day_stats)
         for item in day_payload:
             print_rebuild_row(item)
         payload.extend(day_payload)

@@ -512,6 +512,18 @@
   - 单测改为断言 `user_tool_analysis()` 只读取日聚合摘要。
 - 预防：后续调整 `tools/analysis` 返回字段时，接口层只能读 `user_tool_daily_stats`；如需补历史数据，应通过后台聚合任务、迁移或维护脚本完成。
 
+### 2026-05-07：`source_jobs` 很大但 `jobs_count` 只剩少数显式内存行
+
+- 场景：执行 `slurmweb/scripts/rebuild-user-tool.py` 全表重建，某天日志显示 `source_jobs=1983`，但 `user_tool_daily_stats row` 里 `jobs_count=4`。
+- 现象：当天有上千条提交时间落在该日且状态为 `COMPLETED` 的作业，但日表只写入极少数作业，导致用户工具统计严重偏低。
+- 复现：构造多条完成作业，其中 `used_memory_gb` 为空，但 `usage_stats.memory.value_gb`、`tres_allocated` 或 `tres_req_str` 可解析出正内存；原日聚合只统计显式 `used_memory_gb > 0` 的行。
+- 根因：`aggregate_user_tool_daily_rows()` 没有复用已有 `_memory_gb(row)` 完整内存解析链，只直接读取 `row["used_memory_gb"]`，导致已在 `usage_stats` 或 TRES 中存在内存证据的作业被计入 `rows_skipped_memory`。
+- 解决：
+  - 日聚合改为通过 `_memory_gb(row)` 解析内存，优先使用 `used_memory_gb`，再回退到 `usage_stats.memory.value_gb`、`tres_allocated` / `tres_requested`、`tres_req_str` / `tres_per_job` / `tres_per_node`。
+  - `rebuild-user-tool.py` 每日摘要增加 `counted`、`skipped_memory`、`missing_identity`、`cpu_missing`、`runtime_missing`，便于直接确认源作业未计入原因。
+  - 更新后台当前日聚合和共享日聚合测试，覆盖 `usage_stats` 与 TRES fallback 内存也会进入 `jobs_count`。
+- 预防：后续凡是按内存判断作业是否进入用户工具日表，都必须调用统一 `_memory_gb(row)`，不能直接读取单一物理列。
+
 ### 2026-05-07：`rebuild-user-tool.py` 仍可能沿用源行 `activity_date`
 
 - 场景：全表重建 `user_tool_daily_stats` 时，脚本逐日读取历史作业并调用共享聚合函数生成日表 payload。

@@ -9,7 +9,8 @@
 - 所有写入日表的浮点指标现在统一保留两位小数，包括内存、CPU 和运行时间。
 - 当天后台聚合、按范围修复脚本和全表重建脚本现在复用同一条“按 `submit_time` 当天范围读取 `COMPLETED` 作业，再在 Python 中按用户+工具分组”的聚合逻辑，避免口径再次漂移。
 - 用户分析前端已增加 Average Memory、Peak Memory、Median Memory 展示，工具级面板和图表同步改为使用新字段。
-- 全表重建后，跨多天 `tools/analysis` 仍只读 `user_tool_daily_stats`：`jobs_count` 表示提交时间落在当天、状态为 `COMPLETED` 且 `used_memory_gb > 0` 的作业数，平均内存按日表 `jobs_count` 加权，峰值内存取窗口最大值，中位数内存按日中位数加权近似。
+- 全表重建后，跨多天 `tools/analysis` 仍只读 `user_tool_daily_stats`：`jobs_count` 表示提交时间落在当天、状态为 `COMPLETED` 且可解析出正内存的作业数，平均内存按日表 `jobs_count` 加权，峰值内存取窗口最大值，中位数内存按日中位数加权近似。
+- 日聚合内存样本已从“只看 `used_memory_gb` 列”扩展为复用完整内存解析链；当 `used_memory_gb` 为空时，会继续从 `usage_stats.memory.value_gb`、TRES JSON 和 TRES 字符串解析正内存，避免 `source_jobs` 很大但 `jobs_count` 只剩少数显式内存行。
 
 ## 本轮：`rebuild-user-tool.py` 默认输出逐条重建明细日志
 
@@ -19,6 +20,7 @@
 - 脚本逐日重建时会在聚合前把每条源行的 `activity_date` 固定为当前重建日期，确保写库日期就是该 UTC 日期的年月日。
 - 每条日志会带 `date`、`user_id`、`username`、`tool`、`jobs_count`、内存指标、`avg_cpu_cores` 和 `avg_runtime_seconds`。
 - 每个 UTC 日期会先输出当天扫描到的 `source_jobs` 和当天将写入的聚合行数，再输出逐条行日志。
+- 每日摘要现在同时输出 `counted`、`skipped_memory`、`missing_identity`、`cpu_missing`、`runtime_missing`，用于直接定位源作业未计入的原因。
 - 在真正删除旧表数据并写入新数据前，脚本还会打印一次全表预览摘要，包含日期范围、扫描天数、源作业数、待删除旧行数和待写入新行数。
 - 详细日志默认总是输出，不依赖额外开关；因此全量历史重建时控制台日志会明显增加。
 
@@ -28,7 +30,7 @@
 
 - 日聚合现在先按 `submit_time` 的 UTC 当天范围读取 `job_state = COMPLETED` 的作业。
 - 读取后的作业在 Python 中按 `activity_date + user_id + tool` 分类，不在 `user_tool_daily_stats` 链路中使用数据库聚合。
-- `jobs_count` 只统计 `used_memory_gb > 0` 的作业。
+- `jobs_count` 只统计可解析出正内存的作业，内存来源包括 `used_memory_gb`、`usage_stats.memory.value_gb`、TRES JSON 和 TRES 字符串。
 - `avg_memory_gb`、`max_memory_gb`、`median_memory_gb` 基于同一批正内存样本计算。
 - `avg_cpu_cores` 以 `jobs_count` 为分母，缺失或非法 `used_cpu_cores_avg` 按 `0` 计入。
 - `avg_runtime_seconds` 同样以 `jobs_count` 为分母，缺失运行时间按 `0` 计入。
@@ -131,8 +133,8 @@
 - `NodeView` 详情页继续保留 Edit / Delete，Edit Node 的 `state` 改为下拉框，选项为 `DRAIN`、`RESUME`、`UNDRAIN`、`DOWN`、`IDLE`、`FAIL`、`FUTURE`。
 - `ActionDialog` 增加 `select` 字段类型，支持通用操作弹窗渲染下拉选项。
 - Jobs 用户筛选保留 `/users` 查询建议，同时支持直接输入用户名并点击 `Add username` 加入筛选；空值不添加，重复用户名不重复添加，添加后清空输入。
-- 用户工具当天日聚合按 `activity_date + user_id + tool` 分组，只纳入终态作业。
-- 日聚合只统计 `used_memory_gb > 0` 且 `used_cpu_cores_avg > 0` 的完成作业；`jobs_count` 语义同步收紧为“同时具备有效内存和 CPU 统计的作业数”。
+- 用户工具当天日聚合按 `activity_date + user_id + tool` 分组，只纳入 `COMPLETED` 作业。
+- 日聚合只统计可解析出正内存的完成作业；`jobs_count` 语义为“具备有效内存统计的完成作业数”，CPU 缺失按 `0` 计入平均值。
 - 后台按 `[user_metrics].aggregation_interval` 周期刷新当天日表时，会先删除当天旧 `user_tool_daily_stats` 行，再写入新的有效统计，避免旧的 `jobs_count > 0 / avg_* = 0` 脏行残留。
 - `user/<username>/tools/analysis` 继续只读取 `user_tool_daily_stats`，跨多天按 `sum(day.avg * day.jobs_count) / sum(day.jobs_count)` 合并内存和 CPU 均值；旧日表中的 `0`、`NULL` 或其他非法资源均值不再继续贡献 `completed_jobs`、工具列表或资源均值。
 - 当时间窗内没有任何有效资源对作业时，接口返回空工具列表，`totals.completed_jobs = 0`，资源均值为 `null`。
@@ -184,11 +186,11 @@
 - 用户详情分析页已将原 `Tool Analysis` 与 `Top Tools` 合并为一个 `Completed Job Tool Analysis` 栏目，集中展示已完成作业的工具维度数据分析
 - `user/<username>/tools/analysis` 只按时间窗覆盖的 UTC 日期读取 `user_tool_daily_stats` 并汇总返回工具分类统计；查询多天时，当前实现按 `jobs_count` 加权合并多天日表的内存与 CPU 均值，请求路径不实时扫描 `job_snapshots` 或 SlurmDB
 - 后台用户工具日聚合按 `[user_metrics].aggregation_interval` 周期更新当天 UTC 自然日统计，并与 `slurmweb/scripts/repair-user-tool-daily-stats.py` 维护脚本复用同一套聚合函数，保持工具归类、空值过滤和插入口径一致
-- `user_tool_daily_stats` 补充资源样本数字段用于诊断；当前内存与 CPU 跨日返回按每日 `jobs_count` 加权
+- `user_tool_daily_stats` 当前使用 `jobs_count + avg/max/median memory + avg_cpu_cores + avg_runtime_seconds` 保存日聚合；内存与 CPU 跨日返回按每日 `jobs_count` 加权
 - 用户分析资源统计明确按已完成作业计算：
-  - 平均最大内存：当前日聚合只使用 `used_memory_gb > 0`，无有效样本时保存 `0`
+  - 平均内存：当前日聚合只使用可解析出的正内存样本，无有效样本时不写入日表行
   - 平均运行时间：`end_time - start_time`，返回小时与兼容秒字段
-  - 平均 CPU 核数：当前日聚合只使用 `used_cpu_cores_avg > 0`，无有效样本时保存 `0`
+  - 平均 CPU 核数：以 `jobs_count` 为分母，缺失或非法 `used_cpu_cores_avg` 按 `0` 计入
 - `Submission Activity` 的提交时间线在 `submit_time` 缺失时会回退到 `start_time` / `last_seen`
 - 用户分析终态作业匹配改为大小写不敏感，避免 `completed` 这类小写状态导致时间窗内无数据
 - 用户分析 `metrics/history` 自定义窗口的 bucket 统一按 UTC 对齐，修复选择 `7 days` 时返回非零数据却前端序列全 0 的问题
