@@ -564,7 +564,9 @@ def aggregate_user_tool_daily_rows(
         bucket = buckets[key]
         if bucket["username"] is None:
             bucket["username"] = row.get("username")
-        memory_value = _positive_numeric_value(_memory_gb(row))
+        memory_value = _numeric_value(row.get("used_memory_gb"))
+        if memory_value is not None and (not math.isfinite(memory_value) or memory_value <= 0):
+            memory_value = None
         if memory_value is None:
             stats["rows_skipped_memory"] += 1
             continue

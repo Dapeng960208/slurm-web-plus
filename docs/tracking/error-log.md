@@ -512,6 +512,18 @@
   - 单测改为断言 `user_tool_analysis()` 只读取日聚合摘要。
 - 预防：后续调整 `tools/analysis` 返回字段时，接口层只能读 `user_tool_daily_stats`；如需补历史数据，应通过后台聚合任务、迁移或维护脚本完成。
 
+### 2026-05-07：误把 `usage_stats` / TRES fallback 纳入 `jobs_count`
+
+- 场景：排查 `rebuild-user-tool.py` 日志中 `source_jobs` 很大但 `jobs_count` 很小的问题时，曾把 `jobs_count` 改成复用 `_memory_gb(row)` 的完整内存解析链。
+- 现象：`used_memory_gb` 为空但 `usage_stats.memory.value_gb` 或 TRES 有内存的作业会被写入 `user_tool_daily_stats`，与“只跳过 `used_memory_gb` 为空作业”的目标口径不一致。
+- 复现：构造 `used_memory_gb = NULL`、`usage_stats.memory.value_gb = 16.0` 或 `tres_allocated.mem = 16384` 的完成作业，上一版日聚合会把它计入 `jobs_count`。
+- 根因：把“排查数据缺口时的兜底解析”错误升级成了 `jobs_count` 写表口径，没有保持用户指定的单字段判定规则。
+- 解决：
+  - `aggregate_user_tool_daily_rows()` 改回只读取 `row["used_memory_gb"]`。
+  - `used_memory_gb` 为空、非法、非有限数或 `<= 0` 时跳过；`usage_stats` 和 TRES 不再作为日表 `jobs_count` 的替代来源。
+  - 补充 10 位小数字符串测试，确认高精度 `used_memory_gb` 可正常计入，避免把字段为空误判为类型转换问题。
+- 预防：`jobs_count` 的写表准入字段必须保持单一事实源；诊断时可以输出 `skipped_memory`，但不能擅自把 fallback 字段并入口径。
+
 ### 2026-05-07：`source_jobs` 很大但 `jobs_count` 只剩少数显式内存行
 
 - 场景：执行 `slurmweb/scripts/rebuild-user-tool.py` 全表重建，某天日志显示 `source_jobs=1983`，但 `user_tool_daily_stats row` 里 `jobs_count=4`。

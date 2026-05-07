@@ -43,7 +43,7 @@
   - 升级后需执行 `slurmweb/scripts/rebuild-user-tool.py` 全表重建 `user_tool_daily_stats`
 - 用户工具日聚合已修正为“按提交时间统计 `COMPLETED` 正内存作业”口径：
   - 聚合链路改为先按 `submit_time` 的 UTC 当天范围读取 `job_state = COMPLETED` 作业，再在 Python 中按 `activity_date + user_id + tool` 分类
-  - `user_tool_daily_stats.jobs_count` 现在表示提交时间落在该 UTC 日期内、状态为 `COMPLETED` 且可解析出正内存的作业数；内存来源包括 `used_memory_gb`、`usage_stats.memory.value_gb`、TRES JSON 和 TRES 字符串
+  - `user_tool_daily_stats.jobs_count` 现在表示提交时间落在该 UTC 日期内、状态为 `COMPLETED` 且 `used_memory_gb > 0` 的作业数
   - `avg_memory_gb`、`max_memory_gb`、`median_memory_gb` 基于同一批正内存样本计算
   - `avg_cpu_cores` 以 `jobs_count` 为分母，缺失或非法 `used_cpu_cores_avg` 按 `0` 计入
   - `avg_runtime_seconds` 同样以 `jobs_count` 为分母，缺失运行时间按 `0` 计入
@@ -237,7 +237,7 @@
 - `user_tool_daily_stats` 已重构为 `jobs_count + avg/max/median memory + avg_cpu_cores + avg_runtime_seconds`；跨多天返回的内存与 CPU 均值按每日 `jobs_count` 加权
 - 用户工具分析聚合已明确按已完成作业统计：
   - 当天日聚合按 `activity_date + user_id + tool` 分组
-  - `avg_memory_gb` 只平均可解析出的正内存样本，内存来源包括 `used_memory_gb`、`usage_stats.memory.value_gb`、TRES JSON 和 TRES 字符串
+  - `avg_memory_gb` 只平均 `used_memory_gb > 0` 的正内存样本
   - `max_memory_gb` 取同组作业的最大内存
   - `median_memory_gb` 取同组作业的中位数内存
   - `avg_runtime_hours` 来自 `end_time - start_time`

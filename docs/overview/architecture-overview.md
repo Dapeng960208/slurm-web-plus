@@ -198,7 +198,7 @@ Vue 页面
   - `avg_memory_gb`
   - `max_memory_gb`
   - `median_memory_gb`
-  - 当前 `jobs_count` 表示可解析出正内存的完成作业数，内存来源包括 `used_memory_gb`、`usage_stats.memory.value_gb` 和 TRES；`avg_cpu_cores` 以同一 `jobs_count` 为分母，缺失 CPU 按 `0` 计入
+  - 当前 `jobs_count` 表示 `used_memory_gb > 0` 的完成作业数；`avg_cpu_cores` 以同一 `jobs_count` 为分母，缺失 CPU 按 `0` 计入
 
 ## 8. 前端权限消费点
 
