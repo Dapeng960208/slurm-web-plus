@@ -1,5 +1,16 @@
 ﻿# 最新功能
 
+## 本轮：`job_snapshots` 资源字段补齐前移并新增历史补数脚本
+
+本轮修正了 `job/history/detail` 按需补齐资源字段但 `user_tool_daily_stats` 重建只读旧快照导致统计偏低的问题：
+
+- `COMPLETED` 作业持久化入库前，如果 `used_memory_gb` 或 `used_cpu_cores_avg` 缺失，会同步查询 Slurm REST detail，并只补写这两个字段到 `job_snapshots`。
+- detail 查询失败、404、`submit_time` 不匹配或 detail 仍缺资源时，不阻断原始快照入库。
+- 新增 `slurmweb/scripts/backfill-job-snapshot-usage.py`，用于补齐历史 `job_snapshots.used_memory_gb` 与 `used_cpu_cores_avg`。
+- 补数脚本支持 `--start`、`--end`、`--user`、`--job-id`、`--limit`、`--dry-run`，并逐条输出 `job_snapshot_usage row:` 明细日志。
+- `user_tool_daily_stats` 和 `rebuild-user-tool.py` 继续只以 `job_snapshots` 当前字段为事实来源，不再在统计链路临时调用 Slurm REST enrich。
+- 历史修复顺序固定为先执行 `backfill-job-snapshot-usage.py`，再执行 `rebuild-user-tool.py` 重建日表。
+
 ## 本轮：`user_tool_daily_stats` 重构为单计数字段并扩展内存统计
 
 本轮完成了 `user_tool_daily_stats` 聚合链路重构，并把内存统计扩展落到后端、脚本和前端：

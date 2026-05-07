@@ -26,6 +26,10 @@
 
 后台线程按 `[user_metrics].aggregation_interval` 配置周期执行，启动时先执行一次，然后按间隔重算并替换当天 UTC 自然日的统计。后台聚合与维护脚本现在共用同一条“历史作业读取 -> Python 分组聚合 -> 写入日表”链路：先按 `submit_time` 当天起止范围读取 `job_state = COMPLETED` 的作业，再按 `activity_date + user_id + tool` 在 Python 中分类汇总，避免 `user_tool_daily_stats` 再维护独立原生 SQL 聚合口径；重算当天数据时会先删除当天旧行，再写入新的有效统计，避免旧脏行残留。
 
+`job_snapshots` 是 `user_tool_daily_stats` 的唯一资源事实来源。日聚合和 `rebuild-user-tool.py` 插入日表时只读取 `job_snapshots.used_memory_gb` 与 `job_snapshots.used_cpu_cores_avg`，不会在统计链路临时调用 Slurm REST detail 补齐资源字段。若历史快照中资源字段为空，需要先运行 `slurmweb/scripts/backfill-job-snapshot-usage.py` 补齐 `job_snapshots`，再执行 `rebuild-user-tool.py` 重建日表。
+
+作业快照持久化阶段会对 `COMPLETED` 且 `used_memory_gb` 或 `used_cpu_cores_avg` 缺失的作业同步查询 Slurm REST detail，并只把计算出的 `used_memory_gb`、`used_cpu_cores_avg` 写入待持久化行；不会在该阶段补写 `usage_stats`。detail 查询失败、404、`submit_time` 不匹配或 detail 仍缺少资源字段时，原始快照继续入库，并记录日志用于后续补数排查。
+
 `user_tool_daily_stats` 按 `(activity_date, user_id, tool)` 保存每日工具统计：
 
 - `jobs_count`
@@ -84,10 +88,14 @@
 维护脚本：
 
 ```powershell
+.venv\Scripts\python.exe slurmweb\scripts\backfill-job-snapshot-usage.py --start 2026-05-04 --end 2026-05-04 --user lizenghui --dry-run
+.venv\Scripts\python.exe slurmweb\scripts\backfill-job-snapshot-usage.py --start 2026-05-04 --end 2026-05-04 --user lizenghui
 .venv\Scripts\python.exe slurmweb\scripts\repair-user-tool-daily-stats.py --start 2026-05-01 --end 2026-05-06 --dry-run
 .venv\Scripts\python.exe slurmweb\scripts\repair-user-tool-daily-stats.py --start 2026-05-01 --end 2026-05-06 --user alice
 .venv\Scripts\python.exe slurmweb\scripts\rebuild-user-tool.py --date 20260504 --user lizenghui --dry-run
 ```
+
+`backfill-job-snapshot-usage.py` 默认扫描 `job_state = COMPLETED` 且 `used_memory_gb IS NULL OR used_cpu_cores_avg IS NULL` 的 `job_snapshots` 记录，支持 `--start YYYY-MM-DD`、`--end YYYY-MM-DD`、`--user <username>`、`--job-id <id>`、`--limit <n>` 和 `--dry-run`。脚本逐条调用 Slurm REST detail，计算并更新 `used_memory_gb` 与 `used_cpu_cores_avg`，并输出稳定单行日志 `job_snapshot_usage row:`，记录记录 ID、作业 ID、用户、旧值、新值、`decision=updated/skipped` 与跳过原因。该脚本不更新 `usage_stats`。
 
 脚本默认删除目标日期范围内的旧 `user_tool_daily_stats`，再按当前口径从 `job_snapshots` 重建；`--dry-run` 只输出将处理的作业数、将删除的旧行数和将写入的新行数，不写数据库。
 

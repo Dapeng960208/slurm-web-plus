@@ -319,6 +319,14 @@ def _is_not_found_error(err: Exception) -> bool:
     return err.__class__.__name__ == "SlurmrestdNotFoundError"
 
 
+def _is_completed_state(value) -> bool:
+    normalized = _state_str(value)
+    if not normalized:
+        return False
+    states = [part.strip().upper() for part in normalized.split(",")]
+    return "COMPLETED" in states
+
+
 def _ts(value):
     """Convert a Slurm epoch integer to a timezone-aware datetime, or None."""
     if isinstance(value, dict):
@@ -1028,8 +1036,64 @@ class JobsStore:
                     row.get("job_id"),
                 )
                 continue
+            self._enrich_completed_usage_fields(row)
             valid.append(row)
         return valid
+
+    def _needs_usage_detail_enrichment(self, row: dict) -> bool:
+        if self._slurmrestd is None:
+            return False
+        if not _is_completed_state(row.get("job_state")):
+            return False
+        return row.get("used_memory_gb") is None or row.get("used_cpu_cores_avg") is None
+
+    def _enrich_completed_usage_fields(self, row: dict) -> dict:
+        if not self._needs_usage_detail_enrichment(row):
+            return row
+
+        try:
+            job = self._slurmrestd.job(row["job_id"])
+        except Exception as err:
+            if _is_not_found_error(err):
+                logger.debug(
+                    "Completed job %s detail not found while filling usage fields",
+                    row.get("job_id"),
+                )
+            else:
+                logger.warning(
+                    "Unable to fill completed job %s usage fields: %s",
+                    row.get("job_id"),
+                    err,
+                )
+            return row
+
+        detail_row = _extract_detail(job, row)
+        if not detail_row.get("job_id") or not detail_row.get("submit_time"):
+            logger.debug(
+                "Ignoring completed job %s usage fill due to missing detail key fields",
+                row.get("job_id"),
+            )
+            return row
+
+        if detail_row.get("submit_time") != row.get("submit_time"):
+            logger.warning(
+                "Ignoring completed job %s usage fill due to submit_time mismatch",
+                row.get("job_id"),
+            )
+            return row
+
+        updated = False
+        for field in ("used_memory_gb", "used_cpu_cores_avg"):
+            if row.get(field) is None and detail_row.get(field) is not None:
+                row[field] = detail_row[field]
+                updated = True
+
+        if not updated:
+            logger.debug(
+                "Completed job %s detail did not include missing usage fields",
+                row.get("job_id"),
+            )
+        return row
 
     def _queue_rows(self, rows: list):
         if rows:

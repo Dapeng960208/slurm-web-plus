@@ -134,7 +134,10 @@ def _day_bounds(activity_date):
 
 
 def completed_rows_for_rebuild_day(jobs_store, activity_date, username=None, user_id=None):
-    rows = jobs_store.completed_job_rows_for_activity_date(activity_date, username=username)
+    rows = jobs_store.completed_job_rows_for_activity_date(
+        activity_date,
+        username=username,
+    )
     normalized_rows = []
     for row in rows:
         if user_id is not None and row.get("user_id") != user_id:
@@ -361,7 +364,8 @@ def print_rebuild_job(row, mapped_mapper, raw_mapper, rewrite_pattern, rewrite_t
         "user_tool_daily_stats job: date={date} job_id={job_id} submit_time={submit_time} "
         "state={state} user_id={user_id} username={username} tool={tool} "
         "memory_source=used_memory_gb used_memory_gb={memory} "
-        "used_cpu_cores_avg={cpu} runtime_seconds={runtime} decision={decision} "
+        "used_cpu_cores_avg={cpu} "
+        "runtime_seconds={runtime} decision={decision} "
         "reason={reason}".format(
             date=row.get("activity_date") or "-",
             job_id=row.get("job_id") or "-",

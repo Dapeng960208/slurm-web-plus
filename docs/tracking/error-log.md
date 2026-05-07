@@ -17,6 +17,18 @@
 
 ## 条目
 
+### 2026-05-07：`job/history/detail` 补齐资源但日表重建仍看到 `used_memory_gb = NULL`
+
+- 场景：用户在 `job/history/detail` 前端详情中看到 `used_memory_gb` 与 `used_cpu_cores_avg` 有值，但执行 `rebuild-user-tool.py --date 20260504 --user lizenghui --dry-run` 时，同一作业日志显示资源字段为空并被 `missing_used_memory_gb` 跳过。
+- 现象：示例作业 `job_id=996542` 的详情接口返回 `used_memory_gb=2.3984947204589844`、`used_cpu_cores_avg=0.8976156767441861`，但 rebuild 日志仍显示 `used_memory_gb=null`、`used_cpu_cores_avg=null`。
+- 复现：历史 `job_snapshots` 行资源字段为空，访问 `job/history/detail` 会触发 `_maybe_enrich_record()` 按需从 Slurm REST detail 计算并持久化；若日表重建在资源字段补齐前执行，`user_tool_daily_stats` 仍只读到 DB 空值并跳过。
+- 根因：资源补齐发生在详情读取路径，统计链路只读取 `job_snapshots` 当前行；旧快照未批量补齐时，`rebuild-user-tool.py` 无法看到详情路径临时计算出的资源结果。曾尝试在 rebuild 查询时临时 enrich，但这会把统计链路绑定到 Slurm REST，并破坏 `job_snapshots` 作为唯一事实来源的边界。
+- 解决：
+  - `JobsStore._prepare_rows()` 在 `COMPLETED` 作业持久化前对缺失 `used_memory_gb` 或 `used_cpu_cores_avg` 的行同步查询 Slurm REST detail，并只把这两个字段写入待持久化 row。
+  - 新增 `slurmweb/scripts/backfill-job-snapshot-usage.py`，用于补齐历史 `job_snapshots.used_memory_gb` 与 `used_cpu_cores_avg`。
+  - `rebuild-user-tool.py` 删除统计查询时 enrich 逻辑，继续只读取 `job_snapshots` 当前字段；历史修复顺序为先 backfill，再 rebuild。
+- 预防：用户工具日聚合只能依赖 `job_snapshots` 已持久化字段；需要补历史资源时使用专用补数脚本，不要在 `user_tool_daily_stats` 聚合或 rebuild 链路临时调用 Slurm REST detail。
+
 ### 2026-05-07：PowerShell 中使用 `&&` 串联 Git 验证命令失败
 
 - 场景：完成 `user_tool_daily_stats` rebuild 口径提交后，在 Windows PowerShell 中验证提交详情。

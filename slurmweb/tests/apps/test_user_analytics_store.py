@@ -1293,7 +1293,8 @@ class TestRebuildUserToolScript(unittest.TestCase):
         self.assertIn(
             "user_tool_daily_stats job: date=2026-04-24 job_id=101 submit_time=2026-04-24T08:00:00+00:00 "
             "state=COMPLETED user_id=1 username=alice tool=blast memory_source=used_memory_gb "
-            "used_memory_gb=4.0 used_cpu_cores_avg=2.0 runtime_seconds=3600.0 decision=counted reason=ok",
+            "used_memory_gb=4.0 used_cpu_cores_avg=2.0 runtime_seconds=3600.0 "
+            "decision=counted reason=ok",
             printed,
         )
 
@@ -1495,8 +1496,8 @@ class TestRebuildUserToolScript(unittest.TestCase):
         self.assertIn(
             "user_tool_daily_stats job: date=2026-05-04 job_id=2001 submit_time=2026-05-04T12:00:00+00:00 "
             "state=COMPLETED user_id=21 username=lizenghui tool=regr memory_source=used_memory_gb "
-            "used_memory_gb=null used_cpu_cores_avg=0.98 runtime_seconds=600.0 decision=skipped "
-            "reason=missing_used_memory_gb",
+            "used_memory_gb=null used_cpu_cores_avg=0.98 runtime_seconds=600.0 "
+            "decision=skipped reason=missing_used_memory_gb",
             printed,
         )
 
@@ -1533,3 +1534,295 @@ class TestRebuildUserToolScript(unittest.TestCase):
         replace_all_rows.assert_not_called()
         replace_target_rows.assert_not_called()
         conn.commit.assert_not_called()
+
+    def test_rebuild_does_not_initialize_slurmrestd_or_enrich_daily_rows(self):
+        script = self._load_script()
+        conn = mock.Mock()
+        args = SimpleNamespace(
+            mapping_file=None,
+            rewrite_pattern=r"^regr([_-].*)?$",
+            rewrite_tool="regr",
+            dry_run=True,
+            date="20260504",
+            user="lizenghui",
+            user_id=None,
+        )
+
+        with mock.patch.object(
+            script,
+            "load_settings",
+            return_value=SimpleNamespace(tool_mapping_file=None),
+        ), mock.patch(
+            "slurmweb.persistence.jobs_store.JobsStore.completed_job_rows_for_activity_date",
+            return_value=[],
+        ) as completed_rows, mock.patch.object(
+            script, "count_target_rows", return_value=0
+        ), mock.patch("builtins.print"):
+            script.rebuild(conn, args)
+
+        self.assertFalse(hasattr(script, "make_slurmrestd"))
+        completed_rows.assert_called_once_with(date(2026, 5, 4), username="lizenghui")
+
+
+class TestBackfillJobSnapshotUsageScript(unittest.TestCase):
+    class SlurmrestdNotFoundError(Exception):
+        pass
+
+    class FakeQuery:
+        def __init__(self, rows):
+            self.rows = rows
+            self.limit_value = None
+            self.filter_calls = 0
+
+        def outerjoin(self, *args, **kwargs):
+            return self
+
+        def filter(self, *args, **kwargs):
+            self.filter_calls += 1
+            return self
+
+        def order_by(self, *args, **kwargs):
+            return self
+
+        def limit(self, value):
+            self.limit_value = value
+            self.rows = self.rows[:value]
+            return self
+
+        def all(self):
+            return self.rows
+
+    class FakeSession:
+        def __init__(self, rows):
+            self.rows = rows
+            self.query_obj = None
+            self.commit = mock.Mock()
+            self.rollback = mock.Mock()
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def query(self, *args):
+            self.query_obj = TestBackfillJobSnapshotUsageScript.FakeQuery(self.rows)
+            return self.query_obj
+
+    def _load_script(self):
+        import importlib.util
+
+        path = REPO_ROOT / "slurmweb" / "scripts" / "backfill-job-snapshot-usage.py"
+        spec = importlib.util.spec_from_file_location("backfill_job_snapshot_usage", path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    def _snapshot(self, record_id=1, job_id=996542, memory=None, cpu=None):
+        submit_time = datetime.fromtimestamp(1710000000, tz=timezone.utc)
+        return SimpleNamespace(
+            id=record_id,
+            job_id=job_id,
+            submit_time=submit_time,
+            job_name="regr",
+            job_state="COMPLETED",
+            state_reason=None,
+            user_id=21,
+            account="science",
+            group="research",
+            partition="normal",
+            qos="normal",
+            nodes="cn1",
+            node_count=1,
+            cpus=16,
+            priority=100,
+            tres_req_str=None,
+            tres_per_job=None,
+            tres_per_node=None,
+            gres_detail=None,
+            tres_requested=None,
+            tres_allocated=None,
+            start_time=datetime.fromtimestamp(1710000100, tz=timezone.utc),
+            end_time=datetime.fromtimestamp(1710000530, tz=timezone.utc),
+            eligible_time=None,
+            last_sched_evaluation_time=None,
+            time_limit_minutes=60,
+            used_memory_gb=memory,
+            usage_stats=None,
+            used_cpu_cores_avg=cpu,
+            exit_code="0:0",
+            working_directory="/tmp/job",
+            command="run-regr",
+        )
+
+    def _detail(self, job_id=996542, submit_ts=1710000000, include_usage=True):
+        detail = {
+            "job_id": job_id,
+            "name": "regr",
+            "user": "lizenghui",
+            "group": "research",
+            "association": {"account": "science"},
+            "partition": "normal",
+            "qos": "normal",
+            "nodes": "cn1",
+            "node_count": {"set": True, "infinite": False, "number": 1},
+            "cpus": {"set": True, "infinite": False, "number": 16},
+            "priority": {"set": True, "infinite": False, "number": 100},
+            "state": {"current": ["COMPLETED"], "reason": "None"},
+            "time": {
+                "submission": submit_ts,
+                "start": 1710000100,
+                "end": 1710000530,
+                "limit": {"set": True, "infinite": False, "number": 60},
+            },
+            "steps": [],
+            "working_directory": "/tmp/job",
+            "command": "run-regr",
+        }
+        if include_usage:
+            detail["steps"] = [
+                {
+                    "time": {
+                        "elapsed": 430,
+                        "total": {"seconds": 386, "microseconds": 0},
+                    },
+                    "step": {"id": f"{job_id}.batch", "name": "batch"},
+                    "tres": {
+                        "consumed": {
+                            "max": [
+                                {
+                                    "type": "mem",
+                                    "count": 2575364096,
+                                    "id": 2,
+                                    "name": "",
+                                }
+                            ]
+                        }
+                    },
+                }
+            ]
+        return detail
+
+    def _args(self, **overrides):
+        values = {
+            "start": None,
+            "end": None,
+            "user": None,
+            "job_id": None,
+            "limit": None,
+            "dry_run": False,
+        }
+        values.update(overrides)
+        return SimpleNamespace(**values)
+
+    def test_backfill_dry_run_logs_rows_without_committing_updates(self):
+        script = self._load_script()
+        snapshot = self._snapshot()
+        session = self.FakeSession([(snapshot, "lizenghui")])
+        slurmrestd = mock.Mock()
+        slurmrestd.job.return_value = self._detail()
+
+        with mock.patch("builtins.print") as mock_print:
+            result = script.backfill(lambda: session, slurmrestd, self._args(dry_run=True))
+
+        self.assertEqual(result, {"scanned": 1, "updated": 1, "skipped": 0})
+        self.assertIsNone(snapshot.used_memory_gb)
+        self.assertIsNone(snapshot.used_cpu_cores_avg)
+        session.rollback.assert_called_once()
+        session.commit.assert_not_called()
+        printed = "\n".join(str(call.args[0]) for call in mock_print.call_args_list)
+        self.assertIn(
+            "job_snapshot_usage row: id=1 job_id=996542 username=lizenghui "
+            "old_memory=null new_memory=2.3984947204589844 old_cpu=null "
+            "new_cpu=0.8976744186046511 decision=updated reason=ok",
+            printed,
+        )
+
+    def test_backfill_updates_missing_usage_fields_and_commits(self):
+        script = self._load_script()
+        snapshot = self._snapshot()
+        session = self.FakeSession([(snapshot, "lizenghui")])
+        slurmrestd = mock.Mock()
+        slurmrestd.job.return_value = self._detail()
+
+        result = script.backfill(lambda: session, slurmrestd, self._args())
+
+        self.assertEqual(result, {"scanned": 1, "updated": 1, "skipped": 0})
+        self.assertEqual(snapshot.used_memory_gb, 2.3984947204589844)
+        self.assertEqual(snapshot.used_cpu_cores_avg, 0.8976744186046511)
+        session.commit.assert_called_once()
+        session.rollback.assert_not_called()
+
+    def test_backfill_query_applies_date_user_job_and_limit_filters(self):
+        script = self._load_script()
+        session = self.FakeSession([(self._snapshot(), "lizenghui")])
+        args = self._args(
+            start=date(2026, 5, 4),
+            end=date(2026, 5, 4),
+            user="lizenghui",
+            job_id=996542,
+            limit=1,
+        )
+
+        query = script.backfill_query(session, args)
+
+        self.assertEqual(query.limit_value, 1)
+        self.assertGreaterEqual(query.filter_calls, 6)
+        self.assertEqual(len(query.all()), 1)
+
+    def test_backfill_logs_skipped_reasons(self):
+        script = self._load_script()
+        missing_usage = self._snapshot(record_id=1, job_id=1)
+        missing_detail = self._snapshot(record_id=2, job_id=2)
+        mismatch = self._snapshot(record_id=3, job_id=3)
+        session = self.FakeSession(
+            [
+                (missing_usage, "alice"),
+                (missing_detail, "bob"),
+                (mismatch, "carol"),
+            ]
+        )
+        slurmrestd = mock.Mock()
+        no_usage_detail = self._detail(job_id=1, include_usage=False)
+        no_usage_detail["time"]["end"] = None
+        slurmrestd.job.side_effect = [
+            no_usage_detail,
+            self.SlurmrestdNotFoundError("missing"),
+            self._detail(job_id=3, submit_ts=1710000999),
+        ]
+
+        with mock.patch("builtins.print") as mock_print:
+            result = script.backfill(lambda: session, slurmrestd, self._args(dry_run=True))
+
+        self.assertEqual(result, {"scanned": 3, "updated": 0, "skipped": 3})
+        printed = "\n".join(str(call.args[0]) for call in mock_print.call_args_list)
+        self.assertIn("job_id=1 username=alice", printed)
+        self.assertIn("decision=skipped reason=missing_used_memory_gb", printed)
+        self.assertIn("job_id=2 username=bob", printed)
+        self.assertIn("decision=skipped reason=not_found", printed)
+        self.assertIn("job_id=3 username=carol", printed)
+        self.assertIn("decision=skipped reason=submit_time_mismatch", printed)
+
+    def test_backfill_updates_cpu_even_when_detail_memory_is_still_missing(self):
+        script = self._load_script()
+        snapshot = self._snapshot()
+        session = self.FakeSession([(snapshot, "lizenghui")])
+        slurmrestd = mock.Mock()
+        detail = self._detail(include_usage=False)
+        detail["steps"] = [
+            {
+                "time": {
+                    "elapsed": 430,
+                    "total": {"seconds": 386, "microseconds": 0},
+                },
+                "step": {"id": "996542.batch", "name": "batch"},
+                "tres": {"consumed": {"max": []}},
+            }
+        ]
+        slurmrestd.job.return_value = detail
+
+        result = script.backfill(lambda: session, slurmrestd, self._args())
+
+        self.assertEqual(result, {"scanned": 1, "updated": 1, "skipped": 0})
+        self.assertIsNone(snapshot.used_memory_gb)
+        self.assertEqual(snapshot.used_cpu_cores_avg, 0.8976744186046511)

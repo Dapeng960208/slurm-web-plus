@@ -879,6 +879,122 @@ class TestJobsStoreCompletedAggregationSource(unittest.TestCase):
             store._serialize_submitted_completed_job_row(snapshot)
 
 
+class TestJobsStorePersistenceUsageEnrichment(unittest.TestCase):
+    def _job(self, state="COMPLETED"):
+        return {
+            "job_id": 996542,
+            "name": "regr",
+            "job_state": [state],
+            "user": "lizenghui",
+            "group": "research",
+            "account": "science",
+            "partition": "normal",
+            "qos": "normal",
+            "nodes": "cn1",
+            "node_count": {"set": True, "infinite": False, "number": 1},
+            "cpus": {"set": True, "infinite": False, "number": 16},
+            "priority": {"set": True, "infinite": False, "number": 100},
+            "submit_time": {"set": True, "infinite": False, "number": 1710000000},
+            "start_time": {"set": True, "infinite": False, "number": 1710000100},
+            "end_time": {"set": True, "infinite": False, "number": 1710000530},
+            "time_limit": {"set": True, "infinite": False, "number": 60},
+            "current_working_directory": "/tmp/job",
+            "command": "run-regr",
+        }
+
+    def _detail(self, submit_ts=1710000000):
+        return {
+            "job_id": 996542,
+            "name": "regr",
+            "user": "lizenghui",
+            "group": "research",
+            "association": {"account": "science"},
+            "partition": "normal",
+            "qos": "normal",
+            "nodes": "cn1",
+            "node_count": {"set": True, "infinite": False, "number": 1},
+            "cpus": {"set": True, "infinite": False, "number": 16},
+            "priority": {"set": True, "infinite": False, "number": 100},
+            "state": {"current": ["COMPLETED"], "reason": "None"},
+            "time": {
+                "submission": submit_ts,
+                "start": 1710000100,
+                "end": 1710000530,
+                "limit": {"set": True, "infinite": False, "number": 60},
+            },
+            "steps": [
+                {
+                    "time": {
+                        "elapsed": 430,
+                        "total": {"seconds": 386, "microseconds": 0},
+                    },
+                    "step": {"id": "996542.batch", "name": "batch"},
+                    "tres": {
+                        "consumed": {
+                            "max": [
+                                {
+                                    "type": "mem",
+                                    "count": 2575364096,
+                                    "id": 2,
+                                    "name": "",
+                                }
+                            ]
+                        }
+                    },
+                }
+            ],
+            "working_directory": "/tmp/job",
+            "command": "run-regr",
+        }
+
+    def test_prepare_rows_enriches_completed_usage_fields_before_persistence(self):
+        slurmrestd = mock.Mock()
+        store = JobsStore(settings=mock.Mock(), slurmrestd=slurmrestd)
+        slurmrestd.job.return_value = self._detail()
+
+        rows = store._prepare_rows([self._job()])
+
+        slurmrestd.job.assert_called_once_with(996542)
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["used_memory_gb"], 2.3984947204589844)
+        self.assertEqual(rows[0]["used_cpu_cores_avg"], 0.8976744186046511)
+        self.assertIsNone(rows[0]["usage_stats"])
+
+    def test_prepare_rows_keeps_original_snapshot_when_detail_lookup_fails(self):
+        slurmrestd = mock.Mock()
+        slurmrestd.job.side_effect = SlurmrestdNotFoundError("missing")
+        store = JobsStore(settings=mock.Mock(), slurmrestd=slurmrestd)
+
+        rows = store._prepare_rows([self._job()])
+
+        slurmrestd.job.assert_called_once_with(996542)
+        self.assertEqual(len(rows), 1)
+        self.assertIsNone(rows[0]["used_memory_gb"])
+        self.assertIsNone(rows[0]["used_cpu_cores_avg"])
+
+    def test_prepare_rows_does_not_enrich_non_completed_jobs(self):
+        slurmrestd = mock.Mock()
+        store = JobsStore(settings=mock.Mock(), slurmrestd=slurmrestd)
+
+        rows = store._prepare_rows([self._job(state="RUNNING")])
+
+        slurmrestd.job.assert_not_called()
+        self.assertEqual(len(rows), 1)
+        self.assertIsNone(rows[0]["used_memory_gb"])
+
+    def test_prepare_rows_ignores_detail_with_submit_time_mismatch(self):
+        slurmrestd = mock.Mock()
+        slurmrestd.job.return_value = self._detail(submit_ts=1710000999)
+        store = JobsStore(settings=mock.Mock(), slurmrestd=slurmrestd)
+
+        rows = store._prepare_rows([self._job()])
+
+        slurmrestd.job.assert_called_once_with(996542)
+        self.assertEqual(len(rows), 1)
+        self.assertIsNone(rows[0]["used_memory_gb"])
+        self.assertIsNone(rows[0]["used_cpu_cores_avg"])
+
+
 class TestJobsStorePendingQueue(unittest.TestCase):
     def setUp(self):
         self.store = JobsStore(settings=mock.Mock(), slurmrestd=None)

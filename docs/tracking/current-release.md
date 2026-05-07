@@ -56,6 +56,16 @@
   - `avg_cpu_cores` 只对仍有有效 CPU 均值的日行按 `jobs_count` 加权
 - 后台用户工具聚合线程每轮刷新会记录汇总日志，输出扫描作业数、计入作业数、缺身份跳过数、缺内存跳过数、缺 CPU 样本数、运行时样本数和写入日行数
 - `slurmweb/scripts/repair-user-tool-daily-stats.py` 与 `slurmweb/scripts/rebuild-user-tool.py` 已同步新返回值和聚合口径，可用于历史日表重建
+- `job_snapshots` 资源字段补齐链路已前移：
+  - `COMPLETED` 作业持久化入库前，如果 `used_memory_gb` 或 `used_cpu_cores_avg` 缺失，会同步调用 Slurm REST detail 计算资源字段
+  - 持久化补齐只写入 `used_memory_gb` 与 `used_cpu_cores_avg`，不补写 `usage_stats`
+  - detail 查询失败、404、`submit_time` 不匹配或 detail 仍缺资源字段时，不阻断原始快照入库
+- 新增历史补数脚本 `slurmweb/scripts/backfill-job-snapshot-usage.py`：
+  - 默认扫描 `job_state = COMPLETED` 且 `used_memory_gb IS NULL OR used_cpu_cores_avg IS NULL` 的 `job_snapshots`
+  - 支持 `--start YYYY-MM-DD`、`--end YYYY-MM-DD`、`--user <username>`、`--job-id <id>`、`--limit <n>`、`--dry-run`
+  - 每条记录输出 `job_snapshot_usage row:` 单行日志，记录旧值、新值、更新或跳过原因
+  - 脚本只更新 `job_snapshots.used_memory_gb` 与 `used_cpu_cores_avg`，不更新 `usage_stats`
+- `user_tool_daily_stats` 日聚合和 `rebuild-user-tool.py` 保持只读 `job_snapshots` 当前资源字段，不再在统计链路临时调用 Slurm REST enrich
 - `slurmweb/scripts/rebuild-user-tool.py` 现在默认输出逐条重建明细日志：
   - 每个 UTC 日期会先打印 `source_jobs` 与当天聚合行数
   - 可通过 `--date 20260504` 或 `--date 2026-05-04` 只重建单日，通过 `--user <username>` 或 `--user-id <id>` 定位用户；指定日期或用户时只删除目标范围旧行
@@ -66,6 +76,8 @@
   - 全表写入前会再打印一次总预览摘要，包含日期范围、扫描天数、源作业数、将删除旧行数和将写入新行数
 - 本轮数据库执行顺序应固定为：
   - `alembic upgrade head`
+  - `python slurmweb/scripts/backfill-job-snapshot-usage.py --dry-run`
+  - `python slurmweb/scripts/backfill-job-snapshot-usage.py`
   - `python slurmweb/scripts/rebuild-user-tool.py`
   - 如需先核对口径，可先执行 `python slurmweb/scripts/rebuild-user-tool.py --dry-run`
 - 用户工具聚合定向回归已通过：`.venv\Scripts\python.exe -m pytest -q slurmweb/tests/apps/test_user_analytics_store.py`
