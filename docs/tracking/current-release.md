@@ -45,7 +45,8 @@
   - 聚合链路改为先按 `submit_time` 的 UTC 当天范围读取 `job_state = COMPLETED` 作业，再在 Python 中按 `activity_date + user_id + tool` 分类
   - `user_tool_daily_stats.jobs_count` 现在表示提交时间落在该 UTC 日期内、状态为 `COMPLETED` 且 `used_memory_gb > 0` 的作业数
   - `avg_memory_gb`、`max_memory_gb`、`median_memory_gb` 基于同一批正内存样本计算
-  - `avg_cpu_cores` 只统计其中 `used_cpu_cores_avg > 0` 的子集
+  - `avg_cpu_cores` 以 `jobs_count` 为分母，缺失或非法 `used_cpu_cores_avg` 按 `0` 计入
+  - `avg_runtime_seconds` 同样以 `jobs_count` 为分母，缺失运行时间按 `0` 计入
   - 没有正内存样本的作业不会写入 `user_tool_daily_stats`
 - `tools/analysis` 跨天汇总继续只读 `user_tool_daily_stats`：
   - `avg_memory_gb` 继续按日行 `jobs_count` 加权

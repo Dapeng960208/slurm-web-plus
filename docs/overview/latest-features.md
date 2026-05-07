@@ -29,7 +29,8 @@
 - 读取后的作业在 Python 中按 `activity_date + user_id + tool` 分类，不在 `user_tool_daily_stats` 链路中使用数据库聚合。
 - `jobs_count` 只统计 `used_memory_gb > 0` 的作业。
 - `avg_memory_gb`、`max_memory_gb`、`median_memory_gb` 基于同一批正内存样本计算。
-- `avg_cpu_cores` 只基于其中 `used_cpu_cores_avg > 0` 的子集计算。
+- `avg_cpu_cores` 以 `jobs_count` 为分母，缺失或非法 `used_cpu_cores_avg` 按 `0` 计入。
+- `avg_runtime_seconds` 同样以 `jobs_count` 为分母，缺失运行时间按 `0` 计入。
 - `tools/analysis` 的跨天汇总仍以日表为准；`avg_cpu_cores` 只会合并仍然带有效 CPU 样本的日行。
 - 后台聚合线程每轮刷新会记录扫描作业数、计入作业数、跳过数和写入行数，方便排查聚合结果为空或 CPU 样本缺失。
 - 历史修复脚本 `slurmweb/scripts/repair-user-tool-daily-stats.py` 已同步新口径，可按日期范围重建旧数据。

@@ -300,9 +300,7 @@ def _daily_payload_from_bucket(activity_date, user_id, tool, values):
         max(values["memory_values"]) if values["memory_values"] else None
     )
     median_memory_gb = _round_metric(_median(values["memory_values"]))
-    avg_runtime_seconds = _round_metric(
-        _avg(values["runtime_total"], values["runtime_weight"])
-    )
+    avg_runtime_seconds = _round_metric(_avg(values["runtime_total"], jobs))
     item = {
         "activity_date": activity_date,
         "user_id": user_id,
@@ -311,7 +309,7 @@ def _daily_payload_from_bucket(activity_date, user_id, tool, values):
         "avg_memory_gb": avg_memory_gb,
         "max_memory_gb": max_memory_gb,
         "median_memory_gb": median_memory_gb,
-        "avg_cpu_cores": _round_metric(_avg(values["cpu_total"], values["cpu_weight"])),
+        "avg_cpu_cores": _round_metric(_avg(values["cpu_total"], jobs)),
         "avg_runtime_seconds": avg_runtime_seconds,
     }
     if "username" in values:
@@ -535,9 +533,7 @@ def aggregate_user_tool_daily_rows(
             "memory_total": 0.0,
             "memory_values": [],
             "cpu_total": 0.0,
-            "cpu_weight": 0,
             "runtime_total": 0.0,
-            "runtime_weight": 0,
             "username": None,
         }
     )
@@ -545,9 +541,9 @@ def aggregate_user_tool_daily_rows(
         "rows_seen": 0,
         "rows_missing_identity": 0,
         "rows_skipped_memory": 0,
-        "rows_skipped_cpu": 0,
+        "cpu_missing": 0,
         "rows_counted": 0,
-        "runtime_counted": 0,
+        "runtime_missing": 0,
     }
     for row in rows:
         stats["rows_seen"] += 1
@@ -579,15 +575,14 @@ def aggregate_user_tool_daily_rows(
         cpu_value = _positive_numeric_value(_explicit_cpu_cores_avg(row))
         if cpu_value is not None:
             bucket["cpu_total"] += cpu_value
-            bucket["cpu_weight"] += 1
         else:
-            stats["rows_skipped_cpu"] += 1
+            stats["cpu_missing"] += 1
         runtime_value = _runtime_seconds(row)
         runtime_value = _positive_numeric_value(runtime_value)
         if runtime_value is not None:
             bucket["runtime_total"] += runtime_value
-            bucket["runtime_weight"] += 1
-            stats["runtime_counted"] += 1
+        else:
+            stats["runtime_missing"] += 1
 
     payload = []
     for (activity_date, user_id, tool), values in buckets.items():
@@ -984,14 +979,14 @@ class UserAnalyticsStore:
         payload, stats = self._aggregate_daily_rows(rows)
         logger.info(
             "User tool daily aggregation refreshed for %s: scanned=%d counted=%d "
-            "missing_identity=%d skipped_memory=%d skipped_cpu=%d runtime_counted=%d rows=%d",
+            "missing_identity=%d skipped_memory=%d cpu_missing=%d runtime_missing=%d rows=%d",
             _now_utc().date().isoformat(),
             stats["rows_seen"],
             stats["rows_counted"],
             stats["rows_missing_identity"],
             stats["rows_skipped_memory"],
-            stats["rows_skipped_cpu"],
-            stats["runtime_counted"],
+            stats["cpu_missing"],
+            stats["runtime_missing"],
             len(payload),
         )
         self._replace_current_day_summary(payload)

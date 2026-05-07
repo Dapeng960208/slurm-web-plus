@@ -35,7 +35,7 @@
 - `avg_cpu_cores`
 - `avg_runtime_seconds`
 
-`tools/analysis` 跨多日返回的 `avg_memory_gb` 与 `avg_cpu_cores` 始终按每日 `jobs_count` 加权，但 `avg_cpu_cores` 只会纳入 `avg_cpu_cores` 仍为有效正数的日行。当前 `jobs_count` 的语义是“提交时间落在该 UTC 日期内、状态为 `COMPLETED`、且 `used_memory_gb > 0` 的作业数”。`max_memory_gb` 取时间窗内日峰值的最大值；`median_memory_gb` 在直接作业聚合时返回精确中位数，在跨多日读取日表时返回按 `jobs_count` 加权的日中位数近似值。
+`tools/analysis` 跨多日返回的 `avg_memory_gb` 与 `avg_cpu_cores` 始终按每日 `jobs_count` 加权。当前 `jobs_count` 的语义是“提交时间落在该 UTC 日期内、状态为 `COMPLETED`、且 `used_memory_gb > 0` 的作业数”。`max_memory_gb` 取时间窗内日峰值的最大值；`median_memory_gb` 在直接作业聚合时返回精确中位数，在跨多日读取日表时返回按 `jobs_count` 加权的日中位数近似值。
 
 `tools/analysis` 当前固定要求：
 
@@ -73,11 +73,11 @@
 - `tools/analysis` 会按 `start` / `end` 覆盖到的 UTC 日期读取日聚合表；该接口的工具统计粒度为日，且请求时不实时重建日聚合表。
 - 日聚合写入会过滤没有 `user_id` 或没有 `submit_time` 的作业；目标日期按 `submit_time` 的 UTC 日期计算。
 - 当天日聚合按 `activity_date + user_id + tool` 分组，只统计提交时间落在当天范围内且状态为 `COMPLETED` 的作业；写入的 `activity_date` 固定为本轮统计日期的年月日。
-- 当天 `jobs_count` 只统计该组中 `used_memory_gb > 0` 的作业；`avg_memory_gb`、`max_memory_gb`、`median_memory_gb` 基于同一批正内存样本计算；`avg_cpu_cores` 只基于其中 `used_cpu_cores_avg > 0` 的子集求平均，不再写入 `0` 占位。
+- 当天 `jobs_count` 只统计该组中 `used_memory_gb > 0` 的作业；`avg_memory_gb`、`max_memory_gb`、`median_memory_gb` 基于同一批正内存样本计算；`avg_cpu_cores` 以 `jobs_count` 为分母，缺失或非法 `used_cpu_cores_avg` 按 `0` 计入。
 - 写入 `user_tool_daily_stats` 前，`avg_memory_gb`、`max_memory_gb`、`median_memory_gb`、`avg_cpu_cores`、`avg_runtime_seconds` 会统一四舍五入到两位小数再入库。
-- 跨多天查询按日表行合并：`avg_memory_gb = sum(day.avg_memory_gb * day.jobs_count) / sum(day.jobs_count)`；`avg_cpu_cores` 只按 `avg_cpu_cores` 仍为有效正数的日行参与同口径加权；`max_memory_gb` 取时间窗内各日 `max_memory_gb` 的最大值；`median_memory_gb` 按 `sum(day.median_memory_gb * day.jobs_count) / sum(day.jobs_count)` 近似。
-- 当整个时间窗内没有任何 `used_memory_gb > 0` 的 `COMPLETED` 作业时，跨天返回该资源均值为 `null`，`completed_jobs` 为 `0`，工具列表为空；如果只有 CPU 样本缺失，则 `avg_cpu_cores` 返回 `null`，但内存统计和 `completed_jobs` 仍保留。
-- 运行时间优先按 `end_time - start_time` 计算，并返回 `avg_runtime_hours`；兼容保留 `avg_runtime_seconds`。
+- 跨多天查询按日表行合并：`avg_memory_gb = sum(day.avg_memory_gb * day.jobs_count) / sum(day.jobs_count)`；`avg_cpu_cores` 使用同一 `jobs_count` 加权口径；`max_memory_gb` 取时间窗内各日 `max_memory_gb` 的最大值；`median_memory_gb` 按 `sum(day.median_memory_gb * day.jobs_count) / sum(day.jobs_count)` 近似。
+- 当整个时间窗内没有任何 `used_memory_gb > 0` 的 `COMPLETED` 作业时，跨天返回该资源均值为 `null`，`completed_jobs` 为 `0`，工具列表为空。
+- 运行时间优先按 `end_time - start_time` 计算，并返回 `avg_runtime_hours`；兼容保留 `avg_runtime_seconds`。日表写入时 `avg_runtime_seconds` 也以 `jobs_count` 为分母，缺失运行时间按 `0` 计入。
 - 状态判断按 `UPPER(job_state) = 'COMPLETED'` 匹配，避免 `completed` / `COMPLETED` 大小写差异导致统计为空。
 - 后台聚合线程每轮刷新会输出汇总日志，记录扫描作业数、纳入统计作业数、缺身份跳过数、缺内存跳过数、缺 CPU 样本数、运行时样本数和写入日行数，便于排查 `tools/analysis` 返回空或 CPU 均值缺失。
 
