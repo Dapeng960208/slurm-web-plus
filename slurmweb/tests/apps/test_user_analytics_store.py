@@ -946,7 +946,7 @@ class TestRepairUserToolDailyStatsScript(unittest.TestCase):
     def _load_script(self):
         import importlib.util
 
-        path = REPO_ROOT / "scripts" / "repair-user-tool-daily-stats.py"
+        path = REPO_ROOT / "slurmweb" / "scripts" / "repair-user-tool-daily-stats.py"
         spec = importlib.util.spec_from_file_location("repair_user_tool_daily_stats", path)
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)

@@ -44,7 +44,7 @@
   - `avg_max_memory_gb` 继续按日行 `jobs_count` 加权
   - `avg_cpu_cores` 只对仍有有效 CPU 均值的日行按 `jobs_count` 加权
 - 后台用户工具聚合线程每轮刷新会记录汇总日志，输出扫描作业数、计入作业数、缺身份跳过数、缺内存跳过数、缺 CPU 样本数、运行时样本数和写入日行数
-- `scripts/repair-user-tool-daily-stats.py` 与 `scripts/rebuild-user-tool.py` 已同步新返回值和聚合口径，可用于历史日表重建
+- `slurmweb/scripts/repair-user-tool-daily-stats.py` 与 `slurmweb/scripts/rebuild-user-tool.py` 已同步新返回值和聚合口径，可用于历史日表重建
 - 用户工具聚合定向回归已通过：`.venv\Scripts\python.exe -m pytest -q slurmweb/tests/apps/test_user_analytics_store.py`
 
 - AI 助手已改为按 Agent 接口语义编排，而不是在工具层直接拼底层数据源调用
@@ -223,7 +223,7 @@
   - `None`、`0`、负数和非法资源值不参与当天资源平均；无有效样本时保存并返回 `0`
   - 跨多天同工具合并按 `sum(day.avg * day.jobs_count) / sum(day.jobs_count)` 计算；只要当天对应 `avg_*` 是有效正值，该日就参与对应资源均值分母，`totals` 层使用相同口径
   - 继续保留 `avg_max_memory_mb` 与 `avg_runtime_seconds` 兼容字段
-- 新增维护脚本 `scripts/repair-user-tool-daily-stats.py`，支持 `--start YYYY-MM-DD`、`--end YYYY-MM-DD`、可选 `--user <username>` 和 `--dry-run`
+- 新增维护脚本 `slurmweb/scripts/repair-user-tool-daily-stats.py`，支持 `--start YYYY-MM-DD`、`--end YYYY-MM-DD`、可选 `--user <username>` 和 `--dry-run`
 - `Submission Activity` 的提交时间线在 `submit_time` 缺失时会回退到 `start_time` / `last_seen`
 - 用户分析终态作业过滤已改为 `UPPER(job_state)` 匹配，避免小写状态导致自定义时间窗无数据
 - 用户分析 `metrics/history` 自定义窗口已统一使用 UTC bucket 与 epoch milliseconds 匹配，避免 `7 days` 等 day bucket 因数据库时区差异返回全 0

@@ -496,7 +496,7 @@
 - 解决：
   - `user_analytics_store` 的聚合查询补取 `tres_req_str`、`tres_per_job`、`tres_per_node`、`tres_requested`、`tres_allocated`。
   - 内存解析在实际用量缺失后，从 `tres_allocated`、`tres_requested` 的 `mem` TRES（MiB）兜底，再从 TRES 字符串中的 `mem=<MiB>` 兜底。
-  - `scripts/rebuild-user-tool.py` 使用同一口径，避免维护脚本重建 `user_tool_daily_stats` 后再次写入空值。
+  - `slurmweb/scripts/rebuild-user-tool.py` 使用同一口径，避免维护脚本重建 `user_tool_daily_stats` 后再次写入空值。
   - 新增聚合和当前日刷新回归测试，覆盖 TRES list 与 TRES string 两类兜底。
 - 预防：后续排查资源均值为空时，需要同时检查 step 实际用量和 job 级 TRES 配置；维护脚本必须与在线聚合保持字段选择和解析口径一致。
 
@@ -508,19 +508,19 @@
 - 根因：将数据修复职责放进了在线查询路径；没有把“日聚合表生成/修复”和“接口读取日聚合表”两个职责分开。
 - 解决：
   - `user_tool_analysis()` 移除 `_refresh_user_tool_daily_stats()` 调用，只执行 `_user_tool_daily_summary()`。
-  - 保留后台当前日聚合和 `scripts/rebuild-user-tool.py` 的资源解析修复，负责生成或修复 `user_tool_daily_stats`。
+  - 保留后台当前日聚合和 `slurmweb/scripts/rebuild-user-tool.py` 的资源解析修复，负责生成或修复 `user_tool_daily_stats`。
   - 单测改为断言 `user_tool_analysis()` 只读取日聚合摘要。
 - 预防：后续调整 `tools/analysis` 返回字段时，接口层只能读 `user_tool_daily_stats`；如需补历史数据，应通过后台聚合任务、迁移或维护脚本完成。
 
-### 2026-05-06：后台日聚合与 `scripts/rebuild-user-tool.py` 聚合口径漂移
+### 2026-05-06：后台日聚合与 `slurmweb/scripts/rebuild-user-tool.py` 聚合口径漂移
 
-- 场景：要求 `user_analytics_store` 的后台聚合与 `scripts/rebuild-user-tool.py` 的数据聚合和插入逻辑保持一致，并由 `tools/analysis` 只读 `UserToolDailyStat` 后多日合并返回。
+- 场景：要求 `user_analytics_store` 的后台聚合与 `slurmweb/scripts/rebuild-user-tool.py` 的数据聚合和插入逻辑保持一致，并由 `tools/analysis` 只读 `UserToolDailyStat` 后多日合并返回。
 - 现象：后台当前日聚合与重建脚本存在重复实现，后台按数据库本地 `CURRENT_DATE` 取当天，重建脚本按 UTC 日期取数；`regr_*` 工具归并只在重建脚本中存在。
 - 复现：分别执行后台当前日聚合和维护脚本重建同一天数据，在数据库 timezone 非 UTC 或工具名为 `regr_foo` / `regr-bar` 时，可能写出不同的 `activity_date` 或 `tool`。
 - 根因：聚合、工具归类和时间口径分散在两个文件中维护，缺少共享函数和回归测试。
 - 解决：
   - `user_analytics_store` 新增共享 `aggregate_user_tool_daily_rows()`，负责日聚合、资源空值过滤、样本数统计与工具归类。
-  - 后台 `_aggregate_daily_rows()` 与 `scripts/rebuild-user-tool.py` 均复用该共享函数。
+  - 后台 `_aggregate_daily_rows()` 与 `slurmweb/scripts/rebuild-user-tool.py` 均复用该共享函数。
   - 后台当前日查询改为 UTC 自然日，并过滤 `user_id IS NULL` 与 `COALESCE(end_time, last_seen) IS NULL` 的行。
   - `tools/analysis` 保持只读 `user_tool_daily_stats`，多日查询由 `_aggregate_daily_stat_rows()` 按 `memory_samples` / `cpu_samples` / `runtime_samples` 加权合并。
 - 预防：后续修改日聚合字段、工具归类或资源解析时，只改共享聚合函数，并补后台路径与维护脚本一致性的测试。
@@ -560,7 +560,7 @@
   - 日聚合写表改为只强制 `used_memory_gb > 0`；`used_cpu_cores_avg` 缺失时仍保留该作业的 `jobs_count`、内存均值和运行时样本。
   - `avg_cpu_cores` 与 `cpu_samples` 仅统计有有效 CPU 样本的子集；跨天 `tools/analysis` 只对这类日行合并 CPU 均值。
   - `refresh_current_day_summary()` 增加每轮聚合汇总日志，记录扫描作业数、缺内存跳过数、缺 CPU 样本数和最终写入行数。
-  - `repair-user-tool-daily-stats.py` 与 `scripts/rebuild-user-tool.py` 同步新口径，用于重建历史 `user_tool_daily_stats`。
+  - `repair-user-tool-daily-stats.py` 与 `slurmweb/scripts/rebuild-user-tool.py` 同步新口径，用于重建历史 `user_tool_daily_stats`。
 - 预防：后续只要调整 `jobs_count`、`avg_cpu_cores` 或样本数字段语义，必须同时更新在线聚合、跨天汇总、维护脚本和诊断日志，并补对应回归测试。
 
 ### 2026-05-06：前端单测入口误用 `npm test` 与 `npm run test:unit -- --run ...`

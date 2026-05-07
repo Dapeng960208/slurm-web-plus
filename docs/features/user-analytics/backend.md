@@ -22,7 +22,7 @@
 - `GET /api/agents/<cluster>/user/<username>/metrics/history`
 - `GET /api/agents/<cluster>/associations`
 
-`tools/analysis` 的工具分类统计以 `user_tool_daily_stats` 为返回来源。接口收到 `start` / `end` 后，只按时间窗覆盖到的 UTC 自然日读取 `user_tool_daily_stats` 并汇总返回；查询多天时，内存与 CPU 均值按 `sum(day.avg * day.jobs_count) / sum(day.jobs_count)` 合并。该请求路径不实时扫描 `job_snapshots` 或 SlurmDB。历史错误日表可通过维护脚本 `scripts/repair-user-tool-daily-stats.py` 按日期范围和可选用户重建。
+`tools/analysis` 的工具分类统计以 `user_tool_daily_stats` 为返回来源。接口收到 `start` / `end` 后，只按时间窗覆盖到的 UTC 自然日读取 `user_tool_daily_stats` 并汇总返回；查询多天时，内存与 CPU 均值按 `sum(day.avg * day.jobs_count) / sum(day.jobs_count)` 合并。该请求路径不实时扫描 `job_snapshots` 或 SlurmDB。历史错误日表可通过维护脚本 `slurmweb/scripts/repair-user-tool-daily-stats.py` 按日期范围和可选用户重建。
 
 后台线程按 `[user_metrics].aggregation_interval` 配置周期执行，启动时先执行一次，然后按间隔重算并替换当天 UTC 自然日的终态作业统计。后台聚合与维护脚本复用同一套聚合函数，保持工具归类、空值过滤和插入字段一致；重算当天数据时会先删除当天旧行，再写入新的有效统计，避免旧脏行残留。
 
@@ -82,8 +82,8 @@
 维护脚本：
 
 ```powershell
-.venv\Scripts\python.exe scripts\repair-user-tool-daily-stats.py --start 2026-05-01 --end 2026-05-06 --dry-run
-.venv\Scripts\python.exe scripts\repair-user-tool-daily-stats.py --start 2026-05-01 --end 2026-05-06 --user alice
+.venv\Scripts\python.exe slurmweb\scripts\repair-user-tool-daily-stats.py --start 2026-05-01 --end 2026-05-06 --dry-run
+.venv\Scripts\python.exe slurmweb\scripts\repair-user-tool-daily-stats.py --start 2026-05-01 --end 2026-05-06 --user alice
 ```
 
 脚本默认删除目标日期范围内的旧 `user_tool_daily_stats`，再按当前口径从 `job_snapshots` 重建；`--dry-run` 只输出将处理的作业数、将删除的旧行数和将写入的新行数，不写数据库。

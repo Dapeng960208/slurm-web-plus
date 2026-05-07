@@ -30,7 +30,7 @@ def parse_args():
         description=(
             "Delete all user_tool_daily_stats rows and rebuild daily tool stats "
             "from job_snapshots. Run from the repository root with: "
-            "python scripts/rebuild-user-tool.py"
+            "python slurmweb/scripts/rebuild-user-tool.py"
         )
     )
     parser.add_argument(
