@@ -59,6 +59,10 @@
   - `max_memory_gb` 取时间窗内日峰值最大值
   - `median_memory_gb` 按日中位数与 `jobs_count` 做近似加权
   - `avg_cpu_cores` 只对仍有有效 CPU 均值的日行按 `jobs_count` 加权
+- 用户详情页与独立用户分析页的 `Completed Job Tool Analysis` 已增强为图表加表格联合展示：
+  - 保留工具维度图表，用于展示工具作业量与内存峰值的相对关系
+  - 新增 `Completed Job Tool Table`，按工具展示作业数量、占比、平均内存、最大内存、中位数内存、平均运行时间和平均 CPU
+  - 表格按作业数量优先排序，并补充体量条、排名编号和工具级资源摘要
 - 后台用户工具聚合线程每轮刷新会记录汇总日志，输出扫描作业数、计入作业数、缺身份跳过数、缺内存跳过数、缺 CPU 样本数、运行时样本数和写入日行数
 - `slurmweb/scripts/repair-user-tool-daily-stats.py` 与 `slurmweb/scripts/rebuild-user-tool.py` 已同步新返回值和聚合口径，可用于历史日表重建
 - `job_snapshots` 资源字段补齐链路已迁移到日聚合前：
@@ -338,6 +342,7 @@
 - 当前 `tool_mapping_file` demo 只提供常见工具归类示例，不会默认启用；生产环境仍需按实际集群命名规则调整
 - 当前 AI token 计数为前端估算，不等同于 provider 真实 usage 或计费 token；若后续需要精确计量，需要扩展后端 provider 返回与持久化结构
 - 当前 Conversation Audit 搜索只过滤已加载摘要，不搜索完整消息正文；如需全文检索需要扩展审计接口
+- `cd frontend && npx vitest run` 当前仍会输出一批既有 Vue `inject() can only be used inside setup() or functional components.` 告警；全量前端测试已通过，但这类告警噪音仍值得后续单独清理
 
 ## 5. 已同步文档
 

@@ -9,7 +9,7 @@
 <script setup lang="ts">
 import { computed, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { getMBHumanUnit, useGatewayAPI } from '@/composables/GatewayAPI'
+import { useGatewayAPI } from '@/composables/GatewayAPI'
 import type {
   DateTimeWindowQuery,
   UserMetricsHistory,
@@ -23,6 +23,7 @@ import MetricRangeSelector from '@/components/MetricRangeSelector.vue'
 import StatCardSkeleton from '@/components/StatCardSkeleton.vue'
 import UserSubmissionHistoryChart from '@/components/user/UserSubmissionHistoryChart.vue'
 import UserToolAnalysisChart from '@/components/user/UserToolAnalysisChart.vue'
+import UserToolAnalysisTable from '@/components/user/UserToolAnalysisTable.vue'
 
 const { cluster, user, enabled } = defineProps<{
   cluster: string
@@ -541,59 +542,71 @@ onUnmounted(() => {
       >
         No completed job tool activity has been recorded for this user yet.
       </p>
-      <div v-else class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(320px,0.86fr)]">
-        <div>
-          <div class="mb-3">
-            <h3 class="ui-stat-label">Memory and Volume</h3>
+      <div v-else class="space-y-6">
+        <div class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(320px,0.86fr)]">
+          <div>
+            <div class="mb-3">
+              <h3 class="ui-stat-label">Memory and Volume</h3>
+            </div>
+            <UserToolAnalysisChart :tools="topTools" />
           </div>
-          <UserToolAnalysisChart :tools="topTools" />
-        </div>
 
-        <div>
-          <div class="mb-3">
-            <h3 class="ui-stat-label">Resource Roll-up</h3>
-          </div>
-          <div class="space-y-3">
-            <div v-for="tool in topTools" :key="tool.tool" class="ui-panel-soft px-4 py-3">
-              <div class="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <div class="font-semibold text-[var(--color-brand-ink-strong)]">
-                    {{ tool.tool }}
+          <div>
+            <div class="mb-3">
+              <h3 class="ui-stat-label">Resource Roll-up</h3>
+            </div>
+            <div class="space-y-3">
+              <div v-for="tool in topTools" :key="tool.tool" class="ui-panel-soft px-4 py-3">
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <div class="font-semibold text-[var(--color-brand-ink-strong)]">
+                      {{ tool.tool }}
+                    </div>
+                    <div class="mt-1 text-sm text-[var(--color-brand-muted)]">
+                      {{ tool.jobs }} completed job(s)
+                    </div>
                   </div>
-                  <div class="mt-1 text-sm text-[var(--color-brand-muted)]">
-                    {{ tool.jobs }} completed job(s)
+                  <span class="ui-chip">{{ tool.jobs }} jobs</span>
+                </div>
+                <div class="mt-3 grid gap-2 text-sm text-[var(--color-brand-muted)] sm:grid-cols-5">
+                  <div>
+                    Memory Avg:
+                    {{ tool.avg_memory_gb != null ? formatGb(tool.avg_memory_gb) : '--' }}
                   </div>
-                </div>
-                <span class="ui-chip">{{ tool.jobs }} jobs</span>
-              </div>
-              <div class="mt-3 grid gap-2 text-sm text-[var(--color-brand-muted)] sm:grid-cols-5">
-                <div>
-                  Memory Avg:
-                  {{ tool.avg_memory_gb != null ? formatGb(tool.avg_memory_gb) : '--' }}
-                </div>
-                <div>
-                  Memory Max:
-                  {{ tool.max_memory_gb != null ? formatGb(tool.max_memory_gb) : '--' }}
-                </div>
-                <div>
-                  Memory Median:
-                  {{ tool.median_memory_gb != null ? formatGb(tool.median_memory_gb) : '--' }}
-                </div>
-                <div>
-                  CPU:
-                  {{ tool.avg_cpu_cores != null ? `${tool.avg_cpu_cores.toFixed(1)} cores` : '--' }}
-                </div>
-                <div>
-                  Runtime:
-                  {{
-                    tool.avg_runtime_hours != null
-                      ? formatHours(tool.avg_runtime_hours)
-                      : formatDuration(tool.avg_runtime_seconds)
-                  }}
+                  <div>
+                    Memory Max:
+                    {{ tool.max_memory_gb != null ? formatGb(tool.max_memory_gb) : '--' }}
+                  </div>
+                  <div>
+                    Memory Median:
+                    {{ tool.median_memory_gb != null ? formatGb(tool.median_memory_gb) : '--' }}
+                  </div>
+                  <div>
+                    CPU:
+                    {{ tool.avg_cpu_cores != null ? `${tool.avg_cpu_cores.toFixed(1)} cores` : '--' }}
+                  </div>
+                  <div>
+                    Runtime:
+                    {{
+                      tool.avg_runtime_hours != null
+                        ? formatHours(tool.avg_runtime_hours)
+                        : formatDuration(tool.avg_runtime_seconds)
+                    }}
+                  </div>
                 </div>
               </div>
             </div>
           </div>
+        </div>
+
+        <div>
+          <div class="mb-3">
+            <h3 class="ui-stat-label">Detailed Tool Metrics</h3>
+          </div>
+          <UserToolAnalysisTable
+            :tools="userToolAnalysis?.tool_breakdown ?? []"
+            :total-completed-jobs="userToolAnalysis?.totals.completed_jobs ?? 0"
+          />
         </div>
       </div>
     </div>
