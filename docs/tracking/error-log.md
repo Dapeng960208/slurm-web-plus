@@ -17,6 +17,18 @@
 
 ## 条目
 
+### 2026-05-07：`backfill-job-snapshot-usage.py` 全量输出 `detail_error`
+
+- 场景：执行 `slurmweb/scripts/backfill-job-snapshot-usage.py` 补齐历史 `job_snapshots` 资源字段。
+- 现象：日志显示 `job_snapshot_usage updated: scanned=278126 updated=0 skipped=278126`，逐条记录均为 `decision=skipped reason=detail_error`，无法判断是认证、连接、版本还是调用错误。
+- 复现：使用基础 `Slurmrestd` 实例运行补数脚本；脚本直接调用 `slurmrestd.job(snapshot.job_id)`。
+- 根因：基础 `Slurmrestd` 类只暴露 `_acctjob()` / `_ctldjob()`，公开 `job()` 方法定义在 `SlurmrestdFiltered`；补数脚本创建的是基础 `Slurmrestd`，因此每条记录都会触发 `AttributeError`，但旧日志把所有非 404 异常都压缩成 `detail_error`。
+- 解决：
+  - 新增 `fetch_job_detail()`，当 client 有 `job()` 时使用公开方法，否则用 `_acctjob()` 加可选 `_ctldjob(ignore_notfound=True)` 兼容基础 `Slurmrestd`。
+  - `job_snapshot_usage row:` 日志新增 `error_type` 与截断后的 `error`，避免系统性失败时丢失异常上下文。
+  - 补单测覆盖基础 `Slurmrestd` 无 `job()` 方法和 `detail_error` 异常信息输出。
+- 预防：维护脚本不能假设创建的 client 与应用运行时过滤/缓存 wrapper 拥有同一公开方法；批量脚本遇到全量失败时必须输出异常类型和消息，不能只保留泛化 reason。
+
 ### 2026-05-07：`job/history/detail` 补齐资源但日表重建仍看到 `used_memory_gb = NULL`
 
 - 场景：用户在 `job/history/detail` 前端详情中看到 `used_memory_gb` 与 `used_cpu_cores_avg` 有值，但执行 `rebuild-user-tool.py --date 20260504 --user lizenghui --dry-run` 时，同一作业日志显示资源字段为空并被 `missing_used_memory_gb` 跳过。

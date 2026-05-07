@@ -21,6 +21,7 @@ from slurmweb.apps._defaults import SlurmwebAppDefaults
 from slurmweb.models.db import sqlalchemy_url
 from slurmweb.models.modes import JobSnapshot, User
 from slurmweb.persistence.jobs_store import _extract_detail, _is_not_found_error
+from slurmweb.slurmrestd.errors import SlurmrestdInternalError
 
 
 def parse_date(value):
@@ -196,11 +197,32 @@ def _format_value(value):
     return str(value)
 
 
-def _print_row(snapshot, username, old_memory, new_memory, old_cpu, new_cpu, decision, reason):
+def _format_error(err):
+    if err is None:
+        return "null", "null"
+    message = str(err).replace("\r", " ").replace("\n", " ")
+    if len(message) > 240:
+        message = message[:237] + "..."
+    return err.__class__.__name__, message or "-"
+
+
+def _print_row(
+    snapshot,
+    username,
+    old_memory,
+    new_memory,
+    old_cpu,
+    new_cpu,
+    decision,
+    reason,
+    error=None,
+):
+    error_type, error_message = _format_error(error)
     print(
         "job_snapshot_usage row: id={id} job_id={job_id} username={username} "
         "old_memory={old_memory} new_memory={new_memory} old_cpu={old_cpu} "
-        "new_cpu={new_cpu} decision={decision} reason={reason}".format(
+        "new_cpu={new_cpu} decision={decision} reason={reason} "
+        "error_type={error_type} error={error}".format(
             id=snapshot.id,
             job_id=snapshot.job_id,
             username=username or "-",
@@ -210,6 +232,8 @@ def _print_row(snapshot, username, old_memory, new_memory, old_cpu, new_cpu, dec
             new_cpu=_format_value(new_cpu),
             decision=decision,
             reason=reason,
+            error_type=error_type,
+            error=error_message,
         )
     )
 
@@ -235,6 +259,19 @@ def _apply_detail(snapshot, username, detail):
     return True, "ok", new_memory, new_cpu
 
 
+def fetch_job_detail(slurmrestd, job_id):
+    if hasattr(slurmrestd, "job"):
+        return slurmrestd.job(job_id)
+
+    result = slurmrestd._acctjob(job_id)
+    try:
+        result.update(slurmrestd._ctldjob(job_id, ignore_notfound=True))
+    except SlurmrestdInternalError as err:
+        if err.error != 2017:
+            raise
+    return result
+
+
 def backfill(session_factory, slurmrestd, args):
     scanned = 0
     updated = 0
@@ -246,7 +283,7 @@ def backfill(session_factory, slurmrestd, args):
             old_memory = snapshot.used_memory_gb
             old_cpu = snapshot.used_cpu_cores_avg
             try:
-                detail = slurmrestd.job(snapshot.job_id)
+                detail = fetch_job_detail(slurmrestd, snapshot.job_id)
             except Exception as err:
                 skipped += 1
                 reason = "not_found" if _is_not_found_error(err) else "detail_error"
@@ -259,6 +296,7 @@ def backfill(session_factory, slurmrestd, args):
                     None,
                     "skipped",
                     reason,
+                    error=err,
                 )
                 continue
 

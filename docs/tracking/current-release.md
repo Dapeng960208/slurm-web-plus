@@ -81,6 +81,10 @@
   - `python slurmweb/scripts/rebuild-user-tool.py`
   - 如需先核对口径，可先执行 `python slurmweb/scripts/rebuild-user-tool.py --dry-run`
 - 用户工具聚合定向回归已通过：`.venv\Scripts\python.exe -m pytest -q slurmweb/tests/apps/test_user_analytics_store.py`
+- 历史资源补数脚本修复后已通过：
+  - `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/apps/test_user_analytics_store.py`
+  - `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/apps/test_jobs_store.py`
+  - `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/views/test_agent_metrics_requests.py`
 
 - AI 助手已改为按 Agent 接口语义编排，而不是在工具层直接拼底层数据源调用
 - AI 当前首批可按需串联的查询接口包括：

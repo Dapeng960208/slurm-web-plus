@@ -1734,7 +1734,8 @@ class TestBackfillJobSnapshotUsageScript(unittest.TestCase):
         self.assertIn(
             "job_snapshot_usage row: id=1 job_id=996542 username=lizenghui "
             "old_memory=null new_memory=2.3984947204589844 old_cpu=null "
-            "new_cpu=0.8976744186046511 decision=updated reason=ok",
+            "new_cpu=0.8976744186046511 decision=updated reason=ok "
+            "error_type=null error=null",
             printed,
         )
 
@@ -1800,8 +1801,38 @@ class TestBackfillJobSnapshotUsageScript(unittest.TestCase):
         self.assertIn("decision=skipped reason=missing_used_memory_gb", printed)
         self.assertIn("job_id=2 username=bob", printed)
         self.assertIn("decision=skipped reason=not_found", printed)
+        self.assertIn("error_type=SlurmrestdNotFoundError error=missing", printed)
         self.assertIn("job_id=3 username=carol", printed)
         self.assertIn("decision=skipped reason=submit_time_mismatch", printed)
+
+    def test_fetch_job_detail_supports_base_slurmrestd_without_job_method(self):
+        script = self._load_script()
+        slurmrestd = SimpleNamespace()
+        slurmrestd._acctjob = mock.Mock(return_value={"job_id": 996542, "name": "regr"})
+        slurmrestd._ctldjob = mock.Mock(return_value={"partition": "normal"})
+
+        detail = script.fetch_job_detail(slurmrestd, 996542)
+
+        self.assertEqual(detail["job_id"], 996542)
+        self.assertEqual(detail["partition"], "normal")
+        slurmrestd._acctjob.assert_called_once_with(996542)
+        slurmrestd._ctldjob.assert_called_once_with(996542, ignore_notfound=True)
+
+    def test_backfill_detail_error_log_includes_exception_type_and_message(self):
+        script = self._load_script()
+        snapshot = self._snapshot()
+        session = self.FakeSession([(snapshot, "lizenghui")])
+        slurmrestd = mock.Mock()
+        slurmrestd.job.side_effect = AttributeError("'Slurmrestd' object has no attribute 'job'")
+
+        with mock.patch("builtins.print") as mock_print:
+            result = script.backfill(lambda: session, slurmrestd, self._args(dry_run=True))
+
+        self.assertEqual(result, {"scanned": 1, "updated": 0, "skipped": 1})
+        printed = "\n".join(str(call.args[0]) for call in mock_print.call_args_list)
+        self.assertIn("decision=skipped reason=detail_error", printed)
+        self.assertIn("error_type=AttributeError", printed)
+        self.assertIn("no attribute 'job'", printed)
 
     def test_backfill_updates_cpu_even_when_detail_memory_is_still_missing(self):
         script = self._load_script()
