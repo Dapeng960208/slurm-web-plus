@@ -17,6 +17,15 @@
 
 ## 条目
 
+### 2026-05-07：PowerShell 中使用 `&&` 串联 Git 验证命令失败
+
+- 场景：完成 `user_tool_daily_stats` rebuild 口径提交后，在 Windows PowerShell 中验证提交详情。
+- 现象：执行 `git show --stat --oneline --no-patch HEAD && git show --stat --format=short HEAD` 时，PowerShell 报错 `The token '&&' is not a valid statement separator in this version`。
+- 复现：在当前 PowerShell 环境中直接执行包含 `&&` 的串联命令。
+- 根因：当前 PowerShell 版本不支持 Bash 风格的 `&&` 语句分隔符。
+- 解决：改为分别执行 Git 命令，或使用 PowerShell 原生命令分隔方式。
+- 预防：后续在本仓库 Windows PowerShell 环境中验证 Git 状态时，不使用 Bash 风格 `&&` 串联命令。
+
 ### 2026-05-07：按 `used_memory_gb` 单字段口径同步 rebuild 时旧测试仍断言 fallback
 
 - 场景：按要求把 `rebuild-user-tool.py` 同步到“`used_memory_gb` 只可能大于 0 或为空，日表只跳过空值”的口径，并运行用户分析单测。
