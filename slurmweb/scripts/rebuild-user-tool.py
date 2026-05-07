@@ -18,7 +18,7 @@ from rfl.settings import RuntimeSettings
 
 from slurmweb.apps._defaults import SlurmwebAppDefaults
 from slurmweb.models.db import psycopg_connect_kwargs
-from slurmweb.persistence.jobs_store import TERMINAL_STATES
+from slurmweb.persistence.jobs_store import JobsStore
 from slurmweb.persistence.user_analytics_store import (
     aggregate_user_tool_daily_rows,
     ToolNameMapper,
@@ -83,73 +83,6 @@ def load_settings(args):
         password=settings.database.password,
         tool_mapping_file=mapping_file,
     )
-
-
-def terminal_where_clause():
-    clause = " OR ".join(["UPPER(js.job_state) LIKE %s"] * len(TERMINAL_STATES))
-    params = [f"%{state}%" for state in TERMINAL_STATES]
-    return clause, params
-
-
-def completed_date_bounds(conn):
-    where_terminal, terminal_params = terminal_where_clause()
-    with conn.cursor() as cur:
-        cur.execute(
-            """
-            SELECT
-                MIN(DATE(COALESCE(js.end_time, js.last_seen) AT TIME ZONE 'UTC')) AS start_date,
-                MAX(DATE(COALESCE(js.end_time, js.last_seen) AT TIME ZONE 'UTC')) AS end_date
-            FROM job_snapshots js
-            WHERE js.user_id IS NOT NULL
-              AND COALESCE(js.end_time, js.last_seen) IS NOT NULL
-              AND (
-            """
-            + where_terminal
-            + """
-              )
-            """,
-            terminal_params,
-        )
-        return cur.fetchone()
-
-
-def completed_rows_for_date(conn, activity_date):
-    import psycopg2.extras
-
-    where_terminal, terminal_params = terminal_where_clause()
-    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-        cur.execute(
-            """
-            SELECT DISTINCT ON (js.job_id, js.submit_time)
-                DATE(COALESCE(js.end_time, js.last_seen) AT TIME ZONE 'UTC') AS activity_date,
-                js.user_id,
-                u.username,
-                js.job_name,
-                js.command,
-                js.tres_req_str,
-                js.tres_per_job,
-                js.tres_per_node,
-                js.tres_requested,
-                js.tres_allocated,
-                js.used_memory_gb,
-                js.used_cpu_cores_avg,
-                js.start_time,
-                js.end_time,
-                js.usage_stats
-            FROM job_snapshots js
-            INNER JOIN users u ON u.id = js.user_id
-            WHERE js.user_id IS NOT NULL
-              AND DATE(COALESCE(js.end_time, js.last_seen) AT TIME ZONE 'UTC') = %s
-              AND (
-            """
-            + where_terminal
-            + """
-              )
-            ORDER BY js.job_id, js.submit_time, js.last_seen DESC
-            """,
-            [activity_date] + terminal_params,
-        )
-        return list(cur.fetchall())
 
 
 def aggregate_daily_rows(rows, mapped_mapper, raw_mapper, rewrite_pattern, rewrite_tool):
@@ -271,12 +204,13 @@ def print_rebuild_preview(start_date, end_date, days, source_jobs, rows_deleted,
 
 def rebuild(conn, args):
     db_settings = load_settings(args)
+    jobs_store = JobsStore(db_settings, slurmrestd=None)
     rewrite_pattern = re.compile(args.rewrite_pattern)
     rewrite_tool = args.rewrite_tool.strip().lower() or "regr"
     mapped_mapper = ToolNameMapper(db_settings.tool_mapping_file)
     raw_mapper = ToolNameMapper()
 
-    first_date, last_date = completed_date_bounds(conn)
+    first_date, last_date = jobs_store.completed_date_bounds()
     if first_date is None or last_date is None:
         rows_deleted = count_existing_rows(conn)
         if not args.dry_run:
@@ -296,7 +230,7 @@ def rebuild(conn, args):
     cursor = first_date
     days = 0
     while cursor <= last_date:
-        rows = completed_rows_for_date(conn, cursor)
+        rows = jobs_store.completed_job_rows_for_activity_date(cursor)
         source_jobs += len(rows)
         day_payload = aggregate_daily_rows(
             rows,

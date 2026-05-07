@@ -24,7 +24,7 @@
 
 `tools/analysis` 的工具分类统计以 `user_tool_daily_stats` 为返回来源。接口收到 `start` / `end` 后，只按时间窗覆盖到的 UTC 自然日读取 `user_tool_daily_stats` 并汇总返回；查询多天时，内存与 CPU 均值按 `sum(day.avg * day.jobs_count) / sum(day.jobs_count)` 合并。该请求路径不实时扫描 `job_snapshots` 或 SlurmDB。历史错误日表可通过维护脚本 `slurmweb/scripts/repair-user-tool-daily-stats.py` 按日期范围和可选用户重建。
 
-后台线程按 `[user_metrics].aggregation_interval` 配置周期执行，启动时先执行一次，然后按间隔重算并替换当天 UTC 自然日的终态作业统计。后台聚合与维护脚本复用同一套聚合函数，保持工具归类、空值过滤和插入字段一致；重算当天数据时会先删除当天旧行，再写入新的有效统计，避免旧脏行残留。
+后台线程按 `[user_metrics].aggregation_interval` 配置周期执行，启动时先执行一次，然后按间隔重算并替换当天 UTC 自然日的终态作业统计。后台聚合与维护脚本现在共用同一条“历史完成作业读取 -> Python 分组聚合 -> 写入日表”链路：先按完成时间窗口读取所有终态作业，再按 `activity_date + user_id + tool` 在 Python 中分类汇总，避免 `user_tool_daily_stats` 再维护独立原生 SQL 聚合口径；重算当天数据时会先删除当天旧行，再写入新的有效统计，避免旧脏行残留。
 
 `user_tool_daily_stats` 按 `(activity_date, user_id, tool)` 保存每日工具统计：
 
@@ -35,7 +35,7 @@
 - `avg_cpu_cores`
 - `avg_runtime_seconds`
 
-`tools/analysis` 跨多日返回的 `avg_memory_gb` 与 `avg_cpu_cores` 始终按每日 `jobs_count` 加权，但 `avg_cpu_cores` 只会纳入 `avg_cpu_cores` 仍为有效正数的日行。当前 `jobs_count` 的语义是“`used_memory_gb > 0` 的完成作业数”；旧日表中的 `0`、`NULL`、负数或其他非法内存均值不会继续进入接口的 `completed_jobs`、工具列表或资源均值分母。`max_memory_gb` 取时间窗内日峰值的最大值；`median_memory_gb` 在直接作业聚合时返回精确中位数，在跨多日读取日表时返回按 `jobs_count` 加权的日中位数近似值。
+`tools/analysis` 跨多日返回的 `avg_memory_gb` 与 `avg_cpu_cores` 始终按每日 `jobs_count` 加权，但 `avg_cpu_cores` 只会纳入 `avg_cpu_cores` 仍为有效正数的日行。当前 `jobs_count` 的语义是“完成时间落在该 UTC 日期内的全部终态作业数”，不再等同于“有内存样本的作业数”；内存、CPU、runtime 则分别只基于各自有效样本计算。`max_memory_gb` 取时间窗内日峰值的最大值；`median_memory_gb` 在直接作业聚合时返回精确中位数，在跨多日读取日表时返回按 `jobs_count` 加权的日中位数近似值。
 
 `tools/analysis` 当前固定要求：
 
@@ -71,12 +71,12 @@
 
 - 只统计已完成或终态作业。
 - `tools/analysis` 会按 `start` / `end` 覆盖到的 UTC 日期读取日聚合表；该接口的工具统计粒度为日，且请求时不实时重建日聚合表。
-- 日聚合写入会过滤没有 `user_id` 或没有完成时间兜底值 `COALESCE(end_time, last_seen)` 的作业；`used_memory_gb` 为空、非法、负数或 `0` 时，该作业整条不进入日表，也不计入 `jobs_count`。
+- 日聚合写入会过滤没有 `user_id` 或没有完成时间兜底值 `COALESCE(end_time, last_seen)` 的作业；只要作业满足终态且完成时间落入目标 UTC 日期，就会进入 `jobs_count`。
 - 当天日聚合按 `activity_date + user_id + tool` 分组，只统计终态作业。
-- 当天 `avg_memory_gb` 只基于 `used_memory_gb > 0` 的作业求平均；`max_memory_gb` 取同组作业内存峰值最大值；`median_memory_gb` 取同组作业内存中位数；`avg_cpu_cores` 只基于其中 `used_cpu_cores_avg > 0` 的子集求平均，不再写入 `0` 占位。
+- 当天 `jobs_count` 统计该组全部完成作业；`avg_memory_gb`、`max_memory_gb`、`median_memory_gb` 只基于 `used_memory_gb > 0` 的显式内存样本计算；`avg_cpu_cores` 只基于“同时具备显式正内存样本且 `used_cpu_cores_avg > 0`”的子集求平均，不再写入 `0` 占位。
 - 写入 `user_tool_daily_stats` 前，`avg_memory_gb`、`max_memory_gb`、`median_memory_gb`、`avg_cpu_cores`、`avg_runtime_seconds` 会统一四舍五入到两位小数再入库。
 - 跨多天查询按日表行合并：`avg_memory_gb = sum(day.avg_memory_gb * day.jobs_count) / sum(day.jobs_count)`；`avg_cpu_cores` 只按 `avg_cpu_cores` 仍为有效正数的日行参与同口径加权；`max_memory_gb` 取时间窗内各日 `max_memory_gb` 的最大值；`median_memory_gb` 按 `sum(day.median_memory_gb * day.jobs_count) / sum(day.jobs_count)` 近似。
-- 当整个时间窗内没有任何有效内存样本作业时，跨天返回该资源均值为 `null`，`completed_jobs` 为 `0`，工具列表为空；如果只有 CPU 样本缺失，则 `avg_cpu_cores` 返回 `null`，但内存统计和 `completed_jobs` 仍保留。
+- 当整个时间窗内没有任何有效内存样本作业时，跨天返回该资源均值为 `null`；但 `completed_jobs` 仍保留全部完成作业数，工具列表也会保留对应 `jobs_count`。如果 CPU 样本缺失，则 `avg_cpu_cores` 返回 `null`。
 - 运行时间优先按 `end_time - start_time` 计算，并返回 `avg_runtime_hours`；兼容保留 `avg_runtime_seconds`。
 - 终态判断按 `UPPER(job_state)` 匹配，避免 `completed` / `COMPLETED` 大小写差异导致统计为空。
 - 后台聚合线程每轮刷新会输出汇总日志，记录扫描作业数、纳入统计作业数、缺身份跳过数、缺内存跳过数、缺 CPU 样本数、运行时样本数和写入日行数，便于排查 `tools/analysis` 返回空或 CPU 均值缺失。

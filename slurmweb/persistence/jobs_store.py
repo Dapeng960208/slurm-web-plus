@@ -16,10 +16,15 @@ import logging
 import re
 import threading
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
+import sqlalchemy as sa
+from sqlalchemy.orm import sessionmaker
+
 from ..models.db import psycopg_connect_kwargs
+from ..models.db import sqlalchemy_url
+from ..models.modes import JobSnapshot, User
 
 
 logger = logging.getLogger(__name__)
@@ -696,6 +701,8 @@ class JobsStore:
         self._stop_event = threading.Event()
         self._last_cleanup = 0.0
         self._pool = None
+        self._sa_engine = None
+        self._sa_session_factory = None
 
     def start(self):
         self._thread = threading.Thread(
@@ -831,6 +838,135 @@ class JobsStore:
     def _release_conn(self, conn):
         if self._pool is not None:
             self._pool.putconn(conn)
+
+    def _init_sa_engine(self):
+        self._sa_engine = sa.create_engine(sqlalchemy_url(self._settings), future=True)
+        self._sa_session_factory = sessionmaker(
+            bind=self._sa_engine,
+            future=True,
+            expire_on_commit=False,
+        )
+
+    def _session(self):
+        if self._sa_session_factory is None:
+            self._init_sa_engine()
+        return self._sa_session_factory()
+
+    def _completed_jobs_query(self, username=None, start_time=None, end_time=None):
+        completion_time = sa.func.coalesce(JobSnapshot.end_time, JobSnapshot.last_seen)
+        terminal_states = [
+            sa.func.upper(JobSnapshot.job_state).like(f"%{state}%")
+            for state in TERMINAL_STATES
+        ]
+        query = (
+            sa.select(JobSnapshot, User.username.label("username"))
+            .outerjoin(User, User.id == JobSnapshot.user_id)
+            .where(JobSnapshot.user_id.is_not(None))
+            .where(completion_time.is_not(None))
+            .where(sa.or_(*terminal_states))
+        )
+        if username:
+            query = query.where(User.username == username)
+        if start_time is not None:
+            query = query.where(completion_time >= start_time)
+        if end_time is not None:
+            query = query.where(completion_time < end_time)
+        return query.order_by(completion_time.asc(), JobSnapshot.job_id.asc())
+
+    def _serialize_completed_job_row(self, snapshot, username=None):
+        completed_at = snapshot.end_time or snapshot.last_seen
+        if completed_at is None:
+            return None
+        activity_date = completed_at.astimezone(timezone.utc).date()
+        return {
+            "activity_date": activity_date,
+            "user_id": snapshot.user_id,
+            "username": username,
+            "job_name": snapshot.job_name,
+            "command": snapshot.command,
+            "tres_req_str": snapshot.tres_req_str,
+            "tres_per_job": snapshot.tres_per_job,
+            "tres_per_node": snapshot.tres_per_node,
+            "tres_requested": snapshot.tres_requested,
+            "tres_allocated": snapshot.tres_allocated,
+            "used_memory_gb": snapshot.used_memory_gb,
+            "used_cpu_cores_avg": snapshot.used_cpu_cores_avg,
+            "start_time": snapshot.start_time,
+            "end_time": snapshot.end_time,
+            "last_seen": snapshot.last_seen,
+            "usage_stats": snapshot.usage_stats,
+        }
+
+    def completed_job_rows_by_completion_window(
+        self,
+        username=None,
+        start_time=None,
+        end_time=None,
+    ):
+        with self._session() as session:
+            rows = session.execute(
+                self._completed_jobs_query(
+                    username=username,
+                    start_time=start_time,
+                    end_time=end_time,
+                )
+            ).all()
+        payload = []
+        for snapshot, resolved_username in rows:
+            row = self._serialize_completed_job_row(snapshot, resolved_username)
+            if row is not None:
+                payload.append(row)
+        return payload
+
+    def completed_job_rows_for_activity_date(self, activity_date, username=None):
+        start_time = datetime.combine(activity_date, datetime.min.time(), tzinfo=timezone.utc)
+        end_time = start_time + timedelta(days=1)
+        return self.completed_job_rows_by_completion_window(
+            username=username,
+            start_time=start_time,
+            end_time=end_time,
+        )
+
+    def completed_job_rows_for_activity_dates(self, start_date, end_date, username=None):
+        start_time = datetime.combine(start_date, datetime.min.time(), tzinfo=timezone.utc)
+        end_time = datetime.combine(
+            end_date + timedelta(days=1),
+            datetime.min.time(),
+            tzinfo=timezone.utc,
+        )
+        return self.completed_job_rows_by_completion_window(
+            username=username,
+            start_time=start_time,
+            end_time=end_time,
+        )
+
+    def completed_date_bounds(self, username=None):
+        completion_time = sa.func.coalesce(JobSnapshot.end_time, JobSnapshot.last_seen)
+        terminal_states = [
+            sa.func.upper(JobSnapshot.job_state).like(f"%{state}%")
+            for state in TERMINAL_STATES
+        ]
+        query = (
+            sa.select(
+                sa.func.min(completion_time),
+                sa.func.max(completion_time),
+            )
+            .select_from(JobSnapshot)
+            .outerjoin(User, User.id == JobSnapshot.user_id)
+            .where(JobSnapshot.user_id.is_not(None))
+            .where(completion_time.is_not(None))
+            .where(sa.or_(*terminal_states))
+        )
+        if username:
+            query = query.where(User.username == username)
+        with self._session() as session:
+            min_completed_at, max_completed_at = session.execute(query).one()
+        if min_completed_at is None or max_completed_at is None:
+            return None, None
+        return (
+            min_completed_at.astimezone(timezone.utc).date(),
+            max_completed_at.astimezone(timezone.utc).date(),
+        )
 
     def _run(self):
         interval = getattr(self._settings, "snapshot_interval", 60)

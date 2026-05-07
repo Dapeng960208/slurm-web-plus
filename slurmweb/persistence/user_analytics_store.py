@@ -19,7 +19,7 @@ from datetime import date, datetime, timedelta, timezone
 import yaml
 
 from ..models.db import psycopg_connect_kwargs
-from .jobs_store import TERMINAL_STATES
+from .jobs_store import JobsStore, TERMINAL_STATES
 
 
 logger = logging.getLogger(__name__)
@@ -136,6 +136,14 @@ def _runtime_seconds(row: dict):
                     return float(value)
             except (TypeError, ValueError):
                 return None
+    return None
+
+
+def _explicit_cpu_cores_avg(row: dict):
+    for key in ("used_cpu_cores_avg", "used_cpu_core_avg"):
+        cpu_value = _numeric_value(row.get(key))
+        if cpu_value is not None:
+            return cpu_value
     return None
 
 
@@ -287,7 +295,7 @@ def _median(values):
 
 def _daily_payload_from_bucket(activity_date, user_id, tool, values):
     jobs = int(values["jobs_count"])
-    avg_memory_gb = _round_metric(_avg(values["memory_total"], jobs))
+    avg_memory_gb = _round_metric(_avg(values["memory_total"], len(values["memory_values"])))
     max_memory_gb = _round_metric(
         max(values["memory_values"]) if values["memory_values"] else None
     )
@@ -314,12 +322,11 @@ def _daily_payload_from_bucket(activity_date, user_id, tool, values):
 def _merge_daily_row(rollup, jobs, avg_memory_gb, max_memory_gb, median_memory_gb, avg_cpu_cores, avg_runtime_seconds):
     if jobs <= 0:
         return False
-    memory_value = _positive_numeric_value(avg_memory_gb)
-    if memory_value is None:
-        return False
     rollup["jobs"] += jobs
-    rollup["memory_total"] += memory_value * jobs
-    rollup["memory_weight"] += jobs
+    memory_value = _positive_numeric_value(avg_memory_gb)
+    if memory_value is not None:
+        rollup["memory_total"] += memory_value * jobs
+        rollup["memory_weight"] += jobs
     max_memory_value = _positive_numeric_value(max_memory_gb)
     if max_memory_value is not None:
         current = rollup["max_memory_gb"]
@@ -338,7 +345,7 @@ def _merge_daily_row(rollup, jobs, avg_memory_gb, max_memory_gb, median_memory_g
     if runtime_value is not None:
         rollup["runtime_total"] += runtime_value * jobs
         rollup["runtime_weight"] += jobs
-    return True
+    return memory_value is not None
 
 
 def _build_analysis_response(tool_rollups):
@@ -561,20 +568,20 @@ def aggregate_user_tool_daily_rows(
         bucket = buckets[key]
         if bucket["username"] is None:
             bucket["username"] = row.get("username")
-        memory_value = _positive_numeric_value(row.get("used_memory_gb"))
-        if memory_value is None:
-            stats["rows_skipped_memory"] += 1
-            continue
         bucket["jobs_count"] += 1
-        bucket["memory_total"] += memory_value
-        bucket["memory_values"].append(memory_value)
         stats["rows_counted"] += 1
-        cpu_value = _positive_numeric_value(_cpu_cores_avg(row))
-        if cpu_value is not None:
-            bucket["cpu_total"] += cpu_value
-            bucket["cpu_weight"] += 1
+        memory_value = _positive_numeric_value(row.get("used_memory_gb"))
+        if memory_value is not None:
+            bucket["memory_total"] += memory_value
+            bucket["memory_values"].append(memory_value)
+            cpu_value = _positive_numeric_value(_explicit_cpu_cores_avg(row))
+            if cpu_value is not None:
+                bucket["cpu_total"] += cpu_value
+                bucket["cpu_weight"] += 1
+            else:
+                stats["rows_skipped_cpu"] += 1
         else:
-            stats["rows_skipped_cpu"] += 1
+            stats["rows_skipped_memory"] += 1
         runtime_value = _runtime_seconds(row)
         runtime_value = _positive_numeric_value(runtime_value)
         if runtime_value is not None:
@@ -595,6 +602,7 @@ class UserAnalyticsStore:
         self._settings = settings
         self._users_store = users_store
         self._pool = None
+        self._jobs_store = JobsStore(settings, slurmrestd=None)
         self._thread = None
         self._stop_event = threading.Event()
         self._tool_mapper = ToolNameMapper(getattr(settings, "tool_mapping_file", None))
@@ -1030,174 +1038,27 @@ class UserAnalyticsStore:
             self._release_conn(conn)
 
     def _completed_jobs_rows(self, username, activity_date: date):
-        import psycopg2.extras
-
-        terminal_params = [f"%{state}%" for state in TERMINAL_STATES]
-        where_terminal = " OR ".join(["UPPER(js.job_state) LIKE %s"] * len(TERMINAL_STATES))
-        conn = self._get_conn()
-        try:
-            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-                cur.execute(
-                    """
-                    SELECT DISTINCT ON (js.job_id, js.submit_time)
-                        js.job_name,
-                        js.command,
-                        js.tres_req_str,
-                        js.tres_per_job,
-                        js.tres_per_node,
-                        js.tres_requested,
-                        js.tres_allocated,
-                        js.used_memory_gb,
-                        js.used_cpu_cores_avg,
-                        js.start_time,
-                        js.end_time,
-                        js.last_seen,
-                        js.usage_stats
-                    FROM job_snapshots js
-                    INNER JOIN users u ON u.id = js.user_id
-                    WHERE u.username = %s
-                      AND DATE(COALESCE(js.end_time, js.last_seen)) = %s
-                      AND (
-                    """
-                    + where_terminal
-                    + """
-                      )
-                    ORDER BY js.job_id, js.submit_time, js.last_seen DESC
-                    """,
-                    [username, activity_date] + terminal_params,
-                )
-                return list(cur.fetchall())
-        finally:
-            self._release_conn(conn)
+        return self._jobs_store.completed_job_rows_for_activity_date(
+            activity_date,
+            username=username,
+        )
 
     def _completed_jobs_rows_window(self, username, start_time, end_time):
-        import psycopg2.extras
-
-        terminal_params = [f"%{state}%" for state in TERMINAL_STATES]
-        where_terminal = " OR ".join(["UPPER(js.job_state) LIKE %s"] * len(TERMINAL_STATES))
-        conn = self._get_conn()
-        try:
-            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-                cur.execute(
-                    """
-                    SELECT DISTINCT ON (js.job_id, js.submit_time)
-                        js.job_name,
-                        js.command,
-                        js.tres_req_str,
-                        js.tres_per_job,
-                        js.tres_per_node,
-                        js.tres_requested,
-                        js.tres_allocated,
-                        js.used_memory_gb,
-                        js.used_cpu_cores_avg,
-                        js.start_time,
-                        js.end_time,
-                        js.last_seen,
-                        js.usage_stats
-                    FROM job_snapshots js
-                    INNER JOIN users u ON u.id = js.user_id
-                    WHERE u.username = %s
-                      AND COALESCE(js.end_time, js.last_seen) >= %s
-                      AND COALESCE(js.end_time, js.last_seen) <= %s
-                      AND (
-                    """
-                    + where_terminal
-                    + """
-                      )
-                    ORDER BY js.job_id, js.submit_time, js.last_seen DESC
-                    """,
-                    [username, start_time, end_time] + terminal_params,
-                )
-                return list(cur.fetchall())
-        finally:
-            self._release_conn(conn)
+        return self._jobs_store.completed_job_rows_by_completion_window(
+            username=username,
+            start_time=start_time,
+            end_time=end_time + timedelta(microseconds=1),
+        )
 
     def _completed_jobs_rows_for_activity_dates(self, start_date, end_date, username):
-        import psycopg2.extras
-
-        terminal_params = [f"%{state}%" for state in TERMINAL_STATES]
-        where_terminal = " OR ".join(["UPPER(js.job_state) LIKE %s"] * len(TERMINAL_STATES))
-        conn = self._get_conn()
-        try:
-            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-                cur.execute(
-                    """
-                    SELECT DISTINCT ON (js.job_id, js.submit_time)
-                        DATE(COALESCE(js.end_time, js.last_seen) AT TIME ZONE 'UTC') AS activity_date,
-                        js.user_id,
-                        js.job_name,
-                        js.command,
-                        js.tres_req_str,
-                        js.tres_per_job,
-                        js.tres_per_node,
-                        js.tres_requested,
-                        js.tres_allocated,
-                        js.used_memory_gb,
-                        js.used_cpu_cores_avg,
-                        js.start_time,
-                        js.end_time,
-                        js.last_seen,
-                        js.usage_stats
-                    FROM job_snapshots js
-                    INNER JOIN users u ON u.id = js.user_id
-                    WHERE u.username = %s
-                      AND DATE(COALESCE(js.end_time, js.last_seen) AT TIME ZONE 'UTC') >= %s
-                      AND DATE(COALESCE(js.end_time, js.last_seen) AT TIME ZONE 'UTC') <= %s
-                      AND (
-                    """
-                    + where_terminal
-                    + """
-                      )
-                    ORDER BY js.job_id, js.submit_time, js.last_seen DESC
-                    """,
-                    [username, start_date, end_date] + terminal_params,
-                )
-                return list(cur.fetchall())
-        finally:
-            self._release_conn(conn)
+        return self._jobs_store.completed_job_rows_for_activity_dates(
+            start_date,
+            end_date,
+            username=username,
+        )
 
     def _current_day_completed_rows(self):
-        import psycopg2.extras
-
-        terminal_params = [f"%{state}%" for state in TERMINAL_STATES]
-        where_terminal = " OR ".join(["UPPER(js.job_state) LIKE %s"] * len(TERMINAL_STATES))
-        conn = self._get_conn()
-        try:
-            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-                cur.execute(
-                    """
-                    SELECT DISTINCT ON (js.job_id, js.submit_time)
-                        DATE(COALESCE(js.end_time, js.last_seen) AT TIME ZONE 'UTC') AS activity_date,
-                        js.user_id,
-                        js.job_name,
-                        js.command,
-                        js.tres_req_str,
-                        js.tres_per_job,
-                        js.tres_per_node,
-                        js.tres_requested,
-                        js.tres_allocated,
-                        js.used_memory_gb,
-                        js.used_cpu_cores_avg,
-                        js.start_time,
-                        js.end_time,
-                        js.last_seen,
-                        js.usage_stats
-                    FROM job_snapshots js
-                    WHERE js.user_id IS NOT NULL
-                      AND COALESCE(js.end_time, js.last_seen) IS NOT NULL
-                      AND DATE(COALESCE(js.end_time, js.last_seen) AT TIME ZONE 'UTC') = (NOW() AT TIME ZONE 'UTC')::date
-                      AND (
-                    """
-                    + where_terminal
-                    + """
-                      )
-                    ORDER BY js.job_id, js.submit_time, js.last_seen DESC
-                    """,
-                    terminal_params,
-                )
-                return list(cur.fetchall())
-        finally:
-            self._release_conn(conn)
+        return self._jobs_store.completed_job_rows_for_activity_date(_now_utc().date())
 
     def _replace_user_tool_daily_stats(self, username, start_date, end_date, payload):
         from psycopg2.extras import execute_values

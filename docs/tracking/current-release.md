@@ -41,10 +41,12 @@
   - 冗余字段 `memory_samples`、`cpu_samples`、`runtime_samples` 已从模型和迁移中移除
   - 新增 Alembic revision `20260507_0011_user_tool_daily_memory_stats.py`
   - 升级后需执行 `slurmweb/scripts/rebuild-user-tool.py` 全表重建 `user_tool_daily_stats`
-- 用户工具日聚合已改为“内存必需、CPU 可选”口径：
-  - `user_tool_daily_stats.jobs_count` 现在表示 `used_memory_gb > 0` 的完成作业数
-  - `avg_cpu_cores` 只统计其中具备有效 `used_cpu_cores_avg > 0` 的子集
-  - 缺 CPU 样本的完成作业不再整条丢弃
+- 用户工具日聚合已修正为“全部完成作业计数，资源指标按显式样本统计”口径：
+  - 聚合链路改为先按完成时间窗口读取全部终态作业，再在 Python 中按 `activity_date + user_id + tool` 分类
+  - `user_tool_daily_stats.jobs_count` 现在表示完成时间落在该 UTC 日期内的全部终态作业数
+  - `avg_memory_gb`、`max_memory_gb`、`median_memory_gb` 只统计显式 `used_memory_gb > 0` 样本
+  - `avg_cpu_cores` 只统计其中同时具备显式正内存样本且 `used_cpu_cores_avg > 0` 的子集
+  - 缺资源样本的完成作业不再整条丢弃，仍会进入 `jobs_count`
 - `tools/analysis` 跨天汇总继续只读 `user_tool_daily_stats`：
   - `avg_memory_gb` 继续按日行 `jobs_count` 加权
   - `max_memory_gb` 取时间窗内日峰值最大值

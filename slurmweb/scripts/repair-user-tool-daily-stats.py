@@ -17,7 +17,7 @@ from rfl.settings import RuntimeSettings
 
 from slurmweb.apps._defaults import SlurmwebAppDefaults
 from slurmweb.models.db import psycopg_connect_kwargs
-from slurmweb.persistence.jobs_store import TERMINAL_STATES
+from slurmweb.persistence.jobs_store import JobsStore
 from slurmweb.persistence.user_analytics_store import (
     ToolNameMapper,
     aggregate_user_tool_daily_rows,
@@ -88,60 +88,6 @@ def load_settings(args):
         password=settings.database.password,
         tool_mapping_file=args.mapping_file or getattr(user_metrics, "tool_mapping_file", None),
     )
-
-
-def terminal_where_clause():
-    clause = " OR ".join(["UPPER(js.job_state) LIKE %s"] * len(TERMINAL_STATES))
-    return clause, [f"%{state}%" for state in TERMINAL_STATES]
-
-
-def completed_rows(conn, start_date, end_date, username=None):
-    import psycopg2.extras
-
-    where_terminal, terminal_params = terminal_where_clause()
-    user_filter = "AND u.username = %s" if username else ""
-    params = []
-    if username:
-        params.append(username)
-    params.extend([start_date, end_date])
-    params.extend(terminal_params)
-    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-        cur.execute(
-            """
-            SELECT DISTINCT ON (js.job_id, js.submit_time)
-                DATE(COALESCE(js.end_time, js.last_seen) AT TIME ZONE 'UTC') AS activity_date,
-                js.user_id,
-                u.username,
-                js.job_name,
-                js.command,
-                js.tres_req_str,
-                js.tres_per_job,
-                js.tres_per_node,
-                js.tres_requested,
-                js.tres_allocated,
-                js.used_memory_gb,
-                js.used_cpu_cores_avg,
-                js.start_time,
-                js.end_time,
-                js.last_seen,
-                js.usage_stats
-            FROM job_snapshots js
-            INNER JOIN users u ON u.id = js.user_id
-            WHERE js.user_id IS NOT NULL
-              {user_filter}
-              AND COALESCE(js.end_time, js.last_seen) IS NOT NULL
-              AND DATE(COALESCE(js.end_time, js.last_seen) AT TIME ZONE 'UTC') >= %s
-              AND DATE(COALESCE(js.end_time, js.last_seen) AT TIME ZONE 'UTC') <= %s
-              AND (
-            """.format(user_filter=user_filter)
-            + where_terminal
-            + """
-              )
-            ORDER BY js.job_id, js.submit_time, js.last_seen DESC
-            """,
-            params,
-        )
-        return list(cur.fetchall())
 
 
 def count_target_rows(conn, start_date, end_date, username=None):
@@ -223,10 +169,15 @@ def replace_target_rows(conn, start_date, end_date, payload, username=None):
 
 
 def rebuild(conn, args, db_settings):
+    jobs_store = JobsStore(db_settings, slurmrestd=None)
     mapper = ToolNameMapper(db_settings.tool_mapping_file)
     raw_mapper = ToolNameMapper()
     payload, _ = aggregate_user_tool_daily_rows(
-        completed_rows(conn, args.start, args.end, username=args.user),
+        jobs_store.completed_job_rows_for_activity_dates(
+            args.start,
+            args.end,
+            username=args.user,
+        ),
         mapper,
         raw_mapper=raw_mapper,
         rewrite_pattern=re.compile(args.rewrite_pattern),
