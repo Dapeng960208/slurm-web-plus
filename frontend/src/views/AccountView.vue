@@ -106,8 +106,7 @@ const userAssociations = computed(() => {
 })
 
 const accountKnown = computed(() => {
-  if (!data.value) return false
-  return data.value.some((association) => association.account === account)
+  return Boolean(accountDetails.value?.name)
 })
 
 const jobLimits = computed(() => {
@@ -471,7 +470,7 @@ function hasDifferentQos(userAssociation: ClusterAssociation): boolean {
       <InfoAlert v-else-if="loaded && !accountKnown">
         Account <span class="font-semibold">{{ account }}</span> does not exist on this cluster.
       </InfoAlert>
-      <div v-else-if="accountAssociation" class="ui-section-stack">
+      <div v-else-if="accountKnown" class="ui-section-stack">
         <div class="ui-stat-grid">
           <div class="ui-stat-card">
             <div class="ui-stat-label">Parent Chain</div>
@@ -481,7 +480,7 @@ function hasDifferentQos(userAssociation: ClusterAssociation): boolean {
           <div class="ui-stat-card">
             <div class="ui-stat-label">QoS Scope</div>
             <div class="mt-3 text-lg font-bold text-[var(--color-brand-ink-strong)]">
-              {{ renderQosLabel(accountAssociation.qos) }}
+              {{ renderQosLabel(accountAssociation?.qos ?? []) }}
             </div>
             <div class="ui-stat-subtle">Applied at account level</div>
           </div>
@@ -533,7 +532,7 @@ function hasDifferentQos(userAssociation: ClusterAssociation): boolean {
 
               <div id="qos" class="ui-detail-row">
                 <dt class="ui-detail-term">QoS</dt>
-                <dd class="ui-detail-value">{{ renderQosLabel(accountAssociation.qos) }}</dd>
+                <dd class="ui-detail-value">{{ renderQosLabel(accountAssociation?.qos ?? []) }}</dd>
               </div>
 
               <div id="limits-jobs" class="ui-detail-row">
@@ -582,7 +581,7 @@ function hasDifferentQos(userAssociation: ClusterAssociation): boolean {
           Account <span class="font-semibold">{{ account }}</span> has no end-user associations.
         </InfoAlert>
 
-        <div v-else class="ui-table-shell overflow-x-auto">
+        <div class="ui-table-shell overflow-x-auto">
           <div class="flex flex-wrap items-start justify-between gap-3 border-b border-[rgba(80,105,127,0.08)] px-6 py-5">
             <div>
               <h2 class="ui-panel-title">User Associations</h2>
@@ -600,7 +599,11 @@ function hasDifferentQos(userAssociation: ClusterAssociation): boolean {
             </button>
           </div>
 
-          <div class="inline-block min-w-full align-middle">
+          <InfoAlert v-if="userAssociations.length === 0" class="m-6">
+            Account <span class="font-semibold">{{ account }}</span> has no end-user associations yet.
+          </InfoAlert>
+
+          <div v-else class="inline-block min-w-full align-middle">
             <table class="ui-table min-w-full">
               <thead>
                 <tr>

@@ -14,7 +14,7 @@ import ClusterMainLayout from '@/components/ClusterMainLayout.vue'
 import { useClusterDataPoller } from '@/composables/DataPoller'
 import { useGatewayAPI } from '@/composables/GatewayAPI'
 import { parseCsvList } from '@/composables/management'
-import type { ClusterAssociation, ClusterAccountTreeNode } from '@/composables/GatewayAPI'
+import type { AccountDescription, ClusterAssociation, ClusterAccountTreeNode } from '@/composables/GatewayAPI'
 import InfoAlert from '@/components/InfoAlert.vue'
 import ErrorAlert from '@/components/ErrorAlert.vue'
 import AccountTreeNode from '@/components/accounts/AccountTreeNode.vue'
@@ -37,11 +37,24 @@ const router = useRouter()
 const gateway = useGatewayAPI()
 const runtimeStore = useRuntimeStore()
 
-const { data, unable, loaded, initialLoading } = useClusterDataPoller<ClusterAssociation[]>(
+const {
+  data: associationsData,
+  unable: associationsUnable,
+  loaded: associationsLoaded,
+  initialLoading: associationsInitialLoading,
+  setCallback: refreshAssociations
+} = useClusterDataPoller<ClusterAssociation[]>(
   cluster,
   'associations',
   120000
 )
+const {
+  data: accountsData,
+  unable: accountsUnable,
+  loaded: accountsLoaded,
+  initialLoading: accountsInitialLoading,
+  setCallback: refreshAccounts
+} = useClusterDataPoller<AccountDescription[]>(cluster, 'accounts', 120000)
 
 const expandedAccounts = ref<Set<string>>(new Set())
 const autoExpandedOnce = ref(false)
@@ -62,32 +75,63 @@ function toggleAccount(account: string) {
   }
 }
 
+const unable = computed(() => associationsUnable.value || accountsUnable.value)
+const loaded = computed(() => associationsLoaded.value && accountsLoaded.value)
+const initialLoading = computed(() => associationsInitialLoading.value || accountsInitialLoading.value)
+
 const accountTree = computed<ClusterAccountTreeNode[]>(() => {
-  if (!data.value || data.value.length === 0) {
+  if (!accountsData.value || accountsData.value.length === 0) {
     return []
   }
 
   const accountMap = new Map<string, ClusterAccountTreeNode>()
   const rootAccounts: ClusterAccountTreeNode[] = []
 
-  for (const association of data.value) {
-    const existingNode = accountMap.get(association.account)
-    if (existingNode) {
-      if (association.user) {
-        existingNode.users.push(association.user)
-      }
-      continue
-    }
+  for (const accountEntry of accountsData.value) {
     const node: ClusterAccountTreeNode = {
       children: [],
       level: 0,
-      account: association.account,
-      max: association.max,
-      parent_account: association.parent_account,
-      qos: association.qos,
-      users: association.user ? [association.user] : []
+      account: accountEntry.name,
+      max: {
+        jobs: {
+          accruing: { set: false, infinite: false, number: 0 },
+          active: { set: false, infinite: false, number: 0 },
+          per: {
+            accruing: { set: false, infinite: false, number: 0 },
+            count: { set: false, infinite: false, number: 0 },
+            submitted: { set: false, infinite: false, number: 0 },
+            wall_clock: { set: false, infinite: false, number: 0 }
+          },
+          total: { set: false, infinite: false, number: 0 }
+        },
+        per: {
+          account: {
+            wall_clock: { set: false, infinite: false, number: 0 }
+          }
+        },
+        tres: {
+          group: { active: [], minutes: [] },
+          minutes: { per: { job: [] }, total: [] },
+          per: { job: [], node: [] },
+          total: []
+        }
+      },
+      parent_account: accountEntry.parent_account ?? '',
+      qos: accountEntry.qos ?? [],
+      users: []
     }
-    accountMap.set(association.account, node)
+    accountMap.set(accountEntry.name, node)
+  }
+
+  for (const association of associationsData.value ?? []) {
+    const existingNode = accountMap.get(association.account)
+    if (!existingNode) continue
+    existingNode.max = association.max
+    existingNode.parent_account = association.parent_account || existingNode.parent_account
+    existingNode.qos = association.qos?.length ? association.qos : existingNode.qos
+    if (association.user) {
+      existingNode.users.push(association.user)
+    }
   }
 
   for (const node of accountMap.values()) {
@@ -119,11 +163,11 @@ const pagedAccountTree = computed(() => {
 
 const availableAccounts = computed<Set<string>>(() => {
   const accounts = new Set<string>()
-  if (!data.value) {
+  if (!accountsData.value) {
     return accounts
   }
-  for (const association of data.value) {
-    accounts.add(association.account)
+  for (const accountEntry of accountsData.value) {
+    accounts.add(accountEntry.name)
   }
   return accounts
 })
@@ -174,11 +218,13 @@ async function createAccount(payload: Record<string, string>) {
   try {
     await gateway.save_account(cluster, {
       name: payload.name || undefined,
-      description: payload.description || null,
+      description: payload.description || undefined,
       organization: payload.organization || undefined,
       parent_account: payload.parent_account || undefined,
       qos: parseCsvList(payload.qos)
     })
+    refreshAccounts('accounts')
+    refreshAssociations('associations')
     runtimeStore.reportInfo(`Account ${payload.name || ''} creation requested.`)
     createOpen.value = false
   } catch (error: unknown) {
@@ -239,11 +285,11 @@ if (route.query.page_size) {
       </template>
     </PageHeader>
     <ErrorAlert v-if="unable"
-      >Unable to retrieve associations from cluster
+      >Unable to retrieve accounts from cluster
       <span class="font-medium">{{ cluster }}</span></ErrorAlert
     >
-    <InfoAlert v-else-if="loaded && data?.length == 0"
-      >No association defined on cluster <span class="font-medium">{{ cluster }}</span></InfoAlert
+    <InfoAlert v-else-if="loaded && accountsData?.length == 0"
+      >No account defined on cluster <span class="font-medium">{{ cluster }}</span></InfoAlert
     >
     <div v-else class="ui-section-stack">
       <PanelSkeleton v-if="initialLoading" :rows="7" />
@@ -281,7 +327,7 @@ if (route.query.page_size) {
       :error="operationError"
       :fields="[
         { key: 'name', label: 'Account name', required: true },
-        { key: 'description', label: 'Description', type: 'textarea' },
+        { key: 'description', label: 'Description', type: 'textarea', required: true },
         { key: 'organization', label: 'Organization', required: true },
         { key: 'parent_account', label: 'Parent account' },
         { key: 'qos', label: 'QOS (comma separated)' }

@@ -481,6 +481,8 @@ export interface AccountDescription {
   name: string
   description?: string | null
   organization?: string | null
+  parent_account?: string | null
+  qos?: string[] | null
 }
 
 interface GatewayLoginResponse extends UserDescription {

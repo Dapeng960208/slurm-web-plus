@@ -60,7 +60,7 @@ describe('AccountView.vue', () => {
     document.body.innerHTML = ''
   })
 
-  test('displays account details', () => {
+  test('displays account details', async () => {
     mockClusterDataPoller.loaded.value = true
     mockClusterDataPoller.initialLoading.value = false
     mockClusterDataPoller.data.value = associations as ClusterAssociation[]
@@ -80,6 +80,8 @@ describe('AccountView.vue', () => {
         }
       }
     })
+
+    await flushPromises()
 
     const buttons = wrapper.findAll('button')
     const backButton = buttons.find((btn) => btn.text().includes('Back to accounts'))
@@ -182,7 +184,7 @@ describe('AccountView.vue', () => {
     expect(infoAlert.text()).toContain('Account nonexistent does not exist on this cluster')
   })
 
-  test('displays empty symbol when no subaccounts', () => {
+  test('displays empty symbol when no subaccounts', async () => {
     const accountData: ClusterAssociation[] = [
       {
         account: 'leaf',
@@ -196,6 +198,11 @@ describe('AccountView.vue', () => {
     mockClusterDataPoller.loaded.value = true
     mockClusterDataPoller.initialLoading.value = false
     mockClusterDataPoller.data.value = accountData
+    mockGatewayAPI.account.mockResolvedValue({
+      name: 'leaf',
+      description: 'Leaf account',
+      organization: 'Core HPC'
+    })
 
     const wrapper = mount(AccountView, {
       props: {
@@ -204,12 +211,14 @@ describe('AccountView.vue', () => {
       }
     })
 
+    await flushPromises()
+
     expect(wrapper.text()).toContain('Subaccounts')
     const subaccountsSection = wrapper.get('div#subaccounts')
     expect(subaccountsSection.get('dd').text()).toBe('∅')
   })
 
-  test('shows info alert when account has no user associations', () => {
+  test('shows info alert when account has no user associations', async () => {
     const accountData: ClusterAssociation[] = [
       {
         account: 'empty',
@@ -223,6 +232,11 @@ describe('AccountView.vue', () => {
     mockClusterDataPoller.loaded.value = true
     mockClusterDataPoller.initialLoading.value = false
     mockClusterDataPoller.data.value = accountData
+    mockGatewayAPI.account.mockResolvedValue({
+      name: 'empty',
+      description: 'Empty account',
+      organization: 'Core HPC'
+    })
 
     const wrapper = mount(AccountView, {
       props: {
@@ -230,6 +244,8 @@ describe('AccountView.vue', () => {
         account: 'empty'
       }
     })
+
+    await flushPromises()
 
     const infoAlert = wrapper.findComponent(InfoAlert)
     expect(infoAlert.exists()).toBe(true)
@@ -278,6 +294,8 @@ describe('AccountView.vue', () => {
         account: 'root'
       }
     })
+
+    await flushPromises()
 
     await wrapper.findAll('button').find((button) => button.text() === 'Add user')!.trigger('click')
     await nextTick()
@@ -337,6 +355,63 @@ describe('AccountView.vue', () => {
         {
           account: 'root',
           user: 'alice'
+        }
+      ]
+    })
+    wrapper.unmount()
+  })
+
+  test('adds user for account without account-level association row', async () => {
+    useRuntimeStore().availableClusters = [
+      {
+        name: 'foo',
+        permissions: {
+          roles: [],
+          actions: [],
+          rules: ['accounts:view:*', 'accounts:edit:*']
+        },
+        racksdb: true,
+        infrastructure: 'foo',
+        metrics: true,
+        cache: true
+      }
+    ]
+    mockGatewayAPI.account.mockResolvedValue({
+      name: 'science',
+      description: 'Science',
+      organization: 'Science'
+    })
+    mockGatewayAPI.save_association.mockResolvedValue({ operation: 'accounts.associations.update' })
+    mockClusterDataPoller.loaded.value = true
+    mockClusterDataPoller.initialLoading.value = false
+    mockClusterDataPoller.data.value = [] as ClusterAssociation[]
+
+    const wrapper = mount(AccountView, {
+      attachTo: document.body,
+      props: {
+        cluster: 'foo',
+        account: 'science'
+      }
+    })
+    await flushPromises()
+
+    await wrapper.findAll('button').find((button) => button.text() === 'Add user')!.trigger('click')
+    await nextTick()
+    wrapper
+      .findAllComponents(ActionDialog)
+      .find((dialog) => dialog.props('title') === 'Add User Association')!
+      .vm.$emit('submit', {
+        user: 'bob',
+        qos: '',
+        default_qos: ''
+      })
+    await flushPromises()
+
+    expect(mockGatewayAPI.save_association).toHaveBeenCalledWith('foo', {
+      associations: [
+        {
+          account: 'science',
+          user: 'bob'
         }
       ]
     })
