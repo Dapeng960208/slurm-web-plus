@@ -1396,8 +1396,9 @@ export interface UserMetricsHistory {
 export interface UserToolActivityRecord {
   tool: string
   jobs: number
-  avg_max_memory_gb?: number | null
-  avg_max_memory_mb: number | null
+  avg_memory_gb?: number | null
+  max_memory_gb?: number | null
+  median_memory_gb?: number | null
   avg_cpu_cores: number | null
   avg_runtime_hours?: number | null
   avg_runtime_seconds: number | null
@@ -1421,8 +1422,9 @@ export interface UserToolAnalysisSummary {
   totals: {
     completed_jobs: number
     active_tools: number
-    avg_max_memory_gb?: number | null
-    avg_max_memory_mb: number | null
+    avg_memory_gb?: number | null
+    max_memory_gb?: number | null
+    median_memory_gb?: number | null
     avg_cpu_cores: number | null
     avg_runtime_hours?: number | null
     avg_runtime_seconds: number | null

@@ -101,12 +101,21 @@ AI 当前按数据库能力自动启用：
 
 其中 `user/tools/analysis` 现在明确用于承载用户维度的聚合资源证据，例如：
 
-- `totals.avg_max_memory_mb`
+- `totals.avg_memory_gb`
+- `totals.max_memory_gb`
+- `totals.median_memory_gb`
 - `totals.avg_cpu_cores`
 - `totals.avg_runtime_seconds`
-- `tool_breakdown[].avg_max_memory_mb`
+- `tool_breakdown[].avg_memory_gb`
+- `tool_breakdown[].max_memory_gb`
+- `tool_breakdown[].median_memory_gb`
 - `tool_breakdown[].avg_cpu_cores`
 - `tool_breakdown[].avg_runtime_seconds`
+
+兼容说明：
+
+- 当前接口仍兼容返回 `avg_max_memory_gb` 与 `avg_max_memory_mb`
+- AI 提示词与新实现应优先使用 `avg_memory_gb`、`max_memory_gb`、`median_memory_gb`
 
 因此当问题是“某个用户常用工具推荐多少内存/CPU/运行时”这类推荐题时，AI 应优先把它视为直接证据源；只有聚合证据不足时，才继续补查 `jobs/history` 等原始历史接口。
 

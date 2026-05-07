@@ -36,15 +36,30 @@
 - 已补充多需求输入处理规则：
   - 用户一次提出多个需求、问题或 bug 时，AI 必须先整理并分类，再按主题分别处理
   - 提交前必须检查工作区并区分当前主题改动与其他未确认改动；确认后的当前主题改动按规范拆分提交，并至少完成一次本地提交
+- `user_tool_daily_stats` 聚合链路已完成重构：
+  - 日表字段已切换为 `jobs_count`、`avg_memory_gb`、`max_memory_gb`、`median_memory_gb`、`avg_cpu_cores`、`avg_runtime_seconds`
+  - 冗余字段 `memory_samples`、`cpu_samples`、`runtime_samples` 已从模型和迁移中移除
+  - 新增 Alembic revision `20260507_0011_user_tool_daily_memory_stats.py`
+  - 升级后需执行 `slurmweb/scripts/rebuild-user-tool.py` 全表重建 `user_tool_daily_stats`
 - 用户工具日聚合已改为“内存必需、CPU 可选”口径：
   - `user_tool_daily_stats.jobs_count` 现在表示 `used_memory_gb > 0` 的完成作业数
-  - `avg_cpu_cores` 与 `cpu_samples` 只统计其中具备有效 `used_cpu_cores_avg > 0` 的子集
+  - `avg_cpu_cores` 只统计其中具备有效 `used_cpu_cores_avg > 0` 的子集
   - 缺 CPU 样本的完成作业不再整条丢弃
 - `tools/analysis` 跨天汇总继续只读 `user_tool_daily_stats`：
-  - `avg_max_memory_gb` 继续按日行 `jobs_count` 加权
+  - `avg_memory_gb` 继续按日行 `jobs_count` 加权
+  - `max_memory_gb` 取时间窗内日峰值最大值
+  - `median_memory_gb` 按日中位数与 `jobs_count` 做近似加权
   - `avg_cpu_cores` 只对仍有有效 CPU 均值的日行按 `jobs_count` 加权
 - 后台用户工具聚合线程每轮刷新会记录汇总日志，输出扫描作业数、计入作业数、缺身份跳过数、缺内存跳过数、缺 CPU 样本数、运行时样本数和写入日行数
 - `slurmweb/scripts/repair-user-tool-daily-stats.py` 与 `slurmweb/scripts/rebuild-user-tool.py` 已同步新返回值和聚合口径，可用于历史日表重建
+- `slurmweb/scripts/rebuild-user-tool.py` 现在默认输出逐条重建明细日志：
+  - 每个 UTC 日期会先打印 `source_jobs` 与当天聚合行数
+  - 每条将写入 `user_tool_daily_stats` 的日聚合行会打印 `date/user_id/username/tool/jobs_count` 以及内存、CPU、runtime 关键指标
+  - 全表写入前会再打印一次总预览摘要，包含日期范围、扫描天数、源作业数、将删除旧行数和将写入新行数
+- 本轮数据库执行顺序应固定为：
+  - `alembic upgrade head`
+  - `python slurmweb/scripts/rebuild-user-tool.py`
+  - 如需先核对口径，可先执行 `python slurmweb/scripts/rebuild-user-tool.py --dry-run`
 - 用户工具聚合定向回归已通过：`.venv\Scripts\python.exe -m pytest -q slurmweb/tests/apps/test_user_analytics_store.py`
 
 - AI 助手已改为按 Agent 接口语义编排，而不是在工具层直接拼底层数据源调用
@@ -214,13 +229,15 @@
 - 集群页与 Settings 页已统一为主内容区独立滚动，内容超过视口时在内容区域内滚动，底部固定保留 `2rem` 边缘留白
 - `user/<username>/tools/analysis` 已改为只按时间窗覆盖的 UTC 日期读取 `user_tool_daily_stats` 并返回工具分类统计，请求路径不实时扫描 `job_snapshots` 或 SlurmDB
 - 后台用户工具日聚合已按 `[user_metrics].aggregation_interval` 周期更新当天 UTC 自然日统计，并与维护脚本复用同一套聚合函数，保持工具归类、空值过滤和插入口径一致
-- `user_tool_daily_stats` 已补 `memory_samples`、`cpu_samples`、`runtime_samples` 作为诊断字段；当前跨多天返回的内存与 CPU 均值按每日 `jobs_count` 加权，不再按样本数加权
+- `user_tool_daily_stats` 已重构为 `jobs_count + avg/max/median memory + avg_cpu_cores + avg_runtime_seconds`；跨多天返回的内存与 CPU 均值按每日 `jobs_count` 加权
 - 用户工具分析聚合已明确按已完成作业统计：
   - 当天日聚合按 `activity_date + user_id + tool` 分组
-  - `avg_max_memory_gb` 只平均 `used_memory_gb > 0`
+  - `avg_memory_gb` 只平均 `used_memory_gb > 0`
+  - `max_memory_gb` 取同组作业的最大内存
+  - `median_memory_gb` 取同组作业的中位数内存
   - `avg_runtime_hours` 来自 `end_time - start_time`
   - `avg_cpu_cores` 只平均 `used_cpu_cores_avg > 0`
-  - `None`、`0`、负数和非法资源值不参与当天资源平均；无有效样本时保存并返回 `0`
+  - `None`、`0`、负数和非法资源值不参与当天资源平均；无有效样本时返回 `null`
   - 跨多天同工具合并按 `sum(day.avg * day.jobs_count) / sum(day.jobs_count)` 计算；只要当天对应 `avg_*` 是有效正值，该日就参与对应资源均值分母，`totals` 层使用相同口径
   - 继续保留 `avg_max_memory_mb` 与 `avg_runtime_seconds` 兼容字段
 - 新增维护脚本 `slurmweb/scripts/repair-user-tool-daily-stats.py`，支持 `--start YYYY-MM-DD`、`--end YYYY-MM-DD`、可选 `--user <username>` 和 `--dry-run`

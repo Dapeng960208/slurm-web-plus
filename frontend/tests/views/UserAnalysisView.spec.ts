@@ -48,7 +48,9 @@ describe('UserAnalysisView.vue', () => {
       totals: {
         completed_jobs: 12,
         active_tools: 3,
-        avg_max_memory_mb: 8192,
+        avg_memory_gb: 8,
+        max_memory_gb: 12,
+        median_memory_gb: 7.5,
         avg_cpu_cores: 7.5,
         avg_runtime_seconds: 5400,
         busiest_tool: 'bwa',
@@ -58,7 +60,9 @@ describe('UserAnalysisView.vue', () => {
         {
           tool: 'bwa',
           jobs: 8,
-          avg_max_memory_mb: 9216,
+          avg_memory_gb: 8,
+          max_memory_gb: 9,
+          median_memory_gb: 8,
           avg_cpu_cores: 8,
           avg_runtime_seconds: 7200
         }

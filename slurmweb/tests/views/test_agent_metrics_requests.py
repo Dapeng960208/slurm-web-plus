@@ -200,7 +200,17 @@ class TestAgentMetricsRequest(TestAgentBase):
                 "start": "2026-04-24T00:00:00+00:00",
                 "end": "2026-04-24T12:00:00+00:00",
             },
-            "totals": {"completed_jobs": 3, "active_tools": 1, "avg_max_memory_mb": None, "avg_cpu_cores": None, "avg_runtime_seconds": None, "busiest_tool": None, "busiest_tool_jobs": 0},
+            "totals": {
+                "completed_jobs": 3,
+                "active_tools": 1,
+                "avg_memory_gb": None,
+                "max_memory_gb": None,
+                "median_memory_gb": None,
+                "avg_cpu_cores": None,
+                "avg_runtime_seconds": None,
+                "busiest_tool": None,
+                "busiest_tool_jobs": 0,
+            },
             "tool_breakdown": [],
         }
 
@@ -629,7 +639,9 @@ class TestAgentUserMetricsRequests(TestAgentBase):
             "totals": {
                 "completed_jobs": 2,
                 "active_tools": 1,
-                "avg_max_memory_mb": 2048,
+                "avg_memory_gb": 2.0,
+                "max_memory_gb": 4.0,
+                "median_memory_gb": 2.0,
                 "avg_cpu_cores": 4,
                 "avg_runtime_seconds": 600,
                 "busiest_tool": "blast",

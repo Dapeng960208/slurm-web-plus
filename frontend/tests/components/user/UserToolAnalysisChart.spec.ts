@@ -10,14 +10,18 @@ describe('UserToolAnalysisChart.vue', () => {
           {
             tool: 'bwa',
             jobs: 8,
-            avg_max_memory_mb: 9216,
+            avg_memory_gb: 8,
+            max_memory_gb: 9,
+            median_memory_gb: 8,
             avg_cpu_cores: 8,
             avg_runtime_seconds: 7200
           },
           {
             tool: 'samtools',
             jobs: 3,
-            avg_max_memory_mb: 4096,
+            avg_memory_gb: 3.5,
+            max_memory_gb: 4,
+            median_memory_gb: 3.5,
             avg_cpu_cores: 4,
             avg_runtime_seconds: 1800
           }
@@ -31,12 +35,12 @@ describe('UserToolAnalysisChart.vue', () => {
     expect(rows).toHaveLength(2)
 
     expect(wrapper.get('[data-testid="tool-chart-bwa"]').text()).toContain('8 completed job(s)')
-    expect(wrapper.get('[data-testid="tool-chart-bwa"]').text()).toContain('9GB')
+    expect(wrapper.get('[data-testid="tool-chart-bwa"]').text()).toContain('9.00 GB')
     expect(wrapper.get('[data-testid="tool-chart-bwa"]').text()).toContain('CPU: 8.0 cores')
     expect(wrapper.get('[data-testid="tool-chart-bwa"]').text()).toContain('Runtime: 2h')
 
     expect(wrapper.get('[data-testid="tool-chart-samtools"]').text()).toContain('3 completed job(s)')
-    expect(wrapper.get('[data-testid="tool-chart-samtools"]').text()).toContain('4GB')
+    expect(wrapper.get('[data-testid="tool-chart-samtools"]').text()).toContain('4.00 GB')
     expect(wrapper.get('[data-testid="tool-chart-samtools"]').text()).toContain('Runtime: 30m')
 
     const fills = wrapper.findAll('.ui-tool-chart-fill')
@@ -54,7 +58,9 @@ describe('UserToolAnalysisChart.vue', () => {
           {
             tool: 'unknown',
             jobs: 1,
-            avg_max_memory_mb: null,
+            avg_memory_gb: null,
+            max_memory_gb: null,
+            median_memory_gb: null,
             avg_cpu_cores: null,
             avg_runtime_seconds: null
           }

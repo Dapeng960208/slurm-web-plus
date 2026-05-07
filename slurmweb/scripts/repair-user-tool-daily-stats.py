@@ -111,6 +111,7 @@ def completed_rows(conn, start_date, end_date, username=None):
             SELECT DISTINCT ON (js.job_id, js.submit_time)
                 DATE(COALESCE(js.end_time, js.last_seen) AT TIME ZONE 'UTC') AS activity_date,
                 js.user_id,
+                u.username,
                 js.job_name,
                 js.command,
                 js.tres_req_str,
@@ -193,31 +194,28 @@ def replace_target_rows(conn, start_date, end_date, payload, username=None):
                     user_id,
                     tool,
                     jobs_count,
-                    avg_max_memory_gb,
+                    avg_memory_gb,
+                    max_memory_gb,
+                    median_memory_gb,
                     avg_cpu_cores,
                     avg_runtime_seconds,
-                    memory_samples,
-                    cpu_samples,
-                    runtime_samples,
                     created_at,
                     updated_at
                 ) VALUES %s
                 ON CONFLICT (activity_date, user_id, tool) DO UPDATE SET
                     jobs_count = EXCLUDED.jobs_count,
-                    avg_max_memory_gb = EXCLUDED.avg_max_memory_gb,
+                    avg_memory_gb = EXCLUDED.avg_memory_gb,
+                    max_memory_gb = EXCLUDED.max_memory_gb,
+                    median_memory_gb = EXCLUDED.median_memory_gb,
                     avg_cpu_cores = EXCLUDED.avg_cpu_cores,
                     avg_runtime_seconds = EXCLUDED.avg_runtime_seconds,
-                    memory_samples = EXCLUDED.memory_samples,
-                    cpu_samples = EXCLUDED.cpu_samples,
-                    runtime_samples = EXCLUDED.runtime_samples,
                     updated_at = NOW()
                 """,
                 payload,
                 template=(
                     "(%(activity_date)s, %(user_id)s, %(tool)s, %(jobs_count)s, "
-                    "%(avg_max_memory_gb)s, %(avg_cpu_cores)s, "
-                    "%(avg_runtime_seconds)s, %(memory_samples)s, "
-                    "%(cpu_samples)s, %(runtime_samples)s, NOW(), NOW())"
+                    "%(avg_memory_gb)s, %(max_memory_gb)s, %(median_memory_gb)s, "
+                    "%(avg_cpu_cores)s, %(avg_runtime_seconds)s, NOW(), NOW())"
                 ),
                 page_size=1000,
             )

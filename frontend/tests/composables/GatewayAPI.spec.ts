@@ -163,7 +163,9 @@ describe('user metrics requests', () => {
       totals: {
         completed_jobs: 0,
         active_tools: 0,
-        avg_max_memory_mb: null,
+        avg_memory_gb: null,
+        max_memory_gb: null,
+        median_memory_gb: null,
         avg_cpu_cores: null,
         avg_runtime_seconds: null,
         busiest_tool: null,
@@ -206,7 +208,9 @@ describe('user metrics requests', () => {
       totals: {
         completed_jobs: 0,
         active_tools: 0,
-        avg_max_memory_mb: null,
+        avg_memory_gb: null,
+        max_memory_gb: null,
+        median_memory_gb: null,
         avg_cpu_cores: null,
         avg_runtime_seconds: null,
         busiest_tool: null,
@@ -301,7 +305,9 @@ describe('user activity gateway methods', () => {
       totals: {
         completed_jobs: 4,
         active_tools: 2,
-        avg_max_memory_mb: 2048,
+        avg_memory_gb: 2,
+        max_memory_gb: 4,
+        median_memory_gb: 2,
         avg_cpu_cores: 8,
         avg_runtime_seconds: 600,
         busiest_tool: 'blastn',

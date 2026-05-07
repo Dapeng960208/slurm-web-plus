@@ -123,6 +123,7 @@ def completed_rows_for_date(conn, activity_date):
             SELECT DISTINCT ON (js.job_id, js.submit_time)
                 DATE(COALESCE(js.end_time, js.last_seen) AT TIME ZONE 'UTC') AS activity_date,
                 js.user_id,
+                u.username,
                 js.job_name,
                 js.command,
                 js.tres_req_str,
@@ -136,6 +137,7 @@ def completed_rows_for_date(conn, activity_date):
                 js.end_time,
                 js.usage_stats
             FROM job_snapshots js
+            INNER JOIN users u ON u.id = js.user_id
             WHERE js.user_id IS NOT NULL
               AND DATE(COALESCE(js.end_time, js.last_seen) AT TIME ZONE 'UTC') = %s
               AND (
@@ -158,6 +160,13 @@ def aggregate_daily_rows(rows, mapped_mapper, raw_mapper, rewrite_pattern, rewri
         rewrite_pattern=rewrite_pattern,
         rewrite_tool=rewrite_tool,
     )
+    usernames = {}
+    for row in rows:
+        username = row.get("username")
+        if username:
+            usernames[row.get("user_id")] = username
+    for item in payload:
+        item["username"] = usernames.get(item["user_id"])
     return payload
 
 
@@ -182,35 +191,82 @@ def replace_all_rows(conn, payload):
                     user_id,
                     tool,
                     jobs_count,
-                    avg_max_memory_gb,
+                    avg_memory_gb,
+                    max_memory_gb,
+                    median_memory_gb,
                     avg_cpu_cores,
                     avg_runtime_seconds,
-                    memory_samples,
-                    cpu_samples,
-                    runtime_samples,
                     created_at,
                     updated_at
                 ) VALUES %s
                 ON CONFLICT (activity_date, user_id, tool) DO UPDATE SET
                     jobs_count = EXCLUDED.jobs_count,
-                    avg_max_memory_gb = EXCLUDED.avg_max_memory_gb,
+                    avg_memory_gb = EXCLUDED.avg_memory_gb,
+                    max_memory_gb = EXCLUDED.max_memory_gb,
+                    median_memory_gb = EXCLUDED.median_memory_gb,
                     avg_cpu_cores = EXCLUDED.avg_cpu_cores,
                     avg_runtime_seconds = EXCLUDED.avg_runtime_seconds,
-                    memory_samples = EXCLUDED.memory_samples,
-                    cpu_samples = EXCLUDED.cpu_samples,
-                    runtime_samples = EXCLUDED.runtime_samples,
                     updated_at = NOW()
                 """,
                 payload,
                 template=(
                     "(%(activity_date)s, %(user_id)s, %(tool)s, %(jobs_count)s, "
-                    "%(avg_max_memory_gb)s, %(avg_cpu_cores)s, "
-                    "%(avg_runtime_seconds)s, %(memory_samples)s, "
-                    "%(cpu_samples)s, %(runtime_samples)s, NOW(), NOW())"
+                    "%(avg_memory_gb)s, %(max_memory_gb)s, %(median_memory_gb)s, "
+                    "%(avg_cpu_cores)s, %(avg_runtime_seconds)s, NOW(), NOW())"
                 ),
                 page_size=1000,
             )
     return rows_deleted
+
+
+def _format_metric(value):
+    if value is None:
+        return "null"
+    return str(value)
+
+
+def print_rebuild_day_summary(activity_date, source_rows, rows_to_insert):
+    print(
+        "user_tool_daily_stats day: date={date} source_jobs={source_jobs} rows={rows}".format(
+            date=activity_date,
+            source_jobs=source_rows,
+            rows=len(rows_to_insert),
+        )
+    )
+
+
+def print_rebuild_row(item):
+    print(
+        "user_tool_daily_stats row: date={date} user_id={user_id} username={username} "
+        "tool={tool} jobs={jobs} avg_memory_gb={avg_memory_gb} max_memory_gb={max_memory_gb} "
+        "median_memory_gb={median_memory_gb} avg_cpu_cores={avg_cpu_cores} "
+        "avg_runtime_seconds={avg_runtime_seconds}".format(
+            date=item["activity_date"],
+            user_id=item["user_id"],
+            username=item.get("username") or "-",
+            tool=item["tool"],
+            jobs=item["jobs_count"],
+            avg_memory_gb=_format_metric(item.get("avg_memory_gb")),
+            max_memory_gb=_format_metric(item.get("max_memory_gb")),
+            median_memory_gb=_format_metric(item.get("median_memory_gb")),
+            avg_cpu_cores=_format_metric(item.get("avg_cpu_cores")),
+            avg_runtime_seconds=_format_metric(item.get("avg_runtime_seconds")),
+        )
+    )
+
+
+def print_rebuild_preview(start_date, end_date, days, source_jobs, rows_deleted, rows_inserted):
+    print(
+        "user_tool_daily_stats preview: start={start} end={end} days={days} "
+        "source_jobs={source_jobs} delete_rows={deleted} insert_rows={inserted}".format(
+            start=start_date or "-",
+            end=end_date or "-",
+            days=days,
+            source_jobs=source_jobs,
+            deleted=rows_deleted,
+            inserted=rows_inserted,
+        )
+    )
 
 
 def rebuild(conn, args):
@@ -242,19 +298,22 @@ def rebuild(conn, args):
     while cursor <= last_date:
         rows = completed_rows_for_date(conn, cursor)
         source_jobs += len(rows)
-        payload.extend(
-            aggregate_daily_rows(
-                rows,
-                mapped_mapper,
-                raw_mapper,
-                rewrite_pattern,
-                rewrite_tool,
-            )
+        day_payload = aggregate_daily_rows(
+            rows,
+            mapped_mapper,
+            raw_mapper,
+            rewrite_pattern,
+            rewrite_tool,
         )
+        print_rebuild_day_summary(cursor, len(rows), day_payload)
+        for item in day_payload:
+            print_rebuild_row(item)
+        payload.extend(day_payload)
         cursor += timedelta(days=1)
         days += 1
 
     rows_deleted = count_existing_rows(conn)
+    print_rebuild_preview(first_date, last_date, days, source_jobs, rows_deleted, len(payload))
     if not args.dry_run:
         rows_deleted = replace_all_rows(conn, payload)
         conn.commit()

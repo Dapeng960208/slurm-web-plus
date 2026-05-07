@@ -75,7 +75,7 @@ const userMetricsHistoryHasData = computed(() => {
 const topTools = computed<UserToolActivityRecord[]>(() => {
   return (userToolAnalysis.value?.tool_breakdown ?? [])
     .slice()
-    .sort((a, b) => (b.avg_max_memory_mb ?? 0) - (a.avg_max_memory_mb ?? 0) || b.jobs - a.jobs)
+    .sort((a, b) => (b.max_memory_gb ?? 0) - (a.max_memory_gb ?? 0) || b.jobs - a.jobs)
     .slice(0, 6)
 })
 
@@ -84,10 +84,18 @@ const submittedJobsInRange = computed(() => userMetricsHistory.value?.totals?.su
 const completedJobsInRange = computed(() => userMetricsHistory.value?.totals?.completed_jobs ?? 0)
 
 const averageMemoryLabel = computed(() => {
-  const gbValue = userToolAnalysis.value?.totals.avg_max_memory_gb
-  if (gbValue != null) return formatGb(gbValue)
-  const value = userToolAnalysis.value?.totals.avg_max_memory_mb
-  return value != null ? getMBHumanUnit(value) : '--'
+  const value = userToolAnalysis.value?.totals.avg_memory_gb
+  return value != null ? formatGb(value) : '--'
+})
+
+const maxMemoryLabel = computed(() => {
+  const value = userToolAnalysis.value?.totals.max_memory_gb
+  return value != null ? formatGb(value) : '--'
+})
+
+const medianMemoryLabel = computed(() => {
+  const value = userToolAnalysis.value?.totals.median_memory_gb
+  return value != null ? formatGb(value) : '--'
 })
 
 const averageCpuLabel = computed(() => {
@@ -466,12 +474,32 @@ onUnmounted(() => {
 
         <div class="space-y-3">
           <div class="ui-panel-soft px-4 py-3">
-            <div class="ui-stat-label">Average Max Memory</div>
+            <div class="ui-stat-label">Average Memory</div>
             <div class="mt-2 text-2xl font-bold text-[var(--color-brand-ink-strong)]">
               {{ averageMemoryLabel }}
             </div>
             <div class="mt-1.5 text-sm text-[var(--color-brand-muted)]">
               Per completed job across recorded tools in the selected window
+            </div>
+          </div>
+
+          <div class="ui-panel-soft px-4 py-3">
+            <div class="ui-stat-label">Peak Memory</div>
+            <div class="mt-2 text-2xl font-bold text-[var(--color-brand-ink-strong)]">
+              {{ maxMemoryLabel }}
+            </div>
+            <div class="mt-1.5 text-sm text-[var(--color-brand-muted)]">
+              Highest recorded completed-job memory across the selected window
+            </div>
+          </div>
+
+          <div class="ui-panel-soft px-4 py-3">
+            <div class="ui-stat-label">Median Memory</div>
+            <div class="mt-2 text-2xl font-bold text-[var(--color-brand-ink-strong)]">
+              {{ medianMemoryLabel }}
+            </div>
+            <div class="mt-1.5 text-sm text-[var(--color-brand-muted)]">
+              Typical completed-job memory across recorded tools in the selected window
             </div>
           </div>
 
@@ -538,16 +566,18 @@ onUnmounted(() => {
                 </div>
                 <span class="ui-chip">{{ tool.jobs }} jobs</span>
               </div>
-              <div class="mt-3 grid gap-2 text-sm text-[var(--color-brand-muted)] sm:grid-cols-3">
+              <div class="mt-3 grid gap-2 text-sm text-[var(--color-brand-muted)] sm:grid-cols-5">
                 <div>
-                  Memory:
-                  {{
-                    tool.avg_max_memory_gb != null
-                      ? formatGb(tool.avg_max_memory_gb)
-                      : tool.avg_max_memory_mb != null
-                        ? getMBHumanUnit(tool.avg_max_memory_mb)
-                        : '--'
-                  }}
+                  Memory Avg:
+                  {{ tool.avg_memory_gb != null ? formatGb(tool.avg_memory_gb) : '--' }}
+                </div>
+                <div>
+                  Memory Max:
+                  {{ tool.max_memory_gb != null ? formatGb(tool.max_memory_gb) : '--' }}
+                </div>
+                <div>
+                  Memory Median:
+                  {{ tool.median_memory_gb != null ? formatGb(tool.median_memory_gb) : '--' }}
                 </div>
                 <div>
                   CPU:

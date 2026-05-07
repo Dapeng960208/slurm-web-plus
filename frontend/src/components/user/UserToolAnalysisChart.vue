@@ -9,7 +9,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { UserToolActivityRecord } from '@/composables/GatewayAPI'
-import { getMBHumanUnit } from '@/composables/GatewayAPI'
 
 const { tools } = defineProps<{
   tools: UserToolActivityRecord[]
@@ -37,14 +36,14 @@ function formatRuntime(tool: UserToolActivityRecord): string {
 }
 
 const maxMemory = computed(() =>
-  Math.max(...tools.map((tool) => tool.avg_max_memory_mb ?? 0), 0)
+  Math.max(...tools.map((tool) => tool.max_memory_gb ?? 0), 0)
 )
 
 const maxJobs = computed(() => Math.max(...tools.map((tool) => tool.jobs), 0))
 
 function memoryWidth(tool: UserToolActivityRecord): string {
   if (!maxMemory.value) return '0%'
-  return `${((tool.avg_max_memory_mb ?? 0) / maxMemory.value) * 100}%`
+  return `${(((tool.max_memory_gb ?? tool.avg_memory_gb) ?? 0) / maxMemory.value) * 100}%`
 }
 
 function jobsWidth(tool: UserToolActivityRecord): string {
@@ -53,8 +52,8 @@ function jobsWidth(tool: UserToolActivityRecord): string {
 }
 
 function memoryLabel(tool: UserToolActivityRecord): string {
-  if (tool.avg_max_memory_gb != null) return formatGb(tool.avg_max_memory_gb)
-  return tool.avg_max_memory_mb != null ? getMBHumanUnit(tool.avg_max_memory_mb) : 'N/A'
+  if (tool.max_memory_gb != null) return formatGb(tool.max_memory_gb)
+  return tool.avg_memory_gb != null ? formatGb(tool.avg_memory_gb) : 'N/A'
 }
 </script>
 
@@ -86,7 +85,7 @@ function memoryLabel(tool: UserToolActivityRecord): string {
       <div class="mt-4 grid gap-4 xl:grid-cols-2">
         <div>
           <div class="mb-2 flex items-center justify-between gap-3">
-            <span class="ui-stat-label">Average Max Memory</span>
+            <span class="ui-stat-label">Peak Memory</span>
             <span class="text-sm font-semibold text-[var(--color-brand-ink-strong)]">
               {{ memoryLabel(tool) }}
             </span>
@@ -123,7 +122,7 @@ function memoryLabel(tool: UserToolActivityRecord): string {
         <div>Runtime: {{ formatRuntime(tool) }}</div>
         <div>
           Peak reference:
-          {{ maxMemory > 0 ? getMBHumanUnit(maxMemory) : 'N/A' }}
+          {{ maxMemory > 0 ? formatGb(maxMemory) : 'N/A' }}
         </div>
       </div>
     </article>

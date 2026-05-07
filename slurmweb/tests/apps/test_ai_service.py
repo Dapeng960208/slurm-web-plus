@@ -623,7 +623,9 @@ class TestAIService(TestCase):
         self.assertIn("Prefer direct aggregate interfaces over raw history", system_prompt)
         self.assertIn("user/tools/analysis", system_prompt)
         self.assertIn("best direct source for a user's usual resource profile by tool", system_prompt)
-        self.assertIn("avg_max_memory_mb", system_prompt)
+        self.assertIn("avg_memory_gb", system_prompt)
+        self.assertIn("max_memory_gb", system_prompt)
+        self.assertIn("median_memory_gb", system_prompt)
         self.assertIn("Never expose internal tool-call metadata", system_prompt)
 
     def test_planner_prompt_describes_persisted_job_history_usage_fields(self):

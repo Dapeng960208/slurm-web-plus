@@ -228,7 +228,7 @@ class AIAgentInterfaceRegistry:
                 key="user/tools/analysis",
                 method="GET",
                 description="Get aggregated user tool analysis, including per-tool usage counts and average memory, CPU, and runtime. This is the best direct source for a user's usual resource profile by tool.",
-                arguments_description="Required: username. Optional: start, end ISO 8601 datetimes. Returns window, totals plus tool_breakdown entries such as tool, jobs, avg_max_memory_mb, avg_cpu_cores, and avg_runtime_seconds.",
+                arguments_description="Required: username. Optional: start, end ISO 8601 datetimes. Returns window, totals plus tool_breakdown entries such as tool, jobs, avg_memory_gb, max_memory_gb, median_memory_gb, avg_cpu_cores, and avg_runtime_seconds.",
                 write=False,
                 handler=self._user_tools_analysis,
             ),

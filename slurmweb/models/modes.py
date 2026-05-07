@@ -179,24 +179,11 @@ class UserToolDailyStat(Base):
     user_id = sa.Column(sa.BigInteger(), sa.ForeignKey("users.id"), nullable=False)
     tool = sa.Column(sa.Text(), nullable=False)
     jobs_count = sa.Column(sa.Integer(), nullable=False)
-    avg_max_memory_gb = sa.Column(sa.Float(), nullable=True)
+    avg_memory_gb = sa.Column(sa.Float(), nullable=True)
+    max_memory_gb = sa.Column(sa.Float(), nullable=True)
+    median_memory_gb = sa.Column(sa.Float(), nullable=True)
     avg_cpu_cores = sa.Column(sa.Float(), nullable=True)
     avg_runtime_seconds = sa.Column(sa.Float(), nullable=True)
-    memory_samples = sa.Column(
-        sa.Integer(),
-        nullable=False,
-        server_default=sa.text("0"),
-    )
-    cpu_samples = sa.Column(
-        sa.Integer(),
-        nullable=False,
-        server_default=sa.text("0"),
-    )
-    runtime_samples = sa.Column(
-        sa.Integer(),
-        nullable=False,
-        server_default=sa.text("0"),
-    )
     created_at = sa.Column(
         sa.TIMESTAMP(timezone=True),
         nullable=False,

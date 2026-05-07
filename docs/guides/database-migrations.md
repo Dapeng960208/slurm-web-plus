@@ -121,6 +121,19 @@
 
 这些字段用于 `tools/analysis` 从日聚合表跨多日汇总时，按真实资源样本数加权计算 `avg_max_memory_gb`、`avg_cpu_cores` 与 `avg_runtime_seconds`。
 
+### 3.11 `20260507_0011`：用户工具日聚合内存字段重构
+
+在 `user_tool_daily_stats` 上执行以下调整：
+
+- `avg_max_memory_gb` 重命名为 `avg_memory_gb`
+- 新增 `max_memory_gb`
+- 新增 `median_memory_gb`
+- 删除 `memory_samples`
+- 删除 `cpu_samples`
+- 删除 `runtime_samples`
+
+升级后应配合运行全表重建脚本 `slurmweb/scripts/rebuild-user-tool.py`，按新聚合口径重建历史 `user_tool_daily_stats`。
+
 ## 4. 迁移验证（最小集）
 
 1. Alembic revision：

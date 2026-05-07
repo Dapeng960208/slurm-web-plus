@@ -195,10 +195,10 @@ Vue 页面
   - `deleted_at`
   - `deleted_by`
 - `user_tool_daily_stats` 当前新增：
-  - `memory_samples`
-  - `cpu_samples`
-  - `runtime_samples`
-  - 当前 `jobs_count` 表示 `used_memory_gb > 0` 的完成作业数；`cpu_samples` 与 `avg_cpu_cores` 只覆盖其中具备有效 CPU 样本的子集
+  - `avg_memory_gb`
+  - `max_memory_gb`
+  - `median_memory_gb`
+  - 当前 `jobs_count` 表示 `used_memory_gb > 0` 的完成作业数；`avg_cpu_cores` 只覆盖其中具备有效 CPU 样本的子集
 
 ## 8. 前端权限消费点
 

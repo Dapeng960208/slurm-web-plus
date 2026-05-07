@@ -1,11 +1,32 @@
 ﻿# 最新功能
 
+## 本轮：`user_tool_daily_stats` 重构为单计数字段并扩展内存统计
+
+本轮完成了 `user_tool_daily_stats` 聚合链路重构，并把内存统计扩展落到后端、脚本和前端：
+
+- 日表去掉了冗余样本数字段 `memory_samples`、`cpu_samples`、`runtime_samples`，仅保留 `jobs_count` 作为完成作业计数。
+- 日表内存字段改为 `avg_memory_gb`、`max_memory_gb`、`median_memory_gb`；旧 `avg_max_memory_gb` 在接口层继续兼容输出。
+- 所有写入日表的浮点指标现在统一保留两位小数，包括内存、CPU 和运行时间。
+- 当天后台聚合、按范围修复脚本和全表重建脚本现在复用同一套聚合逻辑，避免口径再次漂移。
+- 用户分析前端已增加 Average Memory、Peak Memory、Median Memory 展示，工具级面板和图表同步改为使用新字段。
+- 全表重建后，跨多天 `tools/analysis` 仍只读 `user_tool_daily_stats`：平均内存按 `jobs_count` 加权，峰值内存取窗口最大值，中位数内存按日中位数加权近似。
+
+## 本轮：`rebuild-user-tool.py` 默认输出逐条重建明细日志
+
+本轮增强了 `slurmweb/scripts/rebuild-user-tool.py` 的可观测性，方便排查 `user_tool_daily_stats` 的历史重建结果：
+
+- 脚本现在会按 `activity_date + user_id + tool` 逐条打印将写入 `user_tool_daily_stats` 的日聚合明细。
+- 每条日志会带 `date`、`user_id`、`username`、`tool`、`jobs_count`、内存指标、`avg_cpu_cores` 和 `avg_runtime_seconds`。
+- 每个 UTC 日期会先输出当天扫描到的 `source_jobs` 和当天将写入的聚合行数，再输出逐条行日志。
+- 在真正删除旧表数据并写入新数据前，脚本还会打印一次全表预览摘要，包含日期范围、扫描天数、源作业数、待删除旧行数和待写入新行数。
+- 详细日志默认总是输出，不依赖额外开关；因此全量历史重建时控制台日志会明显增加。
+
 ## 本轮：用户工具日聚合改为内存必需、CPU 可选，并补后台刷新日志
 
 本轮收紧了 `user_tool_daily_stats` 的日聚合写入口径，并补齐排障信息：
 
 - 日聚合写表只强制 `used_memory_gb > 0`；`used_cpu_cores_avg` 现在只作为可选样本，不再作为整条作业的硬门槛。
-- 缺 CPU 样本的完成作业会进入 `user_tool_daily_stats`，但不会贡献 `avg_cpu_cores/cpu_samples`。
+- 缺 CPU 样本的完成作业会进入 `user_tool_daily_stats`，但不会贡献 `avg_cpu_cores`。
 - `tools/analysis` 的跨天汇总仍以日表为准；`avg_cpu_cores` 只会合并仍然带有效 CPU 样本的日行。
 - 后台聚合线程每轮刷新会记录扫描作业数、计入作业数、跳过数和写入行数，方便排查聚合结果为空或 CPU 样本缺失。
 - 历史修复脚本 `slurmweb/scripts/repair-user-tool-daily-stats.py` 已同步新口径，可按日期范围重建旧数据。
