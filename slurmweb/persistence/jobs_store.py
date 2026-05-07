@@ -876,9 +876,10 @@ class JobsStore:
     ):
         if snapshot.submit_time is None:
             return None
-        row_activity_date = activity_date or snapshot.submit_time.astimezone(timezone.utc).date()
+        if activity_date is None:
+            raise ValueError("activity_date must be provided for daily aggregation rows")
         return {
-            "activity_date": row_activity_date,
+            "activity_date": activity_date,
             "user_id": snapshot.user_id,
             "username": username,
             "job_name": snapshot.job_name,
@@ -903,6 +904,8 @@ class JobsStore:
         end_time=None,
         activity_date=None,
     ):
+        if activity_date is None:
+            raise ValueError("activity_date must be provided for daily aggregation rows")
         with self._session() as session:
             rows = session.execute(
                 self._submitted_completed_jobs_query(

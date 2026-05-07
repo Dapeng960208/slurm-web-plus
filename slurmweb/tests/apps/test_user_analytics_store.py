@@ -1022,6 +1022,7 @@ class TestUserMetricsQueries(unittest.TestCase):
             username="alice",
             start_time=start_time,
             end_time=end_time + timedelta(microseconds=1),
+            activity_date=date(2026, 4, 24),
         )
 
     def test_submission_timeline_uses_fallback_time_when_submit_time_missing(self):

@@ -1039,10 +1039,12 @@ class UserAnalyticsStore:
         )
 
     def _completed_jobs_rows_window(self, username, start_time, end_time):
+        activity_date = start_time.astimezone(timezone.utc).date()
         return self._jobs_store.completed_job_rows_by_submit_window(
             username=username,
             start_time=start_time,
             end_time=end_time + timedelta(microseconds=1),
+            activity_date=activity_date,
         )
 
     def _completed_jobs_rows_for_activity_dates(self, start_date, end_date, username):

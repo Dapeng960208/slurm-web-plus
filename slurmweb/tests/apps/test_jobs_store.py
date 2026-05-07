@@ -861,6 +861,15 @@ class TestJobsStoreCompletedAggregationSource(unittest.TestCase):
         self.assertEqual(row["activity_date"], date(2026, 4, 24))
         self.assertEqual(row["username"], "alice")
 
+    def test_activity_date_is_required_for_daily_rows(self):
+        store = JobsStore(settings=mock.Mock(), slurmrestd=None)
+        snapshot = types.SimpleNamespace(
+            submit_time=datetime(2026, 4, 24, 23, 30, tzinfo=timezone.utc),
+        )
+
+        with self.assertRaisesRegex(ValueError, "activity_date must be provided"):
+            store._serialize_submitted_completed_job_row(snapshot)
+
 
 class TestJobsStorePendingQueue(unittest.TestCase):
     def setUp(self):
