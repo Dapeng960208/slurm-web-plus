@@ -456,7 +456,9 @@ class SlurmwebAppAgent(SlurmwebWebApp, RFLTokenizedRBACWebApp):
                     tool_mapping_file=self.settings.user_metrics.tool_mapping_file,
                 )
                 self.user_analytics_store = UserAnalyticsStore(
-                    store_settings, users_store=self.users_store
+                    store_settings,
+                    users_store=self.users_store,
+                    slurmrestd=self.slurmrestd,
                 )
                 self.user_analytics_store.start()
                 self.user_metrics_store = self.user_analytics_store

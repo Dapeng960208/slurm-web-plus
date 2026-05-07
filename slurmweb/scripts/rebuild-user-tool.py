@@ -23,6 +23,8 @@ from slurmweb.persistence.user_analytics_store import (
     aggregate_user_tool_daily_rows,
     ToolNameMapper,
 )
+from slurmweb.slurmrestd import Slurmrestd
+from slurmweb.slurmrestd.auth import SlurmrestdAuthentifier
 
 
 def parse_args():
@@ -95,6 +97,31 @@ def load_settings(args):
         user=settings.database.user,
         password=settings.database.password,
         tool_mapping_file=mapping_file,
+        slurmrestd_uri=settings.slurmrestd.uri,
+        slurmrestd_auth=settings.slurmrestd.auth,
+        slurmrestd_jwt_mode=settings.slurmrestd.jwt_mode,
+        slurmrestd_jwt_user=settings.slurmrestd.jwt_user,
+        slurmrestd_jwt_key=settings.slurmrestd.jwt_key,
+        slurmrestd_jwt_lifespan=settings.slurmrestd.jwt_lifespan,
+        slurmrestd_jwt_token=settings.slurmrestd.jwt_token,
+        slurmrestd_versions=settings.slurmrestd.versions,
+        service_cluster=getattr(settings.service, "cluster", None),
+    )
+
+
+def make_slurmrestd(settings):
+    return Slurmrestd(
+        settings.slurmrestd_uri,
+        SlurmrestdAuthentifier(
+            settings.slurmrestd_auth,
+            settings.slurmrestd_jwt_mode,
+            settings.slurmrestd_jwt_user,
+            settings.slurmrestd_jwt_key,
+            settings.slurmrestd_jwt_lifespan,
+            settings.slurmrestd_jwt_token,
+        ),
+        settings.slurmrestd_versions,
+        cluster_name_hint=settings.service_cluster,
     )
 
 
@@ -131,6 +158,27 @@ def _parse_activity_date(value):
 def _day_bounds(activity_date):
     start_time = datetime.combine(activity_date, time.min, tzinfo=timezone.utc)
     return start_time, start_time + timedelta(days=1)
+
+
+def backfill_usage_for_dates(
+    jobs_store,
+    slurmrestd,
+    start_date,
+    end_date,
+    username=None,
+    user_id=None,
+    dry_run=False,
+):
+    start_time = datetime.combine(start_date, time.min, tzinfo=timezone.utc)
+    end_time = datetime.combine(end_date + timedelta(days=1), time.min, tzinfo=timezone.utc)
+    return jobs_store.backfill_usage_fields(
+        slurmrestd=slurmrestd,
+        start_time=start_time,
+        end_time=end_time,
+        username=username,
+        user_id=user_id,
+        dry_run=dry_run,
+    )
 
 
 def completed_rows_for_rebuild_day(jobs_store, activity_date, username=None, user_id=None):
@@ -384,6 +432,7 @@ def print_rebuild_preview(start_date, end_date, days, source_jobs, rows_deleted,
 def rebuild(conn, args):
     db_settings = load_settings(args)
     jobs_store = JobsStore(db_settings, slurmrestd=None)
+    slurmrestd = make_slurmrestd(db_settings)
     rewrite_pattern = re.compile(args.rewrite_pattern)
     rewrite_tool = args.rewrite_tool.strip().lower() or "regr"
     mapped_mapper = ToolNameMapper(db_settings.tool_mapping_file)
@@ -415,6 +464,16 @@ def rebuild(conn, args):
             "rows_deleted": rows_deleted,
             "rows_inserted": 0,
         }
+
+    backfill_usage_for_dates(
+        jobs_store,
+        slurmrestd,
+        first_date,
+        last_date,
+        username=requested_user,
+        user_id=requested_user_id,
+        dry_run=args.dry_run,
+    )
 
     payload = []
     source_jobs = 0

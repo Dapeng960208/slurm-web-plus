@@ -328,6 +328,18 @@ def _is_completed_state(value) -> bool:
     return "COMPLETED" in states
 
 
+def _is_failed_state(value) -> bool:
+    normalized = _state_str(value)
+    if not normalized:
+        return False
+    states = [part.strip().upper() for part in normalized.split(",")]
+    return "FAILED" in states
+
+
+def _is_usage_backfill_state(value) -> bool:
+    return _is_completed_state(value) or _is_failed_state(value)
+
+
 def _ts(value):
     """Convert a Slurm epoch integer to a timezone-aware datetime, or None."""
     if isinstance(value, dict):
@@ -700,6 +712,21 @@ def _prepare_db_row(row: dict) -> dict:
     return data
 
 
+def fetch_job_detail(slurmrestd, job_id):
+    from ..slurmrestd.errors import SlurmrestdInternalError
+
+    if hasattr(slurmrestd, "job"):
+        return slurmrestd.job(job_id)
+
+    result = slurmrestd._acctjob(job_id)
+    try:
+        result.update(slurmrestd._ctldjob(job_id, ignore_notfound=True))
+    except SlurmrestdInternalError as err:
+        if err.error != 2017:
+            raise
+    return result
+
+
 class JobsStore:
     """
     Manage PostgreSQL persistence for job snapshots.
@@ -1048,66 +1075,8 @@ class JobsStore:
                     row.get("job_id"),
                 )
                 continue
-            self._enrich_completed_usage_fields(row)
             valid.append(row)
         return valid
-
-    def _needs_usage_detail_enrichment(self, row: dict) -> bool:
-        if self._slurmrestd is None:
-            return False
-        if not _is_completed_state(row.get("job_state")):
-            return False
-        return row.get("used_memory_gb") is None or row.get("used_cpu_cores_avg") is None
-
-    def _enrich_completed_usage_fields(self, row: dict) -> dict:
-        if not self._needs_usage_detail_enrichment(row):
-            return row
-
-        try:
-            job = self._slurmrestd.job(row["job_id"])
-        except Exception as err:
-            if _is_not_found_error(err):
-                logger.debug(
-                    "Completed job %s detail not found while filling usage fields",
-                    row.get("job_id"),
-                )
-            else:
-                logger.warning(
-                    "Unable to fill completed job %s usage fields: %s",
-                    row.get("job_id"),
-                    err,
-                )
-            return row
-
-        detail_row = _extract_detail(job, row)
-        if not detail_row.get("job_id") or not detail_row.get("submit_time"):
-            logger.debug(
-                "Ignoring completed job %s usage fill due to missing detail key fields",
-                row.get("job_id"),
-            )
-            return row
-
-        if detail_row.get("submit_time") != row.get("submit_time"):
-            logger.warning(
-                "Ignoring completed job %s usage fill due to submit_time mismatch",
-                row.get("job_id"),
-            )
-            return row
-
-        updated = False
-        for field in ("used_memory_gb", "used_cpu_cores_avg"):
-            if row.get(field) is None and detail_row.get(field) is not None:
-                row[field] = detail_row[field]
-                updated = True
-
-        if not updated:
-            logger.debug(
-                "Completed job %s detail did not include missing usage fields",
-                row.get("job_id"),
-            )
-        for field in ("used_memory_gb", "used_cpu_cores_avg"):
-            row[field] = _round_metric(row.get(field))
-        return row
 
     def _queue_rows(self, rows: list):
         if rows:
@@ -1212,6 +1181,230 @@ class JobsStore:
             "used_cpu_cores_avg",
         )
         return any(record.get(field) is None for field in detail_fields)
+
+    def usage_backfill_rows_query(
+        self,
+        session,
+        start_time=None,
+        end_time=None,
+        username=None,
+        user_id=None,
+        job_id=None,
+        limit=None,
+        missing_only=True,
+    ):
+        query = (
+            session.query(JobSnapshot, User.username)
+            .outerjoin(User, User.id == JobSnapshot.user_id)
+            .filter(
+                sa.or_(
+                    sa.func.upper(JobSnapshot.job_state).like("%COMPLETED%"),
+                    sa.func.upper(JobSnapshot.job_state).like("%FAILED%"),
+                )
+            )
+        )
+        if missing_only:
+            query = query.filter(
+                sa.or_(
+                    JobSnapshot.used_memory_gb.is_(None),
+                    JobSnapshot.used_cpu_cores_avg.is_(None),
+                )
+            )
+        if start_time is not None:
+            query = query.filter(JobSnapshot.submit_time >= start_time)
+        if end_time is not None:
+            query = query.filter(JobSnapshot.submit_time < end_time)
+        if username:
+            query = query.filter(User.username == username)
+        if user_id is not None:
+            query = query.filter(JobSnapshot.user_id == user_id)
+        if job_id is not None:
+            query = query.filter(JobSnapshot.job_id == int(job_id))
+        query = query.order_by(JobSnapshot.submit_time.asc(), JobSnapshot.job_id.asc())
+        if limit is not None:
+            query = query.limit(limit)
+        return query
+
+    def usage_backfill_candidates(
+        self,
+        start_time=None,
+        end_time=None,
+        username=None,
+        user_id=None,
+        job_id=None,
+        limit=None,
+        missing_only=True,
+    ):
+        with self._session() as session:
+            return list(
+                self.usage_backfill_rows_query(
+                    session,
+                    start_time=start_time,
+                    end_time=end_time,
+                    username=username,
+                    user_id=user_id,
+                    job_id=job_id,
+                    limit=limit,
+                    missing_only=missing_only,
+                ).all()
+            )
+
+    def _apply_usage_detail(self, snapshot, username, detail):
+        record = {
+            "id": snapshot.id,
+            "job_id": snapshot.job_id,
+            "submit_time": snapshot.submit_time,
+            "job_name": snapshot.job_name,
+            "job_state": snapshot.job_state,
+            "state_reason": snapshot.state_reason,
+            "user_id": snapshot.user_id,
+            "user_name": username,
+            "account": snapshot.account,
+            "group": snapshot.group,
+            "partition": snapshot.partition,
+            "qos": snapshot.qos,
+            "nodes": snapshot.nodes,
+            "node_count": snapshot.node_count,
+            "cpus": snapshot.cpus,
+            "priority": snapshot.priority,
+            "tres_req_str": snapshot.tres_req_str,
+            "tres_per_job": snapshot.tres_per_job,
+            "tres_per_node": snapshot.tres_per_node,
+            "gres_detail": snapshot.gres_detail,
+            "tres_requested": snapshot.tres_requested,
+            "tres_allocated": snapshot.tres_allocated,
+            "start_time": snapshot.start_time,
+            "end_time": snapshot.end_time,
+            "eligible_time": snapshot.eligible_time,
+            "last_sched_evaluation_time": snapshot.last_sched_evaluation_time,
+            "time_limit_minutes": snapshot.time_limit_minutes,
+            "used_memory_gb": snapshot.used_memory_gb,
+            "usage_stats": snapshot.usage_stats,
+            "used_cpu_cores_avg": snapshot.used_cpu_cores_avg,
+            "exit_code": snapshot.exit_code,
+            "working_directory": snapshot.working_directory,
+            "command": snapshot.command,
+        }
+        row = _extract_detail(detail, record)
+        if not row.get("job_id") or not row.get("submit_time"):
+            return False, "missing_detail_key", None, None
+        if row.get("submit_time") != snapshot.submit_time:
+            return False, "submit_time_mismatch", None, None
+
+        new_memory = _round_metric(row.get("used_memory_gb"))
+        new_cpu = _round_metric(row.get("used_cpu_cores_avg"))
+        memory_update = snapshot.used_memory_gb is None and new_memory is not None
+        cpu_update = snapshot.used_cpu_cores_avg is None and new_cpu is not None
+        if not memory_update and not cpu_update:
+            if snapshot.used_memory_gb is None and new_memory is None:
+                return False, "missing_used_memory_gb", new_memory, new_cpu
+            if snapshot.used_cpu_cores_avg is None and new_cpu is None:
+                return False, "missing_used_cpu_cores_avg", new_memory, new_cpu
+            return False, "no_usage_updates", new_memory, new_cpu
+        return True, "ok", new_memory, new_cpu
+
+    def backfill_usage_fields(
+        self,
+        slurmrestd=None,
+        start_time=None,
+        end_time=None,
+        username=None,
+        user_id=None,
+        job_id=None,
+        limit=None,
+        dry_run=False,
+        logger_fn=None,
+        missing_only=True,
+        session_factory=None,
+    ):
+        slurmrestd = slurmrestd or self._slurmrestd
+        if slurmrestd is None:
+            return {"scanned": 0, "updated": 0, "skipped": 0}
+
+        scanned = 0
+        updated = 0
+        skipped = 0
+        session_manager = session_factory or self._session
+        with session_manager() as session:
+            rows = self.usage_backfill_rows_query(
+                session,
+                start_time=start_time,
+                end_time=end_time,
+                username=username,
+                user_id=user_id,
+                job_id=job_id,
+                limit=limit,
+                missing_only=missing_only,
+            ).all()
+            for snapshot, resolved_username in rows:
+                scanned += 1
+                old_memory = snapshot.used_memory_gb
+                old_cpu = snapshot.used_cpu_cores_avg
+                try:
+                    detail = fetch_job_detail(slurmrestd, snapshot.job_id)
+                except Exception as err:
+                    skipped += 1
+                    reason = "not_found" if _is_not_found_error(err) else "detail_error"
+                    if logger_fn is not None:
+                        logger_fn(
+                            snapshot=snapshot,
+                            username=resolved_username,
+                            old_memory=old_memory,
+                            new_memory=None,
+                            old_cpu=old_cpu,
+                            new_cpu=None,
+                            decision="skipped",
+                            reason=reason,
+                            error=err,
+                        )
+                    continue
+
+                can_update, reason, new_memory, new_cpu = self._apply_usage_detail(
+                    snapshot,
+                    resolved_username,
+                    detail,
+                )
+                if not can_update:
+                    skipped += 1
+                    if logger_fn is not None:
+                        logger_fn(
+                            snapshot=snapshot,
+                            username=resolved_username,
+                            old_memory=old_memory,
+                            new_memory=new_memory,
+                            old_cpu=old_cpu,
+                            new_cpu=new_cpu,
+                            decision="skipped",
+                            reason=reason,
+                            error=None,
+                        )
+                    continue
+
+                if not dry_run:
+                    if snapshot.used_memory_gb is None:
+                        snapshot.used_memory_gb = new_memory
+                    if snapshot.used_cpu_cores_avg is None:
+                        snapshot.used_cpu_cores_avg = new_cpu
+                updated += 1
+                if logger_fn is not None:
+                    logger_fn(
+                        snapshot=snapshot,
+                        username=resolved_username,
+                        old_memory=old_memory,
+                        new_memory=new_memory if old_memory is None else old_memory,
+                        old_cpu=old_cpu,
+                        new_cpu=new_cpu if old_cpu is None else old_cpu,
+                        decision="updated",
+                        reason=reason,
+                        error=None,
+                    )
+
+            if dry_run:
+                session.rollback()
+            else:
+                session.commit()
+
+        return {"scanned": scanned, "updated": updated, "skipped": skipped}
 
     def _maybe_enrich_record(self, record: dict) -> Optional[dict]:
         if self._slurmrestd is None or not self._needs_detail_enrichment(record):

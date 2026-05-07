@@ -879,6 +879,27 @@ class TestJobsStoreCompletedAggregationSource(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "activity_date must be provided"):
             store._serialize_submitted_completed_job_row(snapshot)
 
+    def test_usage_backfill_query_matches_completed_and_failed_terminal_substrings(self):
+        store = JobsStore(settings=mock.Mock(), slurmrestd=None)
+        session = mock.Mock()
+        query = mock.Mock()
+        query.outerjoin.return_value = query
+        query.filter.return_value = query
+        query.order_by.return_value = query
+        session.query.return_value = query
+
+        store.usage_backfill_rows_query(session)
+
+        filter_args = [call.args[0] for call in query.filter.call_args_list]
+        compiled = [str(arg.compile(compile_kwargs={"literal_binds": True})) for arg in filter_args]
+        self.assertTrue(
+            any(
+                "upper(job_snapshots.job_state) LIKE '%COMPLETED%'" in text
+                and "upper(job_snapshots.job_state) LIKE '%FAILED%'" in text
+                for text in compiled
+            )
+        )
+
 
 class TestJobsStorePersistenceUsageEnrichment(unittest.TestCase):
     def _job(self, state="COMPLETED"):
@@ -948,17 +969,16 @@ class TestJobsStorePersistenceUsageEnrichment(unittest.TestCase):
             "command": "run-regr",
         }
 
-    def test_prepare_rows_enriches_completed_usage_fields_before_persistence(self):
+    def test_prepare_rows_does_not_enrich_completed_usage_fields_before_persistence(self):
         slurmrestd = mock.Mock()
         store = JobsStore(settings=mock.Mock(), slurmrestd=slurmrestd)
-        slurmrestd.job.return_value = self._detail()
 
         rows = store._prepare_rows([self._job()])
 
-        slurmrestd.job.assert_called_once_with(996542)
+        slurmrestd.job.assert_not_called()
         self.assertEqual(len(rows), 1)
-        self.assertEqual(rows[0]["used_memory_gb"], 2.4)
-        self.assertEqual(rows[0]["used_cpu_cores_avg"], 0.9)
+        self.assertIsNone(rows[0]["used_memory_gb"])
+        self.assertIsNone(rows[0]["used_cpu_cores_avg"])
         self.assertIsNone(rows[0]["usage_stats"])
 
     def test_prepare_db_row_rounds_usage_metrics_to_two_decimals(self):
@@ -975,14 +995,13 @@ class TestJobsStorePersistenceUsageEnrichment(unittest.TestCase):
         self.assertEqual(prepared["used_memory_gb"], 2.4)
         self.assertEqual(prepared["used_cpu_cores_avg"], 0.9)
 
-    def test_prepare_rows_keeps_original_snapshot_when_detail_lookup_fails(self):
+    def test_prepare_rows_keeps_original_snapshot_without_detail_lookup(self):
         slurmrestd = mock.Mock()
-        slurmrestd.job.side_effect = SlurmrestdNotFoundError("missing")
         store = JobsStore(settings=mock.Mock(), slurmrestd=slurmrestd)
 
         rows = store._prepare_rows([self._job()])
 
-        slurmrestd.job.assert_called_once_with(996542)
+        slurmrestd.job.assert_not_called()
         self.assertEqual(len(rows), 1)
         self.assertIsNone(rows[0]["used_memory_gb"])
         self.assertIsNone(rows[0]["used_cpu_cores_avg"])
@@ -996,19 +1015,6 @@ class TestJobsStorePersistenceUsageEnrichment(unittest.TestCase):
         slurmrestd.job.assert_not_called()
         self.assertEqual(len(rows), 1)
         self.assertIsNone(rows[0]["used_memory_gb"])
-
-    def test_prepare_rows_ignores_detail_with_submit_time_mismatch(self):
-        slurmrestd = mock.Mock()
-        slurmrestd.job.return_value = self._detail(submit_ts=1710000999)
-        store = JobsStore(settings=mock.Mock(), slurmrestd=slurmrestd)
-
-        rows = store._prepare_rows([self._job()])
-
-        slurmrestd.job.assert_called_once_with(996542)
-        self.assertEqual(len(rows), 1)
-        self.assertIsNone(rows[0]["used_memory_gb"])
-        self.assertIsNone(rows[0]["used_cpu_cores_avg"])
-
 
 class TestJobsStorePendingQueue(unittest.TestCase):
     def setUp(self):

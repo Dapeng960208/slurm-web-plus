@@ -17,6 +17,62 @@
 
 ## 条目
 
+### 2026-05-07：本地提交流程被 `.git/index.lock` 短暂阻断
+
+- 场景：在仓库根目录执行 `git add ...` 准备拆分本地提交。
+- 现象：Git 返回 `fatal: Unable to create '.../.git/index.lock': File exists.`，导致暂存失败。
+- 复现：
+  - 在当前仓库执行 `git add <files...>`
+  - 若之前有异常退出的 Git 写操作或外部 Git 进程刚释放锁，可能短暂命中 `index.lock` 已存在
+- 根因：
+  - Git 索引锁文件在本次暂存时仍被保留或尚未释放，新的写操作被保护机制拒绝
+- 解决：
+  - 先检查活跃 Git 进程和 `.git/index.lock` 是否仍存在
+  - 确认锁文件已经消失后，重新执行 `git add`
+- 预防：
+  - 提交前若遇到 `index.lock`，不要直接反复重试或破坏性删除；先确认是否仍有 Git 进程占用，再决定是否清理残留锁
+
+### 2026-05-07：根目录执行 `pytest -q` 会被 `slurmweb4.2` 参考测试树和可选依赖阻断
+
+- 场景：在当前主线仓库执行全量 Python 回归，命令为 `.venv\Scripts\python.exe -m pytest -q`。
+- 现象：
+  - pytest 在收集阶段直接失败，未进入当前主线 `slurmweb/tests/**` 的执行阶段
+  - 典型错误包括：
+    - `ImportError: cannot import name 'SlurmwebConfSeed' from 'slurmweb.apps'`
+    - `ModuleNotFoundError: No module named 'racksdb'`
+  - 报错来源集中在 `slurmweb4.2/tests/**`
+- 复现：
+  - 在仓库根目录执行 `.venv\Scripts\python.exe -m pytest -q`
+  - 可见 `slurmweb4.2/tests/apps/test_agent.py`、`slurmweb4.2/tests/views/test_agent.py` 等旧测试树在收集阶段失败
+- 根因：
+  - `slurmweb4.2/` 在当前仓库中仍作为历史兼容/行为参考树存在，不对应当前 `slurmweb/` 主线实现
+  - 根级 pytest 默认会递归收集该参考树测试，但这些测试仍依赖旧接口 `SlurmwebConfSeed` 和当前环境未安装的可选依赖 `racksdb`
+- 解决：
+  - 本轮验收改为执行当前主线测试入口 `.venv\Scripts\python.exe -m pytest -q slurmweb/tests`
+  - 同时保留根级 `pytest -q` 失败记录，避免误判为本轮业务改动导致的主线回归
+- 预防：
+  - 后续若需要把根级 `pytest -q` 作为正式验收入口，必须先明确 `slurmweb4.2/` 的收集策略，是从 pytest 配置中排除，还是补齐其独立依赖与兼容层
+  - 在未处理该测试树前，发布记录中必须显式区分“主线测试通过”和“根级 pytest 收集失败”
+
+### 2026-05-07：把资源补齐共享到聚合前链路后，脚本测试仍按“原始浮点值”和“不会初始化 Slurm REST”断言
+
+- 场景：将 `job_snapshots` 资源补齐从入库前迁移到 `user_tool_daily_stats` 聚合前，并把 `backfill-job-snapshot-usage.py`、`rebuild-user-tool.py`、`repair-user-tool-daily-stats.py` 统一改为复用 `JobsStore.backfill_usage_fields()`。
+- 现象：
+  - `rebuild-user-tool.py` 相关测试仍断言脚本“不会初始化 `slurmrestd`”
+  - `backfill-job-snapshot-usage.py` 相关测试仍断言写回值和日志使用 detail 原始浮点值，而不是 `job_snapshots` 实际入库时的两位小数
+- 复现：
+  - 迁移后运行 `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/apps/test_user_analytics_store.py`
+  - 可见 `make_slurmrestd` 缺少 mock，以及 `2.3984947204589844` / `0.8976744186046511` 这类旧断言失败
+- 根因：
+  - 测试夹具没有同步新的共享实现边界：`rebuild` / `repair` 现在必须先初始化 Slurm REST client 才能做预补齐
+  - 共享补齐逻辑复用 `job_snapshots` 写库口径，`used_memory_gb` 与 `used_cpu_cores_avg` 在持久化前会统一四舍五入保留两位小数
+- 解决：
+  - 更新 `rebuild-user-tool.py` / `repair-user-tool-daily-stats.py` 测试，补 `make_slurmrestd` 与 `JobsStore.backfill_usage_fields()` mock，并断言先执行预补齐
+  - 更新 `backfill-job-snapshot-usage.py` 测试，改为断言写回值和日志使用两位小数
+- 预防：
+  - 后续把单独脚本逻辑下沉到共享持久化层时，脚本测试必须同步改为断言“共享实现后的行为”，不要继续以旧脚本内部实现为真
+  - 任何涉及 `job_snapshots` 资源字段的测试，都要以“最终持久化值保留两位小数”为准，而不是 detail 原始浮点值
+
 ### 2026-05-07：`pip install SQLAlchemy` 显示已安装，但 `slurm-web-agent` 仍报 `No module named 'sqlalchemy'`
 
 - 场景：在 RHEL 系主机上通过 `systemd` 启动 `slurm-web-agent.service`，现场为解决 agent 启动时的 `ModuleNotFoundError: No module named 'sqlalchemy'`，先执行 `/usr/bin/python3 -m pip install SQLAlchemy`。

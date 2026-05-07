@@ -3,7 +3,7 @@
 import argparse
 import re
 import sys
-from datetime import date
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -22,6 +22,8 @@ from slurmweb.persistence.user_analytics_store import (
     ToolNameMapper,
     aggregate_user_tool_daily_rows,
 )
+from slurmweb.slurmrestd import Slurmrestd
+from slurmweb.slurmrestd.auth import SlurmrestdAuthentifier
 
 
 def parse_date(value):
@@ -87,6 +89,31 @@ def load_settings(args):
         user=settings.database.user,
         password=settings.database.password,
         tool_mapping_file=args.mapping_file or getattr(user_metrics, "tool_mapping_file", None),
+        slurmrestd_uri=settings.slurmrestd.uri,
+        slurmrestd_auth=settings.slurmrestd.auth,
+        slurmrestd_jwt_mode=settings.slurmrestd.jwt_mode,
+        slurmrestd_jwt_user=settings.slurmrestd.jwt_user,
+        slurmrestd_jwt_key=settings.slurmrestd.jwt_key,
+        slurmrestd_jwt_lifespan=settings.slurmrestd.jwt_lifespan,
+        slurmrestd_jwt_token=settings.slurmrestd.jwt_token,
+        slurmrestd_versions=settings.slurmrestd.versions,
+        service_cluster=getattr(settings.service, "cluster", None),
+    )
+
+
+def make_slurmrestd(settings):
+    return Slurmrestd(
+        settings.slurmrestd_uri,
+        SlurmrestdAuthentifier(
+            settings.slurmrestd_auth,
+            settings.slurmrestd_jwt_mode,
+            settings.slurmrestd_jwt_user,
+            settings.slurmrestd_jwt_key,
+            settings.slurmrestd_jwt_lifespan,
+            settings.slurmrestd_jwt_token,
+        ),
+        settings.slurmrestd_versions,
+        cluster_name_hint=settings.service_cluster,
     )
 
 
@@ -170,8 +197,20 @@ def replace_target_rows(conn, start_date, end_date, payload, username=None):
 
 def rebuild(conn, args, db_settings):
     jobs_store = JobsStore(db_settings, slurmrestd=None)
+    slurmrestd = make_slurmrestd(db_settings)
     mapper = ToolNameMapper(db_settings.tool_mapping_file)
     raw_mapper = ToolNameMapper()
+    jobs_store.backfill_usage_fields(
+        slurmrestd=slurmrestd,
+        start_time=datetime.combine(args.start, datetime.min.time(), tzinfo=timezone.utc),
+        end_time=datetime.combine(
+            args.end + timedelta(days=1),
+            datetime.min.time(),
+            tzinfo=timezone.utc,
+        ),
+        username=args.user,
+        dry_run=args.dry_run,
+    )
     rows = jobs_store.completed_job_rows_for_activity_dates(
         args.start,
         args.end,

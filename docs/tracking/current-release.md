@@ -61,20 +61,22 @@
   - `avg_cpu_cores` 只对仍有有效 CPU 均值的日行按 `jobs_count` 加权
 - 后台用户工具聚合线程每轮刷新会记录汇总日志，输出扫描作业数、计入作业数、缺身份跳过数、缺内存跳过数、缺 CPU 样本数、运行时样本数和写入日行数
 - `slurmweb/scripts/repair-user-tool-daily-stats.py` 与 `slurmweb/scripts/rebuild-user-tool.py` 已同步新返回值和聚合口径，可用于历史日表重建
-- `job_snapshots` 资源字段补齐链路已前移：
-  - `COMPLETED` 作业持久化入库前，如果 `used_memory_gb` 或 `used_cpu_cores_avg` 缺失，会同步调用 Slurm REST detail 计算资源字段
-  - 持久化补齐只写入 `used_memory_gb` 与 `used_cpu_cores_avg`，不补写 `usage_stats`
-  - 两个资源字段在最终写入 `job_snapshots` 前统一四舍五入保留两位小数
-  - detail 查询失败、404、`submit_time` 不匹配或 detail 仍缺资源字段时，不阻断原始快照入库
+- `job_snapshots` 资源字段补齐链路已迁移到日聚合前：
+  - 快照采集入库阶段不再为终态作业同步调用 Slurm REST detail；原始 `job_snapshots` 先按采集结果落库
+  - 后台当前日聚合、`slurmweb/scripts/rebuild-user-tool.py` 与 `slurmweb/scripts/repair-user-tool-daily-stats.py` 会在聚合前先扫描目标日期范围内 `COMPLETED` / `FAILED` 且资源字段缺失的终态作业
+  - 预补齐只写入 `used_memory_gb` 与 `used_cpu_cores_avg`，不补写 `usage_stats`
+  - 两个资源字段在最终写入 `job_snapshots` 时统一四舍五入保留两位小数
+  - detail 查询失败、404、`submit_time` 不匹配或 detail 仍缺资源字段时，不阻断原始快照保留或后续日聚合
 - 新增历史补数脚本 `slurmweb/scripts/backfill-job-snapshot-usage.py`：
-  - 默认扫描 `job_state = COMPLETED` 且 `used_memory_gb IS NULL OR used_cpu_cores_avg IS NULL` 的 `job_snapshots`
+  - 默认扫描 `job_state in (COMPLETED, FAILED)` 且 `used_memory_gb IS NULL OR used_cpu_cores_avg IS NULL` 的 `job_snapshots`
   - 支持 `--start YYYY-MM-DD`、`--end YYYY-MM-DD`、`--user <username>`、`--job-id <id>`、`--limit <n>`、`--dry-run`
   - 每条记录输出 `job_snapshot_usage row:` 单行日志，记录旧值、新值、更新或跳过原因
   - 脚本只更新 `job_snapshots.used_memory_gb` 与 `used_cpu_cores_avg`，不更新 `usage_stats`
-- `user_tool_daily_stats` 日聚合和 `rebuild-user-tool.py` 保持只读 `job_snapshots` 当前资源字段，不再在统计链路临时调用 Slurm REST enrich
+- `user_tool_daily_stats` 日聚合和历史重建继续只读 `job_snapshots` 当前资源字段，但会在读取前先执行一次目标范围资源预补齐
 - `slurmweb/scripts/rebuild-user-tool.py` 现在默认只输出核心聚合日志：
   - 每个 UTC 日期会先打印 `source_jobs` 与当天聚合行数
   - 可通过 `--date 20260504` 或 `--date 2026-05-04` 只重建单日，通过 `--user <username>` 或 `--user-id <id>` 定位用户；指定日期或用户时只删除目标范围旧行
+  - 在聚合前会先初始化 Slurm REST client，并对目标日期范围内缺资源的 `COMPLETED` / `FAILED` 终态作业执行预补齐
   - 每日重建会在聚合前把源行 `activity_date` 固定为当前重建日期，确保写入日表的 `activity_date` 是当天年月日
   - 每日摘要会打印 `counted`、`skipped_memory`、`missing_identity`、`cpu_missing`、`runtime_missing`；其中 `skipped_memory` 表示 `used_memory_gb` 为空而未进入 `jobs_count` 的源作业数
   - 每条将写入 `user_tool_daily_stats` 的日聚合行会打印 `date/user_id/username/tool/jobs_count` 以及内存、CPU、runtime 关键指标
@@ -82,8 +84,8 @@
   - 默认不再打印每条源作业的 `user_tool_daily_stats job:` 诊断日志，避免全量重建时控制台噪音过大
 - 本轮数据库执行顺序应固定为：
   - `alembic upgrade head`
-  - `python slurmweb/scripts/backfill-job-snapshot-usage.py --dry-run`
-  - `python slurmweb/scripts/backfill-job-snapshot-usage.py`
+  - 如需专项核对或批量补历史资源，可执行 `python slurmweb/scripts/backfill-job-snapshot-usage.py --dry-run`
+  - 如需专项核对或批量补历史资源，可执行 `python slurmweb/scripts/backfill-job-snapshot-usage.py`
   - `python slurmweb/scripts/rebuild-user-tool.py`
   - 如需先核对口径，可先执行 `python slurmweb/scripts/rebuild-user-tool.py --dry-run`
 - 用户工具聚合定向回归已通过：`.venv\Scripts\python.exe -m pytest -q slurmweb/tests/apps/test_user_analytics_store.py`
@@ -332,6 +334,7 @@
 - 当前 `association/update` 修复已通过适配层和缓存层单元测试；真实集群端到端仍需在具备 SlurmDB 写权限的环境手工复验
 - 当前 QOS 创建、accounts 创建和 association 删除修复已通过前后端定向单元测试；真实 SlurmDB 写权限环境仍需手工复验端到端创建/删除结果
 - 当前用户分析的真实集群时间窗仍需结合数据库时区与旧快照字段完整性复验；代码已对缺失 `submit_time` 与小写终态做兼容
+- 根目录 `.venv\Scripts\python.exe -m pytest -q` 仍会在收集阶段被 `slurmweb4.2/` 参考测试树和缺失的可选依赖 `racksdb` 阻断；当前可作为主线验收结论的是 `.venv\Scripts\python.exe -m pytest -q slurmweb/tests`
 - 当前 `tool_mapping_file` demo 只提供常见工具归类示例，不会默认启用；生产环境仍需按实际集群命名规则调整
 - 当前 AI token 计数为前端估算，不等同于 provider 真实 usage 或计费 token；若后续需要精确计量，需要扩展后端 provider 返回与持久化结构
 - 当前 Conversation Audit 搜索只过滤已加载摘要，不搜索完整消息正文；如需全文检索需要扩展审计接口
@@ -421,6 +424,11 @@
 - `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/apps/test_user_analytics_store.py`
 - `cd frontend && npx vitest run tests/views/AssistantView.spec.ts`
 - `npm --prefix frontend run type-check`
+- `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/apps/test_jobs_store.py slurmweb/tests/apps/test_user_analytics_store.py`
+- `.venv\Scripts\python.exe -m pytest -q slurmweb/tests`
+- `.venv\Scripts\python.exe -m pytest -q`（收集阶段失败，阻塞见 `docs/tracking/error-log.md`：`slurmweb4.2` 参考测试树 / `racksdb`）
+- `cd frontend && npx vitest run`
+- `npm --prefix frontend run build`
 
 待同步：
 

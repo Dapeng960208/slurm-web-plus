@@ -10,16 +10,16 @@
 - 部署指南已同步补充安装后执行 `systemctl reset-failed`、`systemctl restart` 与 `journalctl` 验证的最小排障步骤。
 - 同时把这条经验上升为仓库约定：后续新引入包默认要求优先提供 `dnf install -y <package>` 方案，并同步更新正式文档，而不是只留下 `pip install`。
 
-## 本轮：`job_snapshots` 资源字段补齐前移并新增历史补数脚本
+## 本轮：`job_snapshots` 资源字段补齐从入库前迁移到日聚合前
 
-本轮修正了 `job/history/detail` 按需补齐资源字段但 `user_tool_daily_stats` 重建只读旧快照导致统计偏低的问题：
+本轮把 `job_snapshots` 资源字段补齐责任从快照采集阶段迁移到了用户工具日聚合前：
 
-- `COMPLETED` 作业持久化入库前，如果 `used_memory_gb` 或 `used_cpu_cores_avg` 缺失，会同步查询 Slurm REST detail，并只补写这两个字段到 `job_snapshots`。
-- detail 查询失败、404、`submit_time` 不匹配或 detail 仍缺资源时，不阻断原始快照入库。
-- 新增 `slurmweb/scripts/backfill-job-snapshot-usage.py`，用于补齐历史 `job_snapshots.used_memory_gb` 与 `used_cpu_cores_avg`。
-- 补数脚本支持 `--start`、`--end`、`--user`、`--job-id`、`--limit`、`--dry-run`，并逐条输出 `job_snapshot_usage row:` 明细日志。
-- `user_tool_daily_stats` 和 `rebuild-user-tool.py` 继续只以 `job_snapshots` 当前字段为事实来源，不再在统计链路临时调用 Slurm REST enrich。
-- 历史修复顺序固定为先执行 `backfill-job-snapshot-usage.py`，再执行 `rebuild-user-tool.py` 重建日表。
+- 快照采集入库时不再为缺少 `used_memory_gb` 或 `used_cpu_cores_avg` 的终态作业同步调用 Slurm REST detail；原始 `job_snapshots` 先按采集结果落库。
+- 后台当前日聚合、`slurmweb/scripts/rebuild-user-tool.py` 和 `slurmweb/scripts/repair-user-tool-daily-stats.py` 在真正统计前，会先扫描目标日期范围内 `COMPLETED` / `FAILED` 且资源字段缺失的终态作业，并用 Slurm REST detail 预补齐资源字段。
+- `FAILED` 作业只参与这一步资源补齐，不参与 `user_tool_daily_stats` 的 `jobs_count` 和资源均值统计。
+- `jobs/history/detail` 仍保留单条按需 enrich；读取历史详情时仍可通过 `_maybe_enrich_record()` 补齐并持久化该记录的资源字段。
+- 独立脚本 `slurmweb/scripts/backfill-job-snapshot-usage.py` 继续保留作专项补数工具；其默认扫描范围已扩展到 `COMPLETED` / `FAILED` 缺资源终态作业。
+- 历史修复顺序已简化为直接执行 `rebuild-user-tool.py` 或 `repair-user-tool-daily-stats.py`；这两个脚本会自带预补齐，不再要求调用者先手工执行 backfill。
 
 ## 本轮：`user_tool_daily_stats` 重构为单计数字段并扩展内存统计
 

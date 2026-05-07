@@ -523,9 +523,10 @@ def aggregate_user_tool_daily_rows(
 
 
 class UserAnalyticsStore:
-    def __init__(self, settings, users_store=None):
+    def __init__(self, settings, users_store=None, slurmrestd=None):
         self._settings = settings
         self._users_store = users_store
+        self._slurmrestd = slurmrestd
         self._pool = None
         self._jobs_store = JobsStore(settings, slurmrestd=None)
         self._thread = None
@@ -905,12 +906,18 @@ class UserAnalyticsStore:
             self.refresh_current_day_summary()
 
     def refresh_current_day_summary(self):
+        activity_date = _now_utc().date()
+        usage_backfill = self._backfill_usage_for_dates(activity_date, activity_date)
         rows = self._current_day_completed_rows()
         payload, stats = self._aggregate_daily_rows(rows)
         logger.info(
-            "User tool daily aggregation refreshed for %s: scanned=%d counted=%d "
+            "User tool daily aggregation refreshed for %s: usage_backfill_scanned=%d "
+            "usage_backfill_updated=%d usage_backfill_skipped=%d scanned=%d counted=%d "
             "missing_identity=%d skipped_memory=%d cpu_missing=%d runtime_missing=%d rows=%d",
-            _now_utc().date().isoformat(),
+            activity_date.isoformat(),
+            usage_backfill["scanned"],
+            usage_backfill["updated"],
+            usage_backfill["skipped"],
             stats["rows_seen"],
             stats["rows_counted"],
             stats["rows_missing_identity"],
@@ -931,6 +938,11 @@ class UserAnalyticsStore:
         )
 
     def _refresh_user_tool_daily_stats(self, username, start_date, end_date):
+        self._backfill_usage_for_dates(
+            start_date,
+            end_date,
+            username=username,
+        )
         rows = self._completed_jobs_rows_for_activity_dates(
             start_date=start_date,
             end_date=end_date,
@@ -938,6 +950,21 @@ class UserAnalyticsStore:
         )
         payload, _ = self._aggregate_daily_rows(rows)
         self._replace_user_tool_daily_stats(username, start_date, end_date, payload)
+
+    def _backfill_usage_for_dates(self, start_date, end_date, username=None, user_id=None):
+        start_time = datetime.combine(start_date, datetime.min.time(), tzinfo=timezone.utc)
+        end_time = datetime.combine(
+            end_date + timedelta(days=1),
+            datetime.min.time(),
+            tzinfo=timezone.utc,
+        )
+        return self._jobs_store.backfill_usage_fields(
+            slurmrestd=self._slurmrestd,
+            start_time=start_time,
+            end_time=end_time,
+            username=username,
+            user_id=user_id,
+        )
 
     def _submitted_jobs_today(self, username):
         conn = self._get_conn()

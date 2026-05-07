@@ -773,6 +773,9 @@ class TestUserMetricsQueries(unittest.TestCase):
         )
 
     def test_refresh_current_day_summary_handles_rows_without_submit_line(self):
+        self.store._backfill_usage_for_dates = mock.Mock(
+            return_value={"scanned": 0, "updated": 0, "skipped": 0}
+        )
         self.store._current_day_completed_rows = mock.Mock(
             return_value=[
                 {
@@ -799,6 +802,9 @@ class TestUserMetricsQueries(unittest.TestCase):
         self.assertEqual(payload[0]["jobs_count"], 1)
 
     def test_refresh_current_day_summary_skips_usage_stats_when_used_memory_is_missing(self):
+        self.store._backfill_usage_for_dates = mock.Mock(
+            return_value={"scanned": 0, "updated": 0, "skipped": 0}
+        )
         self.store._current_day_completed_rows = mock.Mock(
             return_value=[
                 {
@@ -826,6 +832,9 @@ class TestUserMetricsQueries(unittest.TestCase):
         self.assertEqual(payload, [])
 
     def test_refresh_current_day_summary_skips_tres_when_used_memory_is_missing(self):
+        self.store._backfill_usage_for_dates = mock.Mock(
+            return_value={"scanned": 0, "updated": 0, "skipped": 0}
+        )
         self.store._current_day_completed_rows = mock.Mock(
             return_value=[
                 {
@@ -850,6 +859,9 @@ class TestUserMetricsQueries(unittest.TestCase):
         self.assertEqual(payload, [])
 
     def test_refresh_current_day_summary_keeps_positive_memory_rows_without_cpu(self):
+        self.store._backfill_usage_for_dates = mock.Mock(
+            return_value={"scanned": 0, "updated": 0, "skipped": 0}
+        )
         self.store._current_day_completed_rows = mock.Mock(
             return_value=[
                 {
@@ -878,7 +890,58 @@ class TestUserMetricsQueries(unittest.TestCase):
         self.assertEqual(payload[0]["median_memory_gb"], 8.0)
         self.assertEqual(payload[0]["avg_cpu_cores"], 0.0)
 
+    def test_refresh_current_day_summary_backfills_usage_before_aggregation(self):
+        self.store._backfill_usage_for_dates = mock.Mock(
+            return_value={"scanned": 2, "updated": 1, "skipped": 1}
+        )
+        self.store._current_day_completed_rows = mock.Mock(return_value=[])
+        self.store._replace_current_day_summary = mock.Mock()
+
+        with mock.patch(
+            "slurmweb.persistence.user_analytics_store._now_utc",
+            return_value=datetime(2026, 4, 24, 12, 0, tzinfo=timezone.utc),
+        ):
+            self.store.refresh_current_day_summary()
+
+        self.store._backfill_usage_for_dates.assert_called_once_with(
+            date(2026, 4, 24),
+            date(2026, 4, 24),
+        )
+        self.store._current_day_completed_rows.assert_called_once()
+
+    def test_refresh_current_day_summary_failed_backfill_rows_do_not_enter_jobs_count(self):
+        self.store._backfill_usage_for_dates = mock.Mock(
+            return_value={"scanned": 1, "updated": 1, "skipped": 0}
+        )
+        self.store._current_day_completed_rows = mock.Mock(
+            return_value=[
+                {
+                    "activity_date": date(2026, 4, 24),
+                    "user_id": 1,
+                    "job_name": "blast",
+                    "command": "blastp",
+                    "used_memory_gb": 8.0,
+                    "used_cpu_cores_avg": 2.0,
+                    "start_time": datetime(2026, 4, 24, 8, 0, tzinfo=timezone.utc),
+                    "end_time": datetime(2026, 4, 24, 9, 0, tzinfo=timezone.utc),
+                    "last_seen": datetime(2026, 4, 24, 9, 0, tzinfo=timezone.utc),
+                    "usage_stats": None,
+                    "job_state": "COMPLETED",
+                }
+            ]
+        )
+        self.store._replace_current_day_summary = mock.Mock()
+
+        self.store.refresh_current_day_summary()
+
+        payload = self.store._replace_current_day_summary.call_args.args[0]
+        self.assertEqual(len(payload), 1)
+        self.assertEqual(payload[0]["jobs_count"], 1)
+
     def test_refresh_user_tool_daily_stats_replaces_persisted_rows(self):
+        self.store._backfill_usage_for_dates = mock.Mock(
+            return_value={"scanned": 1, "updated": 1, "skipped": 0}
+        )
         self.store._jobs_store.completed_job_rows_for_activity_dates.return_value = [
             {
                 "activity_date": date(2026, 4, 24),
@@ -908,10 +971,36 @@ class TestUserMetricsQueries(unittest.TestCase):
         self.assertEqual(payload[0]["max_memory_gb"], 10.0)
         self.assertEqual(payload[0]["median_memory_gb"], 10.0)
         self.assertEqual(payload[0]["avg_cpu_cores"], 5.0)
+        self.store._backfill_usage_for_dates.assert_called_once_with(
+            date(2026, 4, 24),
+            date(2026, 4, 24),
+            username="alice",
+        )
         self.store._jobs_store.completed_job_rows_for_activity_dates.assert_called_once_with(
             date(2026, 4, 24),
             date(2026, 4, 24),
             username="alice",
+        )
+
+    def test_backfill_usage_for_dates_calls_jobs_store_backfill(self):
+        self.store._jobs_store.backfill_usage_fields = mock.Mock(
+            return_value={"scanned": 3, "updated": 2, "skipped": 1}
+        )
+
+        result = self.store._backfill_usage_for_dates(
+            date(2026, 4, 24),
+            date(2026, 4, 25),
+            username="alice",
+            user_id=7,
+        )
+
+        self.assertEqual(result, {"scanned": 3, "updated": 2, "skipped": 1})
+        self.store._jobs_store.backfill_usage_fields.assert_called_once_with(
+            slurmrestd=None,
+            start_time=datetime(2026, 4, 24, 0, 0, tzinfo=timezone.utc),
+            end_time=datetime(2026, 4, 26, 0, 0, tzinfo=timezone.utc),
+            username="alice",
+            user_id=7,
         )
 
     def test_replace_current_day_summary_deletes_existing_day_rows_before_insert(self):
@@ -1138,6 +1227,11 @@ class TestRepairUserToolDailyStatsScript(unittest.TestCase):
                     "usage_stats": None,
                 }
             ],
+        ), mock.patch.object(
+            script, "make_slurmrestd", return_value=mock.Mock()
+        ), mock.patch(
+            "slurmweb.persistence.jobs_store.JobsStore.backfill_usage_fields",
+            return_value={"scanned": 1, "updated": 1, "skipped": 0},
         ), mock.patch.object(script, "count_target_rows", return_value=3) as count_target, mock.patch.object(
             script, "replace_target_rows"
         ) as replace_target:
@@ -1181,6 +1275,11 @@ class TestRepairUserToolDailyStatsScript(unittest.TestCase):
                     "usage_stats": None,
                 }
             ],
+        ), mock.patch.object(
+            script, "make_slurmrestd", return_value=mock.Mock()
+        ), mock.patch(
+            "slurmweb.persistence.jobs_store.JobsStore.backfill_usage_fields",
+            return_value={"scanned": 1, "updated": 0, "skipped": 1},
         ), mock.patch.object(script, "count_target_rows", return_value=0), mock.patch.object(
             script, "replace_target_rows", return_value=2
         ) as replace_target:
@@ -1237,6 +1336,11 @@ class TestRebuildUserToolScript(unittest.TestCase):
 
         with mock.patch.object(
             script, "load_settings", return_value=SimpleNamespace(tool_mapping_file=None)
+        ), mock.patch.object(
+            script, "make_slurmrestd", return_value=mock.Mock()
+        ), mock.patch(
+            "slurmweb.persistence.jobs_store.JobsStore.backfill_usage_fields",
+            return_value={"scanned": 1, "updated": 0, "skipped": 1},
         ), mock.patch(
             "slurmweb.persistence.jobs_store.JobsStore.completed_date_bounds",
             return_value=(date(2026, 4, 24), date(2026, 4, 24)),
@@ -1324,6 +1428,11 @@ class TestRebuildUserToolScript(unittest.TestCase):
 
         with mock.patch.object(
             script, "load_settings", return_value=SimpleNamespace(tool_mapping_file=None)
+        ), mock.patch.object(
+            script, "make_slurmrestd", return_value=mock.Mock()
+        ), mock.patch(
+            "slurmweb.persistence.jobs_store.JobsStore.backfill_usage_fields",
+            return_value={"scanned": 1, "updated": 0, "skipped": 1},
         ), mock.patch(
             "slurmweb.persistence.jobs_store.JobsStore.completed_date_bounds",
             return_value=(date(2026, 4, 24), date(2026, 4, 24)),
@@ -1391,6 +1500,11 @@ class TestRebuildUserToolScript(unittest.TestCase):
 
         with mock.patch.object(
             script, "load_settings", return_value=SimpleNamespace(tool_mapping_file=None)
+        ), mock.patch.object(
+            script, "make_slurmrestd", return_value=mock.Mock()
+        ), mock.patch(
+            "slurmweb.persistence.jobs_store.JobsStore.backfill_usage_fields",
+            return_value={"scanned": 0, "updated": 0, "skipped": 0},
         ), mock.patch(
             "slurmweb.persistence.jobs_store.JobsStore.completed_date_bounds",
             return_value=(date(2026, 4, 24), date(2026, 4, 24)),
@@ -1451,6 +1565,11 @@ class TestRebuildUserToolScript(unittest.TestCase):
 
         with mock.patch.object(
             script, "load_settings", return_value=SimpleNamespace(tool_mapping_file=None)
+        ), mock.patch.object(
+            script, "make_slurmrestd", return_value=mock.Mock()
+        ), mock.patch(
+            "slurmweb.persistence.jobs_store.JobsStore.backfill_usage_fields",
+            return_value={"scanned": 1, "updated": 1, "skipped": 0},
         ), mock.patch(
             "slurmweb.persistence.jobs_store.JobsStore.completed_date_bounds"
         ) as completed_date_bounds, mock.patch(
@@ -1504,6 +1623,11 @@ class TestRebuildUserToolScript(unittest.TestCase):
 
         with mock.patch.object(
             script, "load_settings", return_value=SimpleNamespace(tool_mapping_file=None)
+        ), mock.patch.object(
+            script, "make_slurmrestd", return_value=mock.Mock()
+        ), mock.patch(
+            "slurmweb.persistence.jobs_store.JobsStore.backfill_usage_fields",
+            return_value={"scanned": 0, "updated": 0, "skipped": 0},
         ), mock.patch(
             "slurmweb.persistence.jobs_store.JobsStore.completed_date_bounds",
             return_value=(None, None),
@@ -1523,7 +1647,7 @@ class TestRebuildUserToolScript(unittest.TestCase):
         replace_target_rows.assert_not_called()
         conn.commit.assert_not_called()
 
-    def test_rebuild_does_not_initialize_slurmrestd_or_enrich_daily_rows(self):
+    def test_rebuild_initializes_slurmrestd_and_backfills_usage_before_daily_rows(self):
         script = self._load_script()
         conn = mock.Mock()
         args = SimpleNamespace(
@@ -1540,7 +1664,12 @@ class TestRebuildUserToolScript(unittest.TestCase):
             script,
             "load_settings",
             return_value=SimpleNamespace(tool_mapping_file=None),
-        ), mock.patch(
+        ), mock.patch.object(
+            script, "make_slurmrestd", return_value=mock.Mock()
+        ) as make_slurmrestd, mock.patch(
+            "slurmweb.persistence.jobs_store.JobsStore.backfill_usage_fields",
+            return_value={"scanned": 0, "updated": 0, "skipped": 0},
+        ) as backfill_usage_fields, mock.patch(
             "slurmweb.persistence.jobs_store.JobsStore.completed_job_rows_for_activity_date",
             return_value=[],
         ) as completed_rows, mock.patch.object(
@@ -1548,7 +1677,47 @@ class TestRebuildUserToolScript(unittest.TestCase):
         ), mock.patch("builtins.print"):
             script.rebuild(conn, args)
 
-        self.assertFalse(hasattr(script, "make_slurmrestd"))
+        make_slurmrestd.assert_called_once()
+        backfill_usage_fields.assert_called_once_with(
+            slurmrestd=make_slurmrestd.return_value,
+            start_time=datetime(2026, 5, 4, 0, 0, tzinfo=timezone.utc),
+            end_time=datetime(2026, 5, 5, 0, 0, tzinfo=timezone.utc),
+            username="lizenghui",
+            user_id=None,
+            dry_run=True,
+        )
+        completed_rows.assert_called_once_with(date(2026, 5, 4), username="lizenghui")
+
+    def test_rebuild_date_and_user_filters_query_single_day_after_backfill(self):
+        script = self._load_script()
+        conn = mock.Mock()
+        args = SimpleNamespace(
+            mapping_file=None,
+            rewrite_pattern=r"^regr([_-].*)?$",
+            rewrite_tool="regr",
+            dry_run=True,
+            date="20260504",
+            user="lizenghui",
+            user_id=None,
+        )
+        rows = []
+
+        with mock.patch.object(
+            script,
+            "load_settings",
+            return_value=SimpleNamespace(tool_mapping_file=None),
+        ), mock.patch.object(
+            script, "make_slurmrestd", return_value=mock.Mock()
+        ), mock.patch(
+            "slurmweb.persistence.jobs_store.JobsStore.backfill_usage_fields",
+            return_value={"scanned": 0, "updated": 0, "skipped": 0},
+        ), mock.patch(
+            "slurmweb.persistence.jobs_store.JobsStore.completed_job_rows_for_activity_date",
+            return_value=rows,
+        ) as completed_rows, mock.patch.object(
+            script, "count_target_rows", return_value=0
+        ), mock.patch("builtins.print"):
+            script.rebuild(conn, args)
         completed_rows.assert_called_once_with(date(2026, 5, 4), username="lizenghui")
 
 
@@ -1721,8 +1890,8 @@ class TestBackfillJobSnapshotUsageScript(unittest.TestCase):
         printed = "\n".join(str(call.args[0]) for call in mock_print.call_args_list)
         self.assertIn(
             "job_snapshot_usage row: id=1 job_id=996542 username=lizenghui "
-            "old_memory=null new_memory=2.3984947204589844 old_cpu=null "
-            "new_cpu=0.8976744186046511 decision=updated reason=ok "
+            "old_memory=null new_memory=2.4 old_cpu=null "
+            "new_cpu=0.9 decision=updated reason=ok "
             "error_type=null error=null",
             printed,
         )
@@ -1737,8 +1906,8 @@ class TestBackfillJobSnapshotUsageScript(unittest.TestCase):
         result = script.backfill(lambda: session, slurmrestd, self._args())
 
         self.assertEqual(result, {"scanned": 1, "updated": 1, "skipped": 0})
-        self.assertEqual(snapshot.used_memory_gb, 2.3984947204589844)
-        self.assertEqual(snapshot.used_cpu_cores_avg, 0.8976744186046511)
+        self.assertEqual(snapshot.used_memory_gb, 2.4)
+        self.assertEqual(snapshot.used_cpu_cores_avg, 0.9)
         session.commit.assert_called_once()
         session.rollback.assert_not_called()
 
@@ -1844,4 +2013,4 @@ class TestBackfillJobSnapshotUsageScript(unittest.TestCase):
 
         self.assertEqual(result, {"scanned": 1, "updated": 1, "skipped": 0})
         self.assertIsNone(snapshot.used_memory_gb)
-        self.assertEqual(snapshot.used_cpu_cores_avg, 0.8976744186046511)
+        self.assertEqual(snapshot.used_cpu_cores_avg, 0.9)
