@@ -30,6 +30,11 @@
 
 ## 2. 已完成项
 
+- 已补充一条新的仓库级部署约定：
+  - 后续新增运行依赖时，默认优先提供 `dnf install -y <package>` 方案，不默认只写 `pip install`
+  - 该约定已同步到 `docs/standards/ai-development-standard.md` 与 `docs/guides/deployment-guide.md`
+  - 背景是现场已出现 `pip` 安装路径与 `slurm-web-agent.service` 实际运行路径不一致，导致 shell 可见但 systemd 服务仍报缺包
+
 - `AGENTS.md` 与 `docs/standards/ai-development-standard.md` 已补充两条仓库级 AI 规则：
   - 任何开发必须完成对应测试；无法执行时必须记录阻塞、未验证范围与风险
   - 方案讨论阶段必须逐项澄清设计分支与依赖，一次只问一个问题，并给出推荐答案

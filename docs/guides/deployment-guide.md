@@ -31,6 +31,12 @@
 5. 重启 Gateway 并验证 `/api/clusters` 能力聚合
 6. 验证前端能力门控、路由守卫与设置页
 
+补充约束（当前仓库运维约定）：
+
+- 后续新增运行依赖时，部署文档默认优先提供 `dnf install -y <package>` 方案，不默认使用 `pip install`。
+- 只有在确认目标依赖没有可用系统包，或该依赖明确只用于虚拟环境/开发环境时，才应额外说明 `pip` 方案。
+- 任何新引入的运行依赖都必须同步补到本指南和相关专题文档，不能只写在对话、提交信息或临时命令里。
+
 ## 3. Agent 配置开关与依赖关系
 
 下面开关均来自 Agent（`slurmweb/apps/agent.py`）的装配逻辑，依赖满足时启用，不满足时会降级并在日志中给出原因。
@@ -70,6 +76,26 @@ retention_days = 180
 
 - Agent `/info` 中 `persistence` 为 `true`（意味着 `jobs_store` 初始化成功）
 - 前端 Jobs History 入口需要 capability + 权限双门控（见 `docs/overview/architecture-overview.md`）
+
+部署注意（RHEL / Rocky / Alma 等系统 Python 环境）：
+
+- 如果 `slurm-web-agent.service` 通过系统入口 `/usr/bin/slurm-web` 启动，并加载的是 `/usr/lib/python3.x/site-packages/slurmweb/...`，不要只根据 `pip install SQLAlchemy` 的输出判断依赖已对服务生效。
+- 现场曾出现：`pip` 提示 `SQLAlchemy` 已安装在 `/usr/local/lib64/python3.9/site-packages`，但 `systemd` 启动的 agent 仍报 `ModuleNotFoundError: No module named 'sqlalchemy'`。
+- 这类场景下，`pip` 安装位置与 systemd 服务实际使用的系统 Python 包路径可能不一致；结果是交互式 shell 能看到包，`slurm-web-agent` 仍看不到。
+- 对通过系统 Python / RPM 方式部署的 agent，优先使用系统包安装依赖，例如：
+
+```bash
+dnf install -y python3-sqlalchemy
+```
+
+- 这样依赖会被安装到系统 Python 与 systemd 服务一致的 RPM 管理路径中，通常比单独执行 `pip install SQLAlchemy` 更可靠。
+- 安装后建议执行：
+
+```bash
+systemctl reset-failed slurm-web-agent
+systemctl restart slurm-web-agent
+journalctl -u slurm-web-agent -n 50 --no-pager
+```
 
 ### 3.3 访问控制（自定义角色）
 

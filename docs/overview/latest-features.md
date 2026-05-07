@@ -1,5 +1,15 @@
 ﻿# 最新功能
 
+## 本轮：补充 `slurm-web-agent` 缺少 `sqlalchemy` 时的系统包部署说明
+
+本轮补充了一个现场排障结论，避免在 RHEL 系系统 Python 环境下重复踩坑：
+
+- 当 `slurm-web-agent.service` 通过 `/usr/bin/slurm-web` 启动，并加载 `/usr/lib/python3.x/site-packages/slurmweb/...` 时，`pip install SQLAlchemy` 已显示成功，并不等于 systemd 服务就一定能导入该模块。
+- 现场曾出现 `pip` 把 `SQLAlchemy` 安装到 `/usr/local/lib64/python3.9/site-packages`，但 agent 运行时仍报 `ModuleNotFoundError: No module named 'sqlalchemy'`。
+- 针对这类通过系统 Python / RPM 部署的节点，文档现已明确优先使用 `dnf install -y python3-sqlalchemy`，把依赖安装到与 systemd 服务一致的系统包路径中。
+- 部署指南已同步补充安装后执行 `systemctl reset-failed`、`systemctl restart` 与 `journalctl` 验证的最小排障步骤。
+- 同时把这条经验上升为仓库约定：后续新引入包默认要求优先提供 `dnf install -y <package>` 方案，并同步更新正式文档，而不是只留下 `pip install`。
+
 ## 本轮：`job_snapshots` 资源字段补齐前移并新增历史补数脚本
 
 本轮修正了 `job/history/detail` 按需补齐资源字段但 `user_tool_daily_stats` 重建只读旧快照导致统计偏低的问题：

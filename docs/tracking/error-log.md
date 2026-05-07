@@ -17,6 +17,27 @@
 
 ## 条目
 
+### 2026-05-07：`pip install SQLAlchemy` 显示已安装，但 `slurm-web-agent` 仍报 `No module named 'sqlalchemy'`
+
+- 场景：在 RHEL 系主机上通过 `systemd` 启动 `slurm-web-agent.service`，现场为解决 agent 启动时的 `ModuleNotFoundError: No module named 'sqlalchemy'`，先执行 `/usr/bin/python3 -m pip install SQLAlchemy`。
+- 现象：
+  - `pip` 输出 `Requirement already satisfied: SQLAlchemy in /usr/local/lib64/python3.9/site-packages`
+  - 但 `journalctl -u slurm-web-agent` 仍持续报 `ModuleNotFoundError: No module named 'sqlalchemy'`
+  - 启动栈显示服务入口是 `/usr/bin/slurm-web`，代码加载路径是 `/usr/lib/python3.9/site-packages/slurmweb/...`
+- 复现：
+  - 在通过系统 Python / RPM 方式部署 `slurm-web` 的节点执行 `pip install SQLAlchemy`
+  - `pip` 把包安装或识别在 `/usr/local/lib64/python3.9/site-packages`
+  - `systemd` 服务仍按系统 Python 包路径运行 `slurm-web-agent`
+- 根因：
+  - `pip` 可见的安装位置与 `slurm-web-agent.service` 实际运行时使用的系统 Python 包路径不一致
+  - 结果是交互式 shell 中看似“已经安装”，但 systemd 进程启动时并没有从同一路径解析到 `sqlalchemy`
+- 解决：
+  - 对这类系统 Python / RPM 部署节点，改用系统包安装：`dnf install -y python3-sqlalchemy`
+  - 安装后执行 `systemctl reset-failed slurm-web-agent && systemctl restart slurm-web-agent`
+- 预防：
+  - 排查 systemd Python 依赖问题时，不能只看 `pip install` 输出是否成功；必须同时核对服务入口路径和运行时包路径
+  - 对通过 `/usr/bin/slurm-web` + 系统 Python 部署的节点，优先使用发行版包管理器安装 Python 依赖，而不是默认用 `pip`
+
 ### 2026-05-07：`backfill-job-snapshot-usage.py` 全量输出 `detail_error`
 
 - 场景：执行 `slurmweb/scripts/backfill-job-snapshot-usage.py` 补齐历史 `job_snapshots` 资源字段。

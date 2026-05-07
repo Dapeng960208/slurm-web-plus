@@ -99,3 +99,14 @@ git status --porcelain
 - 对未提交改动，必须先与开发者确认是否纳入本次提交；未经确认，不得擅自混入提交。
 - 对已经确认属于当前主题的改动，AI 必须按仓库规范完成拆分提交；至少要有一个本地提交保证工作可追溯。
 - 如果某轮对话结束时仍无法完成本地提交，必须明确说明原因，并把未提交范围、风险与后续动作写入 `docs/tracking/`。
+
+## 9. 新依赖安装方式（强制）
+
+- 对本仓库后续新引入的系统运行依赖，默认要求优先采用发行版包管理器安装，而不是只给出 `pip install`。
+- 在当前 RHEL / Rocky / Alma 一类系统部署约束下，新增 Python 运行依赖应优先提供 `dnf install -y <package>` 方案，并同步写入正式文档。
+- 原因是 `slurm-web-agent.service` 等 systemd 服务可能运行在系统 Python / RPM 路径下；仅使用 `pip install` 可能把包装到 `site-packages` 的另一条路径，导致交互式 shell 可见、systemd 服务仍不可见。
+- 任何新增依赖如果需要部署侧安装步骤，至少同步更新：
+  - `docs/guides/deployment-guide.md`
+  - `docs/overview/latest-features.md`
+  - `docs/tracking/current-release.md`
+- 如果某个新依赖暂时没有明确的 `dnf` 包名，必须在文档中显式记录待确认状态与风险，不能默认只留下 `pip install`。
