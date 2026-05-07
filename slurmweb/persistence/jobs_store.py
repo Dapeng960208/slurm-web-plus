@@ -852,32 +852,26 @@ class JobsStore:
             self._init_sa_engine()
         return self._sa_session_factory()
 
-    def _completed_jobs_query(self, username=None, start_time=None, end_time=None):
-        completion_time = sa.func.coalesce(JobSnapshot.end_time, JobSnapshot.last_seen)
-        terminal_states = [
-            sa.func.upper(JobSnapshot.job_state).like(f"%{state}%")
-            for state in TERMINAL_STATES
-        ]
+    def _submitted_completed_jobs_query(self, username=None, start_time=None, end_time=None):
         query = (
             sa.select(JobSnapshot, User.username.label("username"))
             .outerjoin(User, User.id == JobSnapshot.user_id)
             .where(JobSnapshot.user_id.is_not(None))
-            .where(completion_time.is_not(None))
-            .where(sa.or_(*terminal_states))
+            .where(JobSnapshot.submit_time.is_not(None))
+            .where(sa.func.upper(JobSnapshot.job_state) == "COMPLETED")
         )
         if username:
             query = query.where(User.username == username)
         if start_time is not None:
-            query = query.where(completion_time >= start_time)
+            query = query.where(JobSnapshot.submit_time >= start_time)
         if end_time is not None:
-            query = query.where(completion_time < end_time)
-        return query.order_by(completion_time.asc(), JobSnapshot.job_id.asc())
+            query = query.where(JobSnapshot.submit_time < end_time)
+        return query.order_by(JobSnapshot.submit_time.asc(), JobSnapshot.job_id.asc())
 
-    def _serialize_completed_job_row(self, snapshot, username=None):
-        completed_at = snapshot.end_time or snapshot.last_seen
-        if completed_at is None:
+    def _serialize_submitted_completed_job_row(self, snapshot, username=None):
+        if snapshot.submit_time is None:
             return None
-        activity_date = completed_at.astimezone(timezone.utc).date()
+        activity_date = snapshot.submit_time.astimezone(timezone.utc).date()
         return {
             "activity_date": activity_date,
             "user_id": snapshot.user_id,
@@ -897,7 +891,7 @@ class JobsStore:
             "usage_stats": snapshot.usage_stats,
         }
 
-    def completed_job_rows_by_completion_window(
+    def completed_job_rows_by_submit_window(
         self,
         username=None,
         start_time=None,
@@ -905,7 +899,7 @@ class JobsStore:
     ):
         with self._session() as session:
             rows = session.execute(
-                self._completed_jobs_query(
+                self._submitted_completed_jobs_query(
                     username=username,
                     start_time=start_time,
                     end_time=end_time,
@@ -913,15 +907,27 @@ class JobsStore:
             ).all()
         payload = []
         for snapshot, resolved_username in rows:
-            row = self._serialize_completed_job_row(snapshot, resolved_username)
+            row = self._serialize_submitted_completed_job_row(snapshot, resolved_username)
             if row is not None:
                 payload.append(row)
         return payload
 
+    def completed_job_rows_by_completion_window(
+        self,
+        username=None,
+        start_time=None,
+        end_time=None,
+    ):
+        return self.completed_job_rows_by_submit_window(
+            username=username,
+            start_time=start_time,
+            end_time=end_time,
+        )
+
     def completed_job_rows_for_activity_date(self, activity_date, username=None):
         start_time = datetime.combine(activity_date, datetime.min.time(), tzinfo=timezone.utc)
         end_time = start_time + timedelta(days=1)
-        return self.completed_job_rows_by_completion_window(
+        return self.completed_job_rows_by_submit_window(
             username=username,
             start_time=start_time,
             end_time=end_time,
@@ -934,28 +940,23 @@ class JobsStore:
             datetime.min.time(),
             tzinfo=timezone.utc,
         )
-        return self.completed_job_rows_by_completion_window(
+        return self.completed_job_rows_by_submit_window(
             username=username,
             start_time=start_time,
             end_time=end_time,
         )
 
     def completed_date_bounds(self, username=None):
-        completion_time = sa.func.coalesce(JobSnapshot.end_time, JobSnapshot.last_seen)
-        terminal_states = [
-            sa.func.upper(JobSnapshot.job_state).like(f"%{state}%")
-            for state in TERMINAL_STATES
-        ]
         query = (
             sa.select(
-                sa.func.min(completion_time),
-                sa.func.max(completion_time),
+                sa.func.min(JobSnapshot.submit_time),
+                sa.func.max(JobSnapshot.submit_time),
             )
             .select_from(JobSnapshot)
             .outerjoin(User, User.id == JobSnapshot.user_id)
             .where(JobSnapshot.user_id.is_not(None))
-            .where(completion_time.is_not(None))
-            .where(sa.or_(*terminal_states))
+            .where(JobSnapshot.submit_time.is_not(None))
+            .where(sa.func.upper(JobSnapshot.job_state) == "COMPLETED")
         )
         if username:
             query = query.where(User.username == username)

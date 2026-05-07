@@ -568,20 +568,20 @@ def aggregate_user_tool_daily_rows(
         bucket = buckets[key]
         if bucket["username"] is None:
             bucket["username"] = row.get("username")
-        bucket["jobs_count"] += 1
-        stats["rows_counted"] += 1
         memory_value = _positive_numeric_value(row.get("used_memory_gb"))
-        if memory_value is not None:
-            bucket["memory_total"] += memory_value
-            bucket["memory_values"].append(memory_value)
-            cpu_value = _positive_numeric_value(_explicit_cpu_cores_avg(row))
-            if cpu_value is not None:
-                bucket["cpu_total"] += cpu_value
-                bucket["cpu_weight"] += 1
-            else:
-                stats["rows_skipped_cpu"] += 1
-        else:
+        if memory_value is None:
             stats["rows_skipped_memory"] += 1
+            continue
+        bucket["jobs_count"] += 1
+        bucket["memory_total"] += memory_value
+        bucket["memory_values"].append(memory_value)
+        stats["rows_counted"] += 1
+        cpu_value = _positive_numeric_value(_explicit_cpu_cores_avg(row))
+        if cpu_value is not None:
+            bucket["cpu_total"] += cpu_value
+            bucket["cpu_weight"] += 1
+        else:
+            stats["rows_skipped_cpu"] += 1
         runtime_value = _runtime_seconds(row)
         runtime_value = _positive_numeric_value(runtime_value)
         if runtime_value is not None:
@@ -1044,7 +1044,7 @@ class UserAnalyticsStore:
         )
 
     def _completed_jobs_rows_window(self, username, start_time, end_time):
-        return self._jobs_store.completed_job_rows_by_completion_window(
+        return self._jobs_store.completed_job_rows_by_submit_window(
             username=username,
             start_time=start_time,
             end_time=end_time + timedelta(microseconds=1),

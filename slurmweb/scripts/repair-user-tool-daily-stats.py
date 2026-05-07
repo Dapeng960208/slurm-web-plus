@@ -172,12 +172,13 @@ def rebuild(conn, args, db_settings):
     jobs_store = JobsStore(db_settings, slurmrestd=None)
     mapper = ToolNameMapper(db_settings.tool_mapping_file)
     raw_mapper = ToolNameMapper()
+    rows = jobs_store.completed_job_rows_for_activity_dates(
+        args.start,
+        args.end,
+        username=args.user,
+    )
     payload, _ = aggregate_user_tool_daily_rows(
-        jobs_store.completed_job_rows_for_activity_dates(
-            args.start,
-            args.end,
-            username=args.user,
-        ),
+        rows,
         mapper,
         raw_mapper=raw_mapper,
         rewrite_pattern=re.compile(args.rewrite_pattern),
@@ -185,10 +186,10 @@ def rebuild(conn, args, db_settings):
     )
     existing = count_target_rows(conn, args.start, args.end, username=args.user)
     if args.dry_run:
-        return {"source_jobs": sum(item["jobs_count"] for item in payload), "deleted": existing, "inserted": len(payload)}
+        return {"source_jobs": len(rows), "deleted": existing, "inserted": len(payload)}
     deleted = replace_target_rows(conn, args.start, args.end, payload, username=args.user)
     conn.commit()
-    return {"source_jobs": sum(item["jobs_count"] for item in payload), "deleted": deleted, "inserted": len(payload)}
+    return {"source_jobs": len(rows), "deleted": deleted, "inserted": len(payload)}
 
 
 def main():

@@ -811,6 +811,28 @@ class TestJobsStoreQuerySorting(unittest.TestCase):
         self.assertEqual(params[:2], ["%sleep%", "%sleep%"])
 
 
+class TestJobsStoreCompletedAggregationSource(unittest.TestCase):
+    def test_submitted_completed_jobs_query_filters_submit_time_and_completed_state(self):
+        store = JobsStore(settings=mock.Mock(), slurmrestd=None)
+        start_time = datetime(2026, 4, 24, 0, 0, tzinfo=timezone.utc)
+        end_time = datetime(2026, 4, 25, 0, 0, tzinfo=timezone.utc)
+
+        query = store._submitted_completed_jobs_query(
+            username="alice",
+            start_time=start_time,
+            end_time=end_time,
+        )
+        compiled = str(query.compile(compile_kwargs={"literal_binds": True}))
+
+        self.assertIn("job_snapshots.submit_time >= '2026-04-24 00:00:00+00:00'", compiled)
+        self.assertIn("job_snapshots.submit_time < '2026-04-25 00:00:00+00:00'", compiled)
+        self.assertIn("upper(job_snapshots.job_state) = 'COMPLETED'", compiled)
+        self.assertIn("users.username = 'alice'", compiled)
+        where_clause = compiled.split("WHERE ", 1)[1].split(" ORDER BY ", 1)[0]
+        self.assertNotIn("end_time", where_clause)
+        self.assertNotIn("last_seen", where_clause)
+
+
 class TestJobsStorePendingQueue(unittest.TestCase):
     def setUp(self):
         self.store = JobsStore(settings=mock.Mock(), slurmrestd=None)
