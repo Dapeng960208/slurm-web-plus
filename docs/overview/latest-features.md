@@ -1,5 +1,32 @@
 ﻿# 最新功能
 
+## 本轮：用户工具日聚合改为内存必需、CPU 可选，并补后台刷新日志
+
+本轮收紧了 `user_tool_daily_stats` 的日聚合写入口径，并补齐排障信息：
+
+- 日聚合写表只强制 `used_memory_gb > 0`；`used_cpu_cores_avg` 现在只作为可选样本，不再作为整条作业的硬门槛。
+- 缺 CPU 样本的完成作业会进入 `user_tool_daily_stats`，但不会贡献 `avg_cpu_cores/cpu_samples`。
+- `tools/analysis` 的跨天汇总仍以日表为准；`avg_cpu_cores` 只会合并仍然带有效 CPU 样本的日行。
+- 后台聚合线程每轮刷新会记录扫描作业数、计入作业数、跳过数和写入行数，方便排查聚合结果为空或 CPU 样本缺失。
+- 历史修复脚本 `scripts/repair-user-tool-daily-stats.py` 已同步新口径，可按日期范围重建旧数据。
+
+## 本轮：AI 协作规则补充测试强制要求与单问题澄清方式
+
+本轮补充了仓库级 AI 协作规则：
+
+- 任何开发都必须完成与改动对应的测试；如果无法执行，必须明确说明阻塞、未验证范围和风险。
+- 进入方案讨论或规划阶段时，AI 必须持续澄清关键设计分支与依赖关系，直到形成共享理解。
+- 方案澄清要求改为一次只问一个问题，并同时给出推荐答案，避免多分支问题混在一轮里。
+
+## 本轮：多需求输入要求先归类再处理，并在对话完成前完成本地提交
+
+本轮继续收紧仓库级 AI 协作规则：
+
+- 当用户一次提出多个需求、问题或 bug 时，AI 必须先自行整理、分类，再按主题分别处理。
+- 提交前必须先检查工作区，区分当前主题改动与其他未确认改动；未经确认，不得把其他改动混入提交。
+- 对已经确认属于当前主题的改动，AI 必须按规范拆分提交，并至少完成一次本地提交保证可追溯。
+- 若某轮结束时仍无法完成本地提交，必须把未提交范围与风险写入 `docs/tracking/`。
+
 ## 本轮：AI 写接口 payload 收紧到与前端表单一致
 
 本轮专门收紧了 AI 写接口最容易绕过前端表单约束的两条管理写链路：
@@ -13,6 +40,13 @@
 
 - `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/apps/test_ai_service.py`
 - `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/slurmrestd/test_slurmrestd_write_operations.py slurmweb/tests/views/test_agent_operations.py`
+
+补充修正：
+
+- `AccountsView` 不再只依赖 `associations` 构建账户树，现改为以 `accounts` 为主数据源、`associations` 作为补充用户和限制信息。
+- 因此新创建但尚未返回 account-level association 的账户，现在也会在前端账户列表中显示。
+- 创建 account 时，`description` 现已改为前端显式必填字段。
+- 创建成功后，账户页会主动刷新 `accounts` 与 `associations` 两条数据链，而不是继续等待后台轮询。
 
 ## 本轮：AI 对话页布局稳定性修复
 
@@ -76,7 +110,7 @@
 - 后台按 `[user_metrics].aggregation_interval` 周期刷新当天日表时，会先删除当天旧 `user_tool_daily_stats` 行，再写入新的有效统计，避免旧的 `jobs_count > 0 / avg_* = 0` 脏行残留。
 - `user/<username>/tools/analysis` 继续只读取 `user_tool_daily_stats`，跨多天按 `sum(day.avg * day.jobs_count) / sum(day.jobs_count)` 合并内存和 CPU 均值；旧日表中的 `0`、`NULL` 或其他非法资源均值不再继续贡献 `completed_jobs`、工具列表或资源均值。
 - 当时间窗内没有任何有效资源对作业时，接口返回空工具列表，`totals.completed_jobs = 0`，资源均值为 `null`。
-- 新增维护脚本 `slurmweb/repair-user-tool-daily-stats.py`，支持 `--start`、`--end`、可选 `--user` 和 `--dry-run`，用于按新口径从 `job_snapshots` 重建 `user_tool_daily_stats`。
+- 新增维护脚本 `scripts/repair-user-tool-daily-stats.py`，支持 `--start`、`--end`、可选 `--user` 和 `--dry-run`，用于按新口径从 `job_snapshots` 重建 `user_tool_daily_stats`。
 
 本轮新增验证：
 
@@ -123,7 +157,7 @@
 - 用户分析的 `Submission Activity`、`Usage Profile` 与 `Completed Job Tool Analysis` 继续共享同一时间窗
 - 用户详情分析页已将原 `Tool Analysis` 与 `Top Tools` 合并为一个 `Completed Job Tool Analysis` 栏目，集中展示已完成作业的工具维度数据分析
 - `user/<username>/tools/analysis` 只按时间窗覆盖的 UTC 日期读取 `user_tool_daily_stats` 并汇总返回工具分类统计；查询多天时，当前实现按 `jobs_count` 加权合并多天日表的内存与 CPU 均值，请求路径不实时扫描 `job_snapshots` 或 SlurmDB
-- 后台用户工具日聚合按 `[user_metrics].aggregation_interval` 周期更新当天 UTC 自然日统计，并与 `slurmweb/repair-user-tool-daily-stats.py` 维护脚本复用同一套聚合函数，保持工具归类、空值过滤和插入口径一致
+- 后台用户工具日聚合按 `[user_metrics].aggregation_interval` 周期更新当天 UTC 自然日统计，并与 `scripts/repair-user-tool-daily-stats.py` 维护脚本复用同一套聚合函数，保持工具归类、空值过滤和插入口径一致
 - `user_tool_daily_stats` 补充资源样本数字段用于诊断；当前内存与 CPU 跨日返回按每日 `jobs_count` 加权
 - 用户分析资源统计明确按已完成作业计算：
   - 平均最大内存：当前日聚合只使用 `used_memory_gb > 0`，无有效样本时保存 `0`

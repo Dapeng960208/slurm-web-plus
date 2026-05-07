@@ -18,11 +18,13 @@
 如果任务只改小问题，也必须至少判断一次是否需要文档更新；不能默认跳过。
 
 补充约束（本仓库写死）：
-
+- 任何开发都必须完成与改动对应的测试；不能只改代码不验证。若确实无法完成测试，必须明确说明阻塞原因、未验证范围与风险。
+- 进入方案讨论或规划阶段时，AI 必须逐项追问并弄清楚具体需求，直到与开发者形成共享理解；每次只提一个问题，并给出推荐答案。
+- 当用户一次提出多个需求、问题或 bug 时，AI 必须先自行整理并分类，再按主题分别处理；提交时必须先检查工作区、区分哪些改动属于当前主题，并按仓库规范拆分提交。对未提交改动必须先与开发者确认是否纳入本次提交；确认后的当前主题改动至少要完成本地提交，保证可追溯。
+- AI 进行 Git 提交时必须遵循上述拆分与确认原则，并满足提交规范（标准见 `docs/standards/ai-development-standard.md`）。
 - 后续 AI 不允许再向 `docs/` 根目录散写新专题文件；根目录仅保留 `docs/README.md` 作为索引入口。
 - 文档命名与放置必须遵循 `docs/standards/document-naming-convention.md`。
 - `docs/overview/latest-features.md` 视为面向全局的 change log 入口；只要发生可感知变更，AI 必须补充对应摘要，不能只更新 `docs/features/` 或 `docs/tracking/`。
 - AI 开发过程中遇到可复现错误时，必须复盘并写入 `docs/tracking/error-log.md`（标准见 `docs/standards/development-error-summary.md`）。
-- AI 进行 Git 提交时必须遵循提交规范，并在每次提交前检查工作区；对未提交改动必须先与开发者确认是否提交（标准见 `docs/standards/ai-development-standard.md`）。
 - 本仓库中文文档按 UTF-8 维护；在 Windows PowerShell 中读取 `AGENTS.md`、`docs/**/*.md` 等中文文档时，不允许直接用裸 `Get-Content <path>` 作为默认做法，必须优先使用 `Get-Content -Encoding UTF8 <path>`。
 - 如果终端仍出现乱码，必须先设置 `[Console]::InputEncoding`、`[Console]::OutputEncoding` 与 `$OutputEncoding` 为 UTF-8，然后再用 `Get-Content -Encoding UTF8 <path>`，或改用 `[System.IO.File]::ReadAllText(<path>, [System.Text.UTF8Encoding]::new($false))` 按字节读取。
