@@ -868,12 +868,17 @@ class JobsStore:
             query = query.where(JobSnapshot.submit_time < end_time)
         return query.order_by(JobSnapshot.submit_time.asc(), JobSnapshot.job_id.asc())
 
-    def _serialize_submitted_completed_job_row(self, snapshot, username=None):
+    def _serialize_submitted_completed_job_row(
+        self,
+        snapshot,
+        username=None,
+        activity_date=None,
+    ):
         if snapshot.submit_time is None:
             return None
-        activity_date = snapshot.submit_time.astimezone(timezone.utc).date()
+        row_activity_date = activity_date or snapshot.submit_time.astimezone(timezone.utc).date()
         return {
-            "activity_date": activity_date,
+            "activity_date": row_activity_date,
             "user_id": snapshot.user_id,
             "username": username,
             "job_name": snapshot.job_name,
@@ -896,6 +901,7 @@ class JobsStore:
         username=None,
         start_time=None,
         end_time=None,
+        activity_date=None,
     ):
         with self._session() as session:
             rows = session.execute(
@@ -907,7 +913,11 @@ class JobsStore:
             ).all()
         payload = []
         for snapshot, resolved_username in rows:
-            row = self._serialize_submitted_completed_job_row(snapshot, resolved_username)
+            row = self._serialize_submitted_completed_job_row(
+                snapshot,
+                resolved_username,
+                activity_date=activity_date,
+            )
             if row is not None:
                 payload.append(row)
         return payload
@@ -931,20 +941,21 @@ class JobsStore:
             username=username,
             start_time=start_time,
             end_time=end_time,
+            activity_date=activity_date,
         )
 
     def completed_job_rows_for_activity_dates(self, start_date, end_date, username=None):
-        start_time = datetime.combine(start_date, datetime.min.time(), tzinfo=timezone.utc)
-        end_time = datetime.combine(
-            end_date + timedelta(days=1),
-            datetime.min.time(),
-            tzinfo=timezone.utc,
-        )
-        return self.completed_job_rows_by_submit_window(
-            username=username,
-            start_time=start_time,
-            end_time=end_time,
-        )
+        rows = []
+        cursor = start_date
+        while cursor <= end_date:
+            rows.extend(
+                self.completed_job_rows_for_activity_date(
+                    cursor,
+                    username=username,
+                )
+            )
+            cursor += timedelta(days=1)
+        return rows
 
     def completed_date_bounds(self, username=None):
         query = (

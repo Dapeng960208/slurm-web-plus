@@ -4,7 +4,7 @@
 #
 # SPDX-License-Identifier: MIT
 
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 import json
 import copy
 import types
@@ -831,6 +831,35 @@ class TestJobsStoreCompletedAggregationSource(unittest.TestCase):
         where_clause = compiled.split("WHERE ", 1)[1].split(" ORDER BY ", 1)[0]
         self.assertNotIn("end_time", where_clause)
         self.assertNotIn("last_seen", where_clause)
+
+    def test_activity_date_uses_requested_stat_date(self):
+        store = JobsStore(settings=mock.Mock(), slurmrestd=None)
+        snapshot = types.SimpleNamespace(
+            submit_time=datetime(2026, 4, 24, 23, 30, tzinfo=timezone.utc),
+            user_id=1,
+            job_name="blast",
+            command="blastp",
+            tres_req_str=None,
+            tres_per_job=None,
+            tres_per_node=None,
+            tres_requested=None,
+            tres_allocated=None,
+            used_memory_gb=4.0,
+            used_cpu_cores_avg=2.0,
+            start_time=None,
+            end_time=None,
+            last_seen=None,
+            usage_stats=None,
+        )
+
+        row = store._serialize_submitted_completed_job_row(
+            snapshot,
+            username="alice",
+            activity_date=date(2026, 4, 24),
+        )
+
+        self.assertEqual(row["activity_date"], date(2026, 4, 24))
+        self.assertEqual(row["username"], "alice")
 
 
 class TestJobsStorePendingQueue(unittest.TestCase):

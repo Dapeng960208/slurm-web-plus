@@ -72,7 +72,7 @@
 - 只统计 `job_state = COMPLETED` 的作业。
 - `tools/analysis` 会按 `start` / `end` 覆盖到的 UTC 日期读取日聚合表；该接口的工具统计粒度为日，且请求时不实时重建日聚合表。
 - 日聚合写入会过滤没有 `user_id` 或没有 `submit_time` 的作业；目标日期按 `submit_time` 的 UTC 日期计算。
-- 当天日聚合按 `activity_date + user_id + tool` 分组，只统计提交时间落在当天范围内且状态为 `COMPLETED` 的作业。
+- 当天日聚合按 `activity_date + user_id + tool` 分组，只统计提交时间落在当天范围内且状态为 `COMPLETED` 的作业；写入的 `activity_date` 固定为本轮统计日期的年月日。
 - 当天 `jobs_count` 只统计该组中 `used_memory_gb > 0` 的作业；`avg_memory_gb`、`max_memory_gb`、`median_memory_gb` 基于同一批正内存样本计算；`avg_cpu_cores` 只基于其中 `used_cpu_cores_avg > 0` 的子集求平均，不再写入 `0` 占位。
 - 写入 `user_tool_daily_stats` 前，`avg_memory_gb`、`max_memory_gb`、`median_memory_gb`、`avg_cpu_cores`、`avg_runtime_seconds` 会统一四舍五入到两位小数再入库。
 - 跨多天查询按日表行合并：`avg_memory_gb = sum(day.avg_memory_gb * day.jobs_count) / sum(day.jobs_count)`；`avg_cpu_cores` 只按 `avg_cpu_cores` 仍为有效正数的日行参与同口径加权；`max_memory_gb` 取时间窗内各日 `max_memory_gb` 的最大值；`median_memory_gb` 按 `sum(day.median_memory_gb * day.jobs_count) / sum(day.jobs_count)` 近似。
