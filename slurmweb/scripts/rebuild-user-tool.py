@@ -103,6 +103,16 @@ def aggregate_daily_rows(rows, mapped_mapper, raw_mapper, rewrite_pattern, rewri
     return payload
 
 
+def completed_rows_for_rebuild_day(jobs_store, activity_date):
+    rows = jobs_store.completed_job_rows_for_activity_date(activity_date)
+    normalized_rows = []
+    for row in rows:
+        normalized_row = dict(row)
+        normalized_row["activity_date"] = activity_date
+        normalized_rows.append(normalized_row)
+    return normalized_rows
+
+
 def count_existing_rows(conn):
     with conn.cursor() as cur:
         cur.execute("SELECT COUNT(*)::int FROM user_tool_daily_stats")
@@ -171,14 +181,15 @@ def print_rebuild_day_summary(activity_date, source_rows, rows_to_insert):
 def print_rebuild_row(item):
     print(
         "user_tool_daily_stats row: date={date} user_id={user_id} username={username} "
-        "tool={tool} jobs={jobs} avg_memory_gb={avg_memory_gb} max_memory_gb={max_memory_gb} "
+        "tool={tool} jobs_count={jobs_count} avg_memory_gb={avg_memory_gb} "
+        "max_memory_gb={max_memory_gb} "
         "median_memory_gb={median_memory_gb} avg_cpu_cores={avg_cpu_cores} "
         "avg_runtime_seconds={avg_runtime_seconds}".format(
             date=item["activity_date"],
             user_id=item["user_id"],
             username=item.get("username") or "-",
             tool=item["tool"],
-            jobs=item["jobs_count"],
+            jobs_count=item["jobs_count"],
             avg_memory_gb=_format_metric(item.get("avg_memory_gb")),
             max_memory_gb=_format_metric(item.get("max_memory_gb")),
             median_memory_gb=_format_metric(item.get("median_memory_gb")),
@@ -230,7 +241,7 @@ def rebuild(conn, args):
     cursor = first_date
     days = 0
     while cursor <= last_date:
-        rows = jobs_store.completed_job_rows_for_activity_date(cursor)
+        rows = completed_rows_for_rebuild_day(jobs_store, cursor)
         source_jobs += len(rows)
         day_payload = aggregate_daily_rows(
             rows,

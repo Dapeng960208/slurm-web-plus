@@ -57,6 +57,7 @@
 - `slurmweb/scripts/repair-user-tool-daily-stats.py` 与 `slurmweb/scripts/rebuild-user-tool.py` 已同步新返回值和聚合口径，可用于历史日表重建
 - `slurmweb/scripts/rebuild-user-tool.py` 现在默认输出逐条重建明细日志：
   - 每个 UTC 日期会先打印 `source_jobs` 与当天聚合行数
+  - 每日重建会在聚合前把源行 `activity_date` 固定为当前重建日期，确保写入日表的 `activity_date` 是当天年月日
   - 每条将写入 `user_tool_daily_stats` 的日聚合行会打印 `date/user_id/username/tool/jobs_count` 以及内存、CPU、runtime 关键指标
   - 全表写入前会再打印一次总预览摘要，包含日期范围、扫描天数、源作业数、将删除旧行数和将写入新行数
 - 本轮数据库执行顺序应固定为：

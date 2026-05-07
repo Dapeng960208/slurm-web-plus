@@ -16,6 +16,7 @@
 本轮增强了 `slurmweb/scripts/rebuild-user-tool.py` 的可观测性，方便排查 `user_tool_daily_stats` 的历史重建结果：
 
 - 脚本现在会按 `activity_date + user_id + tool` 逐条打印将写入 `user_tool_daily_stats` 的日聚合明细。
+- 脚本逐日重建时会在聚合前把每条源行的 `activity_date` 固定为当前重建日期，确保写库日期就是该 UTC 日期的年月日。
 - 每条日志会带 `date`、`user_id`、`username`、`tool`、`jobs_count`、内存指标、`avg_cpu_cores` 和 `avg_runtime_seconds`。
 - 每个 UTC 日期会先输出当天扫描到的 `source_jobs` 和当天将写入的聚合行数，再输出逐条行日志。
 - 在真正删除旧表数据并写入新数据前，脚本还会打印一次全表预览摘要，包含日期范围、扫描天数、源作业数、待删除旧行数和待写入新行数。

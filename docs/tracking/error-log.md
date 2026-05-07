@@ -512,6 +512,18 @@
   - 单测改为断言 `user_tool_analysis()` 只读取日聚合摘要。
 - 预防：后续调整 `tools/analysis` 返回字段时，接口层只能读 `user_tool_daily_stats`；如需补历史数据，应通过后台聚合任务、迁移或维护脚本完成。
 
+### 2026-05-07：`rebuild-user-tool.py` 仍可能沿用源行 `activity_date`
+
+- 场景：全表重建 `user_tool_daily_stats` 时，脚本逐日读取历史作业并调用共享聚合函数生成日表 payload。
+- 现象：如果 `JobsStore` 返回的源行携带了非当前重建日期的 `activity_date`，脚本会把该日期继续交给聚合函数，导致明细日志和写库 payload 的 `activity_date` 不一定等于当前循环日期。
+- 复现：在 `rebuild-user-tool.py` 单测中 mock `completed_job_rows_for_activity_date(date(2026, 4, 24))` 返回 `activity_date=date(2026, 4, 23)` 的源行，原脚本会按源行日期聚合。
+- 根因：脚本依赖下游 `JobsStore` 正确填充 `activity_date`，自身没有在“当前正在重建哪一天”的边界上做标准化。
+- 解决：
+  - `slurmweb/scripts/rebuild-user-tool.py` 新增 `completed_rows_for_rebuild_day()`，读取每日作业后复制源行并强制设置 `activity_date` 为当前重建日期。
+  - 明细日志字段名同步为 `jobs_count`，与 `user_tool_daily_stats` 和聚合 payload 保持一致。
+  - `TestRebuildUserToolScript` 增加回归断言：即使源行日期错误，dry-run 日志和 payload 仍使用当前重建日期。
+- 预防：维护脚本在进入共享聚合函数前必须固定统计日期；后续若新增 rebuild/repair 脚本，也应把 `activity_date` 视为脚本边界输入而不是源行事实。
+
 ### 2026-05-06：后台日聚合与 `slurmweb/scripts/rebuild-user-tool.py` 聚合口径漂移
 
 - 场景：要求 `user_analytics_store` 的后台聚合与 `slurmweb/scripts/rebuild-user-tool.py` 的数据聚合和插入逻辑保持一致，并由 `tools/analysis` 只读 `UserToolDailyStat` 后多日合并返回。

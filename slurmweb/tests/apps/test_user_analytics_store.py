@@ -1208,7 +1208,7 @@ class TestRebuildUserToolScript(unittest.TestCase):
             dry_run=True,
         )
         row = {
-            "activity_date": date(2026, 4, 24),
+            "activity_date": date(2026, 4, 23),
             "user_id": 1,
             "username": "alice",
             "job_name": "blast",
@@ -1228,7 +1228,7 @@ class TestRebuildUserToolScript(unittest.TestCase):
         ), mock.patch(
             "slurmweb.persistence.jobs_store.JobsStore.completed_job_rows_for_activity_date",
             return_value=[row],
-        ), mock.patch.object(
+        ) as completed_rows, mock.patch.object(
             script, "count_existing_rows", return_value=3
         ), mock.patch.object(
             script, "replace_all_rows"
@@ -1246,6 +1246,7 @@ class TestRebuildUserToolScript(unittest.TestCase):
                 "rows_inserted": 1,
             },
         )
+        completed_rows.assert_called_once_with(date(2026, 4, 24))
         replace_all_rows.assert_not_called()
         conn.commit.assert_not_called()
         printed = "\n".join(str(call.args[0]) for call in mock_print.call_args_list)
@@ -1257,7 +1258,7 @@ class TestRebuildUserToolScript(unittest.TestCase):
         )
         self.assertIn("user_tool_daily_stats row: date=2026-04-24 user_id=1 username=alice", printed)
         self.assertIn("tool=blast", printed)
-        self.assertIn("jobs=1", printed)
+        self.assertIn("jobs_count=1", printed)
         self.assertIn("avg_memory_gb=4.0", printed)
         self.assertIn("max_memory_gb=4.0", printed)
         self.assertIn("median_memory_gb=4.0", printed)
