@@ -477,7 +477,7 @@ onUnmounted(() => {
     :cluster="cluster"
     :breadcrumb="[{ title: 'Resources', routeName: 'resources' }, { title: `Node ${nodeName}` }]"
   >
-    <div class="ui-page ui-page-readable">
+    <div class="ui-page ui-page-readable ui-content-workspace">
       <BackToResourcesButton :cluster="cluster" />
 
       <div class="ui-section-stack">

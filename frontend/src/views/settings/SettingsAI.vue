@@ -10,13 +10,7 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { Dialog, DialogPanel, DialogTitle, TransitionChild, TransitionRoot } from '@headlessui/vue'
-import type {
-  AIConversation,
-  AIConversationSummary,
-  AIModelConfig,
-  AIModelConfigPayload,
-  AIProviderOption
-} from '@/composables/GatewayAPI'
+import type { AIConversationSummary, AIModelConfig, AIModelConfigPayload, AIProviderOption } from '@/composables/GatewayAPI'
 import { hasClusterAIAssistant, useGatewayAPI } from '@/composables/GatewayAPI'
 import { useRuntimeStore } from '@/stores/runtime'
 import SettingsTabs from '@/components/settings/SettingsTabs.vue'
@@ -51,6 +45,7 @@ const isAdminRoute = computed(
 )
 const tabsComponent = computed(() => (isAdminRoute.value ? AdminTabs : SettingsTabs))
 const headerComponent = computed(() => (isAdminRoute.value ? AdminHeader : SettingsHeader))
+
 const loading = ref(false)
 const error = ref<string | null>(null)
 const submitError = ref<string | null>(null)
@@ -59,11 +54,9 @@ const validatingId = ref<number | null>(null)
 const deletingId = ref<number | null>(null)
 const configs = ref<AIModelConfig[]>([])
 const auditConversations = ref<AIConversationSummary[]>([])
-const auditConversation = ref<AIConversation | null>(null)
 const auditUsernameFilter = ref('')
 const auditKeywordFilter = ref('')
 const auditLoading = ref(false)
-const auditDetailLoading = ref(false)
 const auditError = ref<string | null>(null)
 const modalOpen = ref(false)
 const editingConfigId = ref<number | null>(null)
@@ -145,12 +138,10 @@ const filteredAuditConversations = computed(() => {
   const keyword = auditKeywordFilter.value.trim().toLowerCase()
   return auditConversations.value.filter((conversation) => {
     const conversationUsername = (conversation.username ?? '').toLowerCase()
-    const searchableText = `${conversation.title} ${conversation.last_message ?? ''}`.toLowerCase()
-    return (!username || conversationUsername.includes(username)) && (!keyword || searchableText.includes(keyword))
+    const title = conversation.title.toLowerCase()
+    return (!username || conversationUsername.includes(username)) && (!keyword || title.includes(keyword))
   })
 })
-const enabledConfigsCount = computed(() => configs.value.filter((config) => config.enabled).length)
-const defaultConfig = computed(() => configs.value.find((config) => config.is_default) ?? null)
 const currentProvider = computed(() => form.provider)
 const requiresDeployment = computed(() => currentProvider.value === 'azure-openai')
 const requiresApiVersion = computed(() => currentProvider.value === 'azure-openai')
@@ -168,7 +159,9 @@ function formatTimestamp(value: string | null): string {
 }
 
 function providerLabel(config: AIModelConfig): string {
-  return config.provider_label || providerOptions.value.find((option) => option.key === config.provider)?.label || config.provider
+  return (
+    config.provider_label || providerOptions.value.find((option) => option.key === config.provider)?.label || config.provider
+  )
 }
 
 function clearFeedback() {
@@ -323,31 +316,16 @@ async function loadConfigs() {
 async function loadAuditConversations() {
   if (!isAdminRoute.value || !aiAvailable.value || !canView.value || !currentClusterName.value) {
     auditConversations.value = []
-    auditConversation.value = null
     return
   }
   auditLoading.value = true
   auditError.value = null
   try {
     auditConversations.value = await gateway.ai_admin_conversations(currentClusterName.value)
-    auditConversation.value = null
   } catch (err: unknown) {
     auditError.value = err instanceof Error ? err.message : String(err)
   } finally {
     auditLoading.value = false
-  }
-}
-
-async function loadAuditConversation(conversationId: number) {
-  if (!currentClusterName.value) return
-  auditDetailLoading.value = true
-  auditError.value = null
-  try {
-    auditConversation.value = await gateway.ai_admin_conversation(currentClusterName.value, conversationId)
-  } catch (err: unknown) {
-    auditError.value = err instanceof Error ? err.message : String(err)
-  } finally {
-    auditDetailLoading.value = false
   }
 }
 
@@ -449,13 +427,6 @@ watch(
   }
 )
 
-watch(filteredAuditConversations, (conversations) => {
-  if (!auditConversation.value) return
-  if (!conversations.some((conversation) => conversation.id === auditConversation.value?.id)) {
-    auditConversation.value = null
-  }
-})
-
 onMounted(async () => {
   await loadConfigs()
   await loadAuditConversations()
@@ -471,7 +442,7 @@ onMounted(async () => {
         <component
           :is="headerComponent"
           title="AI"
-          description="Manage cluster-scoped model configs, default model selection, connectivity checks and masked secrets."
+          description="Manage cluster AI models, connectivity checks and admin-side conversation audit from one workspace."
         />
         <div class="flex flex-wrap gap-2">
           <RouterLink
@@ -519,46 +490,18 @@ onMounted(async () => {
       </InfoAlert>
 
       <section class="ui-panel ui-section">
-        <div class="ui-stat-grid">
-          <div class="ui-stat-card">
-            <p class="ui-stat-label">Cluster</p>
-            <div class="ui-stat-value text-[1.35rem]">{{ currentClusterName }}</div>
-            <p class="ui-stat-subtle">Settings scope</p>
-          </div>
-          <div class="ui-stat-card">
-            <p class="ui-stat-label">Enabled models</p>
-            <div class="ui-stat-value text-[1.35rem]">{{ enabledConfigsCount }}</div>
-            <p class="ui-stat-subtle">{{ configs.length }} configs total</p>
-          </div>
-          <div class="ui-stat-card">
-            <p class="ui-stat-label">Default model</p>
-            <div class="ui-stat-value text-[1.1rem]">
-              {{ defaultConfig?.display_name || 'Unset' }}
-            </div>
-            <p class="ui-stat-subtle">Fallback for new chats</p>
-          </div>
-          <div class="ui-stat-card">
-            <p class="ui-stat-label">Streaming</p>
-            <div class="ui-stat-value text-[1.35rem]">
-              {{ settingsCluster?.ai?.streaming || settingsCluster?.capabilities?.ai?.streaming ? 'SSE' : 'Off' }}
-            </div>
-            <p class="ui-stat-subtle">Capability reported by the cluster</p>
-          </div>
-        </div>
-      </section>
-
-      <section class="ui-panel ui-section">
-        <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div class="ui-page-tools">
           <div>
-            <p class="ui-page-kicker">Model Configurations</p>
-            <h2 class="ui-panel-title">Cluster model list</h2>
+            <h2 class="ui-panel-title">Model configurations</h2>
             <p class="ui-panel-description mt-2">
-              Supported providers include OpenAI, Azure OpenAI, Anthropic, Gemini, Qwen, DeepSeek, Kimi, Ollama and OpenAI-Compatible services.
+              Each row defines one cluster model target, including provider routing, secret state and validation status.
             </p>
           </div>
-          <button type="button" class="ui-button-secondary" :disabled="loading" @click="loadConfigs">
-            Refresh
-          </button>
+          <div class="ui-page-tools-end">
+            <button type="button" class="ui-button-secondary" :disabled="loading" @click="loadConfigs">
+              Refresh
+            </button>
+          </div>
         </div>
 
         <div v-if="loading" class="mt-6 text-[var(--color-brand-muted)]">
@@ -570,134 +513,138 @@ onMounted(async () => {
           No model configs exist for this cluster yet.
         </InfoAlert>
 
-        <div v-else class="mt-6 flex flex-wrap gap-3">
-          <article
-            v-for="config in sortedConfigs"
-            :key="config.id"
-            data-testid="ai-config-tag"
-            class="flex max-w-full flex-col gap-3 rounded-[18px] border border-[rgba(80,105,127,0.12)] bg-white px-4 py-3 shadow-[var(--shadow-soft)] sm:min-w-[24rem]"
-          >
-            <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-              <div class="min-w-0">
-                <div class="flex flex-wrap gap-2">
-                  <span class="ui-chip">{{ providerLabel(config) }}</span>
-                  <span v-if="config.enabled" class="ui-chip">Enabled</span>
-                  <span v-else class="ui-chip">Disabled</span>
+        <div v-else class="mt-6 ui-table-shell overflow-x-auto">
+          <table class="ui-table min-w-[1100px]">
+            <thead>
+              <tr>
+                <th scope="col" class="py-3.5 pr-3 pl-6 text-left">Display name</th>
+                <th scope="col" class="px-3 py-3.5 text-left">Provider</th>
+                <th scope="col" class="px-3 py-3.5 text-left">Model</th>
+                <th scope="col" class="px-3 py-3.5 text-left">State</th>
+                <th scope="col" class="px-3 py-3.5 text-left">Default</th>
+                <th scope="col" class="px-3 py-3.5 text-left">Secret</th>
+                <th scope="col" class="px-3 py-3.5 text-left">Validated</th>
+                <th scope="col" class="px-3 py-3.5 text-left">Actions</th>
+              </tr>
+            </thead>
+            <tbody class="text-sm text-[var(--color-brand-muted)]">
+              <tr v-for="config in sortedConfigs" :key="config.id" data-testid="ai-config-row">
+                <td class="py-4 pr-3 pl-6 align-top">
+                  <div class="min-w-0">
+                    <p class="font-semibold text-[var(--color-brand-ink-strong)]">
+                      {{ config.display_name }}
+                    </p>
+                    <p class="mt-1 break-all text-xs text-[var(--color-brand-muted)]">
+                      {{ config.name }}
+                    </p>
+                  </div>
+                </td>
+                <td class="px-3 py-4 align-top">{{ providerLabel(config) }}</td>
+                <td class="px-3 py-4 align-top">
+                  <div class="min-w-0">
+                    <p class="font-semibold text-[var(--color-brand-ink-strong)]">{{ config.model }}</p>
+                    <p v-if="config.base_url" class="mt-1 break-all text-xs text-[var(--color-brand-muted)]">
+                      {{ config.base_url }}
+                    </p>
+                  </div>
+                </td>
+                <td class="px-3 py-4 align-top">
+                  <span class="ui-chip">
+                    {{ config.enabled ? 'Enabled' : 'Disabled' }}
+                  </span>
+                </td>
+                <td class="px-3 py-4 align-top">
                   <span v-if="config.is_default" class="ui-chip">Default</span>
-                  <span v-if="config.secret_configured" class="ui-chip">Secret ready</span>
-                </div>
-                <h3 class="mt-2 truncate text-base font-semibold text-[var(--color-brand-ink-strong)]">
-                  {{ config.display_name }}
-                </h3>
-                <p class="mt-1 break-all text-sm text-[var(--color-brand-muted)]">
-                  {{ config.name }} / {{ config.model }}
-                </p>
-              </div>
-              <div class="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  class="ui-button-secondary"
-                  :disabled="!canManage"
-                  title="Open the editor to update provider settings, routing, prompts and secrets."
-                  @click="openEditModal(config)"
-                >
-                  Edit
-                </button>
-                <button
-                  type="button"
-                  class="ui-button-secondary"
-                  :disabled="validatingId === config.id || !canManage"
-                  title="Run a live connectivity check with the current model configuration."
-                  @click="validateConfig(config)"
-                >
-                  {{ validatingId === config.id ? 'Testing...' : 'Test connection' }}
-                </button>
-              </div>
-            </div>
-
-            <dl class="grid gap-2 text-sm text-[var(--color-brand-muted)] sm:grid-cols-2">
-              <div class="rounded-lg bg-[rgba(32,42,53,0.04)] px-3 py-2">
-                <dt class="font-semibold text-[var(--color-brand-ink-strong)]">Config name</dt>
-                <dd class="mt-1">{{ config.name }}</dd>
-              </div>
-              <div class="rounded-lg bg-[rgba(32,42,53,0.04)] px-3 py-2">
-                <dt class="font-semibold text-[var(--color-brand-ink-strong)]">secret_mask</dt>
-                <dd class="mt-1">{{ config.secret_mask || 'Not configured' }}</dd>
-              </div>
-              <div class="rounded-lg bg-[rgba(32,42,53,0.04)] px-3 py-2">
-                <dt class="font-semibold text-[var(--color-brand-ink-strong)]">Base URL</dt>
-                <dd class="mt-1 break-all">{{ config.base_url || 'Default endpoint' }}</dd>
-              </div>
-              <div class="rounded-lg bg-[rgba(32,42,53,0.04)] px-3 py-2">
-                <dt class="font-semibold text-[var(--color-brand-ink-strong)]">Sort order</dt>
-                <dd class="mt-1">{{ config.sort_order }}</dd>
-              </div>
-              <div class="rounded-lg bg-[rgba(32,42,53,0.04)] px-3 py-2">
-                <dt class="font-semibold text-[var(--color-brand-ink-strong)]">Validated</dt>
-                <dd class="mt-1">{{ formatTimestamp(config.last_validated_at) }}</dd>
-              </div>
-              <div class="rounded-lg bg-[rgba(32,42,53,0.04)] px-3 py-2">
-                <dt class="font-semibold text-[var(--color-brand-ink-strong)]">Validation error</dt>
-                <dd class="mt-1 line-clamp-3">{{ config.last_validation_error || 'None' }}</dd>
-              </div>
-            </dl>
-
-            <div class="flex flex-wrap gap-2">
-              <button
-                type="button"
-                class="ui-button-secondary"
-                :disabled="config.is_default || !canManage"
-                title="Make this model the default target for new AI conversations."
-                @click="setDefault(config)"
-              >
-                Set default
-              </button>
-              <button
-                type="button"
-                class="ui-button-secondary"
-                :disabled="!canManage"
-                title="Enable or disable this model without deleting its saved configuration."
-                @click="toggleEnabled(config)"
-              >
-                {{ config.enabled ? 'Disable' : 'Enable' }}
-              </button>
-              <button
-                v-if="canDelete"
-                type="button"
-                class="ui-button-danger"
-                :disabled="deletingId === config.id"
-                title="Delete this model configuration and remove its saved secret."
-                @click="deleteConfig(config)"
-              >
-                {{ deletingId === config.id ? 'Deleting...' : 'Delete' }}
-              </button>
-            </div>
-          </article>
+                  <span v-else>-</span>
+                </td>
+                <td class="px-3 py-4 align-top">
+                  <span v-if="config.secret_configured" class="font-semibold text-[var(--color-brand-ink-strong)]">
+                    {{ config.secret_mask || 'Configured' }}
+                  </span>
+                  <span v-else>Not configured</span>
+                </td>
+                <td class="px-3 py-4 align-top">
+                  <p>{{ formatTimestamp(config.last_validated_at) }}</p>
+                  <p v-if="config.last_validation_error" class="mt-1 max-w-56 text-xs text-[var(--color-brand-danger)]">
+                    {{ config.last_validation_error }}
+                  </p>
+                </td>
+                <td class="px-3 py-4 align-top">
+                  <div class="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      class="ui-button-warning"
+                      :disabled="!canManage"
+                      title="Open the editor to update provider settings, routing, prompts and secrets."
+                      @click="openEditModal(config)"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      class="ui-button-secondary"
+                      :disabled="validatingId === config.id || !canManage"
+                      title="Run a live connectivity check with the current model configuration."
+                      @click="validateConfig(config)"
+                    >
+                      {{ validatingId === config.id ? 'Testing...' : 'Test connection' }}
+                    </button>
+                    <button
+                      v-if="!config.is_default"
+                      type="button"
+                      class="ui-button-secondary"
+                      :disabled="!canManage"
+                      title="Make this model the default target for new AI conversations."
+                      @click="setDefault(config)"
+                    >
+                      Set default
+                    </button>
+                    <button
+                      type="button"
+                      class="ui-button-secondary"
+                      :disabled="!canManage"
+                      title="Enable or disable this model without deleting its saved configuration."
+                      @click="toggleEnabled(config)"
+                    >
+                      {{ config.enabled ? 'Disable' : 'Enable' }}
+                    </button>
+                    <button
+                      v-if="canDelete"
+                      type="button"
+                      class="ui-button-danger"
+                      :disabled="deletingId === config.id"
+                      title="Delete this model configuration and remove its saved secret."
+                      @click="deleteConfig(config)"
+                    >
+                      {{ deletingId === config.id ? 'Deleting...' : 'Delete' }}
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </section>
 
       <section v-if="isAdminRoute" class="ui-panel ui-section">
-        <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div class="ui-page-tools">
           <div>
-            <p class="ui-page-kicker">Conversation Audit</p>
-            <h2 class="ui-panel-title">AI conversation records</h2>
+            <h2 class="ui-panel-title">Conversation audit</h2>
             <p class="ui-panel-description mt-2">
-              Admin audit includes all users and conversations hidden from normal user history.
+              Review cluster-wide AI conversation records in table form, then open a dedicated detail page for full message and tool history.
             </p>
           </div>
-          <button
-            type="button"
-            class="ui-button-secondary"
-            :disabled="auditLoading"
-            @click="loadAuditConversations"
-          >
-            Refresh
-          </button>
+          <div class="ui-page-tools-end">
+            <button type="button" class="ui-button-secondary" :disabled="auditLoading" @click="loadAuditConversations">
+              Refresh
+            </button>
+          </div>
         </div>
 
         <ErrorAlert v-if="auditError" class="mt-5">
           {{ auditError }}
         </ErrorAlert>
+
         <div class="mt-5 grid gap-3 lg:grid-cols-2">
           <label class="block">
             <span class="text-sm font-semibold text-[var(--color-brand-ink-strong)]">Username</span>
@@ -705,21 +652,22 @@ onMounted(async () => {
               v-model="auditUsernameFilter"
               data-testid="audit-username-filter"
               type="search"
-              class="mt-2 block w-full rounded-lg border border-[rgba(80,105,127,0.16)] bg-white px-3 py-2 text-sm text-[var(--color-brand-ink-strong)] outline-hidden focus:border-[rgba(182,232,44,0.65)] focus:ring-4 focus:ring-[rgba(182,232,44,0.18)]"
+              class="ui-input-field mt-2"
               placeholder="Filter by username"
             />
           </label>
           <label class="block">
-            <span class="text-sm font-semibold text-[var(--color-brand-ink-strong)]">Keyword</span>
+            <span class="text-sm font-semibold text-[var(--color-brand-ink-strong)]">Title</span>
             <input
               v-model="auditKeywordFilter"
               data-testid="audit-keyword-filter"
               type="search"
-              class="mt-2 block w-full rounded-lg border border-[rgba(80,105,127,0.16)] bg-white px-3 py-2 text-sm text-[var(--color-brand-ink-strong)] outline-hidden focus:border-[rgba(182,232,44,0.65)] focus:ring-4 focus:ring-[rgba(182,232,44,0.18)]"
-              placeholder="Filter by title or last message"
+              class="ui-input-field mt-2"
+              placeholder="Filter by conversation title"
             />
           </label>
         </div>
+
         <div v-if="auditLoading" class="mt-6 text-[var(--color-brand-muted)]">
           <LoadingSpinner :size="5" />
           Loading conversation audit...
@@ -730,107 +678,47 @@ onMounted(async () => {
         <InfoAlert v-else-if="filteredAuditConversations.length === 0" class="mt-6">
           No AI conversation records match the current filters.
         </InfoAlert>
-        <div v-else class="mt-6 grid gap-4 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
-          <div class="ui-table-shell overflow-x-auto">
-            <table class="ui-table min-w-full">
-              <thead>
-                <tr>
-                  <th scope="col" class="py-3.5 pr-3 pl-6 text-left">Conversation</th>
-                  <th scope="col" class="px-3 py-3.5 text-left">User</th>
-                  <th scope="col" class="px-3 py-3.5 text-left">State</th>
-                  <th scope="col" class="px-3 py-3.5 text-left">Updated</th>
-                </tr>
-              </thead>
-              <tbody class="text-sm text-[var(--color-brand-muted)]">
-                <tr
-                  v-for="conversation in filteredAuditConversations"
-                  :key="conversation.id"
-                  class="cursor-pointer"
-                  :class="
-                    auditConversation?.id === conversation.id
-                      ? 'bg-[rgba(182,232,44,0.12)]'
-                      : 'hover:bg-[rgba(244,248,251,0.82)]'
-                  "
-                  @click="loadAuditConversation(conversation.id)"
-                >
-                  <td class="py-4 pr-3 pl-6 align-top font-semibold text-[var(--color-brand-ink-strong)]">
+
+        <div v-else class="mt-6 ui-table-shell overflow-x-auto">
+          <table class="ui-table min-w-[980px]">
+            <thead>
+              <tr>
+                <th scope="col" class="py-3.5 pr-3 pl-6 text-left">Title</th>
+                <th scope="col" class="px-3 py-3.5 text-left">User</th>
+                <th scope="col" class="px-3 py-3.5 text-left">State</th>
+                <th scope="col" class="px-3 py-3.5 text-left">Updated</th>
+                <th scope="col" class="px-3 py-3.5 text-left">Details</th>
+              </tr>
+            </thead>
+            <tbody class="text-sm text-[var(--color-brand-muted)]">
+              <tr v-for="conversation in filteredAuditConversations" :key="conversation.id">
+                <td class="py-4 pr-3 pl-6 align-top font-semibold text-[var(--color-brand-ink-strong)]">
+                  <span class="block max-w-[28rem] truncate">
                     {{ conversation.title }}
-                    <p class="mt-1 line-clamp-1 font-normal text-[var(--color-brand-muted)]">
-                      {{ conversation.last_message || 'No message content.' }}
-                    </p>
-                  </td>
-                  <td class="px-3 py-4 align-top">{{ conversation.username || '-' }}</td>
-                  <td class="px-3 py-4 align-top">
-                    <span class="ui-chip">
-                      {{ conversation.deleted_at ? 'Deleted' : 'Active' }}
-                    </span>
-                  </td>
-                  <td class="px-3 py-4 align-top">{{ formatTimestamp(conversation.updated_at) }}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          <div class="ui-panel-soft px-5 py-5">
-            <div v-if="auditDetailLoading" class="text-[var(--color-brand-muted)]">
-              <LoadingSpinner :size="5" />
-              Loading audit detail...
-            </div>
-            <template v-else-if="auditConversation">
-              <div class="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <p class="ui-page-kicker">Selected Record</p>
-                  <h3 class="text-lg font-semibold text-[var(--color-brand-ink-strong)]">
-                    {{ auditConversation.title }}
-                  </h3>
-                  <p class="mt-1 text-sm text-[var(--color-brand-muted)]">
-                    {{ auditConversation.username || '-' }} / {{ formatTimestamp(auditConversation.updated_at) }}
-                  </p>
-                </div>
-                <span class="ui-chip">
-                  {{ auditConversation.deleted_at ? 'Deleted' : 'Active' }}
-                </span>
-              </div>
-              <p v-if="auditConversation.deleted_at" class="mt-3 text-sm text-[var(--color-brand-muted)]">
-                Deleted by {{ auditConversation.deleted_by || '-' }} at {{ formatTimestamp(auditConversation.deleted_at) }}.
-              </p>
-
-              <div class="mt-5 space-y-3">
-                <article
-                  v-for="message in auditConversation.messages"
-                  :key="message.id"
-                  class="rounded-[18px] border border-[rgba(80,105,127,0.1)] bg-white px-4 py-3"
-                >
-                  <div class="flex flex-wrap items-center justify-between gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--color-brand-muted)]">
-                    <span>{{ message.role }}</span>
-                    <span>{{ formatTimestamp(message.created_at) }}</span>
-                  </div>
-                  <p class="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-[var(--color-brand-ink-strong)]">
-                    {{ message.content }}
-                  </p>
-                </article>
-              </div>
-
-              <div v-if="auditConversation.tool_calls.length > 0" class="mt-5">
-                <p class="text-sm font-semibold text-[var(--color-brand-ink-strong)]">Tool calls</p>
-                <div class="mt-3 space-y-2">
-                  <div
-                    v-for="toolCall in auditConversation.tool_calls"
-                    :key="toolCall.id"
-                    class="rounded-[16px] bg-white px-3 py-2 text-sm text-[var(--color-brand-muted)]"
+                  </span>
+                </td>
+                <td class="px-3 py-4 align-top">{{ conversation.username || '-' }}</td>
+                <td class="px-3 py-4 align-top">
+                  <span class="ui-chip">
+                    {{ conversation.deleted_at ? 'Deleted' : 'Active' }}
+                  </span>
+                </td>
+                <td class="px-3 py-4 align-top">{{ formatTimestamp(conversation.updated_at) }}</td>
+                <td class="px-3 py-4 align-top">
+                  <RouterLink
+                    :to="{
+                      name: 'admin-ai-conversation',
+                      params: { cluster: currentClusterName, conversationId: conversation.id }
+                    }"
+                    class="ui-button-secondary"
+                    data-testid="audit-detail-link"
                   >
-                    <span class="font-semibold text-[var(--color-brand-ink-strong)]">
-                      {{ toolCall.interface_key || toolCall.tool_name }}
-                    </span>
-                    / {{ toolCall.status_code || toolCall.status }} / {{ toolCall.duration_ms ?? 0 }} ms
-                  </div>
-                </div>
-              </div>
-            </template>
-            <InfoAlert v-else>
-              Select an audit row to inspect conversation content.
-            </InfoAlert>
-          </div>
+                    Open detail
+                  </RouterLink>
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </section>
     </template>
@@ -868,7 +756,7 @@ onMounted(async () => {
                       {{ editingConfigId === null ? 'Create model config' : 'Edit model config' }}
                     </DialogTitle>
                     <p class="mt-2 text-sm text-[var(--color-brand-muted)]">
-                      Provider secrets are stored in the database and only returned as masked summaries.
+                      Provider secrets are stored in the database and only returned to the UI as masked summaries.
                     </p>
                   </div>
                   <button type="button" class="ui-button-secondary" @click="closeModal">Close</button>
@@ -883,11 +771,7 @@ onMounted(async () => {
                         hint="Stable identifier used to recognize this saved model entry."
                         tooltip="Used inside the cluster configuration list and audit trail."
                       />
-                      <input
-                        v-model="form.name"
-                        type="text"
-                        class="mt-2 block w-full rounded-[18px] border border-[rgba(80,105,127,0.14)] bg-white px-3 py-2.5 text-sm outline-hidden focus:border-[rgba(182,232,44,0.65)] focus:ring-4 focus:ring-[rgba(182,232,44,0.18)]"
-                      />
+                      <input v-model="form.name" type="text" class="ui-input-field mt-2" />
                     </label>
                     <label class="block">
                       <FormFieldLabel
@@ -896,11 +780,7 @@ onMounted(async () => {
                         hint="Friendly label shown to end users when they choose a model."
                         tooltip="This can be more readable than the provider model identifier."
                       />
-                      <input
-                        v-model="form.display_name"
-                        type="text"
-                        class="mt-2 block w-full rounded-[18px] border border-[rgba(80,105,127,0.14)] bg-white px-3 py-2.5 text-sm outline-hidden focus:border-[rgba(182,232,44,0.65)] focus:ring-4 focus:ring-[rgba(182,232,44,0.18)]"
-                      />
+                      <input v-model="form.display_name" type="text" class="ui-input-field mt-2" />
                     </label>
                     <label class="block">
                       <FormFieldLabel
@@ -909,10 +789,7 @@ onMounted(async () => {
                         hint="Select which upstream AI service receives chat requests."
                         tooltip="Provider controls which connection options are required below."
                       />
-                      <select
-                        v-model="form.provider"
-                        class="mt-2 block w-full rounded-[18px] border border-[rgba(80,105,127,0.14)] bg-white px-3 py-2.5 text-sm outline-hidden focus:border-[rgba(182,232,44,0.65)] focus:ring-4 focus:ring-[rgba(182,232,44,0.18)]"
-                      >
+                      <select v-model="form.provider" class="ui-select-field mt-2">
                         <option v-for="provider in providerOptions" :key="provider.key" :value="provider.key">
                           {{ provider.label }}
                         </option>
@@ -925,11 +802,7 @@ onMounted(async () => {
                         hint="Provider-specific model identifier, deployment name or runtime tag."
                         tooltip="Examples: gpt-4.1, claude-3-7-sonnet, qwen-max, llama3.1."
                       />
-                      <input
-                        v-model="form.model"
-                        type="text"
-                        class="mt-2 block w-full rounded-[18px] border border-[rgba(80,105,127,0.14)] bg-white px-3 py-2.5 text-sm outline-hidden focus:border-[rgba(182,232,44,0.65)] focus:ring-4 focus:ring-[rgba(182,232,44,0.18)]"
-                      />
+                      <input v-model="form.model" type="text" class="ui-input-field mt-2" />
                     </label>
                   </div>
 
@@ -940,11 +813,7 @@ onMounted(async () => {
                         hint="Optional override when the provider is served from a custom endpoint."
                         tooltip="Leave empty to use the provider's default API base URL."
                       />
-                      <input
-                        v-model="form.base_url"
-                        type="text"
-                        class="mt-2 block w-full rounded-[18px] border border-[rgba(80,105,127,0.14)] bg-white px-3 py-2.5 text-sm outline-hidden focus:border-[rgba(182,232,44,0.65)] focus:ring-4 focus:ring-[rgba(182,232,44,0.18)]"
-                      />
+                      <input v-model="form.base_url" type="text" class="ui-input-field mt-2" />
                     </label>
                     <label class="block">
                       <FormFieldLabel
@@ -952,11 +821,7 @@ onMounted(async () => {
                         hint="Optional numeric weight that controls how models are ordered in the UI."
                         tooltip="Lower values appear earlier in lists; empty falls back to 0."
                       />
-                      <input
-                        v-model="form.sort_order"
-                        type="number"
-                        class="mt-2 block w-full rounded-[18px] border border-[rgba(80,105,127,0.14)] bg-white px-3 py-2.5 text-sm outline-hidden focus:border-[rgba(182,232,44,0.65)] focus:ring-4 focus:ring-[rgba(182,232,44,0.18)]"
-                      />
+                      <input v-model="form.sort_order" type="number" class="ui-input-field mt-2" />
                     </label>
                     <label v-if="requiresDeployment" class="block">
                       <FormFieldLabel
@@ -965,11 +830,7 @@ onMounted(async () => {
                         hint="Azure OpenAI deployment name that routes requests to the target model."
                         tooltip="Azure uses deployment identifiers rather than raw model names at request time."
                       />
-                      <input
-                        v-model="form.deployment"
-                        type="text"
-                        class="mt-2 block w-full rounded-[18px] border border-[rgba(80,105,127,0.14)] bg-white px-3 py-2.5 text-sm outline-hidden focus:border-[rgba(182,232,44,0.65)] focus:ring-4 focus:ring-[rgba(182,232,44,0.18)]"
-                      />
+                      <input v-model="form.deployment" type="text" class="ui-input-field mt-2" />
                     </label>
                     <label v-if="requiresApiVersion" class="block">
                       <FormFieldLabel
@@ -978,11 +839,7 @@ onMounted(async () => {
                         hint="Azure API version appended to requests for compatibility."
                         tooltip="Match this to the Azure OpenAI API version enabled for your deployment."
                       />
-                      <input
-                        v-model="form.api_version"
-                        type="text"
-                        class="mt-2 block w-full rounded-[18px] border border-[rgba(80,105,127,0.14)] bg-white px-3 py-2.5 text-sm outline-hidden focus:border-[rgba(182,232,44,0.65)] focus:ring-4 focus:ring-[rgba(182,232,44,0.18)]"
-                      />
+                      <input v-model="form.api_version" type="text" class="ui-input-field mt-2" />
                     </label>
                   </div>
 
@@ -993,11 +850,7 @@ onMounted(async () => {
                         hint="Optional timeout in seconds before chat or validation requests are aborted."
                         tooltip="Useful for slower providers or on-premise gateways."
                       />
-                      <input
-                        v-model="form.request_timeout"
-                        type="number"
-                        class="mt-2 block w-full rounded-[18px] border border-[rgba(80,105,127,0.14)] bg-white px-3 py-2.5 text-sm outline-hidden focus:border-[rgba(182,232,44,0.65)] focus:ring-4 focus:ring-[rgba(182,232,44,0.18)]"
-                      />
+                      <input v-model="form.request_timeout" type="number" class="ui-input-field mt-2" />
                     </label>
                     <label class="block">
                       <FormFieldLabel
@@ -1005,12 +858,7 @@ onMounted(async () => {
                         hint="Optional sampling control for generation creativity and determinism."
                         tooltip="Leave empty to let the provider or server defaults decide."
                       />
-                      <input
-                        v-model="form.temperature"
-                        type="number"
-                        step="0.1"
-                        class="mt-2 block w-full rounded-[18px] border border-[rgba(80,105,127,0.14)] bg-white px-3 py-2.5 text-sm outline-hidden focus:border-[rgba(182,232,44,0.65)] focus:ring-4 focus:ring-[rgba(182,232,44,0.18)]"
-                      />
+                      <input v-model="form.temperature" type="number" step="0.1" class="ui-input-field mt-2" />
                     </label>
                   </div>
 
@@ -1023,9 +871,7 @@ onMounted(async () => {
                         </p>
                       </div>
                       <div v-if="editingConfigId !== null" class="flex flex-wrap gap-2">
-                        <button type="button" class="ui-button-secondary" @click="secretMode = 'keep'">
-                          Keep
-                        </button>
+                        <button type="button" class="ui-button-secondary" @click="secretMode = 'keep'">Keep</button>
                         <button
                           type="button"
                           class="ui-button-warning"
@@ -1051,12 +897,7 @@ onMounted(async () => {
                         hint="Credential stored securely and only returned to the UI as a masked value."
                         tooltip="Required for providers that authenticate with a bearer secret."
                       />
-                      <input
-                        v-model="form.api_key"
-                        type="password"
-                        class="mt-2 block w-full rounded-[18px] border border-[rgba(80,105,127,0.14)] bg-white px-3 py-2.5 text-sm outline-hidden focus:border-[rgba(182,232,44,0.65)] focus:ring-4 focus:ring-[rgba(182,232,44,0.18)]"
-                        placeholder="sk-..."
-                      />
+                      <input v-model="form.api_key" type="password" class="ui-input-field mt-2" placeholder="sk-..." />
                     </label>
                   </div>
 
@@ -1066,11 +907,7 @@ onMounted(async () => {
                       hint="Optional instruction prefix applied to every new conversation for this model."
                       tooltip="Use this to enforce tone, scope, safety policy or cluster-specific context."
                     />
-                    <textarea
-                      v-model="form.system_prompt"
-                      rows="4"
-                      class="mt-2 block w-full rounded-[20px] border border-[rgba(80,105,127,0.14)] bg-white px-3 py-3 text-sm outline-hidden focus:border-[rgba(182,232,44,0.65)] focus:ring-4 focus:ring-[rgba(182,232,44,0.18)]"
-                    />
+                    <textarea v-model="form.system_prompt" rows="4" class="ui-textarea-field mt-2" />
                   </label>
 
                   <label class="block">
@@ -1082,7 +919,7 @@ onMounted(async () => {
                     <textarea
                       v-model="form.extra_options"
                       rows="5"
-                      class="mt-2 block w-full rounded-[20px] border border-[rgba(80,105,127,0.14)] bg-white px-3 py-3 font-mono text-sm outline-hidden focus:border-[rgba(182,232,44,0.65)] focus:ring-4 focus:ring-[rgba(182,232,44,0.18)]"
+                      class="ui-textarea-field mt-2 font-mono"
                       placeholder="{ }"
                     />
                   </label>

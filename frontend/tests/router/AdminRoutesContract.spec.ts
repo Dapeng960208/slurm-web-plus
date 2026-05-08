@@ -12,6 +12,7 @@ describe('Admin router contract', () => {
     expect(source).toContain("name: 'analysis'")
     expect(source).not.toContain("name: 'admin-system'")
     expect(source).toContain("name: 'admin-ai'")
+    expect(source).toContain("name: 'admin-ai-conversation'")
     expect(source).toContain("name: 'admin-access-control'")
     expect(source).toContain("name: 'admin-cache'")
     expect(source).toContain("name: 'admin-ldap-cache'")

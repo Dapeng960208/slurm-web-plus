@@ -166,7 +166,7 @@ watch(
     :cluster="cluster"
     :breadcrumb="[{ title: 'Dashboard' }]"
   >
-    <div class="ui-page ui-page-wide">
+    <div class="ui-page ui-page-wide ui-content-workspace">
       <PageHeader
         title="Dashboard"
         description="Live cluster statistics, workload activity and metric trends in a unified control view."

@@ -392,7 +392,7 @@ onUnmounted(() => {
 
 <template>
   <ClusterMainLayout menu-entry="analysis" :cluster="cluster" :breadcrumb="[{ title: 'Analysis' }]">
-    <div class="ui-page ui-page-wide">
+    <div class="ui-page ui-page-wide ui-content-workspace">
       <PageHeader
         kicker="Capacity Analysis"
         title="Cluster Efficiency"
@@ -538,7 +538,7 @@ onUnmounted(() => {
                 </div>
               </div>
 
-              <div class="ui-panel-soft px-4 py-4">
+              <div class="ui-metric-surface px-4 py-4">
                 <div class="ui-stat-label">Packing signal</div>
                 <div class="mt-2 text-2xl font-bold text-[var(--color-brand-ink-strong)]">
                   {{ analysis.fragmentationJobs }}
@@ -571,7 +571,7 @@ onUnmounted(() => {
               <div
                 v-for="partition in analysis.partitionPressure"
                 :key="partition.name"
-                class="ui-analysis-partition"
+                class="ui-metric-surface px-4 py-4"
               >
                 <div class="flex flex-wrap items-center justify-between gap-3">
                   <div>
@@ -608,7 +608,7 @@ onUnmounted(() => {
               Historical metrics are temporarily unavailable.
             </InfoAlert>
             <div v-else class="grid gap-3 sm:grid-cols-2">
-              <div v-for="card in historicalCards" :key="card.id" class="ui-panel-soft px-4 py-3">
+              <div v-for="card in historicalCards" :key="card.id" class="ui-metric-surface px-4 py-3">
                 <div class="ui-stat-label">{{ card.label }}</div>
                 <div class="mt-2 text-2xl font-bold text-[var(--color-brand-ink-strong)]">
                   {{ card.value }}
@@ -620,7 +620,7 @@ onUnmounted(() => {
             </div>
 
             <div class="mt-4 space-y-3">
-              <div class="ui-panel-soft px-4 py-3">
+              <div class="ui-metric-surface px-4 py-3">
                 <div class="ui-stat-label">Latest telemetry</div>
                 <div class="mt-2 text-lg font-semibold text-[var(--color-brand-ink-strong)]">
                   {{ renderNumber(analysis.history.latestPending, 'pending') }} /
@@ -631,7 +631,7 @@ onUnmounted(() => {
                 </div>
               </div>
 
-              <div class="ui-panel-soft px-4 py-3">
+              <div class="ui-metric-surface px-4 py-3">
                 <div class="ui-stat-label">Wait samples</div>
                 <div class="mt-2 text-lg font-semibold text-[var(--color-brand-ink-strong)]">
                   {{

@@ -42,7 +42,7 @@ const userMetricsEnabled = computed(
       { title: 'Analysis' }
     ]"
   >
-    <div class="ui-page ui-page-readable">
+    <div class="ui-page ui-page-readable ui-content-workspace">
       <button
         @click="router.push({ name: 'user', params: { cluster, user } })"
         type="button"

@@ -216,7 +216,7 @@ async function removeUser() {
     :cluster="cluster"
     :breadcrumb="breadcrumb"
   >
-    <div class="ui-page ui-page-readable">
+    <div class="ui-page ui-page-readable ui-content-workspace">
       <button @click="goBack" type="button" class="ui-button-secondary self-start">
         <ChevronLeftIcon class="-ml-0.5 h-5 w-5" aria-hidden="true" />
         {{ sections.self ? 'Back to dashboard' : 'Back to accounts' }}

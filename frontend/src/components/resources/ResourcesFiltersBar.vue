@@ -53,7 +53,7 @@ const activeFiltersGroups: Array<{
       <div class="flex justify-end px-4 sm:px-6 lg:px-8">
         <button
           type="button"
-          class="ui-button-primary"
+          class="ui-button-secondary"
           @click="runtimeStore.resources.openFiltersPanel = true"
         >
           <PlusSmallIcon class="-ml-0.5 h-5 w-5" aria-hidden="true" />

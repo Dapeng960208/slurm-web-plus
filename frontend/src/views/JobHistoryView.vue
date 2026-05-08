@@ -363,7 +363,7 @@ watch(
       { title: `Job ${job?.job_id ?? id}` }
     ]"
   >
-    <div class="ui-page ui-page-readable">
+    <div class="ui-page ui-page-readable ui-content-workspace">
       <JobBackButton :cluster="cluster" route-name="jobs-history" />
 
       <div class="ui-section-stack">

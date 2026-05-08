@@ -23,6 +23,7 @@ const SettingsMainView = () => import('@/views/settings/SettingsMain.vue')
 const SettingsErrorsView = () => import('@/views/settings/SettingsErrors.vue')
 const SettingsAccountView = () => import('@/views/settings/SettingsAccount.vue')
 const SettingsAIView = () => import('@/views/settings/SettingsAI.vue')
+const SettingsAIConversationDetailView = () => import('@/views/settings/SettingsAIConversationDetail.vue')
 const SettingsAccessControlView = () => import('@/views/settings/SettingsAccessControl.vue')
 const SettingsCacheView = () => import('@/views/settings/SettingsCache.vue')
 const SettingsLdapCacheView = () => import('@/views/settings/SettingsLdapCache.vue')
@@ -176,6 +177,15 @@ const router = createRouter({
               name: 'admin-ai',
               component: SettingsAIView,
               props: true
+            },
+            {
+              path: 'ai/conversations/:conversationId',
+              name: 'admin-ai-conversation',
+              component: SettingsAIConversationDetailView,
+              props: (route: RouteLocation) => ({
+                cluster: route.params.cluster,
+                conversationId: parseInt(route.params.conversationId as string)
+              })
             },
             {
               path: 'access-control',
@@ -387,6 +397,7 @@ function clusterRoutePermission(
     case 'account':
       return { resource: 'accounts', operation: 'view' }
     case 'admin-ai':
+    case 'admin-ai-conversation':
       return { resource: 'admin/ai', operation: 'view' }
     case 'admin-access-control':
       return { resource: 'admin/access-control', operation: 'view' }

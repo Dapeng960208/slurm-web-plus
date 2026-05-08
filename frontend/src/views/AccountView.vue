@@ -399,7 +399,7 @@ function hasDifferentQos(userAssociation: ClusterAssociation): boolean {
     :cluster="cluster"
     :breadcrumb="[{ title: 'Accounts', routeName: 'accounts' }, { title: `${account}` }]"
   >
-    <div class="ui-page ui-page-readable">
+    <div class="ui-page ui-page-readable ui-content-workspace">
       <button
         @click="router.push({ name: 'accounts', params: { cluster } })"
         type="button"

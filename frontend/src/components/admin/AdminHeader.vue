@@ -16,7 +16,6 @@ defineProps<{
 <template>
   <div class="ui-page-header">
     <div class="ui-page-copy">
-      <p class="ui-page-kicker">Admin Center</p>
       <h1 class="ui-page-title">
         {{ title }}
       </h1>

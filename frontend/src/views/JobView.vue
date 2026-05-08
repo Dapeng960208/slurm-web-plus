@@ -348,7 +348,7 @@ watch(
     :cluster="cluster"
     :breadcrumb="[{ title: 'Jobs', routeName: 'jobs' }, { title: `Job ${id}` }]"
   >
-    <div class="ui-page ui-page-readable">
+    <div class="ui-page ui-page-readable ui-content-workspace">
       <JobBackButton :cluster="cluster" />
 
       <div class="ui-section-stack">

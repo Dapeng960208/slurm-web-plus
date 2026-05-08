@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import type { VueWrapper } from '@vue/test-utils'
+import { RouterLinkStub } from '@vue/test-utils'
 import SettingsAIView from '@/views/settings/SettingsAI.vue'
 import { init_plugins } from '../../lib/common'
 import { useRuntimeStore } from '@/stores/runtime'
@@ -74,7 +75,7 @@ describe('views/settings/SettingsAI.vue', () => {
 
   const globalStubs = {
     SettingsTabs: true,
-    RouterLink: { template: '<a><slot /></a>' },
+    RouterLink: RouterLinkStub,
     TransitionRoot: { template: '<div><slot /></div>' },
     TransitionChild: { template: '<div><slot /></div>' },
     Dialog: { template: '<div><slot /></div>' },
@@ -96,21 +97,12 @@ describe('views/settings/SettingsAI.vue', () => {
       deleted_by: null,
       last_message: 'GPU partition is saturated.',
       model_config_id: 1,
-      messages: [
-        {
-          id: 101,
-          role: 'user',
-          content: 'How busy is the GPU queue?',
-          created_at: '2026-04-24T10:00:00Z',
-          model_config_id: 1,
-          metadata: {}
-        }
-      ],
+      messages: [],
       tool_calls: []
     })
   })
 
-  test('loads AI configs and renders masked secret details', async () => {
+  test('loads AI configs into a table and renders masked secret details', async () => {
     const router = init_plugins()
     seedRuntime()
     mockGatewayAPI.ai_configs.mockResolvedValue([
@@ -157,10 +149,10 @@ describe('views/settings/SettingsAI.vue', () => {
     expect(wrapper.text()).toContain('***1234')
     expect(wrapper.text()).toContain('Default')
     expect(wrapper.text()).toContain('Delete')
-    expect(wrapper.find('[data-testid="ai-config-tag"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="ai-config-row"]').exists()).toBe(true)
   })
 
-  test('filters admin audit records and loads details only after row click', async () => {
+  test('filters admin audit records in table view and exposes detail page links', async () => {
     const router = init_plugins()
     seedRuntime()
     mockGatewayAPI.ai_configs.mockResolvedValue([])
@@ -214,19 +206,23 @@ describe('views/settings/SettingsAI.vue', () => {
     expect(wrapper.text()).toContain('Queue pressure')
     expect(wrapper.text()).not.toContain('Node capacity')
 
-    await wrapper.get('[data-testid="audit-keyword-filter"]').setValue('gpu')
+    await wrapper.get('[data-testid="audit-keyword-filter"]').setValue('queue')
     await flushPromises()
 
     expect(wrapper.text()).toContain('Queue pressure')
+    expect(wrapper.findAll('[data-testid="audit-detail-link"]')).toHaveLength(1)
+    expect(mockGatewayAPI.ai_admin_conversation).not.toHaveBeenCalled()
 
-    await wrapper.find('tbody tr').trigger('click')
-    await flushPromises()
-
-    expect(mockGatewayAPI.ai_admin_conversation).toHaveBeenCalledWith('foo', 21)
-    expect(wrapper.text()).toContain('How busy is the GPU queue?')
+    const detailLinks = wrapper.findAllComponents(RouterLinkStub)
+    const detailLink = detailLinks.find((link) => link.props('to')?.name === 'admin-ai-conversation')
+    expect(detailLink).toBeTruthy()
+    expect(detailLink!.props('to')).toEqual({
+      name: 'admin-ai-conversation',
+      params: { cluster: 'foo', conversationId: 21 }
+    })
   })
 
-  test('deletes a model configuration from the tag list', async () => {
+  test('deletes a model configuration from the table list', async () => {
     const router = init_plugins()
     seedRuntime()
     mockGatewayAPI.ai_configs

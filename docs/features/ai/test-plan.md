@@ -46,8 +46,9 @@ npm --prefix frontend run test:unit
 - `AssistantView` 的 token 估算展示、模型配置限制读取和超限阻止发送
 - `AssistantView` 的左侧聊天列布局稳定性：消息区需撑满左侧工作区，输入框保持在同列内，流式更新时不发生整体下移
 - 普通对话页不展示模型、stream、persistence 等运行配置；相关配置只在 `/:cluster/admin/ai` 查看和维护
-- `SettingsAI` 的弹窗式配置管理、标签式配置列表和配置删除
-- `SettingsAI` 的 Conversation Audit 列表、用户名/关键字过滤与点击后加载详情
+- `SettingsAI` 的弹窗式配置管理、模型表格列表和配置删除
+- `SettingsAI` 的 Conversation Audit 表格、用户名/标题过滤与独立详情页入口
+- `SettingsAIConversationDetail` 的独立消息与工具调用详情页
 - 路由守卫对 `ai:view:*` / `admin/ai:*` 的约束
 
 ## 3. 详细测试点（建议最小集）
@@ -159,8 +160,8 @@ npm --prefix frontend run test:unit
 - 无 `admin/ai:view:*` 不能调用管理员审计列表或详情
 - 管理员审计列表展示 `username` 与删除状态
 - 管理员审计列表默认不自动加载第一条详情
-- 管理员审计列表可按用户名、标题或最后消息过滤
-- 管理员审计详情需要点击列表记录后加载，并展示消息与工具调用
+- 管理员审计列表可按用户名、标题过滤
+- 管理员审计详情通过独立详情页加载，并展示消息与工具调用
 - 用户消息与 assistant 回复均有复制按钮，复制内容为消息原文
 
 ### 3.10 前端 token 估算
@@ -222,3 +223,4 @@ npm --prefix frontend run test:unit
 - `frontend/tests/views/AssistantViewAIContract.spec.ts`
 - `frontend/tests/views/AssistantView.spec.ts`
 - `frontend/tests/views/settings/SettingsAI.spec.ts`
+- `frontend/tests/views/settings/SettingsAIConversationDetail.spec.ts`
