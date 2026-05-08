@@ -17,6 +17,23 @@
 
 ## 条目
 
+### 2026-05-08：Dashboard 视图测试直接用 `wrapper.text()` 断言 `RouterLink` 文本会误报失败
+
+- 场景：调整 `DashboardView` 头部布局后，为 `Open analysis` 按钮补 Vitest 回归。
+- 现象：
+  - 页面真实实现仍存在跳转按钮，但 `tests/views/DashboardView.spec.ts` 使用 `wrapper.text()` 或直接查 `RouterLinkStub` 时断言失败。
+  - 同组 dashboard 测试其余用例全部通过，失败集中在头部 actions 区域文案检查。
+- 复现：
+  - 在当前前端测试环境执行 `pnpm vitest run tests/views/DashboardView.spec.ts`
+  - 若按钮位于 `PageHeader` 的 slot 内，且测试环境使用全局 `RouterLink` stub，`wrapper.text()` 可能拿不到稳定文本，`findComponent(RouterLinkStub)` 也不一定能命中最终渲染节点
+- 根因：
+  - 该断言依赖的是测试环境下 stub 的渲染细节，而不是页面对用户真正可见的 DOM 结构。
+  - 视图重构后，slot 包装层变化会放大这种脆弱性。
+- 解决：
+  - 改为断言 `[data-testid="dashboard-header-tools"] .ui-button-primary` 的存在性，直接覆盖头部操作区真实 DOM。
+- 预防：
+  - 后续对 header actions、dialog actions、slot 内导航按钮做前端回归时，优先断言稳定的 DOM 标记、按钮类名或组件 props，不要把 `wrapper.text()` 当成 `RouterLink` 文本存在性的唯一依据。
+
 ### 2026-05-07：本地提交流程被 `.git/index.lock` 短暂阻断
 
 - 场景：在仓库根目录执行 `git add ...` 准备拆分本地提交。

@@ -29,8 +29,15 @@
 - 收紧 AI 写接口 payload 校验，避免 `account/update` 和 `qos/update` 继续绕过前端表单必填约束
 - 补齐 dashboard `stats` / `metrics` 的 `partition` query 接口契约、Gateway 透传测试与专题文档
 - 修复普通用户导航权限异常：普通用户恢复默认 `AI` 入口和 `ai:view:*` 能力，同时没有 `admin/*` / `*:*:*` 时彻底隐藏并禁止进入 `Admin`
+- 统一 Dashboard 头部摘要、筛选工具栏与统计卡片的布局和 surface 样式，修复按钮错位、筛选区不对齐和卡片背景不一致
 
 ## 2. 已完成项
+
+- Dashboard 页面布局样式已收口：
+  - `Open analysis` 已与 `Total Jobs` 头部摘要合并到同一行
+  - `Partition / Queue` 与 `Time Range` 已改为同一行工具栏式布局，标签左对齐
+  - 筛选区与统计卡片已统一为同一套局部 surface 样式，不再出现不同背景层级
+  - 已通过 `pnpm vitest run tests/views/DashboardView.spec.ts tests/components/dashboard/DashboardCharts.spec.ts tests/components/dashboard/ChartResourcesHistory.spec.ts tests/components/dashboard/ChartJobsHistory.spec.ts`
 
 - 已补充一条新的仓库级部署约定：
   - 后续新增运行依赖时，默认优先提供 `dnf install -y <package>` 方案，不默认只写 `pip install`

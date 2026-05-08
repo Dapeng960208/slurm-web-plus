@@ -1,5 +1,18 @@
 ﻿# 最新功能
 
+## 本轮：Dashboard 头部、筛选区与统计卡片样式已统一
+
+本轮对 Dashboard 页面做了针对性的布局收口，解决头部信息分散、筛选区不对齐和卡片表面风格不一致的问题：
+
+- `Open analysis` 已与头部 `Total Jobs` 摘要收敛到同一行，首屏操作和关键指标不再分散。
+- `Partition / Queue` 与 `Time Range` 已收口到同一组横向工具栏，标签左对齐，控件间距和垂直对齐统一。
+- 筛选区容器与顶部统计卡片已统一为同一套 surface 样式，避免不同区块背景、边框和层次语言不一致。
+- 本轮只调整 Dashboard 视图内的局部布局和样式，不改变分区筛选、统计数据和图表请求行为。
+
+本轮新增验证：
+
+- `cd frontend && pnpm vitest run tests/views/DashboardView.spec.ts tests/components/dashboard/DashboardCharts.spec.ts tests/components/dashboard/ChartResourcesHistory.spec.ts tests/components/dashboard/ChartJobsHistory.spec.ts`
+
 ## 本轮：Dashboard `stats` / `metrics` 已补 `partition` 接口契约与 Gateway 透传验证
 
 本轮在不改动 collector、metrics DB 核心实现和 `slurmrestd` 核心实现的前提下，补齐了 Dashboard 相关接口对 `partition` query 的契约支持：

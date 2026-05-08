@@ -170,13 +170,19 @@ watch(
       <PageHeader
         title="Dashboard"
         description="Live cluster statistics, workload activity and metric trends in a unified control view."
-        :metric-value="loaded && data ? data.jobs.total : undefined"
-        metric-label="total jobs"
       >
         <template #actions>
-          <RouterLink :to="{ name: 'analysis', params: { cluster } }" class="ui-button-primary">
-            Open analysis
-          </RouterLink>
+          <div data-testid="dashboard-header-tools" class="dashboard-header-tools">
+            <div class="dashboard-header-summary dashboard-surface">
+              <span class="dashboard-header-summary-label">Total Jobs</span>
+              <span class="dashboard-header-summary-value">
+                {{ loaded && data ? data.jobs.total : '--' }}
+              </span>
+            </div>
+            <RouterLink :to="{ name: 'analysis', params: { cluster } }" class="ui-button-primary">
+              Open analysis
+            </RouterLink>
+          </div>
         </template>
       </PageHeader>
 
@@ -185,24 +191,25 @@ watch(
         <span class="font-medium">{{ cluster }}</span></ErrorAlert
       >
 
-      <div class="ui-panel ui-section mt-6">
-        <div class="flex flex-wrap items-end justify-between gap-4">
-          <div>
+      <div class="dashboard-surface mt-6 px-4 py-4 sm:px-5">
+        <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+          <div class="min-w-0">
+            <p class="dashboard-toolbar-kicker">Live Controls</p>
             <h2 class="ui-panel-title">Realtime Metrics</h2>
             <p class="ui-panel-description">
-              Filter dashboard stats by queue and switch time range to inspect recent activity.
+              Filter dashboard stats by queue and adjust the live window from one aligned toolbar.
             </p>
           </div>
-          <div class="flex flex-wrap items-end justify-end gap-4">
+          <div data-testid="dashboard-toolbar" class="dashboard-toolbar-fields">
             <label
               v-if="canSelectPartition"
-              class="flex min-w-[15rem] flex-col gap-2 text-sm font-medium text-[var(--color-brand-ink-strong)]"
+              class="dashboard-toolbar-field"
             >
-              <span>Partition / Queue</span>
+              <span class="dashboard-toolbar-label">Partition / Queue</span>
               <select
                 id="dashboard-partition"
                 v-model="runtimeStore.dashboard.partition"
-                class="rounded-full border border-[rgba(80,105,127,0.18)] bg-white px-4 py-2.5 text-sm text-[var(--color-brand-ink-strong)] shadow-[var(--shadow-soft)] outline-none transition focus:border-[var(--color-brand-accent)]"
+                class="dashboard-toolbar-select"
               >
                 <option
                   v-for="option in partitionOptions"
@@ -214,8 +221,8 @@ watch(
               </select>
             </label>
 
-            <div class="flex flex-col gap-2 text-sm font-medium text-[var(--color-brand-ink-strong)]">
-              <span>Time Range</span>
+            <div class="dashboard-toolbar-field">
+              <span class="dashboard-toolbar-label">Time Range</span>
               <MetricRangeSelector
                 :model-value="runtimeStore.dashboard.range"
                 aria-label="Select dashboard metrics range"
@@ -226,8 +233,8 @@ watch(
         </div>
       </div>
 
-      <div v-if="!unable" class="ui-stat-grid">
-        <div v-for="card in statsCards" :key="card.id" class="ui-stat-card">
+      <div v-if="!unable" class="ui-stat-grid mt-4">
+        <div v-for="card in statsCards" :key="card.id" class="ui-stat-card dashboard-surface">
           <p class="ui-stat-label">{{ card.label }}</p>
           <span
             :id="`metric-${card.id}`"
@@ -245,3 +252,118 @@ watch(
     </div>
   </ClusterMainLayout>
 </template>
+
+<style scoped>
+.dashboard-surface {
+  border-radius: calc(var(--radius-panel) - 6px);
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(239, 244, 246, 0.88)),
+    linear-gradient(135deg, rgba(182, 232, 44, 0.07), transparent);
+  box-shadow: var(--shadow-soft);
+}
+
+.dashboard-header-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
+
+.dashboard-header-summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.7rem 0.95rem;
+}
+
+.dashboard-header-summary-label {
+  color: var(--color-brand-muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.dashboard-header-summary-value {
+  color: var(--color-brand-ink-strong);
+  font-size: clamp(1.4rem, 1.6vw, 2rem);
+  font-weight: 700;
+  line-height: 1;
+}
+
+.dashboard-toolbar-kicker {
+  margin-bottom: 0.35rem;
+  color: var(--color-brand-muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.dashboard-toolbar-fields {
+  display: grid;
+  gap: 0.85rem;
+  width: 100%;
+}
+
+.dashboard-toolbar-field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  min-height: 3rem;
+  border-radius: 999px;
+  border: 1px solid rgba(80, 105, 127, 0.12);
+  background: rgba(255, 255, 255, 0.82);
+  padding: 0.45rem 0.55rem 0.45rem 0.95rem;
+}
+
+.dashboard-toolbar-label {
+  color: var(--color-brand-muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.dashboard-toolbar-select {
+  min-width: 14rem;
+  border-radius: 999px;
+  border: 1px solid rgba(80, 105, 127, 0.18);
+  background: white;
+  padding: 0.62rem 1rem;
+  color: var(--color-brand-ink-strong);
+  font-size: 0.92rem;
+  box-shadow: var(--shadow-soft);
+  outline: none;
+  transition: border-color 160ms ease;
+}
+
+.dashboard-toolbar-select:focus {
+  border-color: var(--color-brand-accent);
+}
+
+@media (min-width: 1024px) {
+  .dashboard-toolbar-fields {
+    width: auto;
+    grid-template-columns: repeat(2, minmax(0, auto));
+  }
+}
+
+@media (max-width: 767px) {
+  .dashboard-toolbar-field {
+    align-items: flex-start;
+    border-radius: 1.4rem;
+    flex-direction: column;
+    padding: 0.85rem 0.95rem;
+  }
+
+  .dashboard-toolbar-select {
+    min-width: 100%;
+    width: 100%;
+  }
+}
+</style>

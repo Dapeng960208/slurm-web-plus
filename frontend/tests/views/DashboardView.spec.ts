@@ -83,6 +83,13 @@ describe('DashboardView.vue', () => {
     expect(wrapper.get('span#metric-cores').text()).toBe(stats.resources.cores.toString())
     expect(wrapper.get('span#metric-jobs-running').text()).toBe(stats.jobs.running.toString())
     expect(wrapper.get('span#metric-jobs-total').text()).toBe(stats.jobs.total.toString())
+    expect(wrapper.get('[data-testid="dashboard-header-tools"]').text()).toContain('Total Jobs')
+    expect(wrapper.get('[data-testid="dashboard-header-tools"]').text()).toContain(
+      stats.jobs.total.toString()
+    )
+    expect(wrapper.find('[data-testid="dashboard-header-tools"] .ui-button-primary').exists()).toBe(
+      true
+    )
     expect(wrapper.html()).toContain('dashboard-charts-stub')
   })
   test('restores partition query and shows partition selector', async () => {
@@ -206,10 +213,10 @@ describe('DashboardView.vue', () => {
       }
     })
 
-    const panels = wrapper.findAll('.ui-panel.ui-section')
-    expect(panels).toHaveLength(1)
-    expect(panels[0].text()).toContain('Partition / Queue')
-    expect(panels[0].text()).toContain('Time Range')
+    const toolbar = wrapper.get('[data-testid="dashboard-toolbar"]')
+    expect(toolbar.text()).toContain('Partition / Queue')
+    expect(toolbar.text()).toContain('Time Range')
+    expect(wrapper.findAll('.dashboard-surface').length).toBeGreaterThan(2)
   })
 
   test('should not display charts when metrics are disabled', () => {
