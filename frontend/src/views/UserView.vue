@@ -129,7 +129,7 @@ const breadcrumb = computed(() => {
 const orderedSections = computed(() => {
   const querySection = route.query.section
   const result: Array<'profile' | 'analytics'> = []
-  if (querySection === 'analysis' && sections.value.analytics) {
+  if (sections.value.analytics && querySection !== 'profile') {
     result.push('analytics')
   }
   if (sections.value.profile) {

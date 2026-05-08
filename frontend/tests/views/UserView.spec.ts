@@ -132,6 +132,39 @@ describe('UserView.vue', () => {
     expect(wrapper.text()).toContain('Completed Job Tool Analysis')
   })
 
+  test('renders analytics section before profile section by default when both are available', async () => {
+    useRuntimeStore().availableClusters = [
+      {
+        ...useRuntimeStore().availableClusters[0],
+        permissions: {
+          roles: [],
+          actions: ['associations-view', 'view-jobs'],
+          rules: ['accounts:view:*', 'jobs:view:*', 'user/analysis:view:*']
+        },
+        user_metrics: true
+      }
+    ]
+    mockClusterDataPoller.loaded.value = true
+    mockClusterDataPoller.data.value = associations as ClusterAssociation[]
+
+    const wrapper = mount(UserView, {
+      props: {
+        cluster: 'foo',
+        user: 'root'
+      },
+      global: {
+        stubs: {
+          UserAnalyticsPanels: analyticsPanelsStub
+        }
+      }
+    })
+    await flushPromises()
+
+    const sections = wrapper.findAll('section.ui-panel.ui-section')
+    expect(sections[0].text()).toContain('Submission and tool analytics')
+    expect(sections[1].text()).toContain('Account associations and limits')
+  })
+
   test('shows history jobs shortcut when permission is granted', async () => {
     useRuntimeStore().availableClusters = [
       {

@@ -13,7 +13,6 @@ import { useGatewayAPI } from '@/composables/GatewayAPI'
 import type {
   DateTimeWindowQuery,
   UserMetricsHistory,
-  UserToolActivityRecord,
   UserToolAnalysisSummary
 } from '@/composables/GatewayAPI'
 import ErrorAlert from '@/components/ErrorAlert.vue'
@@ -22,7 +21,6 @@ import LoadingSpinner from '@/components/LoadingSpinner.vue'
 import MetricRangeSelector from '@/components/MetricRangeSelector.vue'
 import StatCardSkeleton from '@/components/StatCardSkeleton.vue'
 import UserSubmissionHistoryChart from '@/components/user/UserSubmissionHistoryChart.vue'
-import UserToolAnalysisChart from '@/components/user/UserToolAnalysisChart.vue'
 import UserToolAnalysisTable from '@/components/user/UserToolAnalysisTable.vue'
 
 const { cluster, user, enabled } = defineProps<{
@@ -71,13 +69,6 @@ const userMetricsHistoryHasData = computed(() => {
   return Boolean(
     userMetricsHistory.value?.submissions?.length || userMetricsHistory.value?.completions?.length
   )
-})
-
-const topTools = computed<UserToolActivityRecord[]>(() => {
-  return (userToolAnalysis.value?.tool_breakdown ?? [])
-    .slice()
-    .sort((a, b) => (b.max_memory_gb ?? 0) - (a.max_memory_gb ?? 0) || b.jobs - a.jobs)
-    .slice(0, 6)
 })
 
 const submittedJobsInRange = computed(() => userMetricsHistory.value?.totals?.submitted_jobs ?? 0)
@@ -330,7 +321,8 @@ watch(
     stopUserMetricsPolling()
     void refreshUserMetrics()
     startUserMetricsPolling()
-  }
+  },
+  { immediate: true }
 )
 
 watch(
@@ -440,7 +432,7 @@ onUnmounted(() => {
 
     <div
       v-if="userMetricsReady || userMetricsHistoryLoading || userMetricsHistoryUnavailable"
-      class="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]"
+      class="grid items-start gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]"
     >
       <div class="ui-panel ui-section">
         <div class="mb-3 flex flex-wrap items-end justify-between gap-3">
@@ -485,7 +477,7 @@ onUnmounted(() => {
           </div>
 
           <div class="ui-panel-soft px-4 py-3">
-            <div class="ui-stat-label">Peak Memory</div>
+            <div class="ui-stat-label">Max Memory</div>
             <div class="mt-2 text-2xl font-bold text-[var(--color-brand-ink-strong)]">
               {{ maxMemoryLabel }}
             </div>
@@ -537,77 +529,16 @@ onUnmounted(() => {
       </div>
 
       <p
-        v-if="topTools.length === 0"
+        v-if="(userToolAnalysis?.tool_breakdown ?? []).length === 0"
         class="ui-panel-soft px-4 py-5 text-sm text-[var(--color-brand-muted)]"
       >
         No completed job tool activity has been recorded for this user yet.
       </p>
-      <div v-else class="space-y-6">
-        <div class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(320px,0.86fr)]">
-          <div>
-            <div class="mb-3">
-              <h3 class="ui-stat-label">Memory and Volume</h3>
-            </div>
-            <UserToolAnalysisChart :tools="topTools" />
-          </div>
-
-          <div>
-            <div class="mb-3">
-              <h3 class="ui-stat-label">Resource Roll-up</h3>
-            </div>
-            <div class="space-y-3">
-              <div v-for="tool in topTools" :key="tool.tool" class="ui-panel-soft px-4 py-3">
-                <div class="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <div class="font-semibold text-[var(--color-brand-ink-strong)]">
-                      {{ tool.tool }}
-                    </div>
-                    <div class="mt-1 text-sm text-[var(--color-brand-muted)]">
-                      {{ tool.jobs }} completed job(s)
-                    </div>
-                  </div>
-                  <span class="ui-chip">{{ tool.jobs }} jobs</span>
-                </div>
-                <div class="mt-3 grid gap-2 text-sm text-[var(--color-brand-muted)] sm:grid-cols-5">
-                  <div>
-                    Memory Avg:
-                    {{ tool.avg_memory_gb != null ? formatGb(tool.avg_memory_gb) : '--' }}
-                  </div>
-                  <div>
-                    Memory Max:
-                    {{ tool.max_memory_gb != null ? formatGb(tool.max_memory_gb) : '--' }}
-                  </div>
-                  <div>
-                    Memory Median:
-                    {{ tool.median_memory_gb != null ? formatGb(tool.median_memory_gb) : '--' }}
-                  </div>
-                  <div>
-                    CPU:
-                    {{ tool.avg_cpu_cores != null ? `${tool.avg_cpu_cores.toFixed(1)} cores` : '--' }}
-                  </div>
-                  <div>
-                    Runtime:
-                    {{
-                      tool.avg_runtime_hours != null
-                        ? formatHours(tool.avg_runtime_hours)
-                        : formatDuration(tool.avg_runtime_seconds)
-                    }}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div>
-          <div class="mb-3">
-            <h3 class="ui-stat-label">Detailed Tool Metrics</h3>
-          </div>
-          <UserToolAnalysisTable
-            :tools="userToolAnalysis?.tool_breakdown ?? []"
-            :total-completed-jobs="userToolAnalysis?.totals.completed_jobs ?? 0"
-          />
-        </div>
+      <div v-else>
+        <UserToolAnalysisTable
+          :tools="userToolAnalysis?.tool_breakdown ?? []"
+          :total-completed-jobs="userToolAnalysis?.totals.completed_jobs ?? 0"
+        />
       </div>
     </div>
   </div>

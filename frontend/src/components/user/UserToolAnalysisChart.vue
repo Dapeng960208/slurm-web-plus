@@ -85,7 +85,7 @@ function memoryLabel(tool: UserToolActivityRecord): string {
       <div class="mt-4 grid gap-4 xl:grid-cols-2">
         <div>
           <div class="mb-2 flex items-center justify-between gap-3">
-            <span class="ui-stat-label">Peak Memory</span>
+            <span class="ui-stat-label">Max Memory</span>
             <span class="text-sm font-semibold text-[var(--color-brand-ink-strong)]">
               {{ memoryLabel(tool) }}
             </span>

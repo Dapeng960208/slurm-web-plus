@@ -82,13 +82,7 @@ function memorySpread(tool: UserToolActivityRecord): string {
 <template>
   <div class="ui-table-shell overflow-x-auto" data-testid="user-tool-analysis-table">
     <div class="border-b border-[rgba(80,105,127,0.08)] px-6 py-5">
-      <div class="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h3 class="ui-panel-title">Completed Job Tool Table</h3>
-          <p class="ui-panel-description mt-2">
-            Detailed per-tool view for completed jobs, combining volume, memory, CPU and runtime.
-          </p>
-        </div>
+      <div class="flex flex-wrap justify-end gap-2">
         <div class="flex flex-wrap gap-2">
           <span class="ui-chip">{{ sortedTools.length }} tool{{ sortedTools.length === 1 ? '' : 's' }}</span>
           <span class="ui-chip">{{ completedJobsTotal }} completed job{{ completedJobsTotal === 1 ? '' : 's' }}</span>
@@ -103,7 +97,7 @@ function memorySpread(tool: UserToolActivityRecord): string {
             <th scope="col" class="py-3.5 pr-3 pl-6 text-left">Tool</th>
             <th scope="col" class="px-3 py-3.5 text-left">Workload</th>
             <th scope="col" class="px-3 py-3.5 text-left">Avg Memory</th>
-            <th scope="col" class="px-3 py-3.5 text-left">Peak Memory</th>
+            <th scope="col" class="px-3 py-3.5 text-left">Max Memory</th>
             <th scope="col" class="px-3 py-3.5 text-left">Median Memory</th>
             <th scope="col" class="px-3 py-3.5 text-left">Avg Runtime</th>
             <th scope="col" class="px-3 py-3.5 text-left">Avg CPU</th>

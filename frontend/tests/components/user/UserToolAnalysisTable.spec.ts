@@ -32,13 +32,13 @@ describe('UserToolAnalysisTable.vue', () => {
 
     await flushPromises()
 
-    expect(wrapper.text()).toContain('Completed Job Tool Table')
     expect(wrapper.text()).toContain('12 completed jobs')
     expect(wrapper.text()).toContain('Avg Memory')
-    expect(wrapper.text()).toContain('Peak Memory')
+    expect(wrapper.text()).toContain('Max Memory')
     expect(wrapper.text()).toContain('Median Memory')
     expect(wrapper.text()).toContain('Avg Runtime')
     expect(wrapper.text()).toContain('Avg CPU')
+    expect(wrapper.text()).not.toContain('Completed Job Tool Table')
 
     const bwaRow = wrapper.get('[data-testid="tool-analysis-row-bwa"]')
     expect(bwaRow.text()).toContain('bwa')

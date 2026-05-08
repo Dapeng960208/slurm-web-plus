@@ -10,20 +10,22 @@
 - 部署指南已同步补充安装后执行 `systemctl reset-failed`、`systemctl restart` 与 `journalctl` 验证的最小排障步骤。
 - 同时把这条经验上升为仓库约定：后续新引入包默认要求优先提供 `dnf install -y <package>` 方案，并同步更新正式文档，而不是只留下 `pip install`。
 
-## 本轮：用户详情页已完成作业分析改为图表加表格联合展示
+## 本轮：用户详情页已完成作业分析改为表格主视图并优化首屏行为
 
-本轮增强了用户详情页 `Completed Job Tool Analysis` 的信息密度和可读性：
+本轮继续收敛用户详情页 `Completed Job Tool Analysis` 的展示方式和首屏行为：
 
-- 保留原有工具维度图表，用于快速扫描工具作业量与内存峰值的相对关系。
-- 新增 `Completed Job Tool Table` 明细表，按工具展示已完成作业的：
+- 用户详情页默认先展示 `User Analysis / Submission and tool analytics`，再展示 `User Profile / Account associations and limits`。
+- `Completed Job Tool Analysis` 已去掉重复标题层级和图表区，改为直接展示工具明细表。
+- 明细表按工具展示已完成作业的：
   - 作业数量与占比
   - 平均内存
   - 最大内存
   - 中位数内存
   - 平均运行时间
   - 平均 CPU 使用
-- 表格与图表共享同一时间窗，支持在用户详情页和独立用户分析页同步查看。
+- 内存字段命名统一为 `Max Memory`，不再使用 `Peak Memory`。
 - 明细表按作业数量优先排序，并补充体量条、排名编号和工具级资源摘要，便于快速比较不同工具的资源特征。
+- 用户分析时间窗继续同步到 URL query；浏览器刷新时，如果 URL 已带时间窗参数，分析卡片会在首屏立即加载数据，不再出现空白。
 
 ## 本轮：`job_snapshots` 资源字段补齐从入库前迁移到日聚合前
 
@@ -44,7 +46,7 @@
 - 日表内存字段改为 `avg_memory_gb`、`max_memory_gb`、`median_memory_gb`；旧 `avg_max_memory_gb` 在接口层继续兼容输出。
 - 所有写入日表的浮点指标现在统一保留两位小数，包括内存、CPU 和运行时间。
 - 当天后台聚合、按范围修复脚本和全表重建脚本现在复用同一条“按 `submit_time` 当天范围读取 `COMPLETED` 作业，再在 Python 中按用户+工具分组”的聚合逻辑，避免口径再次漂移。
-- 用户分析前端已增加 Average Memory、Peak Memory、Median Memory 展示，工具级面板和图表同步改为使用新字段。
+- 用户分析前端已增加 Average Memory、Max Memory、Median Memory 展示，工具级面板和图表同步改为使用新字段。
 - 全表重建后，跨多天 `tools/analysis` 仍只读 `user_tool_daily_stats`：`jobs_count` 表示提交时间落在当天、状态为 `COMPLETED` 且 `used_memory_gb` 非空的作业数，平均内存按日表 `jobs_count` 加权，峰值内存取窗口最大值，中位数内存按日中位数加权近似。
 - 日聚合内存样本只以 `used_memory_gb` 为准；`used_memory_gb` 为空的作业会被跳过，不再用 `usage_stats` 或 TRES fallback 代替该字段。
 - `rebuild-user-tool.py` 支持 `--date 20260504 --user lizenghui --dry-run` 定位单日单用户；默认只输出查询、日摘要、聚合行和总预览这几类核心日志。

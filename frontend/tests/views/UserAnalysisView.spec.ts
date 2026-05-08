@@ -10,9 +10,11 @@ const mockGatewayAPI = {
   user_tools_analysis: vi.fn()
 }
 
+let router: ReturnType<typeof init_plugins>
+
 describe('UserAnalysisView.vue', () => {
   beforeEach(() => {
-    init_plugins()
+    router = init_plugins()
     vi.restoreAllMocks()
     vi.spyOn(GatewayAPI, 'useGatewayAPI').mockReturnValue(
       mockGatewayAPI as unknown as ReturnType<typeof GatewayAPI.useGatewayAPI>
@@ -94,8 +96,7 @@ describe('UserAnalysisView.vue', () => {
       },
       global: {
         stubs: {
-          UserSubmissionHistoryChart: true,
-          UserToolAnalysisChart: true
+          UserSubmissionHistoryChart: true
         }
       }
     })
@@ -105,13 +106,12 @@ describe('UserAnalysisView.vue', () => {
     expect(wrapper.text()).toContain('User Analysis')
     expect(wrapper.text()).toContain('Submission Activity')
     expect(wrapper.text()).toContain('Completed Job Tool Analysis')
-    expect(wrapper.text()).toContain('Completed Job Tool Table')
-    expect(wrapper.text()).toContain('Detailed Tool Metrics')
     expect(wrapper.text()).toContain('Avg Memory')
     expect(wrapper.text()).toContain('Avg CPU')
     expect(wrapper.text()).toContain('bwa')
-    expect(wrapper.text()).toContain('8 completed job(s)')
     expect(wrapper.text()).not.toContain('Top Tools')
+    expect(wrapper.text()).not.toContain('Memory and Volume')
+    expect(wrapper.text()).not.toContain('Resource Roll-up')
     expect(wrapper.text()).toContain('Analysis Window')
     expect(wrapper.text()).toContain('Root User')
     expect(wrapper.text()).toContain('Groups: admins, science')
@@ -132,6 +132,36 @@ describe('UserAnalysisView.vue', () => {
         end: expect.stringMatching(/T/)
       })
     )
+  })
+
+  test('loads analytics immediately on refresh when route already has a time window', async () => {
+    await router.push({
+      query: {
+        start: '2026-04-24T08:30',
+        end: '2026-04-24T11:45'
+      }
+    })
+
+    mount(UserAnalysisView, {
+      props: {
+        cluster: 'foo',
+        user: 'root'
+      },
+      global: {
+        stubs: {
+          UserSubmissionHistoryChart: true
+        }
+      }
+    })
+
+    await flushPromises()
+
+    const expectedWindow = {
+      start: new Date('2026-04-24T08:30').toISOString(),
+      end: new Date('2026-04-24T11:45').toISOString()
+    }
+    expect(mockGatewayAPI.user_tools_analysis).toHaveBeenCalledWith('foo', 'root', expectedWindow)
+    expect(mockGatewayAPI.user_metrics_history).toHaveBeenCalledWith('foo', 'root', expectedWindow)
   })
 
   test('shows disabled message when analytics is unavailable', async () => {
@@ -167,8 +197,7 @@ describe('UserAnalysisView.vue', () => {
       },
       global: {
         stubs: {
-          UserSubmissionHistoryChart: true,
-          UserToolAnalysisChart: true
+          UserSubmissionHistoryChart: true
         }
       }
     })
@@ -201,8 +230,7 @@ describe('UserAnalysisView.vue', () => {
       },
       global: {
         stubs: {
-          UserSubmissionHistoryChart: true,
-          UserToolAnalysisChart: true
+          UserSubmissionHistoryChart: true
         }
       }
     })
@@ -234,8 +262,7 @@ describe('UserAnalysisView.vue', () => {
       },
       global: {
         stubs: {
-          UserSubmissionHistoryChart: true,
-          UserToolAnalysisChart: true
+          UserSubmissionHistoryChart: true
         }
       }
     })
