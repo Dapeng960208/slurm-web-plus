@@ -56,6 +56,8 @@ class SlurmwebMetricQuery:
 
 
 class SlurmwebMetricsDB:
+    PARTITION_SUPPORTED_METRICS = {"nodes", "cores", "gpus", "memory", "jobs"}
+
     RANGE_RESOLUTIONS = {
         "30s": SlurmWebRangeResolutionSet(
             hour=SlurmWebRangeResolution("30s", "1h", 30),
@@ -127,9 +129,13 @@ class SlurmwebMetricsDB:
         self.base_uri = base_uri
         self.job = job
 
-    def request(self, metric, last):
+    def request(self, metric, last, partition=None):
         params = self.METRICS_QUERY_PARAMS[metric]
-        return self._merge_results(asyncio_run(self._requests(params, last)))
+        if metric not in self.PARTITION_SUPPORTED_METRICS:
+            partition = None
+        return self._merge_results(
+            asyncio_run(self._requests(metric, params, last, partition))
+        )
 
     def _merge_results(self, results):
         merge = {}
@@ -137,14 +143,52 @@ class SlurmwebMetricsDB:
             merge.update(result)
         return merge
 
-    async def _requests(self, params, last):
+    async def _requests(self, metric, params, last, partition):
         """Return the list of available clusters with permissions. Clusters on which
         request to get permissions failed are filtered out."""
         return await asyncio.gather(
-            *[self._request(*self._query(id, params, last)) for id in params.ids]
+            *[
+                self._request(
+                    metric, *self._query(metric, id, params, last, partition), partition
+                )
+                for id in params.ids
+            ]
         )
 
-    async def _request(self, id, params, query):
+    def _empty_result(self, metric):
+        if metric == "memory":
+            return {"allocated": [], "idle": []}
+        if metric in {"nodes", "cores", "gpus"}:
+            return {
+                "idle": [],
+                "mixed": [],
+                "allocated": [],
+                "drain": [],
+                "down": [],
+                "error": [],
+                "fail": [],
+                "unknown": [],
+            }
+        if metric == "jobs":
+            return {
+                "running": [],
+                "pending": [],
+                "completing": [],
+                "completed": [],
+                "cancelled": [],
+                "suspended": [],
+                "preempted": [],
+                "failed": [],
+                "timeout": [],
+                "node_fail": [],
+                "boot_fail": [],
+                "deadline": [],
+                "out_of_memory": [],
+                "unknown": [],
+            }
+        return {}
+
+    async def _request(self, metric, id, params, query, partition=None):
         try:
             async with aiohttp.ClientSession() as session:
                 url = f"{self.base_uri.geturl()}{self.REQUEST_BASE_PATH}{query}"
@@ -169,6 +213,8 @@ class SlurmwebMetricsDB:
 
         # Check result is not empty
         if not json["data"]["result"]:
+            if partition is not None and metric in self.PARTITION_SUPPORTED_METRICS:
+                return self._empty_result(metric)
             raise SlurmwebMetricsDBError(f"Empty result for query {query}")
         try:
             result = {}
@@ -189,7 +235,7 @@ class SlurmwebMetricsDB:
                 f"Unexpected result on metrics query {query}"
             ) from err
 
-    def _query(self, id, params, last):
+    def _query(self, metric, id, params, last, partition=None):
         try:
             resolution = getattr(params.resolution, last)
         except AttributeError as err:
@@ -199,7 +245,10 @@ class SlurmwebMetricsDB:
         def _rounded_timetstamp(timestamp):
             return timestamp - timestamp % resolution.rounding
 
-        filter = f"{{job='{self.job}'}}"
+        labels = [f"job='{self.job}'"]
+        if metric in self.PARTITION_SUPPORTED_METRICS:
+            labels.append(f"partition='{'' if partition is None else partition}'")
+        filter = "{" + ",".join(labels) + "}"
         if params.agg:
             range = f"[{resolution.range}:{resolution.step}]"
             _promql = f"{params.agg}({id.name}{filter}[{resolution.step}]){range}"

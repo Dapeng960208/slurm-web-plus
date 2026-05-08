@@ -242,6 +242,21 @@ class TestSlurmrestd(TestSlurmrestdBase):
         self.assertEqual(total, jobs_sum)
         self.assertEqual(jobs["unknown"], 0)
 
+    def test_jobs_states_partition_filter(self):
+        self.slurmrestd.jobs = lambda: [
+            {"job_state": ["RUNNING"], "partition": "cpu"},
+            {"job_state": ["PENDING"], "partition": "gpu"},
+            {"job_state": ["FAILED"], "partition": "cpu,debug"},
+            {"job_state": ["COMPLETED"], "partition": ["debug", "vis"]},
+        ]
+
+        jobs, total = self.slurmrestd.jobs_states(partition="debug")
+
+        self.assertEqual(total, 2)
+        self.assertEqual(jobs["failed"], 1)
+        self.assertEqual(jobs["completed"], 1)
+        self.assertEqual(sum(jobs.values()), total)
+
     @all_slurm_api_versions
     def test_nodes(self, slurm_version, api_version):
         self.setup_slurmrestd(slurm_version, api_version)
@@ -299,6 +314,102 @@ class TestSlurmrestd(TestSlurmrestdBase):
 
         # Check total memory matches the sum of node physical memory in GB
         self.assertEqual(memory_total, sum(node["real_memory"] for node in asset) / 1024)
+
+    def test_resources_states_partition_filter(self):
+        self.slurmrestd.nodes = lambda: [
+            {
+                "cpus": 8,
+                "gres": "gpu:2",
+                "gres_used": "gpu:1",
+                "state": ["MIXED"],
+                "real_memory": 4096,
+                "alloc_memory": 1024,
+                "alloc_cpus": 2,
+                "alloc_idle_cpus": 6,
+                "partitions": ["cpu", "shared"],
+            },
+            {
+                "cpus": 16,
+                "gres": "gpu:4",
+                "gres_used": "gpu:4",
+                "state": ["ALLOCATED"],
+                "real_memory": 8192,
+                "alloc_memory": 8192,
+                "alloc_cpus": 16,
+                "alloc_idle_cpus": 0,
+                "partitions": "gpu,shared",
+            },
+            {
+                "cpus": 4,
+                "gres": "",
+                "gres_used": "",
+                "state": ["IDLE"],
+                "real_memory": 2048,
+                "alloc_memory": 0,
+                "alloc_cpus": 0,
+                "alloc_idle_cpus": 4,
+                "partitions": ["cpu"],
+            },
+        ]
+
+        (
+            nodes_states,
+            cores_states,
+            gpus_states,
+            memory_states,
+            nodes_total,
+            cores_total,
+            gpus_total,
+            memory_total,
+        ) = self.slurmrestd.resources_states(partition="shared")
+
+        self.assertEqual(nodes_total, 2)
+        self.assertEqual(nodes_states["mixed"], 1)
+        self.assertEqual(nodes_states["allocated"], 1)
+        self.assertEqual(cores_total, 24)
+        self.assertEqual(cores_states["allocated"], 18)
+        self.assertEqual(cores_states["idle"], 6)
+        self.assertEqual(gpus_total, 6)
+        self.assertEqual(gpus_states["allocated"], 5)
+        self.assertEqual(gpus_states["idle"], 1)
+        self.assertEqual(memory_states["allocated"], 9.0)
+        self.assertEqual(memory_states["idle"], 3.0)
+        self.assertEqual(memory_total, 12.0)
+
+    def test_resources_states_partition_without_nodes(self):
+        self.slurmrestd.nodes = lambda: [
+            {
+                "cpus": 4,
+                "gres": "",
+                "gres_used": "",
+                "state": ["IDLE"],
+                "real_memory": 2048,
+                "alloc_memory": 0,
+                "alloc_cpus": 0,
+                "alloc_idle_cpus": 4,
+                "partitions": ["cpu"],
+            }
+        ]
+
+        (
+            nodes_states,
+            cores_states,
+            gpus_states,
+            memory_states,
+            nodes_total,
+            cores_total,
+            gpus_total,
+            memory_total,
+        ) = self.slurmrestd.resources_states(partition="ghost")
+
+        self.assertEqual(nodes_total, 0)
+        self.assertEqual(cores_total, 0)
+        self.assertEqual(gpus_total, 0)
+        self.assertEqual(memory_total, 0.0)
+        self.assertEqual(sum(nodes_states.values()), 0)
+        self.assertEqual(sum(cores_states.values()), 0)
+        self.assertEqual(sum(gpus_states.values()), 0)
+        self.assertEqual(sum(memory_states.values()), 0.0)
 
     def test_resources_states_memory_breakdown(self):
         self.slurmrestd.nodes = lambda: [

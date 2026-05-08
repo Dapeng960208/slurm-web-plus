@@ -37,6 +37,7 @@ import nodeWithGpusMixed from '../assets/node-with-gpus-mixed.json'
 import nodeWithGpusModelAllocated from '../assets/node-with-gpus-model-allocated.json'
 import nodeWithGpusModelIdle from '../assets/node-with-gpus-model-idle.json'
 import nodeWithGpusModelMixed from '../assets/node-with-gpus-model-mixed.json'
+import stats from '../assets/stats.json'
 
 import nodeWithoutGpu from '../assets/node-without-gpu.json'
 
@@ -334,6 +335,25 @@ describe('user activity gateway methods', () => {
 describe('gateway data APIs', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+  })
+
+  test('builds dashboard stats and metrics URLs with optional partition query', async () => {
+    mockRestAPI.get
+      .mockResolvedValueOnce(stats)
+      .mockResolvedValueOnce({ idle: [] })
+      .mockResolvedValueOnce({ running: [] })
+
+    const gateway = useGatewayAPI()
+    await gateway.stats('cluster', { partition: 'gpu' })
+    await gateway.metrics_nodes('cluster', { range: 'day', partition: 'gpu' })
+    await gateway.metrics_jobs('cluster', 'hour')
+
+    expect(mockRestAPI.get).toHaveBeenNthCalledWith(1, '/agents/cluster/stats?partition=gpu')
+    expect(mockRestAPI.get).toHaveBeenNthCalledWith(
+      2,
+      '/agents/cluster/metrics/nodes?range=day&partition=gpu'
+    )
+    expect(mockRestAPI.get).toHaveBeenNthCalledWith(3, '/agents/cluster/metrics/jobs?range=hour')
   })
 
   test('uses the corrected write routes for jobs and nodes', async () => {

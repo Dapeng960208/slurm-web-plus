@@ -36,6 +36,14 @@ logger = logging.getLogger(__name__)
 
 
 class SlurmWebMetricsCollector(Collector):
+    RESOURCE_METRICS = (
+        ("slurm_nodes", "Slurm nodes", "slurm_nodes_total", "Slurm total number of nodes"),
+        ("slurm_cores", "Slurm cores", "slurm_cores_total", "Slurm total number of cores"),
+        ("slurm_gpus", "Slurm GPU", "slurm_gpus_total", "Slurm total number of GPU"),
+        ("slurm_memory", "Slurm memory in GB", "slurm_memory_total", "Slurm total memory in GB"),
+        ("slurm_jobs", "Slurm jobs", "slurm_jobs_total", "Slurm total number of jobs"),
+    )
+
     def __init__(
         self,
         slurmrestd: "SlurmrestdFilteredCached",
@@ -75,7 +83,26 @@ class SlurmWebMetricsCollector(Collector):
     def unregister(self):
         prometheus_client.REGISTRY.unregister(self)
 
+    @staticmethod
+    def _set_partition_sample(metric_family, labels, value, partition=None):
+        sample_labels = list(labels)
+        sample_labels.append("" if partition is None else partition)
+        metric_family.add_metric(sample_labels, value)
+
     def _collect(self):
+        metrics = {
+            name: prometheus_client.core.GaugeMetricFamily(
+                name, description, labels=["state", "partition"]
+            )
+            for name, description, _, _ in self.RESOURCE_METRICS
+        }
+        totals = {
+            total_name: prometheus_client.core.GaugeMetricFamily(
+                total_name, total_description, labels=["partition"]
+            )
+            for _, _, total_name, total_description in self.RESOURCE_METRICS
+        }
+
         (
             nodes_states,
             cores_states,
@@ -86,53 +113,71 @@ class SlurmWebMetricsCollector(Collector):
             gpus_total,
             memory_total,
         ) = self.slurmrestd.resources_states()
-        c = prometheus_client.core.GaugeMetricFamily(
-            "slurm_nodes", "Slurm nodes", labels=["state"]
-        )
         for status, value in nodes_states.items():
-            c.add_metric([status], value)
-        yield c
-        yield prometheus_client.metrics_core.GaugeMetricFamily(
-            "slurm_nodes_total", "Slurm total number of nodes", value=nodes_total
-        )
-        c = prometheus_client.core.GaugeMetricFamily(
-            "slurm_cores", "Slurm cores", labels=["state"]
-        )
+            self._set_partition_sample(metrics["slurm_nodes"], [status], value)
+        totals["slurm_nodes_total"].add_metric([""], nodes_total)
         for status, value in cores_states.items():
-            c.add_metric([status], value)
-        yield c
-        yield prometheus_client.metrics_core.GaugeMetricFamily(
-            "slurm_cores_total", "Slurm total number of cores", value=cores_total
-        )
-        c = prometheus_client.core.GaugeMetricFamily(
-            "slurm_gpus", "Slurm GPU", labels=["state"]
-        )
+            self._set_partition_sample(metrics["slurm_cores"], [status], value)
+        totals["slurm_cores_total"].add_metric([""], cores_total)
         for status, value in gpus_states.items():
-            c.add_metric([status], value)
-        yield c
-        yield prometheus_client.metrics_core.GaugeMetricFamily(
-            "slurm_gpus_total", "Slurm total number of GPU", value=gpus_total
-        )
-        c = prometheus_client.core.GaugeMetricFamily(
-            "slurm_memory", "Slurm memory in GB", labels=["state"]
-        )
+            self._set_partition_sample(metrics["slurm_gpus"], [status], value)
+        totals["slurm_gpus_total"].add_metric([""], gpus_total)
         for status, value in memory_states.items():
-            c.add_metric([status], value)
-        yield c
-        yield prometheus_client.metrics_core.GaugeMetricFamily(
-            "slurm_memory_total", "Slurm total memory in GB", value=memory_total
-        )
+            self._set_partition_sample(metrics["slurm_memory"], [status], value)
+        totals["slurm_memory_total"].add_metric([""], memory_total)
 
         (jobs_states, jobs_total) = self.slurmrestd.jobs_states()
-        c = prometheus_client.core.GaugeMetricFamily(
-            "slurm_jobs", "Slurm jobs", labels=["state"]
-        )
         for status, value in jobs_states.items():
-            c.add_metric([status], value)
-        yield c
-        yield prometheus_client.core.GaugeMetricFamily(
-            "slurm_jobs_total", "Slurm total number of jobs", value=jobs_total
-        )
+            self._set_partition_sample(metrics["slurm_jobs"], [status], value)
+        totals["slurm_jobs_total"].add_metric([""], jobs_total)
+
+        for partition_data in self.slurmrestd.partitions():
+            partition = partition_data["name"]
+            (
+                partition_nodes_states,
+                partition_cores_states,
+                partition_gpus_states,
+                partition_memory_states,
+                partition_nodes_total,
+                partition_cores_total,
+                partition_gpus_total,
+                partition_memory_total,
+            ) = self.slurmrestd.resources_states(partition=partition)
+            for status, value in partition_nodes_states.items():
+                self._set_partition_sample(
+                    metrics["slurm_nodes"], [status], value, partition
+                )
+            for status, value in partition_cores_states.items():
+                self._set_partition_sample(
+                    metrics["slurm_cores"], [status], value, partition
+                )
+            for status, value in partition_gpus_states.items():
+                self._set_partition_sample(
+                    metrics["slurm_gpus"], [status], value, partition
+                )
+            for status, value in partition_memory_states.items():
+                self._set_partition_sample(
+                    metrics["slurm_memory"], [status], value, partition
+                )
+            totals["slurm_nodes_total"].add_metric([partition], partition_nodes_total)
+            totals["slurm_cores_total"].add_metric([partition], partition_cores_total)
+            totals["slurm_gpus_total"].add_metric([partition], partition_gpus_total)
+            totals["slurm_memory_total"].add_metric(
+                [partition], partition_memory_total
+            )
+
+            partition_jobs_states, partition_jobs_total = self.slurmrestd.jobs_states(
+                partition=partition
+            )
+            for status, value in partition_jobs_states.items():
+                self._set_partition_sample(
+                    metrics["slurm_jobs"], [status], value, partition
+                )
+            totals["slurm_jobs_total"].add_metric([partition], partition_jobs_total)
+
+        for metric_name, _, total_name, _ in self.RESOURCE_METRICS:
+            yield metrics[metric_name]
+            yield totals[total_name]
 
         user_store = self.user_metrics_store or self.user_analytics_store
         if self.user_metrics_enabled and user_store is not None:

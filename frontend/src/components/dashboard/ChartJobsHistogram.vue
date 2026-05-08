@@ -64,13 +64,25 @@ const liveChart = useLiveHistogram<MetricJobState>(
   'metrics_jobs',
   chartCanvas,
   labels,
-  runtimeStore.dashboard.range
+  runtimeStore.dashboard.range,
+  runtimeStore.dashboard.partition ? { partition: runtimeStore.dashboard.partition } : undefined
 )
 
 watch(
   () => runtimeStore.dashboard.range,
   () => {
-    liveChart.setRange(runtimeStore.dashboard.range)
+    liveChart.setRange(runtimeStore.dashboard.range, {
+      partition: runtimeStore.dashboard.partition || undefined
+    })
+  }
+)
+
+watch(
+  () => runtimeStore.dashboard.partition,
+  () => {
+    liveChart.setRange(runtimeStore.dashboard.range, {
+      partition: runtimeStore.dashboard.partition || undefined
+    })
   }
 )
 

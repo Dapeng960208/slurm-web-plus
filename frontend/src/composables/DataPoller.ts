@@ -18,6 +18,9 @@ import type { GatewayAnyClusterApiKey } from '@/composables/GatewayAPI'
 import { useRuntimeStore } from '@/stores/runtime'
 import { useErrorsHandler } from '@/composables/ErrorsHandler'
 
+export type ClusterDataPollerQuery = Record<string, string | number | boolean | null | undefined>
+export type ClusterDataPollerParam = string | number | ClusterDataPollerQuery
+
 export interface ClusterDataPoller<ResponseType> {
   data: Ref<ResponseType | undefined>
   unable: Ref<boolean>
@@ -26,14 +29,14 @@ export interface ClusterDataPoller<ResponseType> {
   refreshing: Ref<boolean>
   setCluster: (newCluster: string) => void
   setCallback: (newCallback: GatewayAnyClusterApiKey) => void
-  setParam: (newOtherParam: string | number) => void
+  setParam: (newOtherParam: ClusterDataPollerParam | undefined) => void
 }
 
 export function useClusterDataPoller<Type>(
   cluster: string,
   initialCallback: GatewayAnyClusterApiKey,
   timeout: number,
-  initialOtherParam?: number | string
+  initialOtherParam?: ClusterDataPollerParam
 ): ClusterDataPoller<Type> {
   let callback = initialCallback
   let otherParam = initialOtherParam
@@ -58,12 +61,12 @@ export function useClusterDataPoller<Type>(
     refreshing.value = loaded.value
     try {
       unable.value = false
-      if (gateway.isValidGatewayClusterWithStringAPIKey(callback)) {
-        const method = gateway[callback] as (cluster: string, param: string) => Promise<Type>
-        data.value = await method(cluster, otherParam as string)
-      } else if (gateway.isValidGatewayClusterWithNumberAPIKey(callback)) {
-        const method = gateway[callback] as (cluster: string, param: number) => Promise<Type>
-        data.value = await method(cluster, otherParam as number)
+      if (otherParam !== undefined) {
+        const method = gateway[callback] as (
+          cluster: string,
+          param: ClusterDataPollerParam
+        ) => Promise<Type>
+        data.value = await method(cluster, otherParam)
       } else {
         const method = gateway[callback] as (cluster: string) => Promise<Type>
         data.value = await method(cluster)
@@ -125,7 +128,7 @@ export function useClusterDataPoller<Type>(
     start()
   }
 
-  function setParam(newOtherParam: string | number) {
+  function setParam(newOtherParam: ClusterDataPollerParam | undefined) {
     stop()
     otherParam = newOtherParam
     data.value = undefined

@@ -9,8 +9,10 @@
 import { watch, onMounted } from 'vue'
 import type { Ref } from 'vue'
 import type { GatewayAnyClusterApiKey } from '@/composables/GatewayAPI'
+import type { DashboardPartitionQuery } from '@/composables/GatewayAPI'
 import { useClusterDataPoller } from '@/composables/DataPoller'
 import type { ClusterDataPoller } from '@/composables/DataPoller'
+import type { ClusterDataPollerParam } from '@/composables/DataPoller'
 import type { MetricValue } from '@/composables/GatewayAPI'
 import { Chart } from 'chart.js/auto'
 import type { ChartOptions, TimeScaleOptions, TimeUnit, Point } from 'chart.js'
@@ -22,11 +24,12 @@ type HistogramValueFormatter = (value: number) => string | undefined
 export interface DashboardLiveChart<MetricKeyType extends string> {
   metrics: ClusterDataPoller<Record<MetricKeyType, MetricValue[]>>
   setCluster: (cluster: string) => void
-  setRange: (range: string) => void
+  setRange: (range: string, query?: DashboardPartitionQuery) => void
   setCallback: (callback: GatewayAnyClusterApiKey) => void
   setLabels: (
     labels: Record<string, { group: MetricKeyType[]; color: string; invert?: boolean }>
   ) => void
+  clear: () => void
 }
 
 export function useLiveHistogram<MetricKeyType extends string>(
@@ -35,16 +38,18 @@ export function useLiveHistogram<MetricKeyType extends string>(
   chartCanvas: Ref<HTMLCanvasElement | null>,
   originalLabels: Record<string, { group: MetricKeyType[]; color: string; invert?: boolean }>,
   originalRange: string,
+  originalQuery?: DashboardPartitionQuery,
   valueFormatter?: HistogramValueFormatter
 ): DashboardLiveChart<MetricKeyType> {
   let range = originalRange
   let labels = originalLabels
+  let filterQuery = originalQuery
 
   const metrics = useClusterDataPoller<Record<MetricKeyType, MetricValue[]>>(
     cluster,
     callback,
     30000,
-    range
+    buildMetricsQuery(range, filterQuery)
   )
   let chart: Chart | null
 
@@ -227,22 +232,43 @@ export function useLiveHistogram<MetricKeyType extends string>(
       }
     }
   }
+  function clear() {
+    if (chart) {
+      chart.data.datasets = []
+      chart.update()
+    }
+  }
+
+  function buildMetricsQuery(
+    metricsRange: string,
+    query?: DashboardPartitionQuery
+  ): ClusterDataPollerParam {
+    if (!query?.partition) {
+      return metricsRange
+    }
+    return {
+      range: metricsRange,
+      partition: query.partition
+    }
+  }
+
   function setCluster(newCluster: string) {
-    if (chart) chart.data.datasets = []
+    clear()
     metrics.setCluster(newCluster)
   }
 
   /* Clear chart datasets and set new poller param when dashboard range is
    * modified. */
-  function setRange(newRange: string) {
+  function setRange(newRange: string, query?: DashboardPartitionQuery) {
     range = newRange
-    if (chart) chart.data.datasets = []
-    metrics.setParam(range)
+    filterQuery = query
+    clear()
+    metrics.setParam(buildMetricsQuery(range, filterQuery))
   }
 
   /* Clear chart datasets and set new metrics callback */
   function setCallback(callback: GatewayAnyClusterApiKey) {
-    if (chart) chart.data.datasets = []
+    clear()
     metrics.setCallback(callback)
   }
 
@@ -250,7 +276,7 @@ export function useLiveHistogram<MetricKeyType extends string>(
     newLabels: Record<string, { group: MetricKeyType[]; color: string; invert?: boolean }>
   ) {
     labels = newLabels
-    if (chart) chart.data.datasets = []
+    clear()
   }
 
   onMounted(() => {
@@ -263,5 +289,5 @@ export function useLiveHistogram<MetricKeyType extends string>(
     }
   })
 
-  return { metrics, setCluster, setRange, setCallback, setLabels }
+  return { metrics, setCluster, setRange, setCallback, setLabels, clear }
 }

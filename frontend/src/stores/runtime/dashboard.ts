@@ -9,6 +9,8 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import type { MetricRange } from '@/composables/GatewayAPI'
+import { isMetricRange } from '@/composables/GatewayAPI'
+import type { LocationQuery } from 'vue-router'
 
 /*
  * Dashboard view settings
@@ -24,11 +26,27 @@ export function isChartResourcesType(value: unknown): value is ChartResourcesTyp
 export interface DashboardQueryParameters {
   range?: string
   resources?: ChartResourcesType
+  partition?: string
 }
 
 export const useDashboardRuntimeStore = defineStore('dashboardRuntime', () => {
   const range = ref<MetricRange>('hour')
   const chartResourcesType = ref<ChartResourcesType>('nodes')
+  const partition = ref('')
+
+  function reset() {
+    range.value = 'hour'
+    chartResourcesType.value = 'nodes'
+    partition.value = ''
+  }
+
+  function restoreQuery(query: LocationQuery) {
+    range.value = query.range && isMetricRange(query.range) ? query.range : 'hour'
+    chartResourcesType.value =
+      query.resources && isChartResourcesType(query.resources) ? query.resources : 'nodes'
+    partition.value = typeof query.partition === 'string' ? query.partition : ''
+  }
+
   function query() {
     const result: DashboardQueryParameters = {}
     if (range.value != 'hour') {
@@ -37,11 +55,17 @@ export const useDashboardRuntimeStore = defineStore('dashboardRuntime', () => {
     if (chartResourcesType.value != 'nodes') {
       result.resources = chartResourcesType.value
     }
+    if (partition.value) {
+      result.partition = partition.value
+    }
     return result
   }
   return {
     range,
     chartResourcesType,
+    partition,
+    reset,
+    restoreQuery,
     query
   }
 })

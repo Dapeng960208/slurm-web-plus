@@ -227,6 +227,32 @@ class TestGatewayViews(TestGatewayBase):
         self.assertCountEqual(response.json.keys(), ["hit", "miss"])
 
     @mock.patch("slurmweb.views.gateway.aiohttp.ClientSession.get")
+    def test_stats_forwards_partition_to_agent(self, mock_get):
+        foo = fake_slurmweb_agent("foo")
+        self.app_set_agents({"foo": foo})
+        _, mock_get.return_value = mock_agent_aio_response(
+            content={
+                "jobs": {"running": 1, "total": 2},
+                "resources": {
+                    "nodes": 1,
+                    "cores": 48,
+                    "memory": 4096,
+                    "memory_allocated": 1536,
+                    "memory_available": 2560,
+                    "gpus": 2,
+                },
+            }
+        )
+
+        response = self.client.get("/api/agents/foo/stats?partition=debug")
+
+        self.assertEqual(response.status_code, 200)
+        mock_get.assert_called_once_with(
+            f"http://foo/v{foo.version}/stats?partition=debug",
+            headers=mock.ANY,
+        )
+
+    @mock.patch("slurmweb.views.gateway.aiohttp.ClientSession.get")
     def test_clusters_include_extended_capabilities(self, mock_get):
         permissions, mock_get.return_value = mock_agent_aio_response(
             asset="permissions"
@@ -488,6 +514,23 @@ class TestGatewayViews(TestGatewayBase):
         )
         mock_get.assert_called_once_with(
             f"http://foo/v{foo.version}/node/cn1/metrics",
+            headers=mock.ANY,
+        )
+
+    @mock.patch("slurmweb.views.gateway.aiohttp.ClientSession.get")
+    def test_metrics_forwards_partition_to_agent(self, mock_get):
+        foo = fake_slurmweb_agent("foo")
+        self.app_set_agents({"foo": foo})
+        _, mock_get.return_value = mock_agent_aio_response(
+            content={"running": [[1713956400000, 2.0]]}
+        )
+
+        response = self.client.get("/api/agents/foo/metrics/jobs?range=day&partition=debug")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json, {"running": [[1713956400000, 2.0]]})
+        mock_get.assert_called_once_with(
+            f"http://foo/v{foo.version}/metrics/jobs?range=day&partition=debug",
             headers=mock.ANY,
         )
 

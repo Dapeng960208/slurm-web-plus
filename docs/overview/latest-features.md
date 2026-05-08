@@ -1,5 +1,26 @@
 ﻿# 最新功能
 
+## 本轮：Dashboard `stats` / `metrics` 已补 `partition` 接口契约与 Gateway 透传验证
+
+本轮在不改动 collector、metrics DB 核心实现和 `slurmrestd` 核心实现的前提下，补齐了 Dashboard 相关接口对 `partition` query 的契约支持：
+
+- Agent `GET /v<agent-version>/stats` 现在会读取 `partition` query，并基于该分区返回的作业和节点重新聚合：
+  - `jobs.running`
+  - `jobs.total`
+  - `resources.nodes`
+  - `resources.cores`
+  - `resources.memory`
+  - `resources.memory_allocated`
+  - `resources.memory_available`
+  - `resources.gpus`
+- Agent `GET /v<agent-version>/metrics/<metric>` 现在会读取 `partition` query，并在底层 `metrics_db.request(...)` 签名支持时继续透传。
+- 为兼容尚未升级到 `partition` 参数的旧 `metrics_db.request(metric, range)` 实现，Agent 会自动回退到旧调用方式，避免多 Agent 并行开发或不同合并顺序下直接抛出 `TypeError`。
+- Gateway 现有统一 query string 透传逻辑已经满足需求，因此本轮没有新增业务分支，只补了 `/stats` 与 `/metrics/<metric>` 的透传回归测试。
+
+本轮新增验证：
+
+- `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/views/test_agent.py slurmweb/tests/views/test_agent_metrics_requests.py slurmweb/tests/views/test_gateway.py`
+
 ## 本轮：补充 `slurm-web-agent` 缺少 `sqlalchemy` 时的系统包部署说明
 
 本轮补充了一个现场排障结论，避免在 RHEL 系系统 Python 环境下重复踩坑：

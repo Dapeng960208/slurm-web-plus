@@ -899,6 +899,44 @@ class TestAgentViews(TestAgentBase):
         self.assertEqual(response.json["resources"]["memory_allocated"], 1280)
         self.assertEqual(response.json["resources"]["memory_available"], 1792)
 
+    def test_request_stats_forwards_partition_and_uses_partition_data(self):
+        self.app.slurmrestd.jobs = mock.Mock(
+            return_value=[
+                {"job_state": ["RUNNING"]},
+                {"job_state": ["PENDING"]},
+            ]
+        )
+        self.app.slurmrestd.nodes_unfiltered = mock.Mock(
+            return_value=[
+                {
+                    "cpus": 48,
+                    "real_memory": 4096,
+                    "alloc_memory": 1536,
+                    "gres": "gpu:2",
+                }
+            ]
+        )
+
+        response = self.client.get(f"/v{get_version()}/stats?partition=debug")
+
+        self.assertEqual(response.status_code, 200)
+        self.app.slurmrestd.jobs.assert_called_once_with(query={"partition": "debug"})
+        self.app.slurmrestd.nodes_unfiltered.assert_called_once_with(
+            query={"partition": "debug"}
+        )
+        self.assertEqual(response.json["jobs"], {"running": 1, "total": 2})
+        self.assertEqual(
+            response.json["resources"],
+            {
+                "nodes": 1,
+                "cores": 48,
+                "memory": 4096,
+                "memory_allocated": 1536,
+                "memory_available": 2560,
+                "gpus": 2,
+            },
+        )
+
     @all_slurm_api_versions
     def test_request_partitions(self, slurm_version, api_version):
         self.setup_slurmrestd(slurm_version, api_version)

@@ -107,6 +107,58 @@ class TestAgentMetricsRequest(TestAgentBase):
             ],
         )
 
+    def test_request_metrics_forwards_partition_when_supported(self):
+        self._enable_custom_rules("jobs:view:*")
+        self.app.metrics_db.request = mock.Mock(
+            return_value={"running": [[1713956400000, 3.0]]}
+        )
+
+        response = self.client.get(
+            f"/v{get_version()}/metrics/jobs?range=day&partition=debug"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json, {"running": [[1713956400000, 3.0]]})
+        self.app.metrics_db.request.assert_called_once_with(
+            "jobs",
+            "day",
+            partition="debug",
+        )
+
+    def test_request_metrics_keeps_default_signature_when_partition_absent(self):
+        self._enable_custom_rules("jobs:view:*")
+        self.app.metrics_db.request = mock.Mock(
+            return_value={"running": [[1713956400000, 1.0]]}
+        )
+
+        response = self.client.get(f"/v{get_version()}/metrics/jobs?range=day")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json, {"running": [[1713956400000, 1.0]]})
+        self.app.metrics_db.request.assert_called_once_with("jobs", "day")
+
+    def test_request_metrics_partition_is_compatible_with_legacy_signature(self):
+        self._enable_custom_rules("jobs:view:*")
+
+        class LegacyMetricsDB:
+            def __init__(self):
+                self.calls = []
+
+            def request(self, metric, last):
+                self.calls.append((metric, last))
+                return {"running": [[1713956400000, 2.0]]}
+
+        legacy_metrics_db = LegacyMetricsDB()
+        self.app.metrics_db = legacy_metrics_db
+
+        response = self.client.get(
+            f"/v{get_version()}/metrics/jobs?range=week&partition=debug"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json, {"running": [[1713956400000, 2.0]]})
+        self.assertEqual(legacy_metrics_db.calls, [("jobs", "week")])
+
     @mock.patch("slurmweb.metrics.db.aiohttp.ClientSession.get")
     def test_request_metrics_cache(self, mock_get):
         self._enable_custom_rules("admin/cache:view:*")

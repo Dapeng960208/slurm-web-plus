@@ -502,7 +502,26 @@ class Slurmrestd:
 
         return [job for job in self.jobs() if on_node(job) and not terminated(job)]
 
-    def jobs_states(self):
+    @staticmethod
+    def _partition_values(value: t.Any) -> t.Set[str]:
+        if value is None:
+            return set()
+        if isinstance(value, str):
+            return {
+                partition.strip()
+                for partition in value.split(",")
+                if partition.strip()
+            }
+        if isinstance(value, (list, tuple, set)):
+            return {
+                str(partition).strip()
+                for partition in value
+                if str(partition).strip()
+            }
+        partition = str(value).strip()
+        return {partition} if partition else set()
+
+    def jobs_states(self, partition: t.Optional[str] = None):
         # All Slurm jobs base states. Jobs can have only one of them.
         jobs = {
             "running": 0,
@@ -521,7 +540,13 @@ class Slurmrestd:
             "unknown": 0,
         }
         total = 0
-        for job in self.jobs():
+        jobs_getter = getattr(self, "jobs_unfiltered", None)
+        source_jobs = jobs_getter() if callable(jobs_getter) else self.jobs()
+        for job in source_jobs:
+            if partition is not None and partition not in self._partition_values(
+                job.get("partition")
+            ):
+                continue
             state_found = False
             for state in jobs.keys():
                 if state.upper() in job["job_state"]:
@@ -552,7 +577,7 @@ class Slurmrestd:
             return default
         return value
 
-    def resources_states(self):
+    def resources_states(self, partition: t.Optional[str] = None):
         # All Slurm nodes base states and some interesting flags such as drain and fail.
         nodes_states = {
             "idle": 0,
@@ -595,6 +620,10 @@ class Slurmrestd:
         nodes_getter = getattr(self, "nodes_unfiltered", None)
         nodes = nodes_getter() if callable(nodes_getter) else self.nodes()
         for node in nodes:
+            if partition is not None and partition not in self._partition_values(
+                node.get("partitions")
+            ):
+                continue
             cores = node["cpus"]
             node_gpus = self.node_gres_extract_gpus(node["gres"])
             real_memory = max(0, node.get("real_memory", 0))
@@ -1012,6 +1041,15 @@ class SlurmrestdFilteredCached(SlurmrestdFiltered):
         if kwargs:
             return super().jobs(**kwargs)
         return self._cached(CacheKey("jobs"), self.cache.jobs, super().jobs)
+
+    def jobs_unfiltered(self, **kwargs):
+        if kwargs:
+            return super().jobs_unfiltered(**kwargs)
+        return self._cached(
+            CacheKey("jobs-unfiltered", "jobs"),
+            self.cache.jobs,
+            super().jobs_unfiltered,
+        )
 
     def job(self, job_id: int):
         return self._cached(

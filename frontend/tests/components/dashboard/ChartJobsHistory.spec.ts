@@ -1,5 +1,7 @@
 import { describe, test, beforeEach, expect, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
+import { Chart } from 'chart.js/auto'
+import { useRuntimeStore } from '@/stores/runtime'
 import { init_plugins, getMockClusterDataPoller } from '../../lib/common'
 import ChartJobsHistogram from '@/components/dashboard/ChartJobsHistogram.vue'
 import metricsJobsHour from '../../assets/metrics-jobs-hour.json'
@@ -15,6 +17,14 @@ vi.mock('@/composables/DataPoller', () => ({
 describe('ChartJobsHistogram.vue', () => {
   beforeEach(() => {
     init_plugins()
+    useRuntimeStore().dashboard.reset()
+    mockClusterDataPoller.data.value = undefined
+    mockClusterDataPoller.unable.value = false
+    mockClusterDataPoller.loaded.value = true
+    mockClusterDataPoller.initialLoading.value = false
+    mockClusterDataPoller.refreshing.value = false
+    ;(mockClusterDataPoller.setCluster as ReturnType<typeof vi.fn>).mockClear()
+    ;(mockClusterDataPoller.setParam as ReturnType<typeof vi.fn>).mockClear()
   })
   test('should display jobs charts histogram', async () => {
     const wrapper = mount(ChartJobsHistogram, {
@@ -56,5 +66,41 @@ describe('ChartJobsHistogram.vue', () => {
     // Chart chart and placeholder are present in DOM
     expect(wrapper.find({ ref: 'chartCanvas' }).exists()).toBeFalsy()
     expect(wrapper.find('.ui-chart-skeleton').exists()).toBeFalsy()
+  })
+
+  test('refreshes jobs metrics with partition-scoped query', async () => {
+    mount(ChartJobsHistogram, {
+      props: {
+        cluster: 'foo'
+      }
+    })
+
+    useRuntimeStore().dashboard.partition = 'gpu'
+    await flushPromises()
+
+    expect(mockClusterDataPoller.setParam).toHaveBeenCalledWith({
+      range: 'hour',
+      partition: 'gpu'
+    })
+  })
+
+  test('clears jobs chart datasets before loading a new partition', async () => {
+    const wrapper = mount(ChartJobsHistogram, {
+      props: {
+        cluster: 'foo'
+      }
+    })
+
+    mockClusterDataPoller.data.value = metricsJobsHour as Record<MetricJobState, MetricValue[]>
+    await flushPromises()
+
+    const canvas = wrapper.get({ ref: 'chartCanvas' }).element as HTMLCanvasElement
+    const chart = Chart.getChart(canvas)
+    expect(chart?.data.datasets.length).toBeGreaterThan(0)
+
+    useRuntimeStore().dashboard.partition = 'debug'
+    await flushPromises()
+
+    expect(chart?.data.datasets).toHaveLength(0)
   })
 })

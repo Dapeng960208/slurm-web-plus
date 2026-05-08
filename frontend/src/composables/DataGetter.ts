@@ -6,7 +6,7 @@
  * SPDX-License-Identifier: MIT
  */
 
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch, toValue } from 'vue'
 import type { Ref } from 'vue'
 import {
   AuthenticationError,
@@ -17,6 +17,8 @@ import { useGatewayAPI } from '@/composables/GatewayAPI'
 import type { GatewayGenericAPIKey, GatewayAnyClusterApiKey } from '@/composables/GatewayAPI'
 import { useRuntimeStore } from '@/stores/runtime'
 import { useErrorsHandler } from '@/composables/ErrorsHandler'
+
+type GetterEnabled = boolean | Ref<boolean> | (() => boolean)
 
 export function useGatewayDataGetter<Type>(
   callback: GatewayGenericAPIKey,
@@ -68,13 +70,15 @@ export function useGatewayDataGetter<Type>(
 export function useClusterDataGetter<Type>(
   cluster: string,
   initialCallback: GatewayAnyClusterApiKey,
-  initialOtherParam?: string | number
+  initialOtherParam?: string | number,
+  enabled: GetterEnabled = true
 ) {
   let callback = initialCallback
   let otherParam = initialOtherParam
   const data: Ref<Type | undefined> = ref()
   const unable: Ref<boolean> = ref(false)
   const loaded: Ref<boolean> = ref(false)
+  let requestToken = 0
   const gateway = useGatewayAPI()
   const runtime = useRuntimeStore()
   const { reportAuthenticationError, reportPermissionError } = useErrorsHandler()
@@ -85,20 +89,32 @@ export function useClusterDataGetter<Type>(
   }
 
   async function get() {
+    if (!toValue(enabled)) {
+      data.value = undefined
+      unable.value = false
+      loaded.value = false
+      return
+    }
+
+    const currentToken = ++requestToken
     try {
       unable.value = false
+      let result: Type
       if (gateway.isValidGatewayClusterWithStringAPIKey(callback)) {
         const method = gateway[callback] as (cluster: string, param: string) => Promise<Type>
-        data.value = await method(cluster, otherParam as string)
+        result = await method(cluster, otherParam as string)
       } else if (gateway.isValidGatewayClusterWithNumberAPIKey(callback)) {
         const method = gateway[callback] as (cluster: string, param: number) => Promise<Type>
-        data.value = await method(cluster, otherParam as number)
+        result = await method(cluster, otherParam as number)
       } else {
         const method = gateway[callback] as (cluster: string) => Promise<Type>
-        data.value = await method(cluster)
+        result = await method(cluster)
       }
+      if (currentToken !== requestToken) return
+      data.value = result
       loaded.value = true
     } catch (error) {
+      if (currentToken !== requestToken) return
       if (error instanceof AuthenticationError) {
         reportAuthenticationError(error)
       } else if (error instanceof PermissionError) {
@@ -116,8 +132,18 @@ export function useClusterDataGetter<Type>(
     get()
   }
 
+  function setCluster(newCluster: string) {
+    cluster = newCluster
+    requestToken += 1
+    data.value = undefined
+    unable.value = false
+    loaded.value = false
+    get()
+  }
+
   function setParam(newOtherParam: string | number) {
     otherParam = newOtherParam
+    requestToken += 1
     loaded.value = false
     get()
   }
@@ -125,5 +151,18 @@ export function useClusterDataGetter<Type>(
   onMounted(() => {
     get()
   })
-  return { data, unable, loaded, setCallback, setParam }
+  watch(
+    () => toValue(enabled),
+    (isEnabled) => {
+      requestToken += 1
+      if (isEnabled) {
+        get()
+        return
+      }
+      data.value = undefined
+      unable.value = false
+      loaded.value = false
+    }
+  )
+  return { data, unable, loaded, setCallback, setCluster, setParam }
 }

@@ -21,6 +21,7 @@ let router
 describe('ChartJobsHistogram.vue', () => {
   beforeEach(() => {
     router = init_plugins()
+    useRuntimeStore().dashboard.reset()
     mockClusterDataPoller.data.value = undefined
     mockClusterDataPoller.unable.value = false
     mockClusterDataPoller.loaded.value = true
@@ -130,6 +131,50 @@ describe('ChartJobsHistogram.vue', () => {
 
     expect(useRuntimeStore().dashboard.chartResourcesType).toBe('memory')
     expect(mockClusterDataPoller.setCallback).toHaveBeenCalledWith('metrics_memory')
+  })
+
+  test('passes structured range and partition query on partition changes', async () => {
+    mount(ChartResourcesHistogram, {
+      props: {
+        cluster: 'foo'
+      }
+    })
+
+    useRuntimeStore().dashboard.partition = 'gpu'
+    await flushPromises()
+
+    expect(mockClusterDataPoller.setParam).toHaveBeenCalledWith({
+      range: 'hour',
+      partition: 'gpu'
+    })
+
+    useRuntimeStore().dashboard.range = 'day'
+    await flushPromises()
+
+    expect(mockClusterDataPoller.setParam).toHaveBeenLastCalledWith({
+      range: 'day',
+      partition: 'gpu'
+    })
+  })
+
+  test('clears existing chart datasets before refreshing for a new partition', async () => {
+    const wrapper = mount(ChartResourcesHistogram, {
+      props: {
+        cluster: 'foo'
+      }
+    })
+
+    mockClusterDataPoller.data.value = metricsNodesHour as Record<ChartMetricState, MetricValue[]>
+    await flushPromises()
+
+    const canvas = wrapper.get({ ref: 'chartCanvas' }).element as HTMLCanvasElement
+    const chart = Chart.getChart(canvas)
+    expect(chart?.data.datasets.length).toBeGreaterThan(0)
+
+    useRuntimeStore().dashboard.partition = 'debug'
+    await flushPromises()
+
+    expect(chart?.data.datasets).toHaveLength(0)
   })
 
   test('memory mode formats axis ticks and tooltip values in GB', async () => {

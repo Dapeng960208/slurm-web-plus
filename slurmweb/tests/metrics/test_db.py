@@ -26,6 +26,8 @@ class TestSlurmwebMetricsDB(unittest.TestCase):
     def test_request(self, mock_get):
         _, mock_get.return_value = mock_prometheus_response("nodes-hour")
         self.db.request("nodes", "hour")
+        request_url = mock_get.call_args.args[0]
+        self.assertIn("partition=''", request_url)
 
     @mock.patch("slurmweb.metrics.db.aiohttp.ClientSession.get")
     def test_request_memory(self, mock_get):
@@ -34,10 +36,24 @@ class TestSlurmwebMetricsDB(unittest.TestCase):
         self.assertCountEqual(result.keys(), ["allocated", "idle"])
 
     @mock.patch("slurmweb.metrics.db.aiohttp.ClientSession.get")
+    def test_request_partition(self, mock_get):
+        _, mock_get.return_value = mock_prometheus_response("nodes-hour")
+        self.db.request("nodes", "hour", partition="gpu")
+        request_url = mock_get.call_args.args[0]
+        self.assertIn("partition='gpu'", request_url)
+
+    @mock.patch("slurmweb.metrics.db.aiohttp.ClientSession.get")
     def test_request_users(self, mock_get):
         _, mock_get.return_value = mock_prometheus_response("users-hour")
         result = self.db.request("users", "hour")
         self.assertCountEqual(result.keys(), ["alice", "bob"])
+
+    @mock.patch("slurmweb.metrics.db.aiohttp.ClientSession.get")
+    def test_request_users_ignores_partition(self, mock_get):
+        _, mock_get.return_value = mock_prometheus_response("users-hour")
+        self.db.request("users", "hour", partition="gpu")
+        request_url = mock_get.call_args.args[0]
+        self.assertNotIn("partition='gpu'", request_url)
 
     @mock.patch("slurmweb.metrics.db.aiohttp.ClientSession.get")
     def test_request_node_history_metrics(self, mock_get):
@@ -80,6 +96,14 @@ class TestSlurmwebMetricsDB(unittest.TestCase):
             SlurmwebMetricsDBError, "^Empty result for query .*$"
         ):
             self.db.request("nodes", "hour")
+
+    @mock.patch("slurmweb.metrics.db.aiohttp.ClientSession.get")
+    def test_request_partition_empty_result(self, mock_get):
+        _, mock_get.return_value = mock_prometheus_response("unknown-metric")
+        result = self.db.request("jobs", "hour", partition="ghost")
+        self.assertIn("running", result)
+        self.assertEqual(result["running"], [])
+        self.assertEqual(result["unknown"], [])
 
     @mock.patch("slurmweb.metrics.db.aiohttp.ClientSession.get")
     def test_request_unknown_path(self, mock_get):

@@ -27,6 +27,7 @@
 - 修复 account 创建轻量 payload 未补 `organization`，导致 `slurmrestd` 按官方 schema 拒绝创建的问题
 - 修复 AI 对话页左侧聊天工作区未撑满和对话过程中面板下移的问题
 - 收紧 AI 写接口 payload 校验，避免 `account/update` 和 `qos/update` 继续绕过前端表单必填约束
+- 补齐 dashboard `stats` / `metrics` 的 `partition` query 接口契约、Gateway 透传测试与专题文档
 
 ## 2. 已完成项
 
@@ -41,6 +42,11 @@
 - 已补充多需求输入处理规则：
   - 用户一次提出多个需求、问题或 bug 时，AI 必须先整理并分类，再按主题分别处理
   - 提交前必须检查工作区并区分当前主题改动与其他未确认改动；确认后的当前主题改动按规范拆分提交，并至少完成一次本地提交
+- Dashboard 分区筛选接口契约已补齐：
+  - Agent `stats` 现在读取 `partition` query，并对作业数、运行数、节点数、核数、内存和 GPU 按分区结果重新聚合
+  - Agent `metrics/<metric>` 现在会在底层签名支持时把 `partition` 继续传给 `metrics_db.request`
+  - 若底层 `metrics_db.request` 仍是旧两参签名，Agent 会兼容回退到旧调用，避免多 Agent 合并顺序不同导致接口直接报错
+  - Gateway 继续复用统一 query string 透传逻辑，本轮只补 `/stats` 与 `/metrics/<metric>` 的透传回归测试
 - `user_tool_daily_stats` 聚合链路已完成重构：
   - 日表字段已切换为 `jobs_count`、`avg_memory_gb`、`max_memory_gb`、`median_memory_gb`、`avg_cpu_cores`、`avg_runtime_seconds`
   - 冗余字段 `memory_samples`、`cpu_samples`、`runtime_samples` 已从模型和迁移中移除
@@ -368,6 +374,10 @@
 - `docs/features/user-analytics/backend.md`
 - `docs/features/ai-audit-and-metrics-time-range/requirements.md`
 - `docs/features/ai-audit-and-metrics-time-range/test-plan.md`
+- `docs/features/dashboard-partition-filter/requirements.md`
+- `docs/features/dashboard-partition-filter/test-plan.md`
+- `docs/features/dashboard-partition-filter/backend.md`
+- `docs/features/dashboard-partition-filter/verification.md`
 - `docs/tracking/current-release.md`
 - `docs/tracking/error-log.md`
 
@@ -437,6 +447,7 @@
 - `.venv\Scripts\python.exe -m pytest -q`（收集阶段失败，阻塞见 `docs/tracking/error-log.md`：`slurmweb4.2` 参考测试树 / `racksdb`）
 - `cd frontend && npx vitest run`
 - `npm --prefix frontend run build`
+- `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/views/test_agent.py slurmweb/tests/views/test_agent_metrics_requests.py slurmweb/tests/views/test_gateway.py`
 
 待同步：
 

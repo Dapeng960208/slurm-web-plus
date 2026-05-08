@@ -1452,6 +1452,12 @@ export interface DateTimeWindowQuery {
   start: string
   end: string
 }
+export interface DashboardPartitionQuery {
+  partition?: string
+}
+export interface DashboardMetricsQuery extends DashboardPartitionQuery {
+  range: string
+}
 export type MetricResourceState =
   | 'idle'
   | 'mixed'
@@ -1611,6 +1617,28 @@ export type GatewayAnyClusterApiKey =
   | GatewayClusterWithNumberAPIKey
   | GatewayClusterWithStringAPIKey
 
+function buildDashboardQueryString(query?: DashboardPartitionQuery): string {
+  const params = new URLSearchParams()
+  if (query?.partition) {
+    params.append('partition', query.partition)
+  }
+  const result = params.toString()
+  return result ? `?${result}` : ''
+}
+
+function buildDashboardMetricsQueryString(query: string | DashboardMetricsQuery): string {
+  const params = new URLSearchParams()
+  if (typeof query === 'string') {
+    params.append('range', query)
+  } else {
+    params.append('range', query.range)
+    if (query.partition) {
+      params.append('partition', query.partition)
+    }
+  }
+  return `?${params.toString()}`
+}
+
 export function useGatewayAPI() {
   const restAPI = useRESTAPI()
   const runtimeConfiguration = useRuntimeConfiguration()
@@ -1682,8 +1710,10 @@ export function useGatewayAPI() {
     return await restAPI.get<unknown>(`/agents/${cluster}/analysis/diag`)
   }
 
-  async function stats(cluster: string): Promise<ClusterStats> {
-    const result = await restAPI.get<ClusterStatsResponse>(`/agents/${cluster}/stats`)
+  async function stats(cluster: string, query?: DashboardPartitionQuery): Promise<ClusterStats> {
+    const result = await restAPI.get<ClusterStatsResponse>(
+      `/agents/${cluster}/stats${buildDashboardQueryString(query)}`
+    )
     return {
       resources: {
         nodes: result.resources.nodes,
@@ -2133,46 +2163,46 @@ export function useGatewayAPI() {
 
   async function metrics_nodes(
     cluster: string,
-    last: string
+    query: string | DashboardMetricsQuery
   ): Promise<Record<MetricResourceState, MetricValue[]>> {
     return await restAPI.get<Record<MetricResourceState, MetricValue[]>>(
-      `/agents/${cluster}/metrics/nodes?range=${last}`
+      `/agents/${cluster}/metrics/nodes${buildDashboardMetricsQueryString(query)}`
     )
   }
 
   async function metrics_cores(
     cluster: string,
-    last: string
+    query: string | DashboardMetricsQuery
   ): Promise<Record<MetricResourceState, MetricValue[]>> {
     return await restAPI.get<Record<MetricResourceState, MetricValue[]>>(
-      `/agents/${cluster}/metrics/cores?range=${last}`
+      `/agents/${cluster}/metrics/cores${buildDashboardMetricsQueryString(query)}`
     )
   }
 
   async function metrics_gpus(
     cluster: string,
-    last: string
+    query: string | DashboardMetricsQuery
   ): Promise<Record<MetricResourceState, MetricValue[]>> {
     return await restAPI.get<Record<MetricResourceState, MetricValue[]>>(
-      `/agents/${cluster}/metrics/gpus?range=${last}`
+      `/agents/${cluster}/metrics/gpus${buildDashboardMetricsQueryString(query)}`
     )
   }
 
   async function metrics_memory(
     cluster: string,
-    last: string
+    query: string | DashboardMetricsQuery
   ): Promise<Record<MetricMemoryState, MetricValue[]>> {
     return await restAPI.get<Record<MetricMemoryState, MetricValue[]>>(
-      `/agents/${cluster}/metrics/memory?range=${last}`
+      `/agents/${cluster}/metrics/memory${buildDashboardMetricsQueryString(query)}`
     )
   }
 
   async function metrics_jobs(
     cluster: string,
-    last: string
+    query: string | DashboardMetricsQuery
   ): Promise<Record<MetricJobState, MetricValue[]>> {
     return await restAPI.get<Record<MetricJobState, MetricValue[]>>(
-      `/agents/${cluster}/metrics/jobs?range=${last}`
+      `/agents/${cluster}/metrics/jobs${buildDashboardMetricsQueryString(query)}`
     )
   }
 

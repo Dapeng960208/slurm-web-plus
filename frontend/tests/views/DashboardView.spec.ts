@@ -1,35 +1,63 @@
 import { describe, test, beforeEach, expect, vi } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { flushPromises, mount } from '@vue/test-utils'
+import { ref } from 'vue'
 import DashboardView from '@/views/DashboardView.vue'
 import { useRuntimeStore } from '@/stores/runtime'
-import type { ClusterStats } from '@/composables/GatewayAPI'
+import type { ClusterPartition, ClusterStats } from '@/composables/GatewayAPI'
 import ErrorAlert from '@/components/ErrorAlert.vue'
-import DashboardCharts from '@/components/dashboard/DashboardCharts.vue'
 import { init_plugins, getMockClusterDataPoller } from '../lib/common'
 import stats from '../assets/stats.json'
 
 const mockClusterDataPoller = getMockClusterDataPoller<ClusterStats>()
+const mockPartitionsGetter = {
+  data: ref([{ name: 'debug', node_sets: 'a' }, { name: 'gpu', node_sets: 'b' }] as ClusterPartition[]),
+  unable: ref(false),
+  loaded: ref(true),
+  setCluster: vi.fn()
+}
 
 vi.mock('@/composables/DataPoller', () => ({
   useClusterDataPoller: () => mockClusterDataPoller
 }))
 
+vi.mock('@/composables/DataGetter', () => ({
+  useClusterDataGetter: () => mockPartitionsGetter
+}))
+
 describe('DashboardView.vue', () => {
+  let router: ReturnType<typeof init_plugins>
+  let runtimeStore: ReturnType<typeof useRuntimeStore>
+
   beforeEach(() => {
-    init_plugins()
-    useRuntimeStore().availableClusters = [
+    router = init_plugins()
+    runtimeStore = useRuntimeStore()
+    mockClusterDataPoller.data.value = stats
+    mockClusterDataPoller.unable.value = false
+    mockClusterDataPoller.loaded.value = true
+    mockClusterDataPoller.initialLoading.value = false
+    mockClusterDataPoller.refreshing.value = false
+    ;(mockClusterDataPoller.setCluster as ReturnType<typeof vi.fn>).mockClear()
+    ;(mockClusterDataPoller.setParam as ReturnType<typeof vi.fn>).mockClear()
+    ;(mockPartitionsGetter.setCluster as ReturnType<typeof vi.fn>).mockClear()
+    mockPartitionsGetter.data.value = [
+      { name: 'debug', node_sets: 'a' },
+      { name: 'gpu', node_sets: 'b' }
+    ]
+    mockPartitionsGetter.loaded.value = true
+    runtimeStore.availableClusters = [
       {
         name: 'foo',
-        permissions: { roles: [], actions: [] },
+        permissions: { roles: [], actions: ['view-partitions'] },
         racksdb: true,
         infrastructure: 'foo',
         metrics: true,
         cache: true
       }
     ]
+    runtimeStore.currentCluster = runtimeStore.availableClusters[0]
+    runtimeStore.dashboard.reset()
   })
   test('should display dashboard with metrics', () => {
-    mockClusterDataPoller.data.value = stats
     const wrapper = mount(DashboardView, {
       props: {
         cluster: 'foo'
@@ -55,12 +83,117 @@ describe('DashboardView.vue', () => {
     expect(wrapper.get('span#metric-cores').text()).toBe(stats.resources.cores.toString())
     expect(wrapper.get('span#metric-jobs-running').text()).toBe(stats.jobs.running.toString())
     expect(wrapper.get('span#metric-jobs-total').text()).toBe(stats.jobs.total.toString())
-    // Check presence of login service message component
-    wrapper.getComponent(DashboardCharts)
+    expect(wrapper.html()).toContain('dashboard-charts-stub')
   })
+  test('restores partition query and shows partition selector', async () => {
+    await router.setQuery({ partition: 'gpu' })
+
+    const wrapper = mount(DashboardView, {
+      props: {
+        cluster: 'foo'
+      },
+      global: {
+        stubs: {
+          DashboardCharts: true
+        }
+      }
+    })
+
+    await flushPromises()
+
+    expect(runtimeStore.dashboard.partition).toBe('gpu')
+    expect((wrapper.get('#dashboard-partition').element as HTMLSelectElement).value).toBe('gpu')
+  })
+
+  test('keeps a valid partition query until partitions finish loading', async () => {
+    mockPartitionsGetter.loaded.value = false
+    mockPartitionsGetter.data.value = []
+    await router.setQuery({ partition: 'gpu' })
+
+    mount(DashboardView, {
+      props: {
+        cluster: 'foo'
+      },
+      global: {
+        stubs: {
+          DashboardCharts: true
+        }
+      }
+    })
+
+    await flushPromises()
+    expect(runtimeStore.dashboard.partition).toBe('gpu')
+
+    mockPartitionsGetter.data.value = [{ name: 'gpu', node_sets: 'b' }]
+    mockPartitionsGetter.loaded.value = true
+    await flushPromises()
+
+    expect(runtimeStore.dashboard.partition).toBe('gpu')
+  })
+
+  test('changing partition refreshes stats and syncs query', async () => {
+    const wrapper = mount(DashboardView, {
+      props: {
+        cluster: 'foo'
+      },
+      global: {
+        stubs: {
+          DashboardCharts: true
+        }
+      }
+    })
+
+    await wrapper.get('#dashboard-partition').setValue('debug')
+
+    expect(mockClusterDataPoller.setParam).toHaveBeenCalledWith({ partition: 'debug' })
+    expect(router.push).toHaveBeenCalledWith({
+      name: 'dashboard',
+      query: { partition: 'debug' }
+    })
+
+    await wrapper.get('#dashboard-partition').setValue('')
+
+    expect(mockClusterDataPoller.setParam).toHaveBeenCalledWith(undefined)
+    expect(router.push).toHaveBeenLastCalledWith({
+      name: 'dashboard',
+      query: {}
+    })
+  })
+
+  test('hides partition selector and ignores partition query without permission', async () => {
+    runtimeStore.availableClusters = [
+      {
+        name: 'foo',
+        permissions: { roles: [], actions: [], rules: [] },
+        racksdb: true,
+        infrastructure: 'foo',
+        metrics: true,
+        cache: true
+      }
+    ]
+    runtimeStore.currentCluster = runtimeStore.availableClusters[0]
+    await router.setQuery({ partition: 'gpu' })
+
+    const wrapper = mount(DashboardView, {
+      props: {
+        cluster: 'foo'
+      },
+      global: {
+        stubs: {
+          DashboardCharts: true
+        }
+      }
+    })
+
+    await flushPromises()
+
+    expect(wrapper.find('#dashboard-partition').exists()).toBe(false)
+    expect(runtimeStore.dashboard.partition).toBe('')
+  })
+
   test('should not display charts when metrics are disabled', () => {
     // Disable metrics on cluster foo
-    useRuntimeStore().availableClusters[0].metrics = false
+    runtimeStore.availableClusters[0].metrics = false
     const wrapper = mount(DashboardView, {
       props: {
         cluster: 'foo'
@@ -72,7 +205,7 @@ describe('DashboardView.vue', () => {
       }
     })
     // Check absence of charts component
-    expect(wrapper.findComponent(DashboardCharts).exists()).toBe(false)
+    expect(wrapper.html()).not.toContain('dashboard-charts-stub')
   })
   test('should display error when unable to get cluster stats', () => {
     mockClusterDataPoller.unable.value = true
@@ -90,5 +223,63 @@ describe('DashboardView.vue', () => {
     expect(wrapper.getComponent(ErrorAlert).text()).toContain(
       'Unable to retrieve statistics from cluster foo'
     )
+  })
+
+  test('updates partition source when cluster prop changes', async () => {
+    runtimeStore.availableClusters.push({
+      name: 'bar',
+      permissions: { roles: [], actions: ['view-partitions'] },
+      racksdb: true,
+      infrastructure: 'bar',
+      metrics: true,
+      cache: true
+    })
+    const wrapper = mount(DashboardView, {
+      props: {
+        cluster: 'foo'
+      },
+      global: {
+        stubs: {
+          DashboardCharts: true
+        }
+      }
+    })
+
+    await wrapper.setProps({ cluster: 'bar' })
+    await flushPromises()
+
+    expect(mockClusterDataPoller.setCluster).toHaveBeenCalledWith('bar')
+    expect(mockPartitionsGetter.setCluster).toHaveBeenCalledWith('bar')
+  })
+
+  test('clears partition selection when switching to a cluster without permission', async () => {
+    runtimeStore.availableClusters.push({
+      name: 'bar',
+      permissions: { roles: [], actions: [] },
+      racksdb: true,
+      infrastructure: 'bar',
+      metrics: true,
+      cache: true
+    })
+    runtimeStore.availableClusters[0].permissions.actions = []
+    runtimeStore.currentCluster = runtimeStore.availableClusters[0]
+    runtimeStore.dashboard.partition = 'gpu'
+
+    const wrapper = mount(DashboardView, {
+      props: {
+        cluster: 'foo'
+      },
+      global: {
+        stubs: {
+          DashboardCharts: true
+        }
+      }
+    })
+
+    await wrapper.setProps({ cluster: 'bar' })
+    await flushPromises()
+
+    expect(wrapper.find('#dashboard-partition').exists()).toBe(false)
+    expect(runtimeStore.dashboard.partition).toBe('')
   })
 })

@@ -23,6 +23,11 @@
 - AI 审计与指标时间窗
   - [需求说明](./features/ai-audit-and-metrics-time-range/requirements.md)
   - [测试计划](./features/ai-audit-and-metrics-time-range/test-plan.md)
+- Dashboard 分区筛选
+  - [需求说明](./features/dashboard-partition-filter/requirements.md)
+  - [测试计划](./features/dashboard-partition-filter/test-plan.md)
+  - [后端说明](./features/dashboard-partition-filter/backend.md)
+  - [验证说明](./features/dashboard-partition-filter/verification.md)
 - 访问控制
   - [需求说明](./features/access-control/requirements.md)
   - [测试计划](./features/access-control/test-plan.md)

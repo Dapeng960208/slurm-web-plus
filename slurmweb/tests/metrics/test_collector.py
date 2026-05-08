@@ -127,6 +127,44 @@ class TestSlurmWebMetricsCollector(unittest.TestCase):
 
     def test_collect_success_with_cache(self):
         """Test successful collection with cache enabled."""
+        self.mock_slurmrestd.partitions.return_value = [{"name": "cpu"}, {"name": "gpu"}]
+        self.mock_slurmrestd.resources_states.side_effect = [
+            (
+                {"idle": 5, "allocated": 3, "down": 1},
+                {"idle": 20, "allocated": 12, "down": 4},
+                {"idle": 2, "allocated": 1, "down": 0},
+                {"idle": 24.0, "allocated": 8.0, "mixed": 4.0},
+                9,
+                36,
+                3,
+                36.0,
+            ),
+            (
+                {"idle": 2, "allocated": 1, "down": 0},
+                {"idle": 8, "allocated": 4, "down": 0},
+                {"idle": 1, "allocated": 0, "down": 0},
+                {"idle": 8.0, "allocated": 4.0},
+                3,
+                12,
+                1,
+                12.0,
+            ),
+            (
+                {"idle": 1, "allocated": 2, "down": 1},
+                {"idle": 4, "allocated": 8, "down": 4},
+                {"idle": 0, "allocated": 1, "down": 0},
+                {"idle": 4.0, "allocated": 8.0},
+                4,
+                16,
+                1,
+                12.0,
+            ),
+        ]
+        self.mock_slurmrestd.jobs_states.side_effect = [
+            ({"running": 10, "pending": 5, "completed": 100}, 115),
+            ({"running": 2, "pending": 1, "completed": 20}, 23),
+            ({"running": 3, "pending": 2, "completed": 30}, 35),
+        ]
 
         # Collect metrics
         metrics = list(self.collector.collect())
@@ -135,12 +173,14 @@ class TestSlurmWebMetricsCollector(unittest.TestCase):
         self.assertEqual(len(metrics), 14)  # 10 slurm metrics + 4 cache metrics
 
         # Verify slurmrestd methods were called
-        self.mock_slurmrestd.resources_states.assert_called_once()
-        self.mock_slurmrestd.jobs_states.assert_called_once()
+        self.assertEqual(self.mock_slurmrestd.resources_states.call_count, 3)
+        self.assertEqual(self.mock_slurmrestd.jobs_states.call_count, 3)
+        self.mock_slurmrestd.partitions.assert_called_once()
         self.mock_cache.metrics.assert_called_once()
 
     def test_collect_success_without_cache(self):
         """Test successful collection without cache."""
+        self.mock_slurmrestd.partitions.return_value = []
 
         # Disable cache
         self.collector.cache = None
@@ -154,8 +194,57 @@ class TestSlurmWebMetricsCollector(unittest.TestCase):
         # Verify slurmrestd methods were called
         self.mock_slurmrestd.resources_states.assert_called_once()
         self.mock_slurmrestd.jobs_states.assert_called_once()
+        self.mock_slurmrestd.partitions.assert_called_once()
+
+    def test_collect_emits_partition_labels(self):
+        self.mock_slurmrestd.partitions.return_value = [{"name": "cpu"}]
+        self.mock_slurmrestd.resources_states.side_effect = [
+            (
+                {"idle": 5, "allocated": 3},
+                {"idle": 20, "allocated": 12},
+                {"idle": 2, "allocated": 1},
+                {"idle": 24.0, "allocated": 8.0},
+                9,
+                36,
+                3,
+                32.0,
+            ),
+            (
+                {"idle": 2, "allocated": 1},
+                {"idle": 8, "allocated": 4},
+                {"idle": 1, "allocated": 0},
+                {"idle": 8.0, "allocated": 4.0},
+                3,
+                12,
+                1,
+                12.0,
+            ),
+        ]
+        self.mock_slurmrestd.jobs_states.side_effect = [
+            ({"running": 10, "pending": 5}, 15),
+            ({"running": 2, "pending": 1}, 3),
+        ]
+
+        metrics = {metric.name: metric for metric in self.collector.collect()}
+
+        node_samples = {
+            (sample.labels["state"], sample.labels["partition"]): sample.value
+            for sample in metrics["slurm_nodes"].samples
+            if sample.name == "slurm_nodes"
+        }
+        self.assertEqual(node_samples[("idle", "")], 5)
+        self.assertEqual(node_samples[("idle", "cpu")], 2)
+
+        jobs_total_samples = {
+            sample.labels["partition"]: sample.value
+            for sample in metrics["slurm_jobs_total"].samples
+            if sample.name == "slurm_jobs_total"
+        }
+        self.assertEqual(jobs_total_samples[""], 15)
+        self.assertEqual(jobs_total_samples["cpu"], 3)
 
     def test_collect_success_with_user_submission_metric_enabled(self):
+        self.mock_slurmrestd.partitions.return_value = []
         with mock.patch("prometheus_client.REGISTRY"):
             collector = SlurmWebMetricsCollector(
                 slurmrestd=self.mock_slurmrestd,
@@ -185,6 +274,7 @@ class TestSlurmWebMetricsCollector(unittest.TestCase):
         self.assertEqual(samples, {"alice": 3, "bob": 1})
 
     def test_collect_skips_user_submission_metric_when_disabled(self):
+        self.mock_slurmrestd.partitions.return_value = []
         with mock.patch("prometheus_client.REGISTRY"):
             collector = SlurmWebMetricsCollector(
                 slurmrestd=self.mock_slurmrestd,

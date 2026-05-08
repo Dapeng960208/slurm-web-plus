@@ -6,6 +6,7 @@
 
 from functools import wraps
 from typing import Any, Callable, Iterable, Tuple, Union
+import inspect
 import logging
 from datetime import datetime, timezone
 
@@ -493,10 +494,17 @@ def slurmrest(method: str, *args: Tuple[Any, ...]):
     legacy_action="view-stats",
 )
 def stats():
+    partition = request.args.get("partition")
+    query = {"partition": partition} if partition else None
     total = 0
     running = 0
 
-    for job in slurmrest("jobs"):
+    jobs = (
+        current_app.slurmrestd.jobs(query=query)
+        if query is not None
+        else slurmrest("jobs")
+    )
+    for job in jobs:
         total += 1
         if "RUNNING" in job["job_state"]:
             running += 1
@@ -507,7 +515,14 @@ def stats():
     memory_allocated = 0
     gpus = 0
     nodes_getter = getattr(current_app.slurmrestd, "nodes_unfiltered", None)
-    nodes_data = nodes_getter() if callable(nodes_getter) else slurmrest("nodes")
+    if callable(nodes_getter):
+        nodes_data = nodes_getter(query=query) if query is not None else nodes_getter()
+    else:
+        nodes_data = (
+            current_app.slurmrestd.nodes(query=query)
+            if query is not None
+            else slurmrest("nodes")
+        )
     for node in nodes_data:
         nodes += 1
         cores += node["cpus"]
@@ -900,9 +915,19 @@ def metrics(metric):
     # Send metrics from DB
 
     try:
-        return jsonify(
-            current_app.metrics_db.request(metric, request.args.get("range", "hour"))
-        )
+        metric_range = request.args.get("range", "hour")
+        partition = request.args.get("partition")
+        metrics_request = current_app.metrics_db.request
+        request_signature = inspect.signature(metrics_request)
+        supports_partition = False
+        if partition is not None:
+            supports_partition = "partition" in request_signature.parameters or any(
+                parameter.kind == inspect.Parameter.VAR_KEYWORD
+                for parameter in request_signature.parameters.values()
+            )
+        if partition is not None and supports_partition:
+            return jsonify(metrics_request(metric, metric_range, partition=partition))
+        return jsonify(metrics_request(metric, metric_range))
     except SlurmwebMetricsDBError as err:
         logger.warning(str(err))
         abort(500, str(err))
