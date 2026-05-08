@@ -14,7 +14,7 @@ class TestAccessControlStore(unittest.TestCase):
     def test_normalize_legacy_role_actions_moves_removed_actions_into_permissions(self):
         store = AccessControlStore(settings=mock.Mock(), legacy_permission_map={
             "edit-own-jobs": ["jobs:edit:self"],
-            "view-ai": ["ai:view:*", "admin/ai:view:*"],
+            "view-ai": ["ai:view:*"],
             "admin-manage": ["*:*:*"],
         })
         conn = mock.MagicMock()
@@ -40,6 +40,6 @@ class TestAccessControlStore(unittest.TestCase):
         self.assertEqual(update_call.args[1][0].adapted, ["admin-manage"])
         self.assertCountEqual(
             update_call.args[1][1].adapted,
-            ["jobs:view:self", "jobs:edit:self", "ai:view:*", "admin/ai:view:*", "*:*:*"],
+            ["jobs:view:self", "jobs:edit:self", "ai:view:*", "*:*:*"],
         )
         conn.commit.assert_called_once_with()

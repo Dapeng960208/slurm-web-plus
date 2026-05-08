@@ -183,6 +183,7 @@ PERMISSION_CATALOG = [
 
 DEFAULT_LEGACY_PERMISSION_MAP = {
     "view-stats": ["dashboard:view:*", "analysis:view:*"],
+    "view-ai": ["ai:view:*"],
     "view-jobs": ["jobs:view:*"],
     "view-history-jobs": ["jobs-history:view:*"],
     "view-nodes": ["resources:view:*"],
@@ -330,6 +331,7 @@ def default_seed_roles() -> List[Dict[str, object]]:
     user_rules = [
         "dashboard:view:*",
         "analysis:view:*",
+        "ai:view:*",
         "jobs:view:self",
         "jobs:edit:self",
         "jobs:delete:self",

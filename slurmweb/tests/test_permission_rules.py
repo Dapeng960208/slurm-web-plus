@@ -60,10 +60,10 @@ class TestPermissionRules(unittest.TestCase):
             "cancel-own-jobs",
             "roles-view",
             "roles-manage",
-            "view-ai",
             "manage-ai",
         ]:
             self.assertNotIn(action, DEFAULT_LEGACY_PERMISSION_MAP)
+        self.assertCountEqual(DEFAULT_LEGACY_PERMISSION_MAP["view-ai"], ["ai:view:*"])
         self.assertCountEqual(DEFAULT_LEGACY_PERMISSION_MAP["admin-manage"], ["*:*:*"])
 
     def test_default_seed_roles_grant_jobs_self_to_user_and_global_read_edit_to_admin(self):
@@ -74,7 +74,7 @@ class TestPermissionRules(unittest.TestCase):
         self.assertIn("jobs:delete:self", roles["user"])
         self.assertIn("user/analysis:view:self", roles["user"])
         self.assertNotIn("jobs:view:*", roles["user"])
-        self.assertNotIn("ai:view:*", roles["user"])
+        self.assertIn("ai:view:*", roles["user"])
         self.assertNotIn("resources:edit:*", roles["user"])
         self.assertNotIn("accounts:delete:*", roles["user"])
         self.assertNotIn("admin/system:view:*", roles["user"])

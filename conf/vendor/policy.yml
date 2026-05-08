@@ -2,6 +2,8 @@
 actions:
   view-stats: |
     View general cluster statistics in home dashboard and clusters list.
+  view-ai: |
+    Access the cluster AI workspace for regular end users.
   view-jobs: |
     Get _Jobs_ entry in main menu and permission to view all users jobs in
     queue and all jobs details.

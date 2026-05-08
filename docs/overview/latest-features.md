@@ -653,6 +653,8 @@
 
 - `/:cluster/ai` 使用 `ai:view:*`
 - `/:cluster/admin/ai` 使用 `admin/ai:view|edit|delete:*`
+- 默认 `user` 角色现已包含 `ai:view:*`，普通用户可见并可使用 `AI`
+- 没有任一 `admin/*` 或 `*:*:*` 权限的普通用户不会看到 `Admin` 入口，也不能进入 `/:cluster/admin/*`
 - `/:cluster/admin/cache` 使用 `admin/cache:view|edit:*`
 - `/:cluster/admin/ldap-cache` 使用 `admin/ldap-cache:view|edit:*`
 - `/:cluster/admin/access-control` 使用 `admin/access-control:view|edit|delete:*`

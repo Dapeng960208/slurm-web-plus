@@ -28,6 +28,7 @@
 - 修复 AI 对话页左侧聊天工作区未撑满和对话过程中面板下移的问题
 - 收紧 AI 写接口 payload 校验，避免 `account/update` 和 `qos/update` 继续绕过前端表单必填约束
 - 补齐 dashboard `stats` / `metrics` 的 `partition` query 接口契约、Gateway 透传测试与专题文档
+- 修复普通用户导航权限异常：普通用户恢复默认 `AI` 入口和 `ai:view:*` 能力，同时没有 `admin/*` / `*:*:*` 时彻底隐藏并禁止进入 `Admin`
 
 ## 2. 已完成项
 
