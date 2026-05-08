@@ -53,7 +53,7 @@ function changePageSize(event: Event) {
 
 <template>
   <div
-    class="flex flex-col gap-3 border-t border-[rgba(80,105,127,0.08)] px-4 py-2.5 sm:flex-row sm:items-center sm:justify-between sm:px-5"
+    class="ui-results-pagination flex flex-col gap-3 border-t border-[rgba(80,105,127,0.08)] px-4 py-2.5 sm:flex-row sm:items-center sm:justify-between sm:px-5"
   >
     <p class="text-sm text-[var(--color-brand-muted)]">
       Showing

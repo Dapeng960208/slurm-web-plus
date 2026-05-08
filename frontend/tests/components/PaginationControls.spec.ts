@@ -14,6 +14,7 @@ describe('PaginationControls.vue', () => {
     })
 
     expect(wrapper.text()).toContain('Showing 1 to 20 of 80 jobs')
+    expect(wrapper.classes()).toContain('ui-results-pagination')
 
     await wrapper.get('select').setValue('50')
 

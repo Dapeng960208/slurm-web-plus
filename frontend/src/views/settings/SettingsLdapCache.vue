@@ -32,8 +32,6 @@ const router = useRouter()
 const pageSize = ref(DEFAULT_PAGE_SIZE)
 const isAdminRoute = computed(() => String(route.name ?? '').startsWith('admin-'))
 const tabsComponent = computed(() => (isAdminRoute.value ? AdminTabs : SettingsTabs))
-const headerComponent = computed(() => (isAdminRoute.value ? AdminHeader : SettingsHeader))
-
 const clusterUsers = reactive<Record<string, CachedLdapUser[]>>({})
 const clusterTotals = reactive<Record<string, number>>({})
 const clusterPages = reactive<Record<string, number>>({})
@@ -148,13 +146,6 @@ onMounted(async () => {
       entry="LDAP Cache"
       :cluster="runtimeStore.currentCluster?.name ?? runtimeStore.availableClusters[0]?.name ?? ''"
     />
-    <div class="ui-panel ui-section">
-      <component
-        :is="headerComponent"
-        title="LDAP Cache"
-        description="Cached LDAP users persisted in the local database for each cluster."
-      />
-    </div>
 
     <InfoAlert v-if="!runtimeConfiguration.authentication">
       LDAP authentication is disabled, so LDAP cache data is unavailable.
@@ -164,138 +155,131 @@ onMounted(async () => {
     </InfoAlert>
 
     <div v-else class="ui-section-stack">
-      <div
-        v-for="cluster in clusters"
-        :key="cluster.name"
-        class="ui-panel ui-section"
-      >
-      <div class="mb-4">
-        <p class="ui-page-kicker">LDAP Cache</p>
-        <h3 class="text-xl font-bold text-[var(--color-brand-ink-strong)]">
-          Cluster {{ cluster.name }}
-        </h3>
-      </div>
+      <div v-for="cluster in clusters" :key="cluster.name" class="ui-panel ui-section">
+        <InfoAlert
+          v-if="
+            !runtimeStore.hasRoutePermission(
+              cluster.name,
+              isAdminRoute ? 'admin/ldap-cache' : 'settings/ldap-cache',
+              'view'
+            )
+          "
+        >
+          No permission to get LDAP cache information on this cluster.
+        </InfoAlert>
+        <InfoAlert v-else-if="!cluster.database">
+          Database support is disabled on this cluster.
+        </InfoAlert>
+        <div v-else class="space-y-4">
+          <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div class="w-full max-w-xl">
+              <label
+                :for="`ldap-cache-query-${cluster.name}`"
+                class="mb-2 block text-sm font-semibold text-[var(--color-brand-ink-strong)]"
+              >
+                Search by username
+              </label>
+              <div class="flex flex-col gap-3 sm:flex-row">
+                <input
+                  :id="`ldap-cache-query-${cluster.name}`"
+                  v-model="clusterQueries[cluster.name]"
+                  type="text"
+                  class="block w-full rounded-[18px] border border-[rgba(80,105,127,0.16)] bg-white px-4 py-3 text-sm text-[var(--color-brand-ink-strong)] shadow-[var(--shadow-soft)] outline-hidden focus:border-[rgba(182,232,44,0.65)] focus:ring-4 focus:ring-[rgba(182,232,44,0.18)]"
+                  placeholder="Search username..."
+                  @keyup.enter="searchClusterUsers(cluster)"
+                />
+                <button type="button" class="ui-button-primary" @click="searchClusterUsers(cluster)">
+                  Search
+                </button>
+                <button type="button" class="ui-button-secondary" @click="resetClusterUsers(cluster)">
+                  Reset
+                </button>
+              </div>
+            </div>
 
-      <InfoAlert
-        v-if="
-          !runtimeStore.hasRoutePermission(
-            cluster.name,
-            isAdminRoute ? 'admin/ldap-cache' : 'settings/ldap-cache',
-            'view'
-          )
-        "
-      >
-        No permission to get LDAP cache information on this cluster.
-      </InfoAlert>
-      <InfoAlert v-else-if="!cluster.database">
-        Database support is disabled on this cluster.
-      </InfoAlert>
-      <div v-else class="space-y-4">
-        <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div class="w-full max-w-xl">
-            <label
-              :for="`ldap-cache-query-${cluster.name}`"
-              class="mb-2 block text-sm font-semibold text-[var(--color-brand-ink-strong)]"
+            <div
+              v-if="!clusterLoading[cluster.name] && !clusterErrors[cluster.name]"
+              class="text-sm text-[var(--color-brand-muted)]"
             >
-              Search by username
-            </label>
-            <div class="flex flex-col gap-3 sm:flex-row">
-              <input
-                :id="`ldap-cache-query-${cluster.name}`"
-                v-model="clusterQueries[cluster.name]"
-                type="text"
-                class="block w-full rounded-[18px] border border-[rgba(80,105,127,0.16)] bg-white px-4 py-3 text-sm text-[var(--color-brand-ink-strong)] shadow-[var(--shadow-soft)] outline-hidden focus:border-[rgba(182,232,44,0.65)] focus:ring-4 focus:ring-[rgba(182,232,44,0.18)]"
-                placeholder="Search username..."
-                @keyup.enter="searchClusterUsers(cluster)"
-              />
-              <button type="button" class="ui-button-primary" @click="searchClusterUsers(cluster)">
-                Search
-              </button>
-              <button type="button" class="ui-button-secondary" @click="resetClusterUsers(cluster)">
-                Reset
-              </button>
+              {{ clusterTotals[cluster.name] ?? 0 }} user{{ (clusterTotals[cluster.name] ?? 0) === 1 ? '' : 's' }} found
             </div>
           </div>
 
           <div
-            v-if="!clusterLoading[cluster.name] && !clusterErrors[cluster.name]"
-            class="text-sm text-[var(--color-brand-muted)]"
+            v-if="clusterLoading[cluster.name] || clusterLoaded[cluster.name] !== true"
+            class="text-[var(--color-brand-muted)]"
           >
-            {{ clusterTotals[cluster.name] ?? 0 }} user{{ (clusterTotals[cluster.name] ?? 0) === 1 ? '' : 's' }} found
+            <LoadingSpinner :size="5" />
+            Loading cached LDAP users...
+          </div>
+          <ErrorAlert v-else-if="clusterErrors[cluster.name]">
+            {{ clusterErrors[cluster.name] }}
+          </ErrorAlert>
+          <InfoAlert v-else-if="(clusterTotals[cluster.name] ?? 0) === 0">
+            No cached LDAP users found on this cluster.
+          </InfoAlert>
+          <div v-else class="ui-table-shell ui-results-card">
+            <div class="ui-table-scroll">
+              <div class="ui-table-scroll-inner">
+                <table class="ui-table min-w-full">
+                  <thead>
+                    <tr>
+                      <th scope="col" class="py-3.5 pr-3 pl-6 text-left">Username</th>
+                      <th scope="col" class="px-3 py-3.5 text-left">Full name</th>
+                      <th scope="col" class="px-3 py-3.5 text-left">Shortcuts</th>
+                    </tr>
+                  </thead>
+                  <tbody class="text-sm text-[var(--color-brand-muted)]">
+                    <tr v-for="user in clusterUsers[cluster.name]" :key="user.username">
+                      <td class="py-3 pr-3 pl-6 font-medium whitespace-nowrap text-[var(--color-brand-ink-strong)]">
+                        {{ user.username }}
+                      </td>
+                      <td class="px-3 py-3 whitespace-nowrap">{{ user.fullname ?? '-' }}</td>
+                      <td class="px-3 py-3">
+                        <div class="flex flex-wrap gap-2">
+                          <RouterLink
+                            :to="{ name: 'user', params: { cluster: cluster.name, user: user.username } }"
+                            class="ui-button-secondary"
+                          >
+                            View user
+                          </RouterLink>
+                          <RouterLink
+                            v-if="cluster.user_metrics"
+                            :to="{
+                              name: 'user',
+                              params: { cluster: cluster.name, user: user.username },
+                              query: { section: 'analysis' }
+                            }"
+                            class="ui-button-secondary"
+                          >
+                            Open analysis
+                          </RouterLink>
+                          <RouterLink
+                            v-if="runtimeStore.hasRoutePermission(cluster.name, 'jobs-history', 'view')"
+                            :to="{ name: 'jobs-history', params: { cluster: cluster.name }, query: { user: user.username } }"
+                            class="ui-button-secondary"
+                          >
+                            View history jobs
+                          </RouterLink>
+                        </div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div class="mt-3">
+              <PaginationControls
+                :page="currentPage(cluster.name)"
+                :page-size="pageSize"
+                :total="clusterTotals[cluster.name] ?? 0"
+                item-label="user"
+                @update:page="updateClusterPage(cluster, $event)"
+                @update:page-size="updatePageSize"
+              />
+            </div>
           </div>
         </div>
-
-        <div
-          v-if="clusterLoading[cluster.name] || clusterLoaded[cluster.name] !== true"
-          class="text-[var(--color-brand-muted)]"
-        >
-          <LoadingSpinner :size="5" />
-          Loading cached LDAP users...
-        </div>
-        <ErrorAlert v-else-if="clusterErrors[cluster.name]">
-          {{ clusterErrors[cluster.name] }}
-        </ErrorAlert>
-        <InfoAlert v-else-if="(clusterTotals[cluster.name] ?? 0) === 0">
-          No cached LDAP users found on this cluster.
-        </InfoAlert>
-        <div v-else class="ui-table-shell overflow-x-auto">
-          <div class="inline-block min-w-full align-middle">
-            <table class="ui-table min-w-full">
-              <thead>
-                <tr>
-                  <th scope="col" class="py-3.5 pr-3 pl-6 text-left">Username</th>
-                  <th scope="col" class="px-3 py-3.5 text-left">Full name</th>
-                  <th scope="col" class="px-3 py-3.5 text-left">Shortcuts</th>
-                </tr>
-              </thead>
-              <tbody class="text-sm text-[var(--color-brand-muted)]">
-                <tr v-for="user in clusterUsers[cluster.name]" :key="user.username">
-                  <td class="py-3 pr-3 pl-6 font-medium whitespace-nowrap text-[var(--color-brand-ink-strong)]">
-                    {{ user.username }}
-                  </td>
-                  <td class="px-3 py-3 whitespace-nowrap">{{ user.fullname ?? '-' }}</td>
-                  <td class="px-3 py-3">
-                    <div class="flex flex-wrap gap-2">
-                      <RouterLink
-                        :to="{ name: 'user', params: { cluster: cluster.name, user: user.username } }"
-                        class="ui-button-secondary"
-                      >
-                        View user
-                      </RouterLink>
-                      <RouterLink
-                        v-if="cluster.user_metrics"
-                        :to="{
-                          name: 'user',
-                          params: { cluster: cluster.name, user: user.username },
-                          query: { section: 'analysis' }
-                        }"
-                        class="ui-button-secondary"
-                      >
-                        Open analysis
-                      </RouterLink>
-                      <RouterLink
-                        v-if="runtimeStore.hasRoutePermission(cluster.name, 'jobs-history', 'view')"
-                        :to="{ name: 'jobs-history', params: { cluster: cluster.name }, query: { user: user.username } }"
-                        class="ui-button-secondary"
-                      >
-                        View history jobs
-                      </RouterLink>
-                    </div>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-            <PaginationControls
-              :page="currentPage(cluster.name)"
-              :page-size="pageSize"
-              :total="clusterTotals[cluster.name] ?? 0"
-              item-label="user"
-              @update:page="updateClusterPage(cluster, $event)"
-              @update:page-size="updatePageSize"
-            />
-          </div>
-        </div>
-      </div>
       </div>
     </div>
   </div>

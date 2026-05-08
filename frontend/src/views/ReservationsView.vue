@@ -185,6 +185,7 @@ if (route.query.page_size) {
 
 <template>
   <ClusterMainLayout menu-entry="reservations" :cluster="cluster" :breadcrumb="[{ title: 'Reservations' }]">
+    <div class="ui-page ui-page-wide ui-content-workspace">
     <PageHeader
       title="Reservations"
       description="Advanced reservations, affected nodes and account or user access windows."
@@ -209,10 +210,12 @@ if (route.query.page_size) {
     <InfoAlert v-else-if="loaded && data?.length == 0"
       >No reservation defined on cluster <span class="font-medium">{{ cluster }}</span></InfoAlert
     >
-    <div v-else class="ui-section-stack">
-      <div class="ui-table-shell -mx-4 overflow-x-auto sm:-mx-6 lg:-mx-8">
-        <div class="inline-block min-w-full py-2 align-middle">
-          <table class="ui-table min-w-full">
+    <div v-else class="ui-results-layout">
+      <div class="ui-results-workspace">
+        <div class="ui-table-shell ui-results-card">
+          <div class="ui-table-scroll">
+            <div class="ui-table-scroll-inner py-2">
+            <table class="ui-table min-w-full">
             <thead>
               <tr class="text-sm font-semibold text-gray-900 dark:text-gray-200">
                 <th scope="col" class="w-48 py-3.5 pr-3 text-left align-top sm:pl-6 lg:min-w-[150px] lg:pl-8">
@@ -293,7 +296,11 @@ if (route.query.page_size) {
               first-cell-class="sm:pl-6 lg:pl-8"
               cell-class="px-3"
             />
-          </table>
+            </table>
+            </div>
+          </div>
+        </div>
+        <div class="ui-results-dock">
           <PaginationControls
             v-if="loaded"
             :page="page"
@@ -359,5 +366,6 @@ if (route.query.page_size) {
       @close="deleteOpen = false"
       @submit="deleteReservation"
     />
+    </div>
   </ClusterMainLayout>
 </template>

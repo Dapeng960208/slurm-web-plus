@@ -58,6 +58,9 @@ describe('QosView.vue', () => {
         cluster: 'foo'
       }
     })
+    expect(wrapper.find('.ui-table-scroll').exists()).toBe(true)
+    expect(wrapper.find('.ui-results-dock .ui-results-pagination').exists()).toBe(true)
+    expect(wrapper.find('.ui-table-shell .ui-results-pagination').exists()).toBe(false)
     // Retrieve table body lines
     const qosTableLines = wrapper.get('main table tbody').findAll('tr')
     // Check one line per qos in table body

@@ -104,6 +104,9 @@
 - 触达页面的按钮样式按操作语义区分：创建/提交 primary，编辑 warning，删除/取消 danger，查看/返回/筛选 secondary
 - 默认 `admin` 用户可见编辑入口，但删除入口仍继续受 `delete` 权限控制
 - 页面无批量取消入口
+- `JobsView`、`JobsHistoryView`、`ResourcesView`、`QosView`、`ReservationsView` 结果区存在独立 `.ui-table-scroll`，分页节点位于 `.ui-results-dock .ui-results-pagination`，而不再留在 `.ui-table-shell` 内部
+- `AccountsView` 账户树列表存在独立 `.ui-tree-scroll`，分页固定在工作区底部
+- `ClusterMainLayout` 的 `main.ui-content-scroll` 具备显式 `flex-1` 与 `min-h-0`，作为浏览器可视区内框，而不是随子内容增长的普通文档流容器
 - `ResourcesView` 不再渲染节点行尾 `Manage` / `Delete` 按钮，节点名称仍可跳转详情
 - `NodeView` 的 Edit Node 中 `state` 渲染为下拉框，并按所选状态提交 `update_node`
 
@@ -112,6 +115,12 @@
 - `frontend/tests/views/ClusterAnalysisView.spec.ts`
 - `frontend/tests/views/JobsView.spec.ts`
 - `frontend/tests/views/JobView.spec.ts`
+- `frontend/tests/views/JobsHistoryView.spec.ts`
+- `frontend/tests/views/resources/ResourcesView.spec.ts`
+- `frontend/tests/views/QosView.spec.ts`
+- `frontend/tests/views/ReservationsView.spec.ts`
+- `frontend/tests/views/AccountsView.spec.ts`
+- `frontend/tests/components/PaginationControls.spec.ts`
 
 ### 3.3 Gateway API 契约
 

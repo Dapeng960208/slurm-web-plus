@@ -88,6 +88,8 @@ sudo -u postgres psql -d slurmweb -c \
 5. 当记录数超过 20 时，分页栏生效。
 6. 翻页只影响当前 cluster，不影响其他 cluster。
 7. `fullname` 为空的用户显示为 `-`。
+8. 每个 cluster 卡片内部的表格区域独立滚动，长结果不会把整页持续撑高。
+9. 每个 cluster 的分页栏固定在各自结果卡片底部，不固定到浏览器底部，也不会串到其他 cluster 卡片。
 
 ## 4. 多 Agent 验证
 

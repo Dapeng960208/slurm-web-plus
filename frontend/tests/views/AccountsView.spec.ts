@@ -77,6 +77,8 @@ describe('AccountsView.vue', () => {
 
     expect(wrapper.text()).toContain('2')
     expect(wrapper.text()).toContain('accounts')
+    expect(wrapper.find('.ui-tree-scroll').exists()).toBe(true)
+    expect(wrapper.find('.ui-results-dock .ui-results-pagination').exists()).toBe(true)
 
     const treeNodes = wrapper.findAllComponents(AccountTreeNode)
     expect(treeNodes.length).toBeGreaterThan(0)

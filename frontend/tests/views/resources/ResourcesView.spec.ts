@@ -56,6 +56,12 @@ describe('ResourcesView.vue', () => {
     wrapper.getComponent(ResourcesFiltersBar)
     // Check presence of table
     wrapper.get('main table')
+    expect(wrapper.get('main').classes()).toEqual(
+      expect.arrayContaining(['ui-content-scroll', 'flex-1', 'min-h-0', 'pb-3', 'lg:pb-4'])
+    )
+    expect(wrapper.find('.ui-table-scroll').exists()).toBe(true)
+    expect(wrapper.find('.ui-results-dock .ui-results-pagination').exists()).toBe(true)
+    expect(wrapper.find('.ui-table-shell .ui-results-pagination').exists()).toBe(false)
   })
   test('table without diagram when racksdb is disabled', () => {
     mockClusterDataPoller.data.value = nodes
@@ -149,7 +155,7 @@ describe('ResourcesView.vue', () => {
     expect(router.push).toHaveBeenCalled()
   })
 
-  test('uses the shared primary style for add filters button', () => {
+  test('uses the shared secondary style for add filters button', () => {
     mockClusterDataPoller.data.value = nodes
 
     const wrapper = mount(ResourcesView, {
@@ -164,7 +170,7 @@ describe('ResourcesView.vue', () => {
     if (!addFiltersButton) {
       throw new Error('Add filters button not found')
     }
-    expect(addFiltersButton.classes()).toContain('ui-button-primary')
+    expect(addFiltersButton.classes()).toContain('ui-button-secondary')
   })
 
   test('omits row management buttons while node links still open details', () => {

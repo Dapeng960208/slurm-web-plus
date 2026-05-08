@@ -507,7 +507,7 @@ watch(
 
 <template>
   <ClusterMainLayout menu-entry="ai" :cluster="cluster" :breadcrumb="[{ title: 'AI' }]">
-    <div class="ui-page ui-page-wide">
+    <div class="ui-page ui-page-wide ui-content-workspace">
       <PageHeader
         kicker="Cluster Copilot"
         title="AI"
@@ -538,15 +538,15 @@ watch(
       </ErrorAlert>
 
       <template v-else>
-        <div class="grid gap-4 xl:grid-cols-[320px_minmax(0,1fr)]">
-          <aside class="ui-panel ui-section ui-panel-stack">
+        <div
+          data-testid="assistant-workspace"
+          class="ui-assistant-workspace min-h-0 flex-1 gap-4 xl:grid-cols-[320px_minmax(0,1fr)]"
+        >
+          <aside class="ui-panel ui-section ui-panel-stack min-h-0 overflow-hidden">
             <div class="flex items-start justify-between gap-3">
               <div>
                 <p class="ui-page-kicker">History</p>
                 <h2 class="ui-panel-title">Conversations</h2>
-                <p class="ui-panel-description mt-2">
-                  Only your own cluster conversations are shown here.
-                </p>
               </div>
               <button type="button" class="ui-button-secondary" :disabled="conversationsLoading" @click="loadConversations()">
                 Refresh
@@ -566,11 +566,11 @@ watch(
               Start a prompt to create the first conversation.
             </InfoAlert>
 
-            <div v-else class="space-y-3">
+            <div v-else class="ui-scroll-region space-y-3 pr-1">
               <article
                 v-for="conversation in conversations"
                 :key="conversation.id"
-                class="w-full rounded-[22px] border px-4 py-4 text-left transition"
+                class="w-full rounded-[22px] border px-4 py-3 text-left transition"
                 :class="
                   selectedConversationId === conversation.id
                     ? 'border-[rgba(182,232,44,0.55)] bg-[rgba(182,232,44,0.12)]'
@@ -581,9 +581,6 @@ watch(
                   <button type="button" class="min-w-0 flex-1 text-left" @click="loadConversation(conversation.id)">
                     <p class="truncate font-semibold text-[var(--color-brand-ink-strong)]">
                       {{ conversation.title }}
-                    </p>
-                    <p class="mt-1 line-clamp-2 text-sm text-[var(--color-brand-muted)]">
-                      {{ conversation.last_message || 'No assistant reply yet.' }}
                     </p>
                   </button>
                   <button
@@ -603,16 +600,13 @@ watch(
             </div>
           </aside>
 
-          <section class="ui-panel ui-section ui-panel-stack min-w-0">
+          <section class="ui-panel ui-section ui-panel-stack min-w-0 min-h-0 overflow-hidden">
             <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div>
                 <p class="ui-page-kicker">Workspace</p>
                 <h2 class="ui-panel-title">
                   {{ selectedConversation?.title || 'New cluster conversation' }}
                 </h2>
-                <p class="ui-panel-description mt-2">
-                  The assistant can only use read-only tools and must stay within current permissions.
-                </p>
               </div>
               <div class="flex flex-wrap gap-2">
                 <span class="ui-chip">Cluster {{ cluster }}</span>
@@ -629,12 +623,12 @@ watch(
               No enabled model exists for this cluster yet. Create one in Admin > AI first.
             </InfoAlert>
 
-            <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
-              <div data-testid="assistant-chat-column" class="flex min-w-0 flex-col gap-4">
+            <div class="grid min-h-0 flex-1 gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+              <div data-testid="assistant-chat-column" class="flex min-w-0 min-h-0 flex-col gap-4">
                 <div
                   ref="messageScroller"
                   data-testid="assistant-message-scroller"
-                  class="h-[30rem] min-w-0 overflow-y-auto rounded-[28px] border border-[rgba(80,105,127,0.12)] bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(239,244,246,0.84))] px-4 py-4 sm:px-5 lg:h-[38rem]"
+                  class="ui-assistant-chat-scroll ui-scroll-region min-h-0 flex-1 rounded-[28px] border border-[rgba(80,105,127,0.12)] bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(239,244,246,0.84))] px-4 py-4 sm:px-5"
                 >
                   <div v-if="selectedConversationLoading || configsLoading" class="text-[var(--color-brand-muted)]">
                     <LoadingSpinner :size="5" />
@@ -710,10 +704,10 @@ watch(
                   </div>
                 </div>
 
-                <form data-testid="assistant-composer" class="space-y-3" @submit.prevent="submitMessage">
+                <form data-testid="assistant-composer" class="shrink-0 space-y-3" @submit.prevent="submitMessage">
                   <textarea
                     v-model="draft"
-                    rows="5"
+                    rows="4"
                     :disabled="!canView || enabledModels.length === 0 || sending"
                     class="block w-full rounded-[28px] border border-[rgba(80,105,127,0.16)] bg-white px-5 py-4 text-sm leading-6 text-[var(--color-brand-ink-strong)] shadow-[var(--shadow-soft)] outline-hidden focus:border-[rgba(182,232,44,0.65)] focus:ring-4 focus:ring-[rgba(182,232,44,0.18)]"
                     placeholder="Ask about a job, node resources, partitions, or another read-only cluster question."
@@ -742,7 +736,7 @@ watch(
                 </form>
               </div>
 
-              <aside class="space-y-4">
+              <aside class="ui-scroll-region min-h-0 space-y-4 pr-1">
                 <div class="ui-panel-soft px-4 py-4">
                   <p class="ui-page-kicker">Tool Calls</p>
                   <h3 class="text-base font-semibold text-[var(--color-brand-ink-strong)]">

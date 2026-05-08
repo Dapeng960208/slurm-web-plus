@@ -272,6 +272,7 @@ if (route.query.page_size) {
 
 <template>
   <ClusterMainLayout menu-entry="accounts" :cluster="cluster" :breadcrumb="[{ title: 'Accounts' }]">
+    <div class="ui-page ui-page-wide ui-content-workspace">
     <PageHeader
       title="Accounts"
       description="Accounts defined on cluster, with hierarchy, delegated users and structure laid out in one tree."
@@ -291,30 +292,34 @@ if (route.query.page_size) {
     <InfoAlert v-else-if="loaded && accountsData?.length == 0"
       >No account defined on cluster <span class="font-medium">{{ cluster }}</span></InfoAlert
     >
-    <div v-else class="ui-section-stack">
+    <div v-else class="ui-results-layout">
       <PanelSkeleton v-if="initialLoading" :rows="7" />
-      <div v-else class="ui-panel ui-section">
-        <ul role="list" class="space-y-4">
-          <AccountTreeNode
-            v-for="(node, index) in pagedAccountTree"
-            :key="node.account"
-            :node="node"
-            :expanded-accounts="expandedAccounts"
-            :is-last="index === pagedAccountTree.length - 1"
-            :cluster="cluster"
-            @toggle="toggleAccount"
+      <div v-else class="ui-results-workspace">
+        <div class="ui-panel ui-section ui-results-card">
+          <div class="ui-tree-scroll">
+            <ul role="list" class="space-y-4">
+              <AccountTreeNode
+                v-for="(node, index) in pagedAccountTree"
+                :key="node.account"
+                :node="node"
+                :expanded-accounts="expandedAccounts"
+                :is-last="index === pagedAccountTree.length - 1"
+                :cluster="cluster"
+                @toggle="toggleAccount"
+              />
+            </ul>
+          </div>
+        </div>
+        <div class="ui-results-dock">
+          <PaginationControls
+            :page="page"
+            :page-size="pageSize"
+            :total="accountTree.length"
+            item-label="root account"
+            @update:page="updatePage"
+            @update:page-size="updatePageSize"
           />
-        </ul>
-      </div>
-      <div v-if="!initialLoading" class="ui-panel overflow-hidden">
-        <PaginationControls
-          :page="page"
-          :page-size="pageSize"
-          :total="accountTree.length"
-          item-label="root account"
-          @update:page="updatePage"
-          @update:page-size="updatePageSize"
-        />
+        </div>
       </div>
     </div>
 
@@ -335,5 +340,6 @@ if (route.query.page_size) {
       @close="createOpen = false"
       @submit="createAccount"
     />
+    </div>
   </ClusterMainLayout>
 </template>

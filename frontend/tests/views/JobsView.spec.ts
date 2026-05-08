@@ -94,6 +94,15 @@ describe('JobsView.vue', () => {
 
     const table = wrapper.find('main table')
     expect(table.exists()).toBeTruthy()
+    expect(wrapper.get('main').classes()).toEqual(
+      expect.arrayContaining(['ui-content-scroll', 'flex-1', 'min-h-0', 'pb-3', 'lg:pb-4'])
+    )
+    expect(wrapper.find('.ui-table-scroll').exists()).toBe(true)
+    expect(wrapper.find('.ui-results-dock .ui-results-pagination').exists()).toBe(true)
+    expect(wrapper.find('.ui-table-shell .ui-results-pagination').exists()).toBe(false)
+    expect(wrapper.find('.ui-results-workspace').classes()).toEqual(
+      expect.arrayContaining(['ui-results-workspace'])
+    )
     const columns = table.findAll('thead th')
     expect(columns.length).toBe(9)
     expect(columns[0].text()).toBe('#ID')

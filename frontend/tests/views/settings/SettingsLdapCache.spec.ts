@@ -81,11 +81,15 @@ describe('settings/SettingsLdapCache.vue', () => {
 
     await flushPromises()
 
-    expect(wrapper.text()).toContain('Cluster foo')
+    expect(wrapper.text()).not.toContain('Cluster foo')
+    expect(wrapper.text()).not.toContain('LDAP Cache')
+    expect(wrapper.text()).toContain('Search by username')
     expect(wrapper.text()).toContain('alice')
     expect(wrapper.text()).toContain('Alice Doe')
     expect(wrapper.text()).toContain('bob')
     expect(wrapper.text()).toContain('-')
+    expect(wrapper.find('.ui-table-scroll').exists()).toBe(true)
+    expect(wrapper.find('.ui-table-shell .ui-results-pagination').exists()).toBe(true)
     const links = wrapper.findAllComponents(RouterLinkStub)
     expect(links.find((link) => link.props('to')?.name === 'user')).toBeDefined()
     expect(

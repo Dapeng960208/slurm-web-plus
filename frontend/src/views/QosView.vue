@@ -277,142 +277,149 @@ if (route.query.page_size) {
 
 <template>
   <ClusterMainLayout menu-entry="qos" :cluster="cluster" :breadcrumb="[{ title: 'QOS' }]">
-    <PageHeader
-      title="QOS"
-      description="Quality-of-service policies, resource ceilings and scheduling constraints defined on this cluster."
-      :metric-value="loaded ? data?.length : undefined"
-      metric-label="qos policies"
-    >
-      <template #actions>
-        <button v-if="canEditQos" type="button" class="ui-button-primary" @click="openCreateDialog">
-          Create QOS
-        </button>
-      </template>
-    </PageHeader>
-    <QosHelpModal
-      :help-modal-show="helpModalShow"
-      :limit="modalQosLimit"
-      @close-help-modal="closeHelpModal"
-    />
-    <ErrorAlert v-if="unable"
-      >Unable to retrieve qos from cluster
-      <span class="font-medium">{{ cluster }}</span></ErrorAlert
-    >
-    <InfoAlert v-else-if="loaded && data?.length == 0"
-      >No qos defined on cluster <span class="font-medium">{{ cluster }}</span></InfoAlert
-    >
-    <div v-else class="ui-section-stack">
-      <div class="ui-table-shell -mx-4 overflow-x-auto sm:-mx-6 lg:-mx-8">
-        <div class="inline-block min-w-full py-2 align-middle">
-          <table class="ui-table min-w-full">
-            <thead>
-              <tr class="text-sm font-semibold text-gray-900 dark:text-gray-200">
-                <th scope="col" class="py-3.5 pr-3 text-left align-top sm:pl-6 lg:min-w-[250px] lg:pl-8">
-                  Name
-                </th>
-                <th scope="col" class="w-24 px-3 py-3.5 text-left align-top">Priority</th>
-                <th scope="col" class="hidden w-72 px-3 py-3.5 text-left lg:table-cell">Jobs</th>
-                <th scope="col" class="hidden w-72 px-3 py-3.5 text-left lg:table-cell">Resources</th>
-                <th scope="col" class="w-12 px-3 py-3.5 text-left">Time</th>
-                <th scope="col" class="hidden w-12 px-3 py-3.5 text-left align-top 2xl:table-cell">Flags</th>
-                <th scope="col" class="py-3.5 pr-4 pl-3 text-right sm:pr-6 lg:pr-8">Actions</th>
-              </tr>
-            </thead>
-            <tbody
-              v-if="loaded"
-              class="divide-y divide-gray-200 text-sm text-gray-600 dark:divide-gray-700 dark:text-gray-300"
-            >
-              <tr v-for="qos in pagedQos" :key="qos.name">
-                <td class="py-3 pr-3 whitespace-nowrap text-[var(--color-brand-ink-strong)] sm:pl-6 lg:pl-8">
-                  <p class="text-base font-medium">{{ qos.name }}</p>
-                  <p class="text-gray-500 text-[var(--color-brand-muted)]">{{ qos.description }}</p>
-                </td>
-                <td class="px-3 py-3 whitespace-nowrap">{{ qos.priority.number }}</td>
-                <td class="hidden px-3 py-3 whitespace-nowrap lg:table-cell">
-                  <dl>
-                    <div
-                      v-for="limit in qosJobLimits(qos)"
-                      :key="limit.id"
-                      :class="[limit.value.set ? '' : 'text-[var(--color-brand-muted)]/35', 'invisible flex leading-relaxed hover:visible']"
-                    >
-                      <button @click="openHelpModal(qos.name, limit.id, limit.value)" class="mr-1 -ml-5">
-                        <QuestionMarkCircleIcon class="h-5 w-5 text-[var(--color-slurmweb-dark)]" />
-                      </button>
-                      <dt class="visible">{{ limit.label }}:</dt>
-                      <dd class="visible ml-2">{{ renderClusterOptionalNumber(limit.value) }}</dd>
-                    </div>
-                  </dl>
-                </td>
-                <td class="hidden px-3 py-3 whitespace-nowrap lg:table-cell">
-                  <dl>
-                    <div
-                      v-for="limit in qosResourcesLimits(qos)"
-                      :key="limit.id"
-                      :class="[limit.value.length > 0 ? '' : 'text-[var(--color-brand-muted)]/35', 'invisible flex items-baseline leading-relaxed hover:visible']"
-                    >
-                      <button @click="openHelpModal(qos.name, limit.id, limit.value)" class="mr-1 -ml-5 self-center">
-                        <QuestionMarkCircleIcon class="h-5 w-5 text-[var(--color-slurmweb-dark)]" />
-                      </button>
-                      <dt class="visible">{{ limit.label }}:</dt>
-                      <dd class="visible ml-2 font-mono text-xs">{{ renderClusterTRES(limit.value) }}</dd>
-                    </div>
-                  </dl>
-                </td>
-                <td class="px-3 py-3 whitespace-nowrap">
-                  <div
-                    :class="[
-                      qos.limits.max.wall_clock.per.job.set ? '' : 'text-[var(--color-brand-muted)]/35',
-                      'invisible flex items-baseline leading-relaxed hover:visible'
-                    ]"
-                  >
-                    <button
-                      @click="openHelpModal(qos.name, 'MaxWall', qos.limits.max.wall_clock.per.job)"
-                      class="mr-1 -ml-5 self-center"
-                    >
-                      <QuestionMarkCircleIcon class="h-5 w-5 text-[var(--color-slurmweb-dark)]" />
-                    </button>
-                    <span class="visible">{{ renderWalltime(qos.limits.max.wall_clock.per.job) }}</span>
-                  </div>
-                </td>
-                <td class="hidden px-3 py-3 2xl:table-cell">
-                  <span v-for="flag in qos.flags" :key="flag" class="ui-chip m-1">{{ renderQosFlag(flag) }}</span>
-                </td>
-                <td class="py-4 pl-3 text-right whitespace-nowrap sm:pr-6 lg:pr-8">
-                  <div class="flex flex-wrap items-center justify-end gap-2">
-                    <button
-                      v-if="canEditQos"
-                      type="button"
-                      class="ui-button-warning"
-                      @click="openEditDialog(qos)"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      v-if="canDeleteQos"
-                      type="button"
-                      class="ui-button-danger"
-                      @click="openDeleteDialog(qos)"
-                    >
-                      Delete
-                    </button>
-                    <RouterLink
-                      :to="{ name: 'jobs', params: { cluster: cluster }, query: { qos: qos.name } }"
-                      class="ui-button-secondary"
-                    >
-                      View jobs
-                    </RouterLink>
-                  </div>
-                </td>
-              </tr>
-            </tbody>
-            <TableSkeletonRows
-              v-else
-              :columns="7"
-              :rows="6"
-              first-cell-class="sm:pl-6 lg:pl-8"
-              cell-class="px-3"
-            />
-            </table>
+    <div class="ui-page ui-page-wide ui-content-workspace">
+      <PageHeader
+        title="QOS"
+        description="Quality-of-service policies, resource ceilings and scheduling constraints defined on this cluster."
+        :metric-value="loaded ? data?.length : undefined"
+        metric-label="qos policies"
+      >
+        <template #actions>
+          <button v-if="canEditQos" type="button" class="ui-button-primary" @click="openCreateDialog">
+            Create QOS
+          </button>
+        </template>
+      </PageHeader>
+      <QosHelpModal
+        :help-modal-show="helpModalShow"
+        :limit="modalQosLimit"
+        @close-help-modal="closeHelpModal"
+      />
+      <ErrorAlert v-if="unable"
+        >Unable to retrieve qos from cluster
+        <span class="font-medium">{{ cluster }}</span></ErrorAlert
+      >
+      <InfoAlert v-else-if="loaded && data?.length == 0"
+        >No qos defined on cluster <span class="font-medium">{{ cluster }}</span></InfoAlert
+      >
+      <div v-else class="ui-results-layout">
+        <div class="ui-results-workspace">
+          <div class="ui-table-shell ui-results-card">
+            <div class="ui-table-scroll">
+              <div class="ui-table-scroll-inner py-2">
+              <table class="ui-table min-w-full">
+                <thead>
+                  <tr class="text-sm font-semibold text-gray-900 dark:text-gray-200">
+                    <th scope="col" class="py-3.5 pr-3 text-left align-top sm:pl-6 lg:min-w-[250px] lg:pl-8">
+                      Name
+                    </th>
+                    <th scope="col" class="w-24 px-3 py-3.5 text-left align-top">Priority</th>
+                    <th scope="col" class="hidden w-72 px-3 py-3.5 text-left lg:table-cell">Jobs</th>
+                    <th scope="col" class="hidden w-72 px-3 py-3.5 text-left lg:table-cell">Resources</th>
+                    <th scope="col" class="w-12 px-3 py-3.5 text-left">Time</th>
+                    <th scope="col" class="hidden w-12 px-3 py-3.5 text-left align-top 2xl:table-cell">Flags</th>
+                    <th scope="col" class="py-3.5 pr-4 pl-3 text-right sm:pr-6 lg:pr-8">Actions</th>
+                  </tr>
+                </thead>
+                <tbody
+                  v-if="loaded"
+                  class="divide-y divide-gray-200 text-sm text-gray-600 dark:divide-gray-700 dark:text-gray-300"
+                >
+                  <tr v-for="qos in pagedQos" :key="qos.name">
+                    <td class="py-3 pr-3 whitespace-nowrap text-[var(--color-brand-ink-strong)] sm:pl-6 lg:pl-8">
+                      <p class="text-base font-medium">{{ qos.name }}</p>
+                      <p class="text-gray-500 text-[var(--color-brand-muted)]">{{ qos.description }}</p>
+                    </td>
+                    <td class="px-3 py-3 whitespace-nowrap">{{ qos.priority.number }}</td>
+                    <td class="hidden px-3 py-3 whitespace-nowrap lg:table-cell">
+                      <dl>
+                        <div
+                          v-for="limit in qosJobLimits(qos)"
+                          :key="limit.id"
+                          :class="[limit.value.set ? '' : 'text-[var(--color-brand-muted)]/35', 'invisible flex leading-relaxed hover:visible']"
+                        >
+                          <button @click="openHelpModal(qos.name, limit.id, limit.value)" class="mr-1 -ml-5">
+                            <QuestionMarkCircleIcon class="h-5 w-5 text-[var(--color-slurmweb-dark)]" />
+                          </button>
+                          <dt class="visible">{{ limit.label }}:</dt>
+                          <dd class="visible ml-2">{{ renderClusterOptionalNumber(limit.value) }}</dd>
+                        </div>
+                      </dl>
+                    </td>
+                    <td class="hidden px-3 py-3 whitespace-nowrap lg:table-cell">
+                      <dl>
+                        <div
+                          v-for="limit in qosResourcesLimits(qos)"
+                          :key="limit.id"
+                          :class="[limit.value.length > 0 ? '' : 'text-[var(--color-brand-muted)]/35', 'invisible flex items-baseline leading-relaxed hover:visible']"
+                        >
+                          <button @click="openHelpModal(qos.name, limit.id, limit.value)" class="mr-1 -ml-5 self-center">
+                            <QuestionMarkCircleIcon class="h-5 w-5 text-[var(--color-slurmweb-dark)]" />
+                          </button>
+                          <dt class="visible">{{ limit.label }}:</dt>
+                          <dd class="visible ml-2 font-mono text-xs">{{ renderClusterTRES(limit.value) }}</dd>
+                        </div>
+                      </dl>
+                    </td>
+                    <td class="px-3 py-3 whitespace-nowrap">
+                      <div
+                        :class="[
+                          qos.limits.max.wall_clock.per.job.set ? '' : 'text-[var(--color-brand-muted)]/35',
+                          'invisible flex items-baseline leading-relaxed hover:visible'
+                        ]"
+                      >
+                        <button
+                          @click="openHelpModal(qos.name, 'MaxWall', qos.limits.max.wall_clock.per.job)"
+                          class="mr-1 -ml-5 self-center"
+                        >
+                          <QuestionMarkCircleIcon class="h-5 w-5 text-[var(--color-slurmweb-dark)]" />
+                        </button>
+                        <span class="visible">{{ renderWalltime(qos.limits.max.wall_clock.per.job) }}</span>
+                      </div>
+                    </td>
+                    <td class="hidden px-3 py-3 2xl:table-cell">
+                      <span v-for="flag in qos.flags" :key="flag" class="ui-chip m-1">{{ renderQosFlag(flag) }}</span>
+                    </td>
+                    <td class="py-4 pl-3 text-right whitespace-nowrap sm:pr-6 lg:pr-8">
+                      <div class="flex flex-wrap items-center justify-end gap-2">
+                        <button
+                          v-if="canEditQos"
+                          type="button"
+                          class="ui-button-warning"
+                          @click="openEditDialog(qos)"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          v-if="canDeleteQos"
+                          type="button"
+                          class="ui-button-danger"
+                          @click="openDeleteDialog(qos)"
+                        >
+                          Delete
+                        </button>
+                        <RouterLink
+                          :to="{ name: 'jobs', params: { cluster: cluster }, query: { qos: qos.name } }"
+                          class="ui-button-secondary"
+                        >
+                          View jobs
+                        </RouterLink>
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+                <TableSkeletonRows
+                  v-else
+                  :columns="7"
+                  :rows="6"
+                  first-cell-class="sm:pl-6 lg:pl-8"
+                  cell-class="px-3"
+                />
+              </table>
+              </div>
+            </div>
+          </div>
+          <div class="ui-results-dock">
             <PaginationControls
               v-if="loaded"
               :page="page"
@@ -425,101 +432,103 @@ if (route.query.page_size) {
           </div>
         </div>
       </div>
-    <ActionDialog
-      :open="createOpen"
-      title="Create QOS"
-      description="Add a new quality-of-service policy for this cluster."
-      submit-label="Create QOS"
-      :loading="operationBusy"
-      :error="operationError"
-      :initial-values="createQosInitialValues"
-      :fields="[
-        { key: 'name', label: 'Name', required: true },
-        { key: 'description', label: 'Description', type: 'textarea' },
-        { key: 'priority', label: 'Priority', type: 'number' },
-        {
-          key: 'max_submit_jobs_per_user',
-          label: 'MaxSubmitJobsPerUser',
-          type: 'number',
-          required: true,
-          hint: 'Current submitted jobs per user, including running and pending jobs.'
-        },
-        {
-          key: 'max_jobs_per_user',
-          label: 'MaxJobsPerUser',
-          type: 'number',
-          required: true,
-          hint: 'Maximum concurrently running jobs per user.'
-        },
-        {
-          key: 'max_wall_duration_per_job',
-          label: 'MaxWallDurationPerJob',
-          required: true,
-          hint: 'Single-job maximum runtime as days-hh:mm:ss.'
-        }
-      ]"
-      @close="createOpen = false"
-      @submit="createQos"
-    />
 
-    <ActionDialog
-      :open="editOpen"
-      title="Edit QOS"
-      :description="selectedQos ? `Update ${selectedQos.name}.` : ''"
-      submit-label="Save changes"
-      :loading="operationBusy"
-      :error="operationError"
-      :initial-values="{
-        description: selectedQos?.description ?? '',
-        priority: selectedQos?.priority?.set ? String(selectedQos.priority.number) : '',
-        max_submit_jobs_per_user:
-          optionalNumberInput(selectedQos?.limits.max.jobs.per.user) ||
-          createQosInitialValues.max_submit_jobs_per_user,
-        max_jobs_per_user:
-          optionalNumberInput(selectedQos?.limits.max.jobs.active_jobs.per.user) ||
-          createQosInitialValues.max_jobs_per_user,
-        max_wall_duration_per_job:
-          optionalWallDurationInput(selectedQos?.limits.max.wall_clock.per.job) ||
-          createQosInitialValues.max_wall_duration_per_job
-      }"
-      :fields="[
-        { key: 'description', label: 'Description', type: 'textarea' },
-        { key: 'priority', label: 'Priority', type: 'number' },
-        {
-          key: 'max_submit_jobs_per_user',
-          label: 'MaxSubmitJobsPerUser',
-          type: 'number',
-          required: true,
-          hint: 'Current submitted jobs per user, including running and pending jobs.'
-        },
-        {
-          key: 'max_jobs_per_user',
-          label: 'MaxJobsPerUser',
-          type: 'number',
-          required: true,
-          hint: 'Maximum concurrently running jobs per user.'
-        },
-        {
-          key: 'max_wall_duration_per_job',
-          label: 'MaxWallDurationPerJob',
-          required: true,
-          hint: 'Single-job maximum runtime as days-hh:mm:ss.'
-        }
-      ]"
-      @close="editOpen = false"
-      @submit="updateQos"
-    />
+      <ActionDialog
+        :open="createOpen"
+        title="Create QOS"
+        description="Add a new quality-of-service policy for this cluster."
+        submit-label="Create QOS"
+        :loading="operationBusy"
+        :error="operationError"
+        :initial-values="createQosInitialValues"
+        :fields="[
+          { key: 'name', label: 'Name', required: true },
+          { key: 'description', label: 'Description', type: 'textarea' },
+          { key: 'priority', label: 'Priority', type: 'number' },
+          {
+            key: 'max_submit_jobs_per_user',
+            label: 'MaxSubmitJobsPerUser',
+            type: 'number',
+            required: true,
+            hint: 'Current submitted jobs per user, including running and pending jobs.'
+          },
+          {
+            key: 'max_jobs_per_user',
+            label: 'MaxJobsPerUser',
+            type: 'number',
+            required: true,
+            hint: 'Maximum concurrently running jobs per user.'
+          },
+          {
+            key: 'max_wall_duration_per_job',
+            label: 'MaxWallDurationPerJob',
+            required: true,
+            hint: 'Single-job maximum runtime as days-hh:mm:ss.'
+          }
+        ]"
+        @close="createOpen = false"
+        @submit="createQos"
+      />
 
-    <ActionDialog
-      :open="deleteOpen"
-      title="Delete QOS"
-      :description="selectedQos ? `Delete QOS ${selectedQos.name}. This action is destructive.` : ''"
-      submit-label="Delete QOS"
-      :loading="operationBusy"
-      :error="operationError"
-      :fields="[]"
-      @close="deleteOpen = false"
-      @submit="removeQos"
-    />
+      <ActionDialog
+        :open="editOpen"
+        title="Edit QOS"
+        :description="selectedQos ? `Update ${selectedQos.name}.` : ''"
+        submit-label="Save changes"
+        :loading="operationBusy"
+        :error="operationError"
+        :initial-values="{
+          description: selectedQos?.description ?? '',
+          priority: selectedQos?.priority?.set ? String(selectedQos.priority.number) : '',
+          max_submit_jobs_per_user:
+            optionalNumberInput(selectedQos?.limits.max.jobs.per.user) ||
+            createQosInitialValues.max_submit_jobs_per_user,
+          max_jobs_per_user:
+            optionalNumberInput(selectedQos?.limits.max.jobs.active_jobs.per.user) ||
+            createQosInitialValues.max_jobs_per_user,
+          max_wall_duration_per_job:
+            optionalWallDurationInput(selectedQos?.limits.max.wall_clock.per.job) ||
+            createQosInitialValues.max_wall_duration_per_job
+        }"
+        :fields="[
+          { key: 'description', label: 'Description', type: 'textarea' },
+          { key: 'priority', label: 'Priority', type: 'number' },
+          {
+            key: 'max_submit_jobs_per_user',
+            label: 'MaxSubmitJobsPerUser',
+            type: 'number',
+            required: true,
+            hint: 'Current submitted jobs per user, including running and pending jobs.'
+          },
+          {
+            key: 'max_jobs_per_user',
+            label: 'MaxJobsPerUser',
+            type: 'number',
+            required: true,
+            hint: 'Maximum concurrently running jobs per user.'
+          },
+          {
+            key: 'max_wall_duration_per_job',
+            label: 'MaxWallDurationPerJob',
+            required: true,
+            hint: 'Single-job maximum runtime as days-hh:mm:ss.'
+          }
+        ]"
+        @close="editOpen = false"
+        @submit="updateQos"
+      />
+
+      <ActionDialog
+        :open="deleteOpen"
+        title="Delete QOS"
+        :description="selectedQos ? `Delete QOS ${selectedQos.name}. This action is destructive.` : ''"
+        submit-label="Delete QOS"
+        :loading="operationBusy"
+        :error="operationError"
+        :fields="[]"
+        @close="deleteOpen = false"
+        @submit="removeQos"
+      />
+    </div>
   </ClusterMainLayout>
 </template>

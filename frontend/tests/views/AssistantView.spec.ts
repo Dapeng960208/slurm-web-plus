@@ -442,13 +442,72 @@ describe('views/AssistantView.vue', () => {
     await flushPromises()
 
     const chatColumn = wrapper.get('[data-testid="assistant-chat-column"]')
+    const workspace = wrapper.get('[data-testid="assistant-workspace"]')
     const messageScroller = wrapper.get('[data-testid="assistant-message-scroller"]')
     const composer = wrapper.get('[data-testid="assistant-composer"]')
 
-    expect(chatColumn.classes()).toEqual(expect.arrayContaining(['flex', 'min-w-0', 'flex-col']))
-    expect(messageScroller.classes()).toEqual(expect.arrayContaining(['h-[30rem]', 'min-w-0', 'overflow-y-auto']))
+    expect(workspace.classes()).toContain('ui-assistant-workspace')
+    expect(workspace.classes()).toEqual(expect.arrayContaining(['min-h-0', 'flex-1']))
+    expect(chatColumn.classes()).toEqual(expect.arrayContaining(['flex', 'min-w-0', 'min-h-0', 'flex-col']))
+    expect(messageScroller.classes()).toEqual(
+      expect.arrayContaining(['ui-assistant-chat-scroll', 'ui-scroll-region', 'min-h-0', 'flex-1'])
+    )
+    expect(composer.classes()).toContain('shrink-0')
     expect(composer.element.parentElement).toBe(chatColumn.element)
     expect(messageScroller.element.parentElement).toBe(chatColumn.element)
+  })
+
+  test('shows conversation history without message preview text', async () => {
+    mockGatewayAPI.ai_configs.mockResolvedValue([
+      {
+        id: 1,
+        name: 'qwen-prod',
+        provider: 'qwen',
+        provider_label: 'Qwen',
+        model: 'qwen3-coder',
+        display_name: 'Qwen Prod',
+        enabled: true,
+        is_default: true,
+        sort_order: 10,
+        base_url: null,
+        deployment: null,
+        api_version: null,
+        request_timeout: null,
+        temperature: null,
+        system_prompt: null,
+        extra_options: {},
+        secret_configured: true,
+        secret_mask: '***1234',
+        last_validated_at: null,
+        last_validation_error: null
+      }
+    ])
+    mockGatewayAPI.ai_conversations.mockResolvedValue([
+      {
+        id: 9,
+        title: 'Queue pressure and idle node follow-up',
+        created_at: '2026-04-24T10:00:00Z',
+        updated_at: '2026-04-24T10:05:00Z',
+        last_message: 'GPU partition is saturated.',
+        model_config_id: 1
+      }
+    ])
+    mockGatewayAPI.ai_conversation.mockResolvedValue({
+      id: 9,
+      title: 'Queue pressure and idle node follow-up',
+      created_at: '2026-04-24T10:00:00Z',
+      updated_at: '2026-04-24T10:05:00Z',
+      model_config_id: 1,
+      tool_calls: [],
+      messages: []
+    })
+
+    const wrapper = mountAssistantView()
+
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Queue pressure and idle node follow-up')
+    expect(wrapper.text()).not.toContain('GPU partition is saturated.')
   })
 
   test('shows only the latest five tool calls in execution trace', async () => {

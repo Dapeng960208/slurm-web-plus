@@ -203,7 +203,7 @@ watch(totalPages, (newLastPage) => {
     :cluster="cluster"
     :breadcrumb="[{ title: 'Resources' }]"
   >
-    <div class="ui-page ui-page-wide">
+    <div class="ui-page ui-page-wide ui-content-workspace">
       <ResourcesFiltersPanel :cluster="cluster" :nbNodes="filteredNodes.length" />
 
       <PageHeader
@@ -244,10 +244,12 @@ watch(totalPages, (newLastPage) => {
         >Unable to retrieve nodes from cluster
         <span class="font-medium">{{ cluster }}</span></ErrorAlert
       >
-      <div v-else class="ui-section-stack">
-        <div class="ui-table-shell -mx-4 overflow-x-auto sm:-mx-6 lg:-mx-8">
-          <div class="inline-block min-w-full py-2 align-middle">
-            <table class="ui-table min-w-full">
+      <div v-else class="ui-results-layout">
+        <div class="ui-results-workspace">
+          <div class="ui-table-shell ui-results-card">
+            <div class="ui-table-scroll">
+              <div class="ui-table-scroll-inner py-2">
+              <table class="ui-table min-w-full">
               <thead>
                 <tr class="text-sm font-semibold text-gray-900 dark:text-gray-200">
                   <th scope="col" colspan="2" class="w-12 py-3.5 pr-3 text-left sm:pl-6 lg:pl-8">
@@ -386,7 +388,11 @@ watch(totalPages, (newLastPage) => {
                 first-cell-class="sm:pl-6 lg:pl-8"
                 cell-class="px-3"
               />
-            </table>
+              </table>
+              </div>
+            </div>
+          </div>
+          <div class="ui-results-dock">
             <PaginationControls
               v-if="loaded"
               :page="runtimeStore.resources.page"

@@ -31,8 +31,33 @@
 - 修复普通用户导航权限异常：普通用户恢复默认 `AI` 入口和 `ai:view:*` 能力，同时没有 `admin/*` / `*:*:*` 时彻底隐藏并禁止进入 `Admin`
 - 统一 Dashboard 头部摘要、筛选工具栏与统计卡片的布局和 surface 样式，修复按钮错位、筛选区不对齐和卡片背景不一致
 - 压缩用户详情分析区头部与双栏布局，强化时间窗控件可见性并减少 `Submission Activity` 周边空白
+- 收口 `/:cluster/admin/ai`：模型配置改为表格、审计记录改为表格、统一搜索框样式，并将审计详情迁移到独立详情页
 
 ## 2. 已完成项
+
+- 内容页滚动层级、按钮语义与 AI 工作区已完成一轮统一收口：
+  - `ClusterMainLayout`、`SettingsLayout` 与共享样式已补齐 `min-h-0`、`flex-1`、`overflow` 约束，业务内容页改为优先在内容区、表格区、消息区和侧栏内部滚动，不再持续推高最外层页面壳
+  - `ui-content-scroll` 现已固定为 header 下方的浏览器可视区内框，并保留与左侧桌面导航一致的底部留白；主内容区不会再因为内部结果集或聊天记录变长而继续向下扩展
+  - `Jobs`、`Jobs History`、`Resources`、`Dashboard`、`Analysis`、`Accounts`、`Account`、`User`、`Reservations`、`QOS`、`Admin` 等登录后内容页已统一接入 `ui-content-workspace`
+  - `Jobs`、`Jobs History`、`Resources`、`QOS`、`Reservations`、`Accounts` 已统一成“筛选区固定在上、表格/树区域内部滚动、分页条固定在工作区底部”的结构，长结果集不再把分页继续推到浏览器视口之外
+  - 表格共享滚动样式已统一为 `ui-table-scroll` / `ui-table-scroll-inner`，去掉各页零散的负边距横向滚动写法，左右内边距和 gutter 恢复一致
+  - `LDAP Cache` 已删除重复页头卡片和 `Cluster ...` 冗余标题，搜索区与表格统一收口在单个内容卡片内；作为多 cluster 特例，各 cluster 卡片内部独立滚动，分页固定在各自卡片底部
+  - `Cluster Analysis` 中 `Queue Blockers`、`Partition Hotspots`、`Historical Pressure` 的并列指标卡已统一到同一套共享 surface，消除同栏目卡片背景和边框语义漂移
+  - `SettingsHeader` / `AdminHeader` 的固定套话已移除，页面头部继续按“唯一主标题 + 必要说明”展示
+  - `Add filters` 已统一收口为 `ui-button-secondary`；`Jobs` 页把 `Submit job` 与 `Add filters` 收到同一工具区，同排同高对齐
+  - AI 对话页已改为固定工作区：左侧历史、中间消息区、右侧 trace 独立滚动，底部输入区固定在工作区底部；聊天列本身锁定在主可视区内，消息区仅在固定可视高度内滚动，左栏历史只保留标题与更新时间，不再显示消息摘要
+  - 本轮前端回归已补页面结构断言，覆盖 `.ui-results-dock`、`.ui-table-scroll`、`.ui-tree-scroll`、`AssistantView` composer `shrink-0` 与 `LDAP Cache` 卡片内分页位置
+- 已补充并通过 `frontend` 侧类型检查与相关视图测试，覆盖 `Jobs`、`Jobs History`、`Resources`、`Assistant`
+- 已补充并通过本轮工作区/分页定向前端验证：
+  - `npm --prefix frontend run type-check`
+  - `cd frontend && npx vitest run tests/views/JobsView.spec.ts tests/views/JobsHistoryView.spec.ts tests/views/resources/ResourcesView.spec.ts tests/views/QosView.spec.ts tests/views/ReservationsView.spec.ts tests/views/AccountsView.spec.ts tests/views/AssistantView.spec.ts tests/views/settings/SettingsLdapCache.spec.ts tests/components/PaginationControls.spec.ts`
+
+- `admin/ai` 页面已完成二次收口：
+  - 顶部统计卡已移除，页头收口为单个内容卡
+  - 模型配置区域改为标准表格，不再使用标签卡片堆叠
+  - 对话审计区域改为标准表格，搜索框改用共享输入样式
+  - 会话详情不再内嵌在同页右侧，而是改为独立路由 `/:cluster/admin/ai/conversations/:conversationId`
+  - 独立详情页展示会话摘要、完整消息和工具调用表格
 
 - Dashboard 页面布局样式已收口：
   - `Open analysis` 已与 `Total Jobs` 头部摘要合并到同一行
@@ -369,6 +394,7 @@
 - 当前 `tool_mapping_file` demo 只提供常见工具归类示例，不会默认启用；生产环境仍需按实际集群命名规则调整
 - 当前 AI token 计数为前端估算，不等同于 provider 真实 usage 或计费 token；若后续需要精确计量，需要扩展后端 provider 返回与持久化结构
 - 当前 Conversation Audit 搜索只过滤已加载摘要，不搜索完整消息正文；如需全文检索需要扩展审计接口
+- 当前 Conversation Audit 前端过滤只匹配已加载的 `username` 和 `title` 摘要列，不搜索完整消息正文；如需全文检索需要扩展审计接口
 - `cd frontend && npx vitest run` 当前仍会输出一批既有 Vue `inject() can only be used inside setup() or functional components.` 告警；全量前端测试已通过，但这类告警噪音仍值得后续单独清理
 
 ## 5. 已同步文档

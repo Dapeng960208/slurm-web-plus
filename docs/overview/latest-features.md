@@ -1,5 +1,42 @@
 ﻿# 最新功能
 
+## 本轮：内容页滚动层级、按钮语义与 AI 工作区已统一收口
+
+## 本轮：`admin/ai` 已统一为表格工作区和独立会话详情页
+
+本轮继续收口管理员 AI 页面，重点解决模型配置仍是卡片堆叠、审计详情挤在同页右侧，以及搜索框样式与全局不一致的问题：
+
+- `/:cluster/admin/ai` 顶部已收口为单个页头卡，不再保留额外统计卡和重复说明层。
+- 模型配置列表已从紧凑卡片改为标准表格，统一展示模型名、provider、secret、默认状态、校验状态和操作按钮。
+- 对话审计列表继续保留表格形态，但不再在同页右侧展示详情；详情入口改为独立跳转。
+- 新增独立详情页 `/:cluster/admin/ai/conversations/:conversationId`，用于查看完整消息历史和工具调用明细。
+- 审计搜索框已切回共享输入样式，避免 `admin/ai` 页面继续出现和全局不同的一套搜索框视觉。
+
+本轮新增验证：
+
+- `npm --prefix frontend run type-check`
+- `cd frontend && npx vitest run tests/views/settings/SettingsAI.spec.ts tests/views/settings/SettingsAIConversationDetail.spec.ts tests/router/AdminRoutesContract.spec.ts`
+
+本轮继续收口登录后业务页面的工作区结构，重点解决内容过多时外层页面被持续撑高、同类按钮样式不一致，以及 AI 对话区随历史与消息增长不断下扩的问题：
+
+- 共享布局和样式已统一补齐 `flex-1`、`min-h-0` 与内部滚动约束，业务内容页现在优先在表格区、列表区、消息区、侧栏或详情区内部滚动，而不是继续推高最外层容器。
+- `ClusterMainLayout` 与 `SettingsLayout` 现已把 `ui-content-scroll` 固定为浏览器可视区内框；该区域高度会对齐 header 下方剩余视口，并保留与左侧桌面导航一致的底部留白，不再随着内容增长继续拉长整页。
+- `Jobs`、`Jobs History`、`Resources`、`Dashboard`、`Analysis`、`Accounts`、`Account`、`User`、`Reservations`、`QOS`、`Admin` 等页面已接入统一内容工作区容器，页面滚动层级更稳定。
+- `Jobs`、`Jobs History`、`Resources`、`QOS`、`Reservations`、`Accounts` 等单主结果区页面已改为“表格/树内容区单独滚动 + 分页条固定在工作区底部”的展示方式，更接近常见控制台工作区，不必先滚到整页最底部才能翻页。
+- 表格共享滚动样式已去掉各视图里零散的负边距横向滚动写法，表格左右 gutter 与内边距恢复统一，列内容不再紧贴容器边缘。
+- `LDAP Cache` 页面已删除重复的页头卡片与集群标题，搜索和结果区统一合并为单个内容卡片，减少无效留白和重复说明。
+- `LDAP Cache` 作为多 cluster 特例，继续按 cluster 卡片独立滚动与分页；分页固定在各自卡片底部，不固定到浏览器底部，避免同页多分页器互相覆盖。
+- `Cluster Analysis` 中同栏目并列卡片已统一复用共享 surface，避免 `Packing Signal`、分区热点卡、历史压力卡在同一块内容里出现无语义依据的背景和边框差异。
+- `SettingsHeader` 与 `AdminHeader` 的固定套话已删除，页面标题继续按“唯一主标题 + 必要说明”收口，减少重复说明和冗余头部文本。
+- `Add filters` 现已统一为共享次级按钮样式；`Jobs` 页面中的 `Submit job` 与 `Add filters` 已整理到同一操作区，同排、同高、同对齐。
+- AI 对话页已改为固定高度工作区：左侧历史、中间消息区、右侧执行 trace 分别独立滚动，底部输入框固定在工作区底部；消息区内容增多时只在消息区内部滚动，不再把输入框向下挤走；历史列表仅显示会话标题与更新时间，不再显示消息摘要。
+- 本轮补充修正后，AI 中间聊天列本身也锁定在 `ui-content-scroll` 可视区内，因此 composer 会停在浏览器可视区底部，而不是整页内容底部。
+
+本轮新增验证：
+
+- `npm --prefix frontend run type-check`
+- `cd frontend && npx vitest run tests/views/JobsView.spec.ts tests/views/JobsHistoryView.spec.ts tests/views/resources/ResourcesView.spec.ts tests/views/QosView.spec.ts tests/views/ReservationsView.spec.ts tests/views/AccountsView.spec.ts tests/views/AssistantView.spec.ts tests/views/settings/SettingsLdapCache.spec.ts tests/components/PaginationControls.spec.ts`
+
 ## 本轮：Dashboard 头部、筛选区与统计卡片样式已统一
 
 本轮对 Dashboard 页面做了针对性的布局收口，解决头部信息分散、筛选区不对齐和卡片表面风格不一致的问题：

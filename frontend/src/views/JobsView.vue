@@ -311,7 +311,7 @@ onMounted(async () => {
 
 <template>
   <ClusterMainLayout menu-entry="jobs" :cluster="cluster" :breadcrumb="[{ title: 'Jobs' }]">
-    <div class="ui-page ui-page-wide">
+    <div class="ui-page ui-page-wide ui-content-workspace">
       <JobsFiltersPanel :cluster="cluster" :nb-jobs="sortedJobs.length" />
 
       <PageHeader
@@ -321,9 +321,19 @@ onMounted(async () => {
         :metric-label="`job${sortedJobs.length > 1 ? 's' : ''} found`"
       >
         <template #actions>
-          <button v-if="canSubmitJobs" type="button" class="ui-button-primary" @click="openSubmitDialog">
-            Submit job
-          </button>
+          <div class="ui-page-tools-end">
+            <button
+              type="button"
+              class="ui-button-secondary"
+              @click="runtimeStore.jobs.openFiltersPanel = true"
+            >
+              <PlusSmallIcon class="h-5 w-5" aria-hidden="true" />
+              Add filters
+            </button>
+            <button v-if="canSubmitJobs" type="button" class="ui-button-primary" @click="openSubmitDialog">
+              Submit job
+            </button>
+          </div>
         </template>
       </PageHeader>
 
@@ -331,19 +341,14 @@ onMounted(async () => {
         <h2 id="filter-heading" class="sr-only">Filters</h2>
 
         <div class="pb-4">
-          <div class="mx-auto flex items-center justify-between px-4 sm:px-6 lg:px-8">
+          <div class="ui-page-tools mx-auto px-4 sm:px-6 lg:px-8">
             <JobsSorter @sort="sortJobs" />
-
-            <button type="button" class="ui-button-secondary" @click="runtimeStore.jobs.openFiltersPanel = true">
-              <PlusSmallIcon class="-ml-0.5 h-5 w-5" aria-hidden="true" />
-              Add filters
-            </button>
           </div>
         </div>
         <JobsFiltersBar />
       </section>
 
-      <div class="ui-section-stack">
+      <div class="ui-results-layout">
         <ErrorAlert v-if="unable"
           >Unable to retrieve jobs from cluster
           <span class="font-medium">{{ cluster }}</span></ErrorAlert
@@ -351,9 +356,11 @@ onMounted(async () => {
         <InfoAlert v-else-if="loaded && data?.length == 0"
           >No jobs found on cluster <span class="font-medium">{{ cluster }}</span></InfoAlert
         >
-        <div v-else class="ui-table-shell -mx-4 overflow-x-auto sm:-mx-6 lg:-mx-8">
-          <div class="inline-block min-w-full py-2 align-middle">
-            <table class="ui-table min-w-full">
+        <div v-else class="ui-results-workspace">
+          <div class="ui-table-shell ui-results-card">
+            <div class="ui-table-scroll">
+              <div class="ui-table-scroll-inner py-2">
+              <table class="ui-table min-w-full">
               <thead>
                 <tr class="text-sm font-semibold text-gray-900 dark:text-gray-200">
                   <th scope="col" class="w-12 py-3.5 pr-3 text-left sm:pl-6 lg:pl-8">#ID</th>
@@ -446,8 +453,11 @@ onMounted(async () => {
                 first-cell-class="sm:pl-6 lg:pl-8"
                 cell-class="px-3"
               />
-            </table>
-
+              </table>
+              </div>
+            </div>
+          </div>
+          <div class="ui-results-dock">
             <PaginationControls
               v-if="loaded"
               :page="runtimeStore.jobs.page"

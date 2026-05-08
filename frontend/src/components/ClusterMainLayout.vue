@@ -108,12 +108,12 @@ onMounted(() => {
       </div>
     </div>
 
-    <main class="ui-content-scroll px-2 pt-3 sm:px-3 lg:px-4 lg:pt-4 xl:px-5 2xl:px-6">
+    <main class="ui-content-scroll flex-1 min-h-0 px-2 pt-3 pb-3 sm:px-3 sm:pb-3 lg:px-4 lg:pt-4 lg:pb-4">
       <div
-        class="rounded-[36px] border border-white/60 bg-[rgba(255,255,255,0.5)] px-3 py-2.5 shadow-[var(--shadow-soft)] backdrop-blur-sm sm:px-5 sm:py-3 lg:px-6 lg:py-4 xl:px-6 xl:py-4 2xl:px-7"
+        class="flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-[36px] border border-white/60 bg-[rgba(255,255,255,0.5)] px-3 py-2.5 shadow-[var(--shadow-soft)] backdrop-blur-sm sm:px-5 sm:py-3 lg:px-6 lg:py-4"
       >
         <div v-if="clusterNotFound">Cluster not found</div>
-        <div v-else class="home ui-page ui-page-wide">
+        <div v-else class="home ui-page ui-page-wide flex-1">
           <slot></slot>
         </div>
       </div>
