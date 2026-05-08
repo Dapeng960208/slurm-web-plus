@@ -553,11 +553,7 @@ onUnmounted(() => {
   flex-direction: column;
   align-items: flex-start;
   gap: 0.5rem;
-  border: 1px solid rgba(80, 105, 127, 0.12);
-  border-radius: 20px;
-  background: rgba(255, 255, 255, 0.88);
-  box-shadow: var(--shadow-soft);
-  padding: 0.85rem 0.95rem;
+  padding: 0;
 }
 
 .user-analytics-window-label {
@@ -602,6 +598,7 @@ onUnmounted(() => {
   font-size: 0.92rem;
   font-weight: 700;
   min-height: 2.9rem;
+  min-width: 22rem;
   padding: 0.8rem 1rem;
 }
 
@@ -615,7 +612,6 @@ onUnmounted(() => {
   .user-analytics-window-control {
     align-items: flex-end;
     justify-self: end;
-    min-width: 22rem;
   }
 
   .user-analytics-main-grid {

@@ -43,6 +43,7 @@
 - 用户详情分析区布局已收口：
   - `Analysis Window` 顶部已删除全名和群组等冗余身份信息，只保留必要状态和更新时间
   - 时间范围控件已提升为更显著的独立控制块
+  - 时间范围控件外层额外卡片边框已移除，避免出现三层描边
   - `Submission Activity` 与 `Usage Profile` 已改为更紧凑的双栏工作区，usage 指标收口为网格布局
   - 已通过 `pnpm vitest run tests/views/UserAnalysisView.spec.ts tests/views/UserView.spec.ts`
 
