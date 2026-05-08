@@ -69,27 +69,10 @@ function jobsBarWidth(tool: UserToolActivityRecord): string {
   if (!maxJobs.value) return '0%'
   return `${(tool.jobs / maxJobs.value) * 100}%`
 }
-
-function memorySpread(tool: UserToolActivityRecord): string {
-  const parts: string[] = []
-  if (tool.avg_memory_gb != null) parts.push(`avg ${formatGb(tool.avg_memory_gb)}`)
-  if (tool.max_memory_gb != null) parts.push(`peak ${formatGb(tool.max_memory_gb)}`)
-  if (tool.median_memory_gb != null) parts.push(`median ${formatGb(tool.median_memory_gb)}`)
-  return parts.join(' / ') || 'No memory sample'
-}
 </script>
 
 <template>
   <div class="ui-table-shell overflow-x-auto" data-testid="user-tool-analysis-table">
-    <div class="border-b border-[rgba(80,105,127,0.08)] px-6 py-5">
-      <div class="flex flex-wrap justify-end gap-2">
-        <div class="flex flex-wrap gap-2">
-          <span class="ui-chip">{{ sortedTools.length }} tool{{ sortedTools.length === 1 ? '' : 's' }}</span>
-          <span class="ui-chip">{{ completedJobsTotal }} completed job{{ completedJobsTotal === 1 ? '' : 's' }}</span>
-        </div>
-      </div>
-    </div>
-
     <div class="inline-block min-w-full align-middle">
       <table class="ui-table min-w-[1100px]">
         <thead>
@@ -120,9 +103,6 @@ function memorySpread(tool: UserToolActivityRecord): string {
                 <div class="min-w-0">
                   <div class="font-semibold text-[var(--color-brand-ink-strong)]">
                     {{ tool.tool }}
-                  </div>
-                  <div class="mt-1 text-xs text-[var(--color-brand-muted)]">
-                    {{ memorySpread(tool) }}
                   </div>
                 </div>
               </div>

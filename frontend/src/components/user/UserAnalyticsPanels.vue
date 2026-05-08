@@ -493,7 +493,7 @@ onUnmounted(() => {
       </div>
     </div>
 
-    <div v-if="userMetricsReady" class="ui-panel ui-section">
+    <div v-if="userMetricsReady">
       <div class="mb-3">
         <h2 class="ui-panel-title">Completed Job Tool Analysis</h2>
         <p class="ui-panel-description mt-2">

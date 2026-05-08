@@ -32,7 +32,6 @@ describe('UserToolAnalysisTable.vue', () => {
 
     await flushPromises()
 
-    expect(wrapper.text()).toContain('12 completed jobs')
     expect(wrapper.text()).toContain('Avg Memory')
     expect(wrapper.text()).toContain('Max Memory')
     expect(wrapper.text()).toContain('Median Memory')
@@ -48,6 +47,8 @@ describe('UserToolAnalysisTable.vue', () => {
     expect(bwaRow.text()).toContain('7.50 GB')
     expect(bwaRow.text()).toContain('1h 30m')
     expect(bwaRow.text()).toContain('7.5 cores')
+    expect(bwaRow.text()).not.toContain('avg 8.00 GB')
+    expect(bwaRow.text()).not.toContain('peak 12.0 GB')
 
     const samtoolsRow = wrapper.get('[data-testid="tool-analysis-row-samtools"]')
     expect(samtoolsRow.text()).toContain('samtools')
@@ -80,7 +81,6 @@ describe('UserToolAnalysisTable.vue', () => {
     const row = wrapper.get('[data-testid="tool-analysis-row-unknown"]')
     expect(row.text()).toContain('unknown')
     expect(row.text()).toContain('100%')
-    expect(row.text()).toContain('No memory sample')
     expect(row.text()).toContain('--')
   })
 })
