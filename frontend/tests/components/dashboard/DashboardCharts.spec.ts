@@ -27,6 +27,7 @@ describe('DashboardCharts.vue', () => {
         cluster: 'foo'
       }
     })
+    expect(wrapper.text()).not.toContain('Realtime Metrics')
     // Check presence of resources and jobs charts component
     wrapper.getComponent(ChartResourcesHistogram)
     wrapper.getComponent(ChartJobsHistogram)

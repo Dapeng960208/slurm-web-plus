@@ -7,18 +7,20 @@
 -->
 
 <script setup lang="ts">
-import { computed, watch } from 'vue'
+import { computed, onBeforeMount, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import type { LocationQueryRaw } from 'vue-router'
 import { useClusterDataGetter } from '@/composables/DataGetter'
 import { getMBHumanUnit } from '@/composables/GatewayAPI'
 import type { ClusterStats } from '@/composables/GatewayAPI'
 import type { ClusterPartition } from '@/composables/GatewayAPI'
+import { isMetricRange, type MetricRange } from '@/composables/GatewayAPI'
 import { useRuntimeStore } from '@/stores/runtime'
 import { useClusterDataPoller } from '@/composables/DataPoller'
 import ClusterMainLayout from '@/components/ClusterMainLayout.vue'
 import DashboardCharts from '@/components/dashboard/DashboardCharts.vue'
 import ErrorAlert from '@/components/ErrorAlert.vue'
+import MetricRangeSelector from '@/components/MetricRangeSelector.vue'
 import PageHeader from '@/components/PageHeader.vue'
 
 const runtimeStore = useRuntimeStore()
@@ -64,6 +66,19 @@ function syncQuery() {
     query: runtimeStore.dashboard.query() as LocationQueryRaw
   })
 }
+
+function setRange(range: MetricRange) {
+  runtimeStore.dashboard.range = range
+  syncQuery()
+}
+
+onBeforeMount(() => {
+  if (route.query.range && isMetricRange(route.query.range)) {
+    runtimeStore.dashboard.range = route.query.range
+  } else {
+    runtimeStore.dashboard.range = 'hour'
+  }
+})
 
 watch(
   () => route.query,
@@ -170,24 +185,44 @@ watch(
         <span class="font-medium">{{ cluster }}</span></ErrorAlert
       >
 
-      <div v-if="canSelectPartition" class="ui-panel ui-section mt-6">
+      <div class="ui-panel ui-section mt-6">
         <div class="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <h2 class="ui-panel-title">Cluster Scope</h2>
-            <p class="ui-panel-description">Filter dashboard stats and charts by partition/queue.</p>
+            <h2 class="ui-panel-title">Realtime Metrics</h2>
+            <p class="ui-panel-description">
+              Filter dashboard stats by queue and switch time range to inspect recent activity.
+            </p>
           </div>
-          <label class="flex min-w-[15rem] flex-col gap-2 text-sm font-medium text-[var(--color-brand-ink-strong)]">
-            <span>Partition / Queue</span>
-            <select
-              id="dashboard-partition"
-              v-model="runtimeStore.dashboard.partition"
-              class="rounded-full border border-[rgba(80,105,127,0.18)] bg-white px-4 py-2.5 text-sm text-[var(--color-brand-ink-strong)] shadow-[var(--shadow-soft)] outline-none transition focus:border-[var(--color-brand-accent)]"
+          <div class="flex flex-wrap items-end justify-end gap-4">
+            <label
+              v-if="canSelectPartition"
+              class="flex min-w-[15rem] flex-col gap-2 text-sm font-medium text-[var(--color-brand-ink-strong)]"
             >
-              <option v-for="option in partitionOptions" :key="option.value || '__all__'" :value="option.value">
-                {{ option.label }}
-              </option>
-            </select>
-          </label>
+              <span>Partition / Queue</span>
+              <select
+                id="dashboard-partition"
+                v-model="runtimeStore.dashboard.partition"
+                class="rounded-full border border-[rgba(80,105,127,0.18)] bg-white px-4 py-2.5 text-sm text-[var(--color-brand-ink-strong)] shadow-[var(--shadow-soft)] outline-none transition focus:border-[var(--color-brand-accent)]"
+              >
+                <option
+                  v-for="option in partitionOptions"
+                  :key="option.value || '__all__'"
+                  :value="option.value"
+                >
+                  {{ option.label }}
+                </option>
+              </select>
+            </label>
+
+            <div class="flex flex-col gap-2 text-sm font-medium text-[var(--color-brand-ink-strong)]">
+              <span>Time Range</span>
+              <MetricRangeSelector
+                :model-value="runtimeStore.dashboard.range"
+                aria-label="Select dashboard metrics range"
+                @update:model-value="setRange"
+              />
+            </div>
+          </div>
         </div>
       </div>
 

@@ -103,6 +103,8 @@ describe('DashboardView.vue', () => {
 
     expect(runtimeStore.dashboard.partition).toBe('gpu')
     expect((wrapper.get('#dashboard-partition').element as HTMLSelectElement).value).toBe('gpu')
+    expect(wrapper.text()).toContain('Realtime Metrics')
+    expect(wrapper.text()).toContain('Time Range')
   })
 
   test('keeps a valid partition query until partitions finish loading', async () => {
@@ -189,6 +191,25 @@ describe('DashboardView.vue', () => {
 
     expect(wrapper.find('#dashboard-partition').exists()).toBe(false)
     expect(runtimeStore.dashboard.partition).toBe('')
+    expect(wrapper.text()).toContain('Time Range')
+  })
+
+  test('renders partition and time range controls in the same panel', () => {
+    const wrapper = mount(DashboardView, {
+      props: {
+        cluster: 'foo'
+      },
+      global: {
+        stubs: {
+          DashboardCharts: true
+        }
+      }
+    })
+
+    const panels = wrapper.findAll('.ui-panel.ui-section')
+    expect(panels).toHaveLength(1)
+    expect(panels[0].text()).toContain('Partition / Queue')
+    expect(panels[0].text()).toContain('Time Range')
   })
 
   test('should not display charts when metrics are disabled', () => {
