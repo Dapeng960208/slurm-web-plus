@@ -432,9 +432,9 @@ onUnmounted(() => {
 
     <div
       v-if="userMetricsReady || userMetricsHistoryLoading || userMetricsHistoryUnavailable"
-      class="grid items-start gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]"
+      class="flex flex-col gap-6 xl:flex-row xl:items-start"
     >
-      <div class="ui-panel ui-section">
+      <div class="ui-panel ui-section min-w-0 xl:flex-[1.2] xl:self-start">
         <div class="mb-3 flex flex-wrap items-end justify-between gap-3">
           <div>
             <h2 class="ui-panel-title">Submission Activity</h2>
@@ -457,7 +457,7 @@ onUnmounted(() => {
         <UserSubmissionHistoryChart v-else :history="userMetricsHistory" />
       </div>
 
-      <div class="ui-panel ui-section">
+      <div class="ui-panel ui-section min-w-0 xl:flex-[0.8] xl:self-start">
         <div class="mb-3">
           <h2 class="ui-panel-title">Usage Profile</h2>
           <p class="ui-panel-description mt-2">
