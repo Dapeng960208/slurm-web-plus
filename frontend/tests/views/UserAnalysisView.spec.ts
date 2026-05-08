@@ -113,9 +113,12 @@ describe('UserAnalysisView.vue', () => {
     expect(wrapper.text()).not.toContain('Memory and Volume')
     expect(wrapper.text()).not.toContain('Resource Roll-up')
     expect(wrapper.text()).toContain('Analysis Window')
-    expect(wrapper.text()).toContain('Root User')
-    expect(wrapper.text()).toContain('Groups: admins, science')
+    expect(wrapper.text()).toContain('One shared time window for activity, usage and completed tool analysis.')
+    expect(wrapper.text()).toContain('LDAP profile available')
+    expect(wrapper.text()).toContain('Updated')
     expect(wrapper.text()).not.toContain('Username')
+    expect(wrapper.find('.user-analytics-window-control').exists()).toBe(true)
+    expect(wrapper.find('.user-analytics-main-grid').exists()).toBe(true)
     expect(mockGatewayAPI.user_tools_analysis).toHaveBeenCalledWith(
       'foo',
       'root',

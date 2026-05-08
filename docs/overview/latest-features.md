@@ -13,6 +13,19 @@
 
 - `cd frontend && pnpm vitest run tests/views/DashboardView.spec.ts tests/components/dashboard/DashboardCharts.spec.ts tests/components/dashboard/ChartResourcesHistory.spec.ts tests/components/dashboard/ChartJobsHistory.spec.ts`
 
+## 本轮：用户分析页头部、时间窗控件与分析区布局已压缩
+
+本轮继续收口用户详情页中的分析区域，重点解决头部冗余、时间窗不明显和 `Submission Activity` 视觉空白过多的问题：
+
+- `Analysis Window` 顶部说明已压缩为更短的工作区说明，不再重复展示全名和群组等低优先级身份信息。
+- 时间范围选择器已提升为单独的高对比控制块，首屏更容易识别和操作。
+- `Submission Activity` 与 `Usage Profile` 已收敛为更紧凑的双栏分析区，右侧 usage 指标改为网格布局，减少纵向拉伸和大片空白。
+- 本轮只调整用户分析视图的布局和可读性，不改变时间窗查询、用户分析接口和数据口径。
+
+本轮新增验证：
+
+- `cd frontend && pnpm vitest run tests/views/UserAnalysisView.spec.ts tests/views/UserView.spec.ts`
+
 ## 本轮：Dashboard `stats` / `metrics` 已补 `partition` 接口契约与 Gateway 透传验证
 
 本轮在不改动 collector、metrics DB 核心实现和 `slurmrestd` 核心实现的前提下，补齐了 Dashboard 相关接口对 `partition` query 的契约支持：

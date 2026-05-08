@@ -45,13 +45,6 @@ const userMetricsHistoryUnavailable = ref(false)
 let summaryTimer: ReturnType<typeof setInterval> | null = null
 let historyTimer: ReturnType<typeof setInterval> | null = null
 
-const userGroupsLabel = computed(() => {
-  const groups = userToolAnalysis.value?.profile?.groups ?? []
-  return groups.length ? groups.join(', ') : null
-})
-
-const userFullnameLabel = computed(() => userToolAnalysis.value?.profile?.fullname ?? null)
-
 const userProfileStatusLabel = computed(() => {
   if (!userToolAnalysis.value?.profile) return null
   return userToolAnalysis.value.profile.ldap_found ? 'LDAP profile available' : 'LDAP profile unavailable'
@@ -342,43 +335,32 @@ onUnmounted(() => {
   <InfoAlert v-if="!enabled"> User analytics is not enabled for this cluster. </InfoAlert>
 
   <div v-else class="ui-section-stack">
-    <div class="ui-panel-soft px-4 py-4">
-      <div class="flex flex-wrap items-end justify-between gap-3">
-        <div class="min-w-0">
-          <div class="ui-stat-label">Analysis Window</div>
-          <div class="mt-2 text-sm text-[var(--color-brand-muted)]">
-            Use one shared window for submissions, usage profile and completed job tool analysis.
-          </div>
-          <div
-            v-if="userFullnameLabel || userGroupsLabel || userProfileStatusLabel || userMetricsGeneratedAtLabel"
-            class="mt-3 flex flex-wrap items-center gap-2 text-xs text-[var(--color-brand-muted)]"
-          >
-            <span
-              v-if="userFullnameLabel"
-              class="rounded-full border border-[rgba(80,105,127,0.12)] bg-white/80 px-3 py-1 font-medium text-[var(--color-brand-ink-strong)]"
-            >
-              {{ userFullnameLabel }}
-            </span>
-            <span
-              v-if="userProfileStatusLabel"
-              class="rounded-full border border-[rgba(80,105,127,0.12)] bg-white/80 px-3 py-1"
-            >
-              {{ userProfileStatusLabel }}
-            </span>
-            <span
-              v-if="userGroupsLabel"
-              class="rounded-full border border-[rgba(80,105,127,0.12)] bg-white/80 px-3 py-1"
-            >
-              Groups: {{ userGroupsLabel }}
-            </span>
-            <span
-              v-if="userMetricsGeneratedAtLabel"
-              class="rounded-full border border-[rgba(80,105,127,0.12)] bg-white/80 px-3 py-1"
-            >
-              Updated {{ userMetricsGeneratedAtLabel }}
-            </span>
-          </div>
+    <div class="user-analytics-toolbar">
+      <div class="min-w-0">
+        <div class="ui-stat-label">Analysis Window</div>
+        <div class="mt-2 text-sm font-medium text-[var(--color-brand-ink-strong)]">
+          One shared time window for activity, usage and completed tool analysis.
         </div>
+        <div
+          v-if="userProfileStatusLabel || userMetricsGeneratedAtLabel"
+          class="mt-3 flex flex-wrap items-center gap-2 text-xs text-[var(--color-brand-muted)]"
+        >
+          <span
+            v-if="userProfileStatusLabel"
+            class="user-analytics-meta-pill"
+          >
+            {{ userProfileStatusLabel }}
+          </span>
+          <span
+            v-if="userMetricsGeneratedAtLabel"
+            class="user-analytics-meta-pill"
+          >
+            Updated {{ userMetricsGeneratedAtLabel }}
+          </span>
+        </div>
+      </div>
+      <div class="user-analytics-window-control">
+        <div class="user-analytics-window-label">Time Range</div>
         <MetricRangeSelector
           :model-value="'hour'"
           aria-label="Select user analytics time range"
@@ -432,14 +414,14 @@ onUnmounted(() => {
 
     <div
       v-if="userMetricsReady || userMetricsHistoryLoading || userMetricsHistoryUnavailable"
-      class="flex flex-col gap-6 xl:flex-row xl:items-start"
+      class="user-analytics-main-grid"
     >
-      <div class="ui-panel ui-section min-w-0 xl:flex-[1.2] xl:self-start">
+      <div class="ui-panel ui-section min-w-0 user-analytics-activity-panel">
         <div class="mb-3 flex flex-wrap items-end justify-between gap-3">
           <div>
             <h2 class="ui-panel-title">Submission Activity</h2>
             <p class="ui-panel-description mt-2">
-              Submission and completion trends for this user within the selected time range.
+              Submission and completion trends in the selected time range.
             </p>
           </div>
         </div>
@@ -454,10 +436,12 @@ onUnmounted(() => {
         <p v-else-if="!userMetricsHistoryHasData" class="ui-panel-description">
           No submission or completion history is available for this range.
         </p>
-        <UserSubmissionHistoryChart v-else :history="userMetricsHistory" />
+        <div v-else class="user-analytics-chart-frame">
+          <UserSubmissionHistoryChart :history="userMetricsHistory" />
+        </div>
       </div>
 
-      <div class="ui-panel ui-section min-w-0 xl:flex-[0.8] xl:self-start">
+      <div class="ui-panel ui-section min-w-0 user-analytics-usage-panel">
         <div class="mb-3">
           <h2 class="ui-panel-title">Usage Profile</h2>
           <p class="ui-panel-description mt-2">
@@ -465,8 +449,8 @@ onUnmounted(() => {
           </p>
         </div>
 
-        <div class="space-y-3">
-          <div class="ui-panel-soft px-4 py-3">
+        <div class="user-analytics-usage-grid">
+          <div class="ui-panel-soft user-analytics-metric-card px-4 py-3">
             <div class="ui-stat-label">Average Memory</div>
             <div class="mt-2 text-2xl font-bold text-[var(--color-brand-ink-strong)]">
               {{ averageMemoryLabel }}
@@ -476,7 +460,7 @@ onUnmounted(() => {
             </div>
           </div>
 
-          <div class="ui-panel-soft px-4 py-3">
+          <div class="ui-panel-soft user-analytics-metric-card px-4 py-3">
             <div class="ui-stat-label">Max Memory</div>
             <div class="mt-2 text-2xl font-bold text-[var(--color-brand-ink-strong)]">
               {{ maxMemoryLabel }}
@@ -486,7 +470,7 @@ onUnmounted(() => {
             </div>
           </div>
 
-          <div class="ui-panel-soft px-4 py-3">
+          <div class="ui-panel-soft user-analytics-metric-card px-4 py-3">
             <div class="ui-stat-label">Median Memory</div>
             <div class="mt-2 text-2xl font-bold text-[var(--color-brand-ink-strong)]">
               {{ medianMemoryLabel }}
@@ -496,7 +480,7 @@ onUnmounted(() => {
             </div>
           </div>
 
-          <div class="ui-panel-soft px-4 py-3">
+          <div class="ui-panel-soft user-analytics-metric-card px-4 py-3">
             <div class="ui-stat-label">Average CPU Cores</div>
             <div class="mt-2 text-2xl font-bold text-[var(--color-brand-ink-strong)]">
               {{ averageCpuLabel }}
@@ -506,7 +490,7 @@ onUnmounted(() => {
             </div>
           </div>
 
-          <div class="ui-panel-soft px-4 py-3">
+          <div class="ui-panel-soft user-analytics-metric-card px-4 py-3">
             <div class="ui-stat-label">Busiest Tool</div>
             <div class="mt-2 text-2xl font-bold text-[var(--color-brand-ink-strong)]">
               {{ userToolAnalysis?.totals.busiest_tool ?? '--' }}
@@ -543,3 +527,114 @@ onUnmounted(() => {
     </div>
   </div>
 </template>
+
+<style scoped>
+.user-analytics-toolbar {
+  display: grid;
+  gap: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  border-radius: 24px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(240, 244, 247, 0.9)),
+    linear-gradient(135deg, rgba(182, 232, 44, 0.08), transparent);
+  box-shadow: var(--shadow-soft);
+  padding: 1rem 1rem 1.1rem;
+}
+
+.user-analytics-meta-pill {
+  border: 1px solid rgba(80, 105, 127, 0.12);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.86);
+  padding: 0.35rem 0.75rem;
+}
+
+.user-analytics-window-control {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5rem;
+  border: 1px solid rgba(80, 105, 127, 0.12);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow: var(--shadow-soft);
+  padding: 0.85rem 0.95rem;
+}
+
+.user-analytics-window-label {
+  color: var(--color-brand-muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.user-analytics-main-grid {
+  display: grid;
+  gap: 1.25rem;
+  align-items: start;
+}
+
+.user-analytics-activity-panel,
+.user-analytics-usage-panel {
+  min-width: 0;
+}
+
+.user-analytics-chart-frame {
+  border-radius: 24px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.78), rgba(245, 247, 249, 0.88));
+  padding: 0.5rem 0.25rem 0.25rem;
+}
+
+.user-analytics-usage-grid {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.user-analytics-metric-card {
+  min-height: 0;
+}
+
+:deep([data-testid='metric-range-custom-button']) {
+  border: 1px solid rgba(80, 105, 127, 0.16);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(246, 248, 250, 0.94));
+  box-shadow: var(--shadow-soft);
+  color: var(--color-brand-ink-strong);
+  font-size: 0.92rem;
+  font-weight: 700;
+  min-height: 2.9rem;
+  padding: 0.8rem 1rem;
+}
+
+@media (min-width: 960px) {
+  .user-analytics-toolbar {
+    align-items: center;
+    grid-template-columns: minmax(0, 1fr) auto;
+    padding: 1rem 1.1rem;
+  }
+
+  .user-analytics-window-control {
+    align-items: flex-end;
+    justify-self: end;
+    min-width: 22rem;
+  }
+
+  .user-analytics-main-grid {
+    grid-template-columns: minmax(0, 1.35fr) minmax(22rem, 0.85fr);
+  }
+
+  .user-analytics-usage-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 959px) {
+  .user-analytics-window-control {
+    width: 100%;
+  }
+
+  :deep([data-testid='metric-range-custom-button']) {
+    width: 100%;
+    justify-content: flex-start;
+  }
+}
+</style>
