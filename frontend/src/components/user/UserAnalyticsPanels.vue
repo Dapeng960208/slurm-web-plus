@@ -489,16 +489,6 @@ onUnmounted(() => {
               Core allocation requested by this user's tool runs in the selected window
             </div>
           </div>
-
-          <div class="ui-panel-soft user-analytics-metric-card px-4 py-3">
-            <div class="ui-stat-label">Busiest Tool</div>
-            <div class="mt-2 text-2xl font-bold text-[var(--color-brand-ink-strong)]">
-              {{ userToolAnalysis?.totals.busiest_tool ?? '--' }}
-            </div>
-            <div class="mt-1.5 text-sm text-[var(--color-brand-muted)]">
-              {{ userToolAnalysis?.totals.busiest_tool_jobs ?? 0 }} completed job(s)
-            </div>
-          </div>
         </div>
       </div>
     </div>

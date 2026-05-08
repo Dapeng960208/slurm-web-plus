@@ -119,6 +119,7 @@ describe('UserAnalysisView.vue', () => {
     expect(wrapper.text()).not.toContain('Username')
     expect(wrapper.find('.user-analytics-window-control').exists()).toBe(true)
     expect(wrapper.find('.user-analytics-main-grid').exists()).toBe(true)
+    expect(wrapper.findAll('.user-analytics-metric-card')).toHaveLength(4)
     expect(mockGatewayAPI.user_tools_analysis).toHaveBeenCalledWith(
       'foo',
       'root',

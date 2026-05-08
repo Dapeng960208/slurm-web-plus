@@ -45,6 +45,7 @@
   - 时间范围控件已提升为更显著的独立控制块
   - 时间范围控件外层额外卡片边框已移除，避免出现三层描边
   - `Submission Activity` 与 `Usage Profile` 已改为更紧凑的双栏工作区，usage 指标收口为网格布局
+  - `Usage Profile` 已移除 `Busiest Tool` 卡片，右侧固定为 2x2 网格并与左侧图表区域底部对齐
   - 已通过 `pnpm vitest run tests/views/UserAnalysisView.spec.ts tests/views/UserView.spec.ts`
 
 - 已补充一条新的仓库级部署约定：
