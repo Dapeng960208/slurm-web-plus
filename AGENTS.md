@@ -1,30 +1,29 @@
-﻿# Documentation Rules For Future AI
+﻿# Agent Rules
 
-后续 AI 在本仓库工作时，必须遵守以下要求：
+1.  **Documentation First**: Before making any changes, read `docs/standards/documentation-standard.md`.
+2.  **Synchronous Updates**: Any change affecting functionality, interfaces, configuration, permissions, databases, deployment, or testing must be accompanied by corresponding updates in the `docs/` directory. A summary of the change must also be recorded in `docs/overview/latest-features.md`; update `project-overview.md` and `architecture-overview.md` when necessary.
+3.  **Status Tracking**: Development progress and coordination details must be written into `docs/tracking/`. Never leave them only in chat logs or commit messages.
+4.  **New Features**: At minimum, check and update the following as needed:
+    - `docs/README.md`
+    - `docs/overview/project-overview.md`
+    - `docs/overview/architecture-overview.md`
+    - `docs/overview/latest-features.md`
+    - Feature-specific docs under `docs/features/<feature>/`
+    - `docs/tracking/current-release.md`
+5.  **Fact-Based**: Never describe unimplemented features as completed.
 
-1. 先阅读 `docs/standards/documentation-standard.md`。
-2. 任何影响功能、接口、配置、权限、数据库、部署、测试的改动，都必须同步更新 `docs/`。
-3. 开发过程的对接和状态必须更新到 `docs/tracking/`，不能只留在对话或提交信息里。
-4. 任何影响功能、接口、配置、权限、数据库、部署、测试的改动，除专项文档外，还必须同步在 `docs/overview/` 记录变更摘要；至少更新 `docs/overview/latest-features.md`，必要时同步 `project-overview.md` 与 `architecture-overview.md`。
-5. 新增功能时，至少检查并按需更新：
-   - `docs/README.md`
-   - `docs/overview/project-overview.md`
-   - `docs/overview/architecture-overview.md`
-   - `docs/overview/latest-features.md`
-   - 对应 `docs/features/<feature>/` 专项文档
-   - `docs/tracking/current-release.md`
-6. 不要把未实现内容写成已完成事实。
+---
 
-如果任务只改小问题，也必须至少判断一次是否需要文档更新；不能默认跳过。
+## Hard Constraints
 
-补充约束（本仓库写死）：
-- 任何开发都必须完成与改动对应的测试；不能只改代码不验证。若确实无法完成测试，必须明确说明阻塞原因、未验证范围与风险。
-- 进入方案讨论或规划阶段时，AI 必须逐项追问并弄清楚具体需求，直到与开发者形成共享理解；每次只提一个问题，并给出推荐答案。
-- 当用户一次提出多个需求、问题或 bug 时，AI 必须先自行整理并分类，再按主题分别处理；提交时必须先检查工作区、区分哪些改动属于当前主题，并按仓库规范拆分提交。对未提交改动必须先与开发者确认是否纳入本次提交；确认后的当前主题改动至少要完成本地提交，保证可追溯。
-- AI 进行 Git 提交时必须遵循上述拆分与确认原则，并满足提交规范（标准见 `docs/standards/ai-development-standard.md`）。
-- 后续 AI 不允许再向 `docs/` 根目录散写新专题文件；根目录仅保留 `docs/README.md` 作为索引入口。
-- 文档命名与放置必须遵循 `docs/standards/document-naming-convention.md`。
-- `docs/overview/latest-features.md` 视为面向全局的 change log 入口；只要发生可感知变更，AI 必须补充对应摘要，不能只更新 `docs/features/` 或 `docs/tracking/`。
-- AI 开发过程中遇到可复现错误时，必须复盘并写入 `docs/tracking/error-log.md`（标准见 `docs/standards/development-error-summary.md`）。
-- 本仓库中文文档按 UTF-8 维护；在 Windows PowerShell 中读取 `AGENTS.md`、`docs/**/*.md` 等中文文档时，不允许直接用裸 `Get-Content <path>` 作为默认做法，必须优先使用 `Get-Content -Encoding UTF8 <path>`。
-- 如果终端仍出现乱码，必须先设置 `[Console]::InputEncoding`、`[Console]::OutputEncoding` 与 `$OutputEncoding` 为 UTF-8，然后再用 `Get-Content -Encoding UTF8 <path>`，或改用 `[System.IO.File]::ReadAllText(<path>, [System.Text.UTF8Encoding]::new($false))` 按字节读取。
+- **Testing**: Every change must include corresponding tests. If testing is infeasible, explicitly document the blocking reasons, unverified scope, and associated risks.
+- **Multi-Task Handling**: When multiple requests, issues, or bugs are raised at once, the AI must first categorize them independently, then address them separately by topic. Before committing, identify which changes belong to the current topic, and split commits according to repository conventions. Uncommitted changes must be confirmed with the developer before inclusion; confirmed topic changes must at least be committed locally to ensure traceability.
+- **Commit Standards**: Git commits must follow the above splitting and confirmation principles, and adhere to `docs/standards/ai-development-standard.md`.
+- **Documentation Organization**:
+    - Do not create new top-level topic files in the `docs/` root directory; only `docs/README.md` serves as the index entry point.
+    - File naming and placement must follow `docs/standards/document-naming-convention.md`.
+    - `docs/overview/latest-features.md` is the global change log entry point; any perceptible change must be appended with a summary there.
+- **Error Logging**: When encountering a reproducible error, a retrospective must be written into `docs/tracking/error-log.md` (following `docs/standards/development-error-summary.md`).
+- **Chinese Encoding (Windows)**: When reading Chinese `.md` files, never use bare `Get-Content`. Always use `Get-Content -Encoding UTF8`. If terminal garbling persists, first set `[Console]::InputEncoding`, `[Console]::OutputEncoding`, and `$OutputEncoding` to UTF-8 before reading; alternatively, use `[System.IO.File]::ReadAllText(<path>, [System.Text.UTF8Encoding]::new($false))`.
+- **Minor Changes**: Even for trivial fixes, you must evaluate whether documentation updates are required—never skip this step by default.
+- **Frontend Changes**: Any frontend-related changes must use the frontend-skill and must read the global stylesheet at `frontend\src\style.css`.
