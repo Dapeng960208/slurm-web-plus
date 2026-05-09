@@ -58,7 +58,7 @@ git status --porcelain
 1. 仍然必须完成本地 `git commit`（保证改动可追溯、可回滚）
 2. 不强行重试到阻塞工作流；将 push 作为后续动作
 3. 必须写入跟踪记录：
-   - `docs/tracking/error-log.md`：记录现象/根因/解决方案（可复现错误）
+   - `docs/tracking/error-log.md`：记录时间/现象/解决办法（可复现错误）
    - `docs/tracking/current-release.md`：记录“已本地提交，待 push”状态（如影响交付节奏）
 
 ## 5. 最小执行清单

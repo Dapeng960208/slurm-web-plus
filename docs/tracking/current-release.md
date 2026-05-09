@@ -35,6 +35,11 @@
 
 ## 2. 已完成项
 
+- 开发错误库文档格式已收口：
+  - `docs/tracking/error-log.md` 已从长篇复盘格式简化为仅保留 `时间`、`现象`、`解决办法`
+  - `docs/standards/development-error-summary.md` 已同步改为新的最小记录模板
+  - `docs/standards/ai-development-standard.md` 已同步调整错误库字段描述，避免规范冲突
+
 - 内容页滚动层级、按钮语义与 AI 工作区已完成一轮统一收口：
   - `ClusterMainLayout`、`SettingsLayout` 与共享样式已补齐 `min-h-0`、`flex-1`、`overflow` 约束，业务内容页改为优先在内容区、表格区、消息区和侧栏内部滚动，不再持续推高最外层页面壳
   - `ui-content-scroll` 现已固定为 header 下方的浏览器可视区内框，并保留与左侧桌面导航一致的底部留白；主内容区不会再因为内部结果集或聊天记录变长而继续向下扩展
@@ -403,6 +408,8 @@
 - `docs/overview/project-overview.md`
 - `docs/overview/architecture-overview.md`
 - `docs/overview/latest-features.md`
+- `docs/standards/development-error-summary.md`
+- `docs/standards/ai-development-standard.md`
 - `docs/features/access-control/requirements.md`
 - `docs/features/access-control/test-plan.md`
 - `docs/features/ai/requirements.md`
@@ -429,6 +436,9 @@
 
 已通过：
 
+- `Get-Content -Encoding UTF8 docs/tracking/error-log.md`
+- `Get-Content -Encoding UTF8 docs/standards/development-error-summary.md`
+- `Get-Content -Encoding UTF8 docs/standards/ai-development-standard.md`
 - `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/slurmrestd/test_slurmrestd_write_operations.py`
 - `cd frontend && npx vitest run tests/views/QosView.spec.ts tests/views/AccountView.spec.ts tests/composables/GatewayAPI.spec.ts`
 - `npm --prefix frontend run type-check`
