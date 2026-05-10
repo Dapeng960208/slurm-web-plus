@@ -413,6 +413,15 @@
   - `.github/workflows/python-ci.yml` 已改为 `python-version: "3.9"`
   - job 名称、`RESULTS_DIR` 与 `ARTIFACT_NAME` 已同步切到 `backend-python-3.9`
   - 其余自动 CI / 手工 CI 工作流职责不变
+- GitHub `Backend Tests` 发布后已补一处 collection 阶段回归：
+  - `slurmweb/tests/lib/gateway.py` 里的测试侧 `ldap` stub 已补 `ldap.filter` 子模块
+  - 修复 Linux CI 未安装 `python-ldap` 时，`rfl.authentication.ldap` 导入 `ldap.filter` 直接中断 gateway / ldap 相关测试收集的问题
+- 后端版本获取链路已补源码目录回退：
+  - `slurmweb/version.py` 现在会在缺少已安装包元数据时回退读取仓库 `pyproject.toml` 的版本号
+  - 修复 gateway / agent / showconf 相关测试在未 `pip install -e .` 的本地或 CI 环境里因 `PackageNotFoundError` 提前失败的问题
+- 前端时间窗测试已补 Vitest 定时器兼容修复：
+  - `MetricRangeSelector.spec.ts` 与 `UserAnalysisView.spec.ts` 改为 `vi.useFakeTimers({ toFake: ['Date'] })`
+  - 修复 `vue-i18n` 在 fake timers 接管 `performance` 后渲染时报 `invalid timestamp` 的单测失败
 
 ## 3. 进行中项
 
@@ -477,6 +486,11 @@
 - `docs/tracking/error-log.md`
 - `docs/features/ci/requirements.md`
 - `docs/features/ci/verification.md`
+- `slurmweb/tests/lib/gateway.py`
+- `slurmweb/version.py`
+- `slurmweb/tests/test_version.py`
+- `frontend/tests/components/MetricRangeSelector.spec.ts`
+- `frontend/tests/views/UserAnalysisView.spec.ts`
 
 ## 6. 验证状态
 
@@ -514,6 +528,8 @@
 - `Get-Content -Raw -Encoding UTF8 .github/workflows/frontend-static.yml | npx --yes yaml valid`
 - `Get-Content -Raw -Encoding UTF8 .github/workflows/ci-triage.yml | npx --yes yaml valid`
 - `rg -n "Python 3\.12|backend-python-3\.12|python-version: \"3\.12\"" .github docs`
+- `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/apps/test_gateway.py slurmweb/tests/apps/test_ldap.py slurmweb/tests/apps/test_showconf.py slurmweb/tests/views/test_gateway.py slurmweb/tests/views/test_gateway_ai.py slurmweb/tests/views/test_gateway_clusters.py slurmweb/tests/views/test_gateway_operations.py slurmweb/tests/views/test_gateway_permissions.py slurmweb/tests/views/test_gateway_ui.py`
+- `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/test_version.py slurmweb/tests/apps/test_gateway.py slurmweb/tests/apps/test_ldap.py slurmweb/tests/apps/test_showconf.py slurmweb/tests/views/test_gateway.py slurmweb/tests/views/test_gateway_ai.py slurmweb/tests/views/test_gateway_clusters.py slurmweb/tests/views/test_gateway_operations.py slurmweb/tests/views/test_gateway_permissions.py slurmweb/tests/views/test_gateway_ui.py`
 - `cd frontend && npx vitest run tests/components/jobs/JobsHistoryFiltersPanel.spec.ts tests/components/jobs/JobsHistoryFiltersBar.spec.ts`
 - `cd frontend && npx eslint src/components/jobs/JobsHistoryFiltersPanel.vue src/components/jobs/JobsHistoryFiltersBar.vue src/views/JobsHistoryView.vue tests/components/jobs/JobsHistoryFiltersPanel.spec.ts tests/components/jobs/JobsHistoryFiltersBar.spec.ts`
 - `cd frontend && npx eslint src/views/JobHistoryView.vue src/composables/GatewayAPI.ts src/composables/ClusterAnalysis.ts src/components/settings/SettingsTabs.vue`

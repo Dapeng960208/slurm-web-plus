@@ -14,6 +14,15 @@
 - `Get-Content -Raw -Encoding UTF8 .github/workflows/python-ci.yml | npx --yes yaml valid`
 - `rg -n "Python 3\\.12|backend-python-3\\.12|python-version: \\\"3\\.12\\\"" .github docs`
 
+发布后补充修复：
+
+- `slurmweb/tests/lib/gateway.py` 中的测试侧 `ldap` stub 已补成带 `ldap.filter` 子模块的 package 形态
+- 避免 GitHub `Backend Tests` 在未安装 `python-ldap` 的 Linux runner 上，把 `ldap` 识别成普通模块后因 `import ldap.filter` 在 collection 阶段中断
+- `slurmweb/version.py` 已补源码目录回退逻辑：若当前环境未安装 `slurm-web-plus` / `slurm-web` 包元数据，会回退读取仓库 `pyproject.toml` 中的版本号
+- 避免本地或 CI 直接以源码 checkout 运行测试时，`get_version()` 因缺少已安装包元数据而让 gateway / agent / showconf 等测试在导入阶段失败
+- `frontend/tests/components/MetricRangeSelector.spec.ts` 与 `frontend/tests/views/UserAnalysisView.spec.ts` 已改为只 fake `Date`
+- 修复 `vue-i18n` 在 Vitest 全量 fake timers 接管 `performance` 后渲染时报 `invalid timestamp` 的前端单测失败
+
 ## 本轮：前端已接入浏览器优先的中英文切换
 
 本轮在前端落地了第一阶段国际化能力，重点覆盖登录入口、共享导航、设置页和前端提示文案：

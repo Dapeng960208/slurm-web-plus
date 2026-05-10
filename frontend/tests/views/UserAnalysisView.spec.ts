@@ -228,7 +228,7 @@ describe('UserAnalysisView.vue', () => {
   })
 
   test('applies predefined analytics windows from the compact dialog', async () => {
-    vi.useFakeTimers()
+    vi.useFakeTimers({ toFake: ['Date'] })
     vi.setSystemTime(new Date('2026-04-24T12:30'))
     const wrapper = mount(UserAnalysisView, {
       props: {
@@ -260,7 +260,7 @@ describe('UserAnalysisView.vue', () => {
   })
 
   test('applies the seven day analytics window and keeps activity data visible', async () => {
-    vi.useFakeTimers()
+    vi.useFakeTimers({ toFake: ['Date'] })
     vi.setSystemTime(new Date('2026-04-24T12:30'))
     const wrapper = mount(UserAnalysisView, {
       props: {

@@ -20,6 +20,7 @@
   - 固定 `Python 3.9`
   - 测试入口固定为 `pytest slurmweb/tests`
   - 依赖安装固定包含 `.[agent]`、`.[gateway]`、`.[tests]`，其中 `cryptography` 由 `agent/tests` extras 提供
+  - gateway / ldap 相关测试当前允许在无 `python-ldap` 的环境下通过测试侧 `ldap` stub 导入 `rfl.authentication.ldap`，避免仅因 `import ldap.filter` 在 collection 阶段中断
 - `.github/workflows/frontend-ci.yml`
   - 前端单元测试
   - 固定 `Node 18`

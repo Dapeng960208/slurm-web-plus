@@ -84,7 +84,7 @@ describe('MetricRangeSelector.vue', () => {
   })
 
   test('fills start and end from quick custom windows', async () => {
-    vi.useFakeTimers()
+    vi.useFakeTimers({ toFake: ['Date'] })
     vi.setSystemTime(new Date('2026-04-24T12:30'))
     const wrapper = mount(MetricRangeSelector, {
       global: {

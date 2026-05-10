@@ -22,6 +22,7 @@ from rfl.authentication.user import AuthenticatedUser, AnonymousUser
 # gateway-only tests can still import the module graph.
 if "ldap" not in sys.modules:
     ldap_stub = types.ModuleType("ldap")
+    ldap_stub.__path__ = []
     ldap_stub.VERSION3 = 3
     ldap_stub.OPT_X_TLS_REQUIRE_CERT = 0
     ldap_stub.OPT_X_TLS_DEMAND = 0
@@ -38,7 +39,11 @@ if "ldap" not in sys.modules:
     ldap_stub.UNWILLING_TO_PERFORM = type("UNWILLING_TO_PERFORM", (Exception,), {})
     ldap_stub.ldapobject = types.SimpleNamespace(LDAPObject=object)
     ldap_stub.initialize = lambda *args, **kwargs: object()
+    ldap_filter_stub = types.ModuleType("ldap.filter")
+    ldap_filter_stub.filter_format = lambda pattern, values: pattern % tuple(values)
+    ldap_stub.filter = ldap_filter_stub
     sys.modules["ldap"] = ldap_stub
+    sys.modules["ldap.filter"] = ldap_filter_stub
 
 from slurmweb.version import get_version
 from slurmweb.apps import SlurmwebAppSeed

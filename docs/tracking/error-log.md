@@ -26,6 +26,21 @@
 - 现象：执行 `cd frontend && npx vitest run` 时，部分组件测试因新组件调用 `useI18n()` 但挂载时未注入 `i18n` 插件而报 `Need to install with app.use function`；另有少量测试仍直接断言旧英文菜单字段或固定中文文案，导致国际化改造后全量回归失败
 - 解决办法：为相关组件测试统一注入 `i18n` 插件；对语言敏感测试显式设置 locale；把旧硬编码菜单/页面文案断言改为翻译 key 或当前 locale 下的目标文案
 
+### 2026-05-10：GitHub `Backend Tests` 在无 `python-ldap` 环境下会因 `import ldap.filter` 在 collection 阶段中断
+- 时间：2026-05-10
+- 现象：GitHub Actions Linux runner 上执行 `pytest slurmweb/tests` 时，`slurmweb/tests/lib/gateway.py` 里的旧 `ldap` stub 只伪造了顶层 `ldap` 模块；`rfl.authentication.ldap` 继续执行 `import ldap.filter` 后报 `ModuleNotFoundError: No module named 'ldap.filter'; 'ldap' is not a package`，导致 gateway / ldap 相关测试在 collection 阶段中断
+- 解决办法：把测试侧 `ldap` stub 改成 package 形态，补 `__path__`、`sys.modules["ldap.filter"]` 和最小 `filter_format()`；继续允许 gateway / ldap 测试在无 `python-ldap` 的 CI 环境下导入模块图
+
+### 2026-05-10：源码目录直接跑后端测试时，`get_version()` 会因缺少包元数据让 gateway / agent 测试导入失败
+- 时间：2026-05-10
+- 现象：在未执行 `pip install -e .` 的本地或 CI 环境中，`slurmweb.apps.agent` 和 `slurmweb.tests.lib.gateway.fake_slurmweb_agent()` 会在导入或构造阶段调用 `get_version()`；若环境里没有 `slurm-web-plus` / `slurm-web` 的已安装包元数据，就会抛 `PackageNotFoundError: Neither slurm-web-plus nor slurm-web is installed`
+- 解决办法：`slurmweb/version.py` 保留“优先读已安装包元数据”的逻辑，但在源码 checkout 中回退读取仓库 `pyproject.toml` 的 `project.version`；补 `slurmweb/tests/test_version.py` 覆盖回退成功和回退缺失两条分支
+
+### 2026-05-10：Vitest 全量 fake timers 会让 `vue-i18n` 在渲染时触发 `invalid timestamp`
+- 时间：2026-05-10
+- 现象：`MetricRangeSelector.spec.ts` 和 `UserAnalysisView.spec.ts` 在 `vi.useFakeTimers()` 后挂载带 `useI18n()` 的组件时，`vue-i18n` 开发态会经过 `window.performance.mark/measure`，最终报 `TypeError: -670107.545519 is not a valid timestamp`
+- 解决办法：对这类只需要冻结“当前时间”的测试，改为 `vi.useFakeTimers({ toFake: ['Date'] })`，只伪造 `Date`，不接管 `performance` 和其它浏览器计时器
+
 ### 2026-05-09：固定应用壳下非表格内容页缺少内部滚动容器会导致正文无法下滚
 - 时间：2026-05-09
 - 现象：`Dashboard`、`Analysis` 以及 `/:cluster/admin/*` 子页面在使用固定高度 `ui-shell` / `ui-content-workspace` 时，若正文直接堆叠在工作区下方而没有内部 `ui-scroll-region`，页面会出现“表格区域能滚动，但详情或配置内容无法继续向下滚动”的共性问题
