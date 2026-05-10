@@ -11,6 +11,7 @@ describe('SettingsTabs admin migration contract', () => {
     expect(source).not.toContain("{ name: 'Access Control', href: 'settings-access-control' }")
     expect(source).not.toContain("{ name: 'Cache', href: 'settings-cache' }")
     expect(source).not.toContain("{ name: 'LDAP Cache', href: 'settings-ldap-cache' }")
+    expect(source).not.toContain("{ name: 'Users', href: 'settings-ldap-users' }")
   })
 
   test('does not use legacy settings permission resources for admin-managed tabs', () => {
@@ -18,5 +19,6 @@ describe('SettingsTabs admin migration contract', () => {
     expect(source).not.toContain("'settings/access-control'")
     expect(source).not.toContain("'settings/cache'")
     expect(source).not.toContain("'settings/ldap-cache'")
+    expect(source).not.toContain("'settings/ldap-users'")
   })
 })

@@ -17,13 +17,22 @@ vi.mock('@/composables/GatewayAPI', async (importOriginal) => {
   }
 })
 
-function paginatedUsersResponse(items: Array<{ username: string; fullname: string | null }>, total: number, page = 1) {
+function paginatedUsersResponse(
+  items: Array<{ username: string; fullname: string | null }>,
+  total: number,
+  page = 1
+) {
   return {
     items,
     total,
     page,
     page_size: 20
   }
+}
+
+const tabsStub = {
+  props: ['entry'],
+  template: '<div>{{ entry }}</div>'
 }
 
 describe('settings/SettingsLdapCache.vue', () => {
@@ -34,8 +43,12 @@ describe('settings/SettingsLdapCache.vue', () => {
   })
 
   async function primeAdminRoute(router: RouterMock, cluster = 'foo') {
-    await router.setParams({ cluster })
-    router.currentRoute.value.name = 'admin-ldap-cache'
+    router.currentRoute.value = {
+      ...router.currentRoute.value,
+      name: 'admin-ldap-users',
+      params: { cluster }
+    }
+    await flushPromises()
   }
 
   test('renders cached LDAP users by cluster', async () => {
@@ -46,7 +59,7 @@ describe('settings/SettingsLdapCache.vue', () => {
         permissions: {
           roles: [],
           actions: ['view-history-jobs'],
-          rules: ['admin/ldap-cache:view:*', 'jobs-history:view:*']
+          rules: ['admin/ldap-users:view:*', 'jobs-history:view:*']
         },
         racksdb: true,
         infrastructure: 'foo',
@@ -72,7 +85,7 @@ describe('settings/SettingsLdapCache.vue', () => {
       global: {
         stubs: {
           SettingsTabs: true,
-          AdminTabs: true,
+          AdminTabs: tabsStub,
           AdminHeader: true,
           RouterLink: RouterLinkStub
         }
@@ -81,6 +94,7 @@ describe('settings/SettingsLdapCache.vue', () => {
 
     await flushPromises()
 
+    expect(wrapper.text()).toContain('Users')
     expect(wrapper.text()).not.toContain('Cluster foo')
     expect(wrapper.text()).not.toContain('LDAP Cache')
     expect(wrapper.text()).toContain('Search by username')
@@ -112,7 +126,7 @@ describe('settings/SettingsLdapCache.vue', () => {
     useRuntimeStore().availableClusters = [
       {
         name: 'foo',
-        permissions: { roles: [], actions: [], rules: ['admin/ldap-cache:view:*'] },
+        permissions: { roles: [], actions: [], rules: ['admin/ldap-users:view:*'] },
         racksdb: true,
         infrastructure: 'foo',
         metrics: true,
@@ -131,7 +145,7 @@ describe('settings/SettingsLdapCache.vue', () => {
       global: {
         stubs: {
           SettingsTabs: true,
-          AdminTabs: true,
+          AdminTabs: tabsStub,
           AdminHeader: true
         }
       }
@@ -150,7 +164,7 @@ describe('settings/SettingsLdapCache.vue', () => {
     useRuntimeStore().availableClusters = [
       {
         name: 'foo',
-        permissions: { roles: [], actions: [], rules: ['admin/ldap-cache:view:*'] },
+        permissions: { roles: [], actions: [], rules: ['admin/ldap-users:view:*'] },
         racksdb: true,
         infrastructure: 'foo',
         metrics: true,
@@ -159,8 +173,12 @@ describe('settings/SettingsLdapCache.vue', () => {
       }
     ]
     mockGatewayAPI.ldap_cache_users
-      .mockResolvedValueOnce(paginatedUsersResponse([{ username: 'alice', fullname: 'Alice Doe' }], 1))
-      .mockResolvedValueOnce(paginatedUsersResponse([{ username: 'alice', fullname: 'Alice Doe' }], 1))
+      .mockResolvedValueOnce(
+        paginatedUsersResponse([{ username: 'alice', fullname: 'Alice Doe' }], 1)
+      )
+      .mockResolvedValueOnce(
+        paginatedUsersResponse([{ username: 'alice', fullname: 'Alice Doe' }], 1)
+      )
 
     await primeAdminRoute(router)
 
@@ -168,7 +186,7 @@ describe('settings/SettingsLdapCache.vue', () => {
       global: {
         stubs: {
           SettingsTabs: true,
-          AdminTabs: true,
+          AdminTabs: tabsStub,
           AdminHeader: true
         }
       }
@@ -191,7 +209,7 @@ describe('settings/SettingsLdapCache.vue', () => {
     useRuntimeStore().availableClusters = [
       {
         name: 'foo',
-        permissions: { roles: [], actions: [], rules: ['admin/ldap-cache:view:*'] },
+        permissions: { roles: [], actions: [], rules: ['admin/ldap-users:view:*'] },
         racksdb: true,
         infrastructure: 'foo',
         metrics: true,
@@ -200,9 +218,15 @@ describe('settings/SettingsLdapCache.vue', () => {
       }
     ]
     mockGatewayAPI.ldap_cache_users
-      .mockResolvedValueOnce(paginatedUsersResponse([{ username: 'alice', fullname: 'Alice Doe' }], 60, 1))
-      .mockResolvedValueOnce(paginatedUsersResponse([{ username: 'bob', fullname: 'Bob Doe' }], 60, 2))
-      .mockResolvedValueOnce(paginatedUsersResponse([{ username: 'alice', fullname: 'Alice Doe' }], 60, 1))
+      .mockResolvedValueOnce(
+        paginatedUsersResponse([{ username: 'alice', fullname: 'Alice Doe' }], 60, 1)
+      )
+      .mockResolvedValueOnce(
+        paginatedUsersResponse([{ username: 'bob', fullname: 'Bob Doe' }], 60, 2)
+      )
+      .mockResolvedValueOnce(
+        paginatedUsersResponse([{ username: 'alice', fullname: 'Alice Doe' }], 60, 1)
+      )
 
     await primeAdminRoute(router)
 
@@ -210,16 +234,14 @@ describe('settings/SettingsLdapCache.vue', () => {
       global: {
         stubs: {
           SettingsTabs: true,
-          AdminTabs: true,
+          AdminTabs: tabsStub,
           AdminHeader: true
         }
       }
     })
 
     await flushPromises()
-    const pageTwoButton = wrapper
-      .findAll('button')
-      .find((button) => button.text().trim() === '2')
+    const pageTwoButton = wrapper.findAll('button').find((button) => button.text().trim() === '2')
     expect(pageTwoButton).toBeDefined()
     await pageTwoButton!.trigger('click')
     await flushPromises()
@@ -229,9 +251,7 @@ describe('settings/SettingsLdapCache.vue', () => {
       page_size: 20
     })
 
-    const resetButton = wrapper
-      .findAll('button')
-      .find((button) => button.text().trim() === 'Reset')
+    const resetButton = wrapper.findAll('button').find((button) => button.text().trim() === 'Reset')
     expect(resetButton).toBeDefined()
     await resetButton!.trigger('click')
     await flushPromises()
@@ -247,7 +267,7 @@ describe('settings/SettingsLdapCache.vue', () => {
     useRuntimeStore().availableClusters = [
       {
         name: 'foo',
-        permissions: { roles: [], actions: [], rules: ['admin/ldap-cache:view:*'] },
+        permissions: { roles: [], actions: [], rules: ['admin/ldap-users:view:*'] },
         racksdb: true,
         infrastructure: 'foo',
         metrics: true,
@@ -256,7 +276,7 @@ describe('settings/SettingsLdapCache.vue', () => {
       },
       {
         name: 'bar',
-        permissions: { roles: [], actions: [], rules: ['admin/ldap-cache:view:*'] },
+        permissions: { roles: [], actions: [], rules: ['admin/ldap-users:view:*'] },
         racksdb: true,
         infrastructure: 'bar',
         metrics: true,
@@ -265,9 +285,15 @@ describe('settings/SettingsLdapCache.vue', () => {
       }
     ]
     mockGatewayAPI.ldap_cache_users
-      .mockResolvedValueOnce(paginatedUsersResponse([{ username: 'alice', fullname: 'Alice Doe' }], 1))
-      .mockResolvedValueOnce(paginatedUsersResponse([{ username: 'bob', fullname: 'Bob Doe' }], 1))
-      .mockResolvedValueOnce(paginatedUsersResponse([{ username: 'alice', fullname: 'Alice Doe' }], 1))
+      .mockResolvedValueOnce(
+        paginatedUsersResponse([{ username: 'alice', fullname: 'Alice Doe' }], 1)
+      )
+      .mockResolvedValueOnce(
+        paginatedUsersResponse([{ username: 'bob', fullname: 'Bob Doe' }], 1)
+      )
+      .mockResolvedValueOnce(
+        paginatedUsersResponse([{ username: 'alice', fullname: 'Alice Doe' }], 1)
+      )
 
     await primeAdminRoute(router)
 
@@ -275,7 +301,7 @@ describe('settings/SettingsLdapCache.vue', () => {
       global: {
         stubs: {
           SettingsTabs: true,
-          AdminTabs: true,
+          AdminTabs: tabsStub,
           AdminHeader: true
         }
       }
@@ -285,7 +311,9 @@ describe('settings/SettingsLdapCache.vue', () => {
 
     const inputs = wrapper.findAll('input')
     await inputs[0].setValue('ali')
-    const searchButtons = wrapper.findAll('button').filter((button) => button.text().trim() === 'Search')
+    const searchButtons = wrapper
+      .findAll('button')
+      .filter((button) => button.text().trim() === 'Search')
     await searchButtons[0].trigger('click')
     await flushPromises()
 
@@ -311,7 +339,7 @@ describe('settings/SettingsLdapCache.vue', () => {
     useRuntimeStore().availableClusters = [
       {
         name: 'foo',
-        permissions: { roles: [], actions: [], rules: ['admin/ldap-cache:view:*'] },
+        permissions: { roles: [], actions: [], rules: ['admin/ldap-users:view:*'] },
         racksdb: true,
         infrastructure: 'foo',
         metrics: true,
@@ -326,7 +354,7 @@ describe('settings/SettingsLdapCache.vue', () => {
       global: {
         stubs: {
           SettingsTabs: true,
-          AdminTabs: true,
+          AdminTabs: tabsStub,
           AdminHeader: true
         }
       }
@@ -334,7 +362,9 @@ describe('settings/SettingsLdapCache.vue', () => {
 
     await flushPromises()
 
-    expect(wrapper.text()).toContain('No cluster has database support enabled for LDAP user caching.')
+    expect(wrapper.text()).toContain(
+      'No cluster has database support enabled for cached directory users.'
+    )
     expect(mockGatewayAPI.ldap_cache_users).not.toHaveBeenCalled()
   })
 
@@ -358,7 +388,7 @@ describe('settings/SettingsLdapCache.vue', () => {
       global: {
         stubs: {
           SettingsTabs: true,
-          AdminTabs: true,
+          AdminTabs: tabsStub,
           AdminHeader: true
         }
       }
@@ -366,7 +396,7 @@ describe('settings/SettingsLdapCache.vue', () => {
 
     await flushPromises()
 
-    expect(wrapper.text()).toContain('No permission to get LDAP cache information on this cluster.')
+    expect(wrapper.text()).toContain('No permission to view cached directory users on this cluster.')
     expect(mockGatewayAPI.ldap_cache_users).not.toHaveBeenCalled()
   })
 
@@ -375,7 +405,7 @@ describe('settings/SettingsLdapCache.vue', () => {
     useRuntimeStore().availableClusters = [
       {
         name: 'foo',
-        permissions: { roles: [], actions: [], rules: ['admin/ldap-cache:view:*'] },
+        permissions: { roles: [], actions: [], rules: ['admin/ldap-users:view:*'] },
         racksdb: true,
         infrastructure: 'foo',
         metrics: true,
@@ -391,7 +421,7 @@ describe('settings/SettingsLdapCache.vue', () => {
       global: {
         stubs: {
           SettingsTabs: true,
-          AdminTabs: true,
+          AdminTabs: tabsStub,
           AdminHeader: true
         }
       }
@@ -399,6 +429,6 @@ describe('settings/SettingsLdapCache.vue', () => {
 
     await flushPromises()
 
-    expect(wrapper.text()).toContain('No cached LDAP users found on this cluster.')
+    expect(wrapper.text()).toContain('No cached users found on this cluster.')
   })
 })

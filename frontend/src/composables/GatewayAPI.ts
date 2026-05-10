@@ -51,9 +51,13 @@ const LEGACY_PERMISSION_RULES: Record<string, PermissionRule[]> = {
   'associations-view': ['accounts:view:*', 'user/profile:view:*'],
   'view-accounts': ['jobs/filter-accounts:view:*'],
   'view-partitions': ['jobs/filter-partitions:view:*', 'resources/filter-partitions:view:*'],
-  'cache-view': ['admin/cache:view:*', 'admin/ldap-cache:view:*'],
+  'cache-view': ['admin/cache:view:*', 'admin/ldap-users:view:*'],
   'cache-reset': ['admin/cache:edit:*'],
   'admin-manage': ['*:*:*']
+}
+
+const RULE_RESOURCE_ALIASES: Record<string, string> = {
+  'admin/ldap-cache': 'admin/ldap-users'
 }
 
 export interface ClusterPermissionAssignment {
@@ -111,10 +115,17 @@ function normalizeClusterPermissionAssignment(
       rules.add(rule)
     }
   }
+  const normalizedRules = [...rules]
+    .map((rule) => {
+      const [resource, operation, scope] = rule.split(':')
+      if (!resource || !operation || !scope) return rule
+      return `${RULE_RESOURCE_ALIASES[resource] ?? resource}:${operation}:${scope}`
+    })
+    .sort()
   return {
     roles: [...(assignment?.roles ?? [])],
     actions: [...(assignment?.actions ?? [])],
-    rules: [...rules].sort()
+    rules: normalizedRules
   }
 }
 

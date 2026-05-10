@@ -24,7 +24,7 @@
 
 - 当前前端权限主口径已经是 `runtimeStore.hasRoutePermission(...)` 与 `hasRoutePermissionAnyScope(...)`。
 - 主菜单、路由守卫和大部分业务页已按规则模型工作，但共享筛选区和局部图表仍残留少量旧 `actions[]` 判断。
-- 当前真实管理入口是 `/:cluster/admin/*`；`/settings/ai`、`/settings/access-control`、`/settings/cache`、`/settings/ldap-cache` 只是兼容重定向入口，不应再写成主要操作路径。
+- 当前真实管理入口是 `/:cluster/admin/*`；`/settings/ai`、`/settings/access-control`、`/settings/cache`、`/settings/ldap-users` 只是兼容重定向入口，旧 `/settings/ldap-cache` 仅保留为重定向兼容，不应再写成主要操作路径。
 - 全局设计 token 已集中在 `frontend/src/style.css`，按钮语义也已有 `ui-button-primary|warning|danger|secondary|ghost`；本轮样式问题主要是个别组件仍在局部硬编码 segmented button、输入框和 badge 视觉。
 
 ## 3. 已确认并修复的问题

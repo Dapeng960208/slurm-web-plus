@@ -45,7 +45,7 @@
   - [测试计划](./features/management-center/test-plan.md)
 - 用户分析
   - [后端与页面契约](./features/user-analytics/backend.md)
-- LDAP Cache
+- Users
   - [验证说明](./features/ldap-cache/verification.md)
 
 ## 规范
@@ -83,7 +83,7 @@
 - 节点 `Real Metrics` 与用户工具分析页统一为按钮触发的起止时间弹框。
 - 时间范围弹框新增 `1 day`、`3 days`、`7 days`、`15 days`、`1 month` 快捷窗口；用户分析按已完成作业统计平均最大内存 GB、平均运行小时和平均 CPU 核数。
 - 基于现有业务页面增强 Slurm 管理能力，补齐单对象创建、编辑、删除、取消。
-- 新增集群级 `/:cluster/admin` 管理入口；默认跳回 `/:cluster/analysis`，后台子页统一承载 `AI`、`LDAP Cache`、`Cache`、`Access Control`。
+- 新增集群级 `/:cluster/admin` 管理入口；默认跳回 `/:cluster/analysis`，后台子页统一承载 `AI`、`Users`、`Cache`、`Access Control`。
 - `jobs` 资源正式落地 `self` scope，普通用户默认只读非 `admin/*` 页面，并允许查看、编辑、取消自己的作业。
 - 默认 `admin` 角色改为全局 `view/edit`，但不默认拥有全局 `delete`。
 - `analysis` 页面新增 `Slurm ping` 与 `diag` 面板。

@@ -10,6 +10,9 @@ logger = logging.getLogger(__name__)
 
 PERMISSION_SCOPES = ("*", "self")
 PERMISSION_OPERATIONS = ("view", "edit", "delete", "*")
+PERMISSION_RESOURCE_ALIASES = {
+    "admin/ldap-cache": "admin/ldap-users",
+}
 
 
 PERMISSION_CATALOG = [
@@ -121,8 +124,8 @@ PERMISSION_CATALOG = [
                 "scopes": ["*"],
             },
             {
-                "resource": "admin/ldap-cache",
-                "label": "Admin / LDAP Cache",
+                "resource": "admin/ldap-users",
+                "label": "Admin / Users",
                 "operations": ["view", "edit"],
                 "scopes": ["*"],
             },
@@ -195,7 +198,7 @@ DEFAULT_LEGACY_PERMISSION_MAP = {
         "jobs/filter-partitions:view:*",
         "resources/filter-partitions:view:*",
     ],
-    "cache-view": ["admin/cache:view:*", "admin/ldap-cache:view:*"],
+    "cache-view": ["admin/cache:view:*", "admin/ldap-users:view:*"],
     "cache-reset": ["admin/cache:edit:*"],
     "admin-manage": ["*:*:*"],
 }
@@ -215,6 +218,7 @@ def normalize_permission_rule(rule: str) -> str:
         raise ValueError(f"Invalid permission operation {operation}")
     if scope not in PERMISSION_SCOPES:
         raise ValueError(f"Invalid permission scope {scope}")
+    resource = PERMISSION_RESOURCE_ALIASES.get(resource, resource)
     return f"{resource}:{operation}:{scope}"
 
 

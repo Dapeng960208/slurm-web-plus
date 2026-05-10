@@ -64,9 +64,13 @@ const LEGACY_PERMISSION_RULES: Record<string, string[]> = {
   'associations-view': ['accounts:view:*', 'user/profile:view:*'],
   'view-accounts': ['jobs/filter-accounts:view:*'],
   'view-partitions': ['jobs/filter-partitions:view:*', 'resources/filter-partitions:view:*'],
-  'cache-view': ['admin/cache:view:*', 'admin/ldap-cache:view:*'],
+  'cache-view': ['admin/cache:view:*', 'admin/ldap-users:view:*'],
   'cache-reset': ['admin/cache:edit:*'],
   'admin-manage': ['*:*:*']
+}
+
+const RULE_RESOURCE_ALIASES: Record<string, string> = {
+  'admin/ldap-cache': 'admin/ldap-users'
 }
 
 function operationAllows(granted: PermissionOperation, requested: PermissionOperation): boolean {
@@ -89,8 +93,10 @@ function ruleAllows(
 ): boolean {
   const [grantedResource, grantedOperation, grantedScope] = rule.split(':')
   if (!grantedResource || !grantedOperation || !grantedScope) return false
+  const normalizedGrantedResource = RULE_RESOURCE_ALIASES[grantedResource] ?? grantedResource
+  const normalizedRequestedResource = RULE_RESOURCE_ALIASES[resource] ?? resource
   return (
-    resourceAllows(grantedResource, resource) &&
+    resourceAllows(normalizedGrantedResource, normalizedRequestedResource) &&
     operationAllows(grantedOperation as PermissionOperation, operation) &&
     (grantedScope === '*' || grantedScope === scope)
   )

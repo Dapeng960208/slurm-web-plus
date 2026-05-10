@@ -45,14 +45,14 @@ const pageVisible = computed(
   () => runtimeConfiguration.authentication && clusters.value.some((cluster) => cluster.database)
 )
 
+const usersPermissionResource = computed(() =>
+  isAdminRoute.value ? 'admin/ldap-users' : 'settings/ldap-users'
+)
+
 async function fetchClusterUsers(cluster: ClusterDescription) {
   if (
     !cluster.database ||
-    !runtimeStore.hasRoutePermission(
-      cluster.name,
-      isAdminRoute.value ? 'admin/ldap-cache' : 'settings/ldap-cache',
-      'view'
-    )
+    !runtimeStore.hasRoutePermission(cluster.name, usersPermissionResource.value, 'view')
   )
     return
 
@@ -110,7 +110,7 @@ function updateQueryParameters() {
     query.page_size = pageSize.value
   }
   router.push({
-    name: isAdminRoute.value ? 'admin-ldap-cache' : 'settings-ldap-cache',
+    name: isAdminRoute.value ? 'admin-ldap-users' : 'settings-ldap-users',
     params: isAdminRoute.value ? { cluster: runtimeStore.currentCluster?.name } : undefined,
     query
   })
@@ -143,29 +143,25 @@ onMounted(async () => {
   <div class="ui-section-stack">
     <component
       :is="tabsComponent"
-      entry="LDAP Cache"
+      entry="Users"
       :cluster="runtimeStore.currentCluster?.name ?? runtimeStore.availableClusters[0]?.name ?? ''"
     />
 
     <InfoAlert v-if="!runtimeConfiguration.authentication">
-      LDAP authentication is disabled, so LDAP cache data is unavailable.
+      LDAP authentication is disabled, so cached directory users are unavailable.
     </InfoAlert>
     <InfoAlert v-else-if="!pageVisible">
-      No cluster has database support enabled for LDAP user caching.
+      No cluster has database support enabled for cached directory users.
     </InfoAlert>
 
     <div v-else class="ui-section-stack">
       <div v-for="cluster in clusters" :key="cluster.name" class="ui-panel ui-section">
         <InfoAlert
           v-if="
-            !runtimeStore.hasRoutePermission(
-              cluster.name,
-              isAdminRoute ? 'admin/ldap-cache' : 'settings/ldap-cache',
-              'view'
-            )
+            !runtimeStore.hasRoutePermission(cluster.name, usersPermissionResource, 'view')
           "
         >
-          No permission to get LDAP cache information on this cluster.
+          No permission to view cached directory users on this cluster.
         </InfoAlert>
         <InfoAlert v-else-if="!cluster.database">
           Database support is disabled on this cluster.
@@ -174,14 +170,14 @@ onMounted(async () => {
           <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div class="w-full max-w-xl">
               <label
-                :for="`ldap-cache-query-${cluster.name}`"
+                :for="`ldap-users-query-${cluster.name}`"
                 class="mb-2 block text-sm font-semibold text-[var(--color-brand-ink-strong)]"
               >
                 Search by username
               </label>
               <div class="flex flex-col gap-3 sm:flex-row">
                 <input
-                  :id="`ldap-cache-query-${cluster.name}`"
+                  :id="`ldap-users-query-${cluster.name}`"
                   v-model="clusterQueries[cluster.name]"
                   type="text"
                   class="block w-full rounded-[18px] border border-[rgba(80,105,127,0.16)] bg-white px-4 py-3 text-sm text-[var(--color-brand-ink-strong)] shadow-[var(--shadow-soft)] outline-hidden focus:border-[rgba(182,232,44,0.65)] focus:ring-4 focus:ring-[rgba(182,232,44,0.18)]"
@@ -210,13 +206,13 @@ onMounted(async () => {
             class="text-[var(--color-brand-muted)]"
           >
             <LoadingSpinner :size="5" />
-            Loading cached LDAP users...
+            Loading cached users...
           </div>
           <ErrorAlert v-else-if="clusterErrors[cluster.name]">
             {{ clusterErrors[cluster.name] }}
           </ErrorAlert>
           <InfoAlert v-else-if="(clusterTotals[cluster.name] ?? 0) === 0">
-            No cached LDAP users found on this cluster.
+            No cached users found on this cluster.
           </InfoAlert>
           <div v-else class="ui-table-shell ui-results-card">
             <div class="ui-table-scroll">

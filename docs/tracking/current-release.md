@@ -7,7 +7,7 @@
 - 在前端落地中英文切换，优先覆盖登录页、共享导航、Settings、通知、分页和前端生成错误提示
 
 - 在现有业务页面补单对象管理能力，不做独立全量管理中心
-- 将 `AI`、`LDAP Cache`、`Cache`、`Access Control` 迁移到 `/:cluster/admin`
+- 将 `AI`、`Users`、`Cache`、`Access Control` 迁移到 `/:cluster/admin`
 - 在 `analysis` 页面补 `Slurm ping` 与 `diag`
 - 以 `jobs:view|edit|delete:*|self` 落地 owner-aware 权限校验
 - 补齐 `slurmrestd 0.39-0.44` 的读写兼容策略与测试基线
@@ -36,6 +36,14 @@
 - 收口 `/:cluster/admin/ai`：模型配置改为表格、审计记录改为表格、统一搜索框样式，并将审计详情迁移到独立详情页
 
 ## 2. 已完成项
+
+- LDAP 用户缓存管理页已统一改名为 `Users`：
+  - 正式管理路由改为 `/:cluster/admin/ldap-users`
+  - 兼容 settings 入口改为 `/settings/ldap-users`
+  - 旧 `/settings/ldap-cache` 与 `/:cluster/admin/ldap-cache` 继续保留为重定向兼容入口
+  - 正式权限资源改为 `admin/ldap-users:view|edit:*`
+  - 后端与前端权限归一化继续兼容历史 `admin/ldap-cache:*` 规则，避免旧角色立即失效
+  - `Admin` 页签、主菜单和 `Users` 页面文案已统一收口到新命名
 
 - 前端共享局部样式已继续收口：
   - `ResourcesDiagramNavigation` 与 `ChartResourcesHistogram` 改为共享 segmented 控件样式
@@ -94,7 +102,7 @@
 
 - 通用内容页滚动缺陷已继续向 `dashboard` / `analysis` / `admin` 子树收口：
   - `DashboardView` 与 `ClusterAnalysisView` 已补统一正文内部滚动容器，页面头部继续保留在工作区顶端
-  - `AdminLayoutView` 已为 `RouterView` 外层补统一 `ui-scroll-region`，修复 `admin/ai`、`admin/access-control`、`admin/cache`、`admin/ldap-cache` 以及管理员 AI 会话详情等子页面在固定 shell 中无法继续下滚的问题
+  - `AdminLayoutView` 已为 `RouterView` 外层补统一 `ui-scroll-region`，修复 `admin/ai`、`admin/access-control`、`admin/cache`、`admin/ldap-users` 以及管理员 AI 会话详情等子页面在固定 shell 中无法继续下滚的问题
   - 这次修复继续保持表格页自身的 `ui-table-scroll` / `ui-results-scroll` 局部滚动策略，不改变现有表格分页布局
   - 本轮已补对应结构回归测试，覆盖 `DashboardView`、`ClusterAnalysisView`、`AdminLayoutView`
 
@@ -104,12 +112,12 @@
   - `Jobs`、`Jobs History`、`Resources`、`Dashboard`、`Analysis`、`Accounts`、`Account`、`User`、`Reservations`、`QOS`、`Admin` 等登录后内容页已统一接入 `ui-content-workspace`
   - `Jobs`、`Jobs History`、`Resources`、`QOS`、`Reservations`、`Accounts` 已统一成“筛选区固定在上、表格/树区域内部滚动、分页条固定在工作区底部”的结构，长结果集不再把分页继续推到浏览器视口之外
   - 表格共享滚动样式已统一为 `ui-table-scroll` / `ui-table-scroll-inner`，去掉各页零散的负边距横向滚动写法，左右内边距和 gutter 恢复一致
-  - `LDAP Cache` 已删除重复页头卡片和 `Cluster ...` 冗余标题，搜索区与表格统一收口在单个内容卡片内；作为多 cluster 特例，各 cluster 卡片内部独立滚动，分页固定在各自卡片底部
+  - `Users` 页面已删除重复页头卡片和 `Cluster ...` 冗余标题，搜索区与表格统一收口在单个内容卡片内；作为多 cluster 特例，各 cluster 卡片内部独立滚动，分页固定在各自卡片底部
   - `Cluster Analysis` 中 `Queue Blockers`、`Partition Hotspots`、`Historical Pressure` 的并列指标卡已统一到同一套共享 surface，消除同栏目卡片背景和边框语义漂移
   - `SettingsHeader` / `AdminHeader` 的固定套话已移除，页面头部继续按“唯一主标题 + 必要说明”展示
   - `Add filters` 已统一收口为 `ui-button-secondary`；`Jobs` 页把 `Submit job` 与 `Add filters` 收到同一工具区，同排同高对齐
   - AI 对话页已改为固定工作区：左侧历史、中间消息区、右侧 trace 独立滚动，底部输入区固定在工作区底部；聊天列本身锁定在主可视区内，消息区仅在固定可视高度内滚动，左栏历史只保留标题与更新时间，不再显示消息摘要
-  - 本轮前端回归已补页面结构断言，覆盖 `.ui-results-dock`、`.ui-table-scroll`、`.ui-tree-scroll`、`AssistantView` composer `shrink-0` 与 `LDAP Cache` 卡片内分页位置
+  - 本轮前端回归已补页面结构断言，覆盖 `.ui-results-dock`、`.ui-table-scroll`、`.ui-tree-scroll`、`AssistantView` composer `shrink-0` 与 `Users` 卡片内分页位置
 - 已补充并通过 `frontend` 侧类型检查与相关视图测试，覆盖 `Jobs`、`Jobs History`、`Resources`、`Assistant`
 - 已补充并通过本轮工作区/分页定向前端验证：
   - `npm --prefix frontend run type-check`
@@ -285,10 +293,10 @@
   - 已补对应前端组件回归测试
 - `ActionDialog` 在弹窗已打开期间不再因 `initialValues` 被后台轮询刷新而重置用户输入；现在只会在重新打开弹窗或切换到另一种操作时重建表单
 - 新增集群级 `/:cluster/admin` 路由与 `Admin` 菜单入口
-- 旧 `/settings/ai|access-control|cache|ldap-cache` 已重定向到 `admin/*`
+- 旧 `/settings/ai|access-control|cache|ldap-cache` 已重定向到 `admin/*`，其中正式用户缓存路径已改为 `/settings/ldap-users` 和 `/:cluster/admin/ldap-users`
 - `Admin` 页面已统一承载：
   - `AI`
-  - `LDAP Cache`
+  - `Users`
   - `Cache`
   - `Access Control`
 - `ClusterAnalysisView` 已补 `Slurm ping` 与 `diag`
@@ -322,7 +330,7 @@
 - 权限资源已切换到：
   - `admin/ai`
   - `admin/cache`
-  - `admin/ldap-cache`
+  - `admin/ldap-users`
   - `admin/access-control`
 - `default_seed_roles()` 已收紧，普通 `user` 不再默认带 `admin/*`
 - `policy.yml` / `policy.ini` 已移除 6 个旧动作配置入口：
@@ -457,7 +465,7 @@
 ## 4. 风险与阻塞
 
 - 当前前端对 `accounts/users/qos/reservation` 使用的是高频结构化字段，不覆盖全部官方 JSON 细节
-- `admin/ldap-cache:edit:*` 当前表示 LDAP 缓存维护动作，例如刷新、重建或失效缓存；不表示修改 LDAP 源数据
+- `admin/ldap-users:edit:*` 当前表示 LDAP 用户缓存维护动作，例如刷新、重建或失效缓存；不表示修改 LDAP 源数据
 - `.venv\Scripts\python.exe -m pytest -q slurmweb/tests` 在当前 Windows 环境下仍不适合作为本轮唯一验收结论
 - Windows 本地执行 `pip install -e ".[agent,tests,gateway]"` 会继续卡在 `RacksDB[web] -> PyGObject` 编译；后端依赖修复已通过定向 AI pytest 验证，但完整 agent extra 仍更适合以 Ubuntu CI 为准
 - 部分前端测试夹具仍以旧 `actions[]` 为主，若继续扩大回归范围，需继续向 `rules[]` 夹具收敛
@@ -477,6 +485,7 @@
 ## 5. 已同步文档
 
 - `docs/README.md`
+- `docs/features/ldap-cache/verification.md`
 - `docs/features/i18n/requirements.md`
 - `docs/features/i18n/test-plan.md`
 - `docs/overview/project-overview.md`

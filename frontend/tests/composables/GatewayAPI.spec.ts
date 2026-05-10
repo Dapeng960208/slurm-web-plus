@@ -739,7 +739,7 @@ describe('gateway data APIs', () => {
       expect.arrayContaining([
         'admin/cache:edit:*',
         'admin/cache:view:*',
-        'admin/ldap-cache:view:*',
+        'admin/ldap-users:view:*',
         '*:*:*'
       ])
     )

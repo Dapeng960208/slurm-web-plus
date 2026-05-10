@@ -9,7 +9,7 @@ describe('GatewayAPI admin contract', () => {
   test('maps legacy admin actions to admin permission resources', () => {
     expect(source).toContain("'cache-view'")
     expect(source).toContain('admin/cache:view:*')
-    expect(source).toContain('admin/ldap-cache:view:*')
+    expect(source).toContain('admin/ldap-users:view:*')
     expect(source).toContain("'view-ai'")
     expect(source).toContain('ai:view:*')
     expect(source).toContain("'cache-reset'")

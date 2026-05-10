@@ -26,7 +26,7 @@ const SettingsAIView = () => import('@/views/settings/SettingsAI.vue')
 const SettingsAIConversationDetailView = () => import('@/views/settings/SettingsAIConversationDetail.vue')
 const SettingsAccessControlView = () => import('@/views/settings/SettingsAccessControl.vue')
 const SettingsCacheView = () => import('@/views/settings/SettingsCache.vue')
-const SettingsLdapCacheView = () => import('@/views/settings/SettingsLdapCache.vue')
+const SettingsLdapUsersView = () => import('@/views/settings/SettingsLdapCache.vue')
 const AdminLayoutView = () => import('@/views/AdminLayoutView.vue')
 const ClustersView = () => import('@/views/ClustersView.vue')
 const JobsView = () => import('@/views/JobsView.vue')
@@ -137,7 +137,17 @@ const router = createRouter({
         {
           path: '/settings/ldap-cache',
           name: 'settings-ldap-cache',
-          component: SettingsLdapCacheView,
+          redirect: {
+            name: 'settings-ldap-users'
+          },
+          meta: {
+            settings: true
+          }
+        },
+        {
+          path: '/settings/ldap-users',
+          name: 'settings-ldap-users',
+          component: SettingsLdapUsersView,
           meta: {
             settings: true
           }
@@ -202,7 +212,15 @@ const router = createRouter({
             {
               path: 'ldap-cache',
               name: 'admin-ldap-cache',
-              component: SettingsLdapCacheView,
+              redirect: (to: RouteLocation) => ({
+                name: 'admin-ldap-users',
+                params: { cluster: to.params.cluster }
+              })
+            },
+            {
+              path: 'ldap-users',
+              name: 'admin-ldap-users',
+              component: SettingsLdapUsersView,
               props: true
             }
           ]
@@ -404,7 +422,8 @@ function clusterRoutePermission(
     case 'admin-cache':
       return { resource: 'admin/cache', operation: 'view' }
     case 'admin-ldap-cache':
-      return { resource: 'admin/ldap-cache', operation: 'view' }
+    case 'admin-ldap-users':
+      return { resource: 'admin/ldap-users', operation: 'view' }
     default:
       return null
   }
@@ -420,7 +439,7 @@ function clusterHasAdminAccess(
       'admin/ai',
       'admin/access-control',
       'admin/cache',
-      'admin/ldap-cache'
+      'admin/ldap-users'
     ].some((resource) => runtime.hasRoutePermission(clusterName, resource, 'view'))
   )
 }
@@ -503,7 +522,8 @@ router.beforeEach(async (to, from) => {
     to.name === 'settings-ai' ||
     to.name === 'settings-access-control' ||
     to.name === 'settings-cache' ||
-    to.name === 'settings-ldap-cache'
+    to.name === 'settings-ldap-cache' ||
+    to.name === 'settings-ldap-users'
   ) {
     const settingsCluster = getSettingsCluster(runtime)
     if (!settingsCluster) {
@@ -518,7 +538,7 @@ router.beforeEach(async (to, from) => {
     if (to.name === 'settings-cache') {
       return { name: 'admin-cache', params: { cluster: settingsCluster.name } }
     }
-    return { name: 'admin-ldap-cache', params: { cluster: settingsCluster.name } }
+    return { name: 'admin-ldap-users', params: { cluster: settingsCluster.name } }
   }
 
   if (

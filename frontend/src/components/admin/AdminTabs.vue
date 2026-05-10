@@ -30,9 +30,9 @@ const tabs = computed(() => {
   }
   if (
     runtimeConfiguration.authentication &&
-    runtimeStore.hasRoutePermission(cluster, 'admin/ldap-cache', 'view')
+    runtimeStore.hasRoutePermission(cluster, 'admin/ldap-users', 'view')
   ) {
-    result.push({ name: 'LDAP Cache', href: 'admin-ldap-cache' })
+    result.push({ name: 'Users', href: 'admin-ldap-users' })
   }
   if (runtimeStore.hasRoutePermission(cluster, 'admin/access-control', 'view')) {
     result.push({ name: 'Access Control', href: 'admin-access-control' })

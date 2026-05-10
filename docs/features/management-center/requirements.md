@@ -7,7 +7,7 @@
 目标包括：
 
 - 在现有 `Jobs`、`Resources`、`Reservations`、`Accounts`、`User`、`QOS` 页面补创建、编辑、删除、取消等单对象能力
-- 将 `AI`、`LDAP Cache`、`Cache`、`Access Control` 从 `/settings/*` 迁移到 `/:cluster/admin`
+- 将 `AI`、`Users`、`Cache`、`Access Control` 从 `/settings/*` 迁移到 `/:cluster/admin`
 - 在 `analysis` 页面补 `Slurm diag` 与 `ping`
 - 将 `analysis/ping`、`analysis/diag` 从原始 JSON 文本收口为结构化字段展示
 - 用 `resource:operation:scope` 做严格权限控制
@@ -55,7 +55,7 @@
   - 内存容量详情按 GB 展示，评分与百分比仍使用原始 MB 数值
 - `/:cluster/admin`
   - `AI`
-  - `LDAP Cache`
+  - `Users`
   - `Cache`
   - `Access Control`
 
@@ -73,14 +73,14 @@
 - `/:cluster/admin/ai`
 - `/:cluster/admin/access-control`
 - `/:cluster/admin/cache`
-- `/:cluster/admin/ldap-cache`
+- `/:cluster/admin/ldap-users`
 
 旧路由迁移：
 
 - `/settings/ai` -> `/:cluster/admin/ai`
 - `/settings/access-control` -> `/:cluster/admin/access-control`
 - `/settings/cache` -> `/:cluster/admin/cache`
-- `/settings/ldap-cache` -> `/:cluster/admin/ldap-cache`
+- `/settings/ldap-users` -> `/:cluster/admin/ldap-users`
 
 说明：
 
@@ -106,7 +106,7 @@
 后台资源：
 
 - `admin/ai:view|edit|delete:*`
-- `admin/ldap-cache:view|edit:*`
+- `admin/ldap-users:view|edit:*`
 - `admin/cache:view|edit:*`
 - `admin/access-control:view|edit|delete:*`
 
@@ -235,7 +235,7 @@
 
 ## 9. 降级与边界
 
-- `admin/ldap-cache:edit:*` 当前表示 LDAP 缓存维护动作，例如刷新、重建或失效缓存；不表示修改 LDAP 源数据
+- `admin/ldap-users:edit:*` 当前表示 LDAP 用户缓存维护动作，例如刷新、重建或失效缓存；不表示修改 LDAP 源数据
 - `accounts/users/qos/reservation` 当前前端使用轻量结构化表单，不覆盖全部官方 JSON 细节
 - 全量后端回归仍需 Linux 环境补充
 

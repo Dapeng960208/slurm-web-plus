@@ -52,12 +52,12 @@ Browser (Vue SPA)
 
 - `admin/ai`
 - `admin/cache`
-- `admin/ldap-cache`
+- `admin/ldap-users`
 - `admin/access-control`
 
 补充说明：
 
-- `/settings/ai`、`/settings/access-control`、`/settings/cache`、`/settings/ldap-cache` 当前只保留为兼容重定向入口
+- `/settings/ai`、`/settings/access-control`、`/settings/cache`、`/settings/ldap-users` 当前只保留为兼容重定向入口
 - 路由主入口和菜单入口都以 `/:cluster/admin/*` 为准
 
 补充说明：

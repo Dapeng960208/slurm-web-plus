@@ -1018,7 +1018,7 @@ def cache_authenticated_user():
     return jsonify({"result": "User cache updated"})
 
 
-@permission_required(("admin/ldap-cache", "view", "*"), legacy_action="cache-view")
+@permission_required(("admin/ldap-users", "view", "*"), legacy_action="cache-view")
 def ldap_cache_users():
     """Return cached LDAP users stored in the local database."""
     if current_app.users_store is None:

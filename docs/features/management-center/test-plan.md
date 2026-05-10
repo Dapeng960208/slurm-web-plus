@@ -71,7 +71,7 @@
 - `admin-ai`
 - `admin-access-control`
 - `admin-cache`
-- `admin-ldap-cache`
+- `admin-ldap-users`
 - 旧 `settings/*` 管理路由重定向到 `admin/*`
 - 主菜单 `Admin` 入口只在具备任一 `admin/*:view:*` 时显示
 - 主菜单 `Admin` 入口在拥有 `admin-manage`（即 `*:*:*`）时也显示
@@ -110,7 +110,7 @@
 - `ClusterMainLayout` 的 `main.ui-content-scroll` 具备显式 `flex-1` 与 `min-h-0`，作为浏览器可视区内框，而不是随子内容增长的普通文档流容器
 - `UserView`、`AccountView`、`JobView`、`JobHistoryView`、`NodeView`、`UserAnalysisView` 详情页正文存在独立 `.ui-scroll-region`，返回按钮保留在工作区顶部，非表格详情内容可以在固定 shell 内继续下滚
 - `DashboardView` 与 `ClusterAnalysisView` 页面正文存在独立 `.ui-scroll-region`，页头保留在工作区顶部，非表格内容区可以在固定 shell 内继续下滚
-- `AdminLayoutView` 会在 `RouterView` 外层提供 `.ui-scroll-region`，保证 `admin/ai`、`admin/access-control`、`admin/cache`、`admin/ldap-cache` 与管理员详情子页面在固定 shell 中仍可滚动
+- `AdminLayoutView` 会在 `RouterView` 外层提供 `.ui-scroll-region`，保证 `admin/ai`、`admin/access-control`、`admin/cache`、`admin/ldap-users` 与管理员详情子页面在固定 shell 中仍可滚动
 - `ResourcesView` 不再渲染节点行尾 `Manage` / `Delete` 按钮，节点名称仍可跳转详情
 - `NodeView` 的 Edit Node 中 `state` 渲染为下拉框，并按所选状态提交 `update_node`
 

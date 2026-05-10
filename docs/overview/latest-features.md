@@ -79,7 +79,7 @@
 
 - `DashboardView` 已补共享 `ui-scroll-region`，页头保留在工作区顶部，筛选面板、统计卡片和图表区域改为在固定内容区内滚动。
 - `ClusterAnalysisView` 已补同一套正文滚动容器，分析摘要、容量卡、建议区与控制器健康区不再被固定 shell 裁切。
-- `AdminLayoutView` 现已在 `RouterView` 外层统一提供内部滚动区，`admin/ai`、`admin/access-control`、`admin/cache`、`admin/ldap-cache` 以及管理员 AI 会话详情等子页面无需各自重复修补即可恢复内容滚动。
+- `AdminLayoutView` 现已在 `RouterView` 外层统一提供内部滚动区，`admin/ai`、`admin/access-control`、`admin/cache`、`admin/ldap-users` 以及管理员 AI 会话详情等子页面无需各自重复修补即可恢复内容滚动。
 - 本轮修复继续保留表格页各自的局部滚动结构，不改变已存在的 `ui-table-scroll`、`ui-results-scroll` 和分页停靠方式。
 
 本轮新增验证：
@@ -130,8 +130,8 @@
 - `Jobs`、`Jobs History`、`Resources`、`Dashboard`、`Analysis`、`Accounts`、`Account`、`User`、`Reservations`、`QOS`、`Admin` 等页面已接入统一内容工作区容器，页面滚动层级更稳定。
 - `Jobs`、`Jobs History`、`Resources`、`QOS`、`Reservations`、`Accounts` 等单主结果区页面已改为“表格/树内容区单独滚动 + 分页条固定在工作区底部”的展示方式，更接近常见控制台工作区，不必先滚到整页最底部才能翻页。
 - 表格共享滚动样式已去掉各视图里零散的负边距横向滚动写法，表格左右 gutter 与内边距恢复统一，列内容不再紧贴容器边缘。
-- `LDAP Cache` 页面已删除重复的页头卡片与集群标题，搜索和结果区统一合并为单个内容卡片，减少无效留白和重复说明。
-- `LDAP Cache` 作为多 cluster 特例，继续按 cluster 卡片独立滚动与分页；分页固定在各自卡片底部，不固定到浏览器底部，避免同页多分页器互相覆盖。
+- `Users` 页面已删除重复的页头卡片与集群标题，搜索和结果区统一合并为单个内容卡片，减少无效留白和重复说明。
+- `Users` 作为多 cluster 特例，继续按 cluster 卡片独立滚动与分页；分页固定在各自卡片底部，不固定到浏览器底部，避免同页多分页器互相覆盖。
 - `Cluster Analysis` 中同栏目并列卡片已统一复用共享 surface，避免 `Packing Signal`、分区热点卡、历史压力卡在同一块内容里出现无语义依据的背景和边框差异。
 - `SettingsHeader` 与 `AdminHeader` 的固定套话已删除，页面标题继续按“唯一主标题 + 必要说明”收口，减少重复说明和冗余头部文本。
 - `Add filters` 现已统一为共享次级按钮样式；`Jobs` 页面中的 `Submit job` 与 `Add filters` 已整理到同一操作区，同排、同高、同对齐。
@@ -662,7 +662,7 @@
 
 当前保留的旧动作兼容只剩：
 
-- `cache-view` -> `admin/cache:view:*` + `admin/ldap-cache:view:*`
+- `cache-view` -> `admin/cache:view:*` + `admin/ldap-users:view:*`
 - `cache-reset` -> `admin/cache:edit:*`
 - `admin-manage` -> `*:*:*`
 
@@ -708,7 +708,7 @@
 以下原 `settings` 管理能力已迁移到集群级 `Admin`：
 
 - `AI`
-- `LDAP Cache`
+- `Users`
 - `Cache`
 - `Access Control`
 
@@ -727,7 +727,7 @@
 - `/settings/ai` -> `/:cluster/admin/ai`
 - `/settings/access-control` -> `/:cluster/admin/access-control`
 - `/settings/cache` -> `/:cluster/admin/cache`
-- `/settings/ldap-cache` -> `/:cluster/admin/ldap-cache`
+- `/settings/ldap-cache` 与 `/settings/ldap-users` -> `/:cluster/admin/ldap-users`
 
 ## 本轮：`jobs:self` 已落地到后端 owner-aware 校验
 
@@ -797,7 +797,7 @@
 - 后端 `roles.actions` 归一化现在只保留 `view-ai` 与 `admin-manage` 的权限补齐
 - `view-own-jobs`、`edit-own-jobs`、`cancel-own-jobs`、`roles-view`、`roles-manage`、`manage-ai` 会在角色归一化时直接丢弃，不再迁移到 `roles.permissions`
 - 前端运行时补回 `view-ai -> ai:view:*` fallback，确保旧 `actions[]` 集群仍能正确显示 `AI` 页面入口
-- `admin/ldap-cache:edit:*` 已正式定义为 LDAP 缓存维护动作，不表示修改 LDAP 源数据
+- `admin/ldap-users:edit:*` 已正式定义为 LDAP 用户缓存维护动作，不表示修改 LDAP 源数据
 
 ## 2. Access Control 页面改为资源矩阵
 
@@ -813,7 +813,7 @@
 系统当前的业务能力按基础依赖自动推导：
 
 - 数据库开启后，自动提供：
-  - LDAP Cache
+  - Users
   - Jobs History
   - Access Control
   - AI
@@ -835,7 +835,23 @@
 - 默认 `user` 角色现已包含 `ai:view:*`，普通用户可见并可使用 `AI`
 - 没有任一 `admin/*` 或 `*:*:*` 权限的普通用户不会看到 `Admin` 入口，也不能进入 `/:cluster/admin/*`
 - `/:cluster/admin/cache` 使用 `admin/cache:view|edit:*`
-- `/:cluster/admin/ldap-cache` 使用 `admin/ldap-cache:view|edit:*`
+- `/:cluster/admin/ldap-users` 使用 `admin/ldap-users:view|edit:*`
+
+## 本轮：LDAP cache 管理页已统一改名为 `Users`
+
+本轮把 LDAP 用户缓存的正式前端命名、路由与权限资源统一到 `Users` 口径，同时保留低风险兼容：
+
+- 正式管理页改为 `/:cluster/admin/ldap-users`
+- 兼容 settings 入口改为 `/settings/ldap-users`
+- 旧 `/settings/ldap-cache` 与 `/:cluster/admin/ldap-cache` 继续保留为重定向兼容入口
+- 正式权限资源改为 `admin/ldap-users:view|edit:*`
+- 后端与前端权限归一化继续兼容历史 `admin/ldap-cache:*` 角色规则，不会让旧角色立刻失效
+
+本轮新增验证：
+
+- `npm --prefix frontend run type-check`
+- `cd frontend && npx vitest run tests/router/AdminRoutesContract.spec.ts tests/composables/GatewayAPIAdminContract.spec.ts tests/composables/GatewayAPI.spec.ts tests/stores/runtime.spec.ts tests/components/MainMenu.spec.ts tests/components/settings/SettingsTabs.spec.ts tests/components/settings/SettingsTabsAIContract.spec.ts tests/views/settings/SettingsLdapCache.spec.ts`
+- `.venv\\Scripts\\python.exe -m pytest -q slurmweb/tests/test_permission_rules.py slurmweb/tests/views/test_agent.py`
 - `/:cluster/admin/access-control` 使用 `admin/access-control:view|edit|delete:*`
 - 用户空间使用 `user/profile:view:*|self` 与 `user/analysis:view:*|self`
 

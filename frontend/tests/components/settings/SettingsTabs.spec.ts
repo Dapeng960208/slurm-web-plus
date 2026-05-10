@@ -38,11 +38,11 @@ describe('SettingsTabs.vue', () => {
     i18n.global.locale.value = 'en'
   })
 
-  test('does not show LDAP Cache tab after admin-page migration', async () => {
+  test('does not show Users tab in the legacy settings workspace after admin-page migration', async () => {
     const wrapper = mountTabs(true, [
       {
         name: 'foo',
-        permissions: { roles: [], actions: [], rules: ['admin/ldap-cache:view:*'] },
+        permissions: { roles: [], actions: [], rules: ['admin/ldap-users:view:*'] },
         racksdb: true,
         infrastructure: 'foo',
         metrics: true,
@@ -52,7 +52,7 @@ describe('SettingsTabs.vue', () => {
     ])
 
     await nextTick()
-    expect(wrapper.text()).not.toContain('LDAP Cache')
+    expect(wrapper.text()).not.toContain('Users')
   })
 
   test('does not show Access Control tab after admin-page migration', async () => {
@@ -114,7 +114,7 @@ describe('SettingsTabs.vue', () => {
               'admin/ai:view:*',
               'admin/access-control:view:*',
               'admin/cache:view:*',
-              'admin/ldap-cache:view:*'
+              'admin/ldap-users:view:*'
             ]
           },
           capabilities: {
@@ -140,7 +140,7 @@ describe('SettingsTabs.vue', () => {
     expect(wrapper.text()).not.toContain('AI')
     expect(wrapper.text()).not.toContain('Access Control')
     expect(wrapper.text()).not.toContain('Cache')
-    expect(wrapper.text()).not.toContain('LDAP Cache')
+    expect(wrapper.text()).not.toContain('Users')
   })
 
   test('renders translated tab labels', async () => {

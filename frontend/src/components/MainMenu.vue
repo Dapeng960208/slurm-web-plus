@@ -46,7 +46,7 @@ const { t } = useI18n()
 const ADMIN_NAVIGATION = [
   { route: 'admin-ai', resource: 'admin/ai' },
   { route: 'admin-cache', resource: 'admin/cache' },
-  { route: 'admin-ldap-cache', resource: 'admin/ldap-cache' },
+  { route: 'admin-ldap-users', resource: 'admin/ldap-users' },
   { route: 'admin-access-control', resource: 'admin/access-control' }
 ] as const
 const navigation: Array<{
@@ -153,7 +153,7 @@ function isFeatureEnabled(feature: string | undefined): boolean {
 }
 
 function isAdminNavigationAvailable(clusterName: string, resource: (typeof ADMIN_NAVIGATION)[number]['resource']): boolean {
-  if (resource === 'admin/ldap-cache' && !runtimeConfiguration.authentication) {
+  if (resource === 'admin/ldap-users' && !runtimeConfiguration.authentication) {
     return false
   }
   return runtimeStore.hasRoutePermission(clusterName, 'admin/*', 'view') || runtimeStore.hasRoutePermission(clusterName, resource, 'view')

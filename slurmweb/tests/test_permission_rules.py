@@ -30,7 +30,7 @@ class TestPermissionRules(unittest.TestCase):
 
         for resource in [
             "admin/ai",
-            "admin/ldap-cache",
+            "admin/ldap-users",
             "admin/cache",
             "admin/access-control",
         ]:
@@ -39,7 +39,7 @@ class TestPermissionRules(unittest.TestCase):
 
         for resource in [
             "settings/ai",
-            "settings/ldap-cache",
+            "settings/ldap-users",
             "settings/cache",
             "settings/access-control",
         ]:
@@ -48,7 +48,7 @@ class TestPermissionRules(unittest.TestCase):
     def test_legacy_permission_map_uses_admin_resources(self):
         self.assertCountEqual(
             DEFAULT_LEGACY_PERMISSION_MAP["cache-view"],
-            ["admin/cache:view:*", "admin/ldap-cache:view:*"],
+            ["admin/cache:view:*", "admin/ldap-users:view:*"],
         )
         self.assertCountEqual(
             DEFAULT_LEGACY_PERMISSION_MAP["cache-reset"],
@@ -103,6 +103,9 @@ class TestPermissionRules(unittest.TestCase):
         self.assertFalse(permission_rules_allow(["jobs:view:self"], "jobs", "view", "*"))
         self.assertTrue(
             permission_rules_allow(["admin/ai:edit:*"], "admin/ai", "view", "*")
+        )
+        self.assertTrue(
+            permission_rules_allow(["admin/ldap-cache:view:*"], "admin/ldap-users", "view", "*")
         )
         self.assertTrue(permission_rules_allow(["*:view:*"], "admin/ai", "view", "*"))
         self.assertTrue(permission_rules_allow(["*:edit:*"], "jobs", "edit", "self"))

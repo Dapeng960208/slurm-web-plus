@@ -8,7 +8,7 @@ Cache 功能当前包括：
   - cache 统计
   - reset 统计
   - metrics 视图
-- `Settings > LDAP Cache`
+- `Admin > Users`
   - 数据库缓存的 LDAP 用户列表
 
 ## 2. 启用条件
@@ -19,7 +19,7 @@ Cache 功能当前包括：
   - 依赖 cache service 自身可用
 - Cache metrics：
   - 依赖 cluster metrics 可用
-- LDAP Cache：
+- Users：
   - 依赖数据库开启
 
 旧独立 feature flag 不再作为新的业务语义来源。
@@ -32,11 +32,11 @@ Cache 功能当前包括：
 |---|---|
 | `/:cluster/admin/cache` 查看 | `admin/cache:view:*` |
 | reset 统计 | `admin/cache:edit:*` |
-| `/:cluster/admin/ldap-cache` 查看 | `admin/ldap-cache:view:*` |
+| `/:cluster/admin/ldap-users` 查看 | `admin/ldap-users:view:*` |
 
 旧权限兼容：
 
-- `cache-view` -> `admin/cache:view:*` + `admin/ldap-cache:view:*`
+- `cache-view` -> `admin/cache:view:*` + `admin/ldap-users:view:*`
 - `cache-reset` -> `admin/cache:edit:*`
 
 说明：
@@ -50,7 +50,7 @@ Cache 功能当前包括：
 - metrics 不可用：
   - 页面显示无 metrics 的说明卡片
 - 数据库不可用：
-  - LDAP Cache 页面显示数据库不可用
+  - Users 页面显示数据库不可用
 
 ## 5. 相关实现
 

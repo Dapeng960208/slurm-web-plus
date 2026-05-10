@@ -1,11 +1,12 @@
-﻿# LDAP Cache 验证说明（Settings > LDAP Cache）
+# Users 页面验证说明（Admin > Users）
 
-本文档补充说明本次 LDAP Cache 改动的验证方式，适用于以下变更：
+本文档补充说明当前 `Users` 管理页的验证方式，适用于以下变更：
 
 - gateway 登录成功后，显式向 agent 发送 `username`、`fullname`、`groups`
 - agent `GET /users/cache` 支持 `username`、`page`、`page_size`
-- Settings -> LDAP Cache 页面支持按用户名搜索和分页
+- `/:cluster/admin/ldap-users` 页面支持按用户名搜索和分页
 - 多 cluster 下，搜索和分页状态按 cluster 独立维护
+- 旧 `/settings/ldap-cache`、`/settings/ldap-users` 与 `/:cluster/admin/ldap-cache` 仅保留为重定向兼容入口
 
 ## 1. API 验证
 
@@ -18,7 +19,7 @@ TOKEN=$(curl -s -X POST http://localhost:5012/api/login \
   | python3 -c "import sys,json; print(json.load(sys.stdin)['token'])")
 ```
 
-查询 LDAP cache 首页：
+查询 users cache 首页：
 
 ```bash
 curl -s -H "Authorization: Bearer $TOKEN" \
@@ -79,7 +80,7 @@ sudo -u postgres psql -d slurmweb -c \
 
 ## 3. 页面验证
 
-登录 Web 页面后，进入 `Settings -> LDAP Cache`，逐项确认：
+登录 Web 页面后，进入 `Admin -> Users`，逐项确认：
 
 1. 页面继续按 cluster 分块展示。
 2. 每个 cluster 都显示独立的搜索框、Search、Reset 和分页栏。
@@ -90,19 +91,20 @@ sudo -u postgres psql -d slurmweb -c \
 7. `fullname` 为空的用户显示为 `-`。
 8. 每个 cluster 卡片内部的表格区域独立滚动，长结果不会把整页持续撑高。
 9. 每个 cluster 的分页栏固定在各自结果卡片底部，不固定到浏览器底部，也不会串到其他 cluster 卡片。
+10. 访问旧 `/settings/ldap-cache`、`/settings/ldap-users` 或 `/:cluster/admin/ldap-cache` 时，会重定向到正式 `Users` 页面。
 
 ## 4. 多 Agent 验证
 
 当一个 gateway 对接多个 agent 时，额外确认：
 
-- 各 cluster 的 LDAP cache 数据彼此独立
-- 某一个 agent 不可用时，不影响其他 agent 的 LDAP cache 查询
+- 各 cluster 的 users cache 数据彼此独立
+- 某一个 agent 不可用时，不影响其他 agent 的 users cache 查询
 - 某一个 cluster 的搜索词和页码不会串到其他 cluster
 
 ## 5. 通过标准
 
 - [ ] LDAP 登录后，`users.fullname` 正常写入
 - [ ] `/api/agents/<cluster>/users/cache` 返回分页对象
-- [ ] LDAP Cache 页面支持用户名搜索
-- [ ] LDAP Cache 页面支持分页
+- [ ] Users 页面支持用户名搜索
+- [ ] Users 页面支持分页
 - [ ] 多 cluster 状态互不影响

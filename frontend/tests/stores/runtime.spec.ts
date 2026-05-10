@@ -192,6 +192,25 @@ describe('Runtime Store', () => {
     expect(runtime.hasRoutePermission('foo', 'settings/access-control', 'view')).toBe(false)
   })
 
+  test('legacy ldap-cache rules still satisfy renamed ldap-users resource', () => {
+    const runtime = useRuntimeStore()
+    runtime.addCluster({
+      name: 'foo',
+      infrastructure: 'foo',
+      racksdb: true,
+      metrics: true,
+      cache: true,
+      permissions: {
+        roles: ['admin'],
+        actions: [],
+        rules: ['admin/ldap-cache:view:*']
+      }
+    })
+
+    expect(runtime.hasRoutePermission('foo', 'admin/ldap-users', 'view')).toBe(true)
+    expect(runtime.hasRoutePermission('foo', 'admin/ldap-cache', 'view')).toBe(true)
+  })
+
   test('legacy admin-manage normalizes to super-admin access', () => {
     const runtime = useRuntimeStore()
     runtime.addCluster({

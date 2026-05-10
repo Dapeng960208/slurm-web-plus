@@ -86,7 +86,7 @@ Admin 资源：
 - `admin/ai`
 - `admin/access-control`
 - `admin/cache`
-- `admin/ldap-cache`
+- `admin/ldap-users`
 
 用户空间资源：
 
@@ -103,7 +103,7 @@ Admin 资源：
 说明：
 
 - 当前前端主工作路径已经是 `/:cluster/admin/*`。
-- `/settings/ai`、`/settings/access-control`、`/settings/cache`、`/settings/ldap-cache` 只是兼容重定向入口，不再是主资源名。
+- `/settings/ai`、`/settings/access-control`、`/settings/cache`、`/settings/ldap-users` 只是兼容重定向入口，不再是主资源名。
 
 ## 6. 兼容映射
 
@@ -121,7 +121,7 @@ Admin 资源：
 | `view-accounts` | `jobs/filter-accounts:view:*` |
 | `view-partitions` | `jobs/filter-partitions:view:*` + `resources/filter-partitions:view:*` |
 | `view-ai` | `ai:view:*` |
-| `cache-view` | `admin/cache:view:*` + `admin/ldap-cache:view:*` |
+| `cache-view` | `admin/cache:view:*` + `admin/ldap-users:view:*` |
 | `cache-reset` | `admin/cache:edit:*` |
 | `admin-manage` | `*:*:*` |
 

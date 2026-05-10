@@ -261,7 +261,7 @@ class TestAgentViews(TestAgentBase):
         )
 
     def test_ldap_cache_users(self):
-        self._enable_rules("admin/ldap-cache:view:*")
+        self._enable_rules("admin/ldap-users:view:*")
         self.app.users_store = mock.Mock()
         self.app.users_store.list_ldap_users.return_value = {
             "items": [
@@ -288,7 +288,7 @@ class TestAgentViews(TestAgentBase):
         )
 
     def test_ldap_cache_users_with_filters(self):
-        self._enable_rules("admin/ldap-cache:view:*")
+        self._enable_rules("admin/ldap-users:view:*")
         self.app.users_store = mock.Mock()
         self.app.users_store.list_ldap_users.return_value = {
             "items": [{"username": "alice", "fullname": "Alice Doe"}],
@@ -316,7 +316,7 @@ class TestAgentViews(TestAgentBase):
         )
 
     def test_ldap_cache_users_disabled(self):
-        self._enable_rules("admin/ldap-cache:view:*")
+        self._enable_rules("admin/ldap-users:view:*")
         with self.assertLogs("slurmweb", level="WARNING") as cm:
             response = self.client.get(f"/v{get_version()}/users/cache")
         self.assertEqual(response.status_code, 501)

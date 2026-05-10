@@ -26,7 +26,7 @@
 - 当前后端真实权限模型已经是 `resource:operation:scope`，最终判定入口在 `AccessControlPolicyManager.allowed_user_permission()`。
 - 文件策略层仍可提供旧 `actions[]`，但会先通过 `legacy_permission_map` 转成 `rules[]` 再参与合并。
 - 数据库角色当前主字段是 `roles.permissions`，`roles.actions` 只作为兼容输入继续读取。
-- 当前主管理资源是 `admin/ai`、`admin/access-control`、`admin/cache`、`admin/ldap-cache`；`settings/ai`、`settings/access-control`、`settings/cache`、`settings/ldap-cache` 不再是主资源名。
+- 当前主管理资源是 `admin/ai`、`admin/access-control`、`admin/cache`、`admin/ldap-users`；`settings/ai`、`settings/access-control`、`settings/cache`、`settings/ldap-users` 不再是主资源名；旧 `admin/ldap-cache` 只作为兼容别名继续归一到 `admin/ldap-users`。
 
 ## 3. 已确认实现正确的关键点
 

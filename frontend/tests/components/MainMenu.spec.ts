@@ -195,7 +195,7 @@ describe('MainMenu.vue', () => {
         permissions: {
           roles: ['admin'],
           actions: [],
-          rules: ['admin/ldap-cache:view:*', 'admin/cache:view:*']
+          rules: ['admin/ldap-users:view:*', 'admin/cache:view:*']
         },
         racksdb: true,
         infrastructure: 'foo',
