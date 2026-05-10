@@ -51,7 +51,7 @@ describe('NodeView.vue', () => {
     useRuntimeStore().availableClusters = [
       {
         name: 'foo',
-        permissions: { roles: [], actions: [] },
+        permissions: { roles: [], actions: [], rules: ['jobs:view:*'] },
         racksdb: true,
         infrastructure: 'foo',
         metrics: true,
@@ -340,7 +340,7 @@ describe('NodeView.vue', () => {
         permissions: {
           roles: [],
           actions: [],
-          rules: ['resources:edit:*']
+          rules: ['jobs:view:*', 'resources:edit:*']
         }
       }
     ]
@@ -393,7 +393,7 @@ describe('NodeView.vue', () => {
         permissions: {
           roles: [],
           actions: [],
-          rules: ['resources:edit:*']
+          rules: ['jobs:view:*', 'resources:edit:*']
         }
       }
     ]
@@ -439,7 +439,7 @@ describe('NodeView.vue', () => {
         permissions: {
           roles: [],
           actions: [],
-          rules: ['resources:edit:*']
+          rules: ['jobs:view:*', 'resources:edit:*']
         }
       }
     ]
@@ -489,7 +489,7 @@ describe('NodeView.vue', () => {
         permissions: {
           roles: [],
           actions: [],
-          rules: ['resources:edit:*']
+          rules: ['jobs:view:*', 'resources:edit:*']
         }
       }
     ]

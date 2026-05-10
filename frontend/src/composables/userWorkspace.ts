@@ -40,7 +40,7 @@ function hasUserWorkspacePermission(
 export function canViewUserProfile(
   runtimeStore: RuntimePermissionStore,
   clusterName: string,
-  self: boolean
+  self = false
 ): boolean {
   return (
     hasUserWorkspacePermission(runtimeStore, clusterName, 'user/profile', self) ||
@@ -52,7 +52,7 @@ export function canViewUserAnalytics(
   runtimeStore: RuntimePermissionStore,
   cluster: ClusterDescription | undefined,
   clusterName: string,
-  self: boolean
+  self = false
 ): boolean {
   return (
     Boolean(cluster?.user_metrics) &&

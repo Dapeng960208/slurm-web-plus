@@ -37,6 +37,17 @@
 
 ## 2. 已完成项
 
+- 前端共享权限消费点已继续向 `resource:operation:scope` 收口：
+  - `DashboardView` 的分区筛选改为按 `jobs/filter-partitions:view:*` 或 `resources/filter-partitions:view:*` 判断
+  - `NodeView` 的节点作业轮询改为按 `jobs:view:*` 判断
+  - `JobsFiltersPanel` 的 `Accounts / QOS / Partitions` 筛选区改为按对应 filter resource 判断
+  - `DashboardCharts` 的图表显示改为按 `resources:view:*` 与 `jobs:view:*` 判断
+  - `ResourcesFiltersPanel` 的分区筛选改为按 `resources/filter-partitions:view:*` 判断
+  - `userWorkspace` 保留必要的 legacy fallback，但默认参数已与现有 route-rule 调用方式对齐
+- 本轮前端权限收口定向验证已通过：
+  - `npm --prefix frontend run type-check`
+  - `cd frontend && npx vitest run tests/views/DashboardView.spec.ts tests/views/NodeView.spec.ts tests/components/jobs/JobsFiltersPanel.spec.ts tests/components/dashboard/DashboardCharts.spec.ts tests/composables/userWorkspace.spec.ts`
+
 - 前端国际化基础层已接入：
   - `frontend` 已安装并接入 `vue-i18n`
   - 已新增 `frontend/src/plugins/i18n.ts`、`frontend/src/locales/en.ts`、`frontend/src/locales/zh-CN.ts`

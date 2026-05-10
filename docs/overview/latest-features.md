@@ -1,5 +1,21 @@
 # 最新功能
 
+## 本轮：前端共享权限消费点已统一优先走 `resource:operation:scope`
+
+本轮对几处仍依赖旧 `actions[]` 的共享权限判断做了收口，避免菜单、路由和页内局部控件继续出现不同步的授权口径：
+
+- `DashboardView` 的分区筛选改为按 `jobs/filter-partitions:view:*` 或 `resources/filter-partitions:view:*` 判断
+- `NodeView` 的节点作业轮询改为按 `jobs:view:*` 判断
+- `JobsFiltersPanel` 的 `Accounts / QOS / Partitions` 筛选区改为按对应 filter resource 判断
+- `DashboardCharts` 的图表显示改为按 `resources:view:*` 与 `jobs:view:*` 判断
+- `ResourcesFiltersPanel` 的分区筛选改为按 `resources/filter-partitions:view:*` 判断
+- `userWorkspace` 继续保留必要的 legacy fallback，但默认调用口径已与现有 route-rule 测试夹具对齐
+
+本轮新增验证：
+
+- `npm --prefix frontend run type-check`
+- `cd frontend && npx vitest run tests/views/DashboardView.spec.ts tests/views/NodeView.spec.ts tests/components/jobs/JobsFiltersPanel.spec.ts tests/components/dashboard/DashboardCharts.spec.ts tests/composables/userWorkspace.spec.ts`
+
 ## 本轮：GitHub `Backend Tests` 已改为 `Python 3.9`
 
 本轮把提交到 GitHub 后自动触发的后端主线测试版本从 `Python 3.12` 调整为 `Python 3.9`：

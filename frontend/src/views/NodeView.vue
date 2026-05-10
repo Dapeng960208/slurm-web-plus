@@ -188,7 +188,7 @@ function resolveMetricsWindowQuery(
 const node = useClusterDataPoller<ClusterIndividualNode>(cluster, 'node', 5000, nodeName)
 
 let jobs: ClusterDataPoller<ClusterJob[]> | undefined
-if (runtimeStore.hasPermission('view-jobs')) {
+if (runtimeStore.hasRoutePermission(cluster, 'jobs', 'view')) {
   jobs = useClusterDataPoller<ClusterJob[]>(cluster, 'jobs', 10000, nodeName)
 }
 

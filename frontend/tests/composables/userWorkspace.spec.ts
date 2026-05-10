@@ -9,7 +9,13 @@ import {
 
 function buildRuntimeStore(permissions: string[]) {
   return {
-    hasClusterPermission: (_clusterName: string, permission: string) => permissions.includes(permission)
+    hasClusterPermission: (_clusterName: string, permission: string) => permissions.includes(permission),
+    hasRoutePermission: (
+      _clusterName: string,
+      resource: string,
+      operation = 'view',
+      scope = '*'
+    ) => permissions.includes(`${resource}:${operation}:${scope}`)
   }
 }
 
@@ -50,7 +56,7 @@ describe('userWorkspace', () => {
   })
 
   test('resolves partial access for other users', () => {
-    const runtimeStore = buildRuntimeStore(['associations-view'])
+    const runtimeStore = buildRuntimeStore(['accounts:view:*'])
     const cluster = buildCluster(true)
 
     expect(canViewUserProfile(runtimeStore, 'foo')).toBe(true)
@@ -76,9 +82,22 @@ describe('userWorkspace', () => {
   })
 
   test('enables analytics only when capability and permission are both present', () => {
-    const runtimeStore = buildRuntimeStore(['view-jobs'])
+    const runtimeStore = buildRuntimeStore(['jobs:view:*'])
 
     expect(canViewUserAnalytics(runtimeStore, buildCluster(true), 'foo')).toBe(true)
     expect(canViewUserAnalytics(runtimeStore, buildCluster(false), 'foo')).toBe(false)
+  })
+
+  test('resolves analytics from user/analysis self rule for current user', () => {
+    const runtimeStore = buildRuntimeStore(['user/analysis:view:self'])
+
+    expect(canViewUserAnalytics(runtimeStore, buildCluster(true), 'foo', true)).toBe(true)
+    expect(
+      resolveUserWorkspaceSections(runtimeStore, buildCluster(true), 'foo', 'alice', 'alice')
+    ).toMatchObject({
+      self: true,
+      analytics: true,
+      any: true
+    })
   })
 })

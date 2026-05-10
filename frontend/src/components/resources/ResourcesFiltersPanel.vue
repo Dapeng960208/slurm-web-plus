@@ -25,6 +25,8 @@ import { XMarkIcon } from '@heroicons/vue/24/outline'
 const { cluster, nbNodes } = defineProps<{ cluster: string; nbNodes: number }>()
 
 const runtimeStore = useRuntimeStore()
+const canViewPartitionFilter = () =>
+  runtimeStore.hasRoutePermission(cluster, 'resources/filter-partitions', 'view')
 </script>
 
 <template>
@@ -124,7 +126,7 @@ const runtimeStore = useRuntimeStore()
               </Disclosure>
 
               <Disclosure
-                v-if="runtimeStore.hasPermission('view-partitions')"
+                v-if="canViewPartitionFilter()"
                 as="div"
                 class="border-t border-t-gray-200 px-4 py-6 dark:border-t-gray-600"
                 v-slot="{ open }"

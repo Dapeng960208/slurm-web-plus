@@ -37,7 +37,8 @@ const { data, unable, loaded, setCluster, setParam } = useClusterDataPoller<Clus
   runtimeStore.dashboard.partition ? { partition: runtimeStore.dashboard.partition } : undefined
 )
 const canSelectPartition = computed(() =>
-  runtimeStore.hasClusterPermission(cluster.value, 'view-partitions')
+  runtimeStore.hasRoutePermission(cluster.value, 'jobs/filter-partitions', 'view') ||
+  runtimeStore.hasRoutePermission(cluster.value, 'resources/filter-partitions', 'view')
 )
 const {
   data: partitions,

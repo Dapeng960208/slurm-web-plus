@@ -44,6 +44,10 @@ const state_filters = [
   { value: 'running', label: 'Running' },
   { value: 'pending', label: 'Pending' }
 ]
+
+function canViewJobFilter(resource: 'jobs/filter-accounts' | 'jobs/filter-qos' | 'jobs/filter-partitions') {
+  return runtimeStore.hasRoutePermission(cluster, resource, 'view')
+}
 </script>
 
 <template>
@@ -178,7 +182,7 @@ const state_filters = [
                 </DisclosurePanel>
               </Disclosure>
               <Disclosure
-                v-if="runtimeStore.hasPermission('view-accounts')"
+                v-if="canViewJobFilter('jobs/filter-accounts')"
                 as="div"
                 class="border-t border-t-gray-200 px-4 py-6 dark:border-t-gray-600"
                 v-slot="{ open }"
@@ -207,7 +211,7 @@ const state_filters = [
                 </DisclosurePanel>
               </Disclosure>
               <Disclosure
-                v-if="runtimeStore.hasPermission('view-qos')"
+                v-if="canViewJobFilter('jobs/filter-qos')"
                 as="div"
                 class="border-t border-t-gray-200 px-4 py-6 dark:border-t-gray-600"
                 v-slot="{ open }"
@@ -236,7 +240,7 @@ const state_filters = [
                 </DisclosurePanel>
               </Disclosure>
               <Disclosure
-                v-if="runtimeStore.hasPermission('view-partitions')"
+                v-if="canViewJobFilter('jobs/filter-partitions')"
                 as="div"
                 class="border-t border-t-gray-200 px-4 py-6 dark:border-t-gray-600"
                 v-slot="{ open }"

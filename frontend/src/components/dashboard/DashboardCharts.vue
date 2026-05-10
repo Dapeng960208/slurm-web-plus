@@ -7,6 +7,7 @@
 -->
 
 <script setup lang="ts">
+import { computed } from 'vue'
 import { useRuntimeStore } from '@/stores/runtime'
 import ChartResourcesHistogram from '@/components/dashboard/ChartResourcesHistogram.vue'
 import ChartJobsHistogram from '@/components/dashboard/ChartJobsHistogram.vue'
@@ -14,9 +15,11 @@ import ChartJobsHistogram from '@/components/dashboard/ChartJobsHistogram.vue'
 const { cluster } = defineProps<{ cluster: string }>()
 
 const runtimeStore = useRuntimeStore()
+const canViewResources = computed(() => runtimeStore.hasRoutePermission(cluster, 'resources', 'view'))
+const canViewJobs = computed(() => runtimeStore.hasRoutePermission(cluster, 'jobs', 'view'))
 </script>
 
 <template>
-  <ChartResourcesHistogram v-if="runtimeStore.hasPermission('view-nodes')" :cluster="cluster" />
-  <ChartJobsHistogram v-if="runtimeStore.hasPermission('view-jobs')" :cluster="cluster" />
+  <ChartResourcesHistogram v-if="canViewResources" :cluster="cluster" />
+  <ChartJobsHistogram v-if="canViewJobs" :cluster="cluster" />
 </template>

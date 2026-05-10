@@ -11,7 +11,11 @@ describe('DashboardCharts.vue', () => {
     init_plugins()
     const cluster = {
       name: 'foo',
-      permissions: { roles: ['admin'], actions: ['view-nodes', 'view-jobs'] },
+      permissions: {
+        roles: ['admin'],
+        actions: ['view-nodes', 'view-jobs'],
+        rules: ['resources:view:*', 'jobs:view:*']
+      },
       racksdb: true,
       infrastructure: 'foo',
       metrics: true,
@@ -32,10 +36,10 @@ describe('DashboardCharts.vue', () => {
     wrapper.getComponent(ChartResourcesHistogram)
     wrapper.getComponent(ChartJobsHistogram)
   })
-  test('should not display resources charts without view-nodes permission', () => {
+  test('should not display resources charts without resources:view:* permission', () => {
     const runtimeStore = useRuntimeStore()
-    runtimeStore.currentCluster!.permissions.actions =
-      runtimeStore.currentCluster!.permissions.actions.filter((action) => action !== 'view-nodes')
+    runtimeStore.currentCluster!.permissions.rules =
+      runtimeStore.currentCluster!.permissions.rules.filter((rule) => rule !== 'resources:view:*')
     const wrapper = shallowMount(DashboardCharts, {
       props: {
         cluster: 'foo'
@@ -45,10 +49,10 @@ describe('DashboardCharts.vue', () => {
     expect(wrapper.findComponent(ChartResourcesHistogram).exists()).toBe(false)
     wrapper.getComponent(ChartJobsHistogram)
   })
-  test('should not display jobs charts without view-jobs permission', () => {
+  test('should not display jobs charts without jobs:view:* permission', () => {
     const runtimeStore = useRuntimeStore()
-    runtimeStore.currentCluster!.permissions.actions =
-      runtimeStore.currentCluster!.permissions.actions.filter((action) => action !== 'view-jobs')
+    runtimeStore.currentCluster!.permissions.rules =
+      runtimeStore.currentCluster!.permissions.rules.filter((rule) => rule !== 'jobs:view:*')
     const wrapper = shallowMount(DashboardCharts, {
       props: {
         cluster: 'foo'
@@ -57,5 +61,18 @@ describe('DashboardCharts.vue', () => {
     // Check absence of jobs chart and presence of resources charts
     wrapper.getComponent(ChartResourcesHistogram)
     expect(wrapper.findComponent(ChartJobsHistogram).exists()).toBe(false)
+  })
+
+  test('shows charts from route rules even without legacy actions', () => {
+    const runtimeStore = useRuntimeStore()
+    runtimeStore.currentCluster!.permissions.actions = []
+    const wrapper = shallowMount(DashboardCharts, {
+      props: {
+        cluster: 'foo'
+      }
+    })
+
+    wrapper.getComponent(ChartResourcesHistogram)
+    wrapper.getComponent(ChartJobsHistogram)
   })
 })

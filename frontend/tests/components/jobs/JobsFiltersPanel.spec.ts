@@ -13,7 +13,13 @@ describe('JobsFiltersPanel.vue', () => {
       name: 'foo',
       permissions: {
         roles: ['admin'],
-        actions: ['view-jobs', 'view-accounts', 'view-qos', 'view-partitions']
+        actions: ['view-jobs', 'view-accounts', 'view-qos', 'view-partitions'],
+        rules: [
+          'jobs:view:*',
+          'jobs/filter-accounts:view:*',
+          'jobs/filter-qos:view:*',
+          'jobs/filter-partitions:view:*'
+        ]
       },
       racksdb: true,
       infrastructure: 'foo',
@@ -117,6 +123,7 @@ describe('JobsFiltersPanel.vue', () => {
     const runtimeStore = useRuntimeStore()
     // Remove permissions before mounting
     runtimeStore.currentCluster!.permissions.actions = ['view-jobs']
+    runtimeStore.currentCluster!.permissions.rules = ['jobs:view:*']
     const wrapper = mount(JobsFiltersPanel, {
       props: { cluster: 'foo', nbJobs: 0 },
       global: {
@@ -145,6 +152,46 @@ describe('JobsFiltersPanel.vue', () => {
     expect(panel.text()).not.toContain('Accounts')
     expect(panel.text()).not.toContain('QOS')
     expect(panel.text()).not.toContain('Partitions')
+    wrapper.unmount()
+  })
+
+  test('uses route rules even when legacy filter actions are absent', async () => {
+    const runtimeStore = useRuntimeStore()
+    runtimeStore.currentCluster!.permissions.actions = ['view-jobs']
+    runtimeStore.currentCluster!.permissions.rules = [
+      'jobs:view:*',
+      'jobs/filter-accounts:view:*',
+      'jobs/filter-qos:view:*',
+      'jobs/filter-partitions:view:*'
+    ]
+
+    const wrapper = mount(JobsFiltersPanel, {
+      props: { cluster: 'foo', nbJobs: 0 },
+      global: {
+        stubs: {
+          teleport: true,
+          Dialog: { template: '<div v-bind="$attrs"><slot /></div>' },
+          DialogPanel: { template: '<div v-bind="$attrs"><slot /></div>' },
+          TransitionRoot: { template: '<div><slot /></div>' },
+          TransitionChild: { template: '<div><slot /></div>' },
+          Disclosure: { template: '<div><slot /></div>' },
+          DisclosureButton: { template: '<button v-bind="$attrs"><slot /></button>' },
+          DisclosurePanel: { template: '<div><slot /></div>' },
+          UserFilterSelector: true,
+          AccountFilterSelector: true,
+          QosFilterSelector: true,
+          PartitionFilterSelector: true
+        }
+      }
+    })
+    await nextTick()
+    runtimeStore.jobs.openFiltersPanel = true
+    await nextTick()
+
+    const panel = wrapper.find('#jobs-filters-panel')
+    expect(panel.text()).toContain('Accounts')
+    expect(panel.text()).toContain('QOS')
+    expect(panel.text()).toContain('Partitions')
     wrapper.unmount()
   })
 })

@@ -1,105 +1,86 @@
-﻿# 前端代码审查报告
+# 前端审查报告
 
 ## 1. 审查范围
 
-本次前端审查覆盖：
+本次前端审查聚焦以下主题：
 
-- `frontend/src/**`
-- `frontend/index.html`
-- `frontend/package.json`
-- `frontend/package-lock.json`
-- `frontend/README.md`
+- 权限消费是否与当前 `resource:operation:scope` 模型一致
+- `Admin` 与兼容 `Settings` 路由是否按当前真实入口工作
+- 页面局部按钮、筛选区和共享控件是否复用既有样式 token
+- 与本轮修复点直接相关的前端测试是否覆盖
 
-重点关注：
+重点核对文件：
 
-- 对外品牌名是否已切换到 `slurm-web-plus`
-- 明显的 UI 文案、标题、资源命名不一致
-- 发布前会影响构建或验收的低风险问题
+- `frontend/src/stores/runtime.ts`
+- `frontend/src/router/index.ts`
+- `frontend/src/views/DashboardView.vue`
+- `frontend/src/views/NodeView.vue`
+- `frontend/src/components/jobs/JobsFiltersPanel.vue`
+- `frontend/src/components/dashboard/DashboardCharts.vue`
+- `frontend/src/components/resources/ResourcesFiltersPanel.vue`
+- `frontend/src/composables/userWorkspace.ts`
 
-## 2. 已直接修复的问题
+## 2. 当前结论
 
-### 2.1 前端入口标题仍显示旧产品名
+- 当前前端权限主口径已经是 `runtimeStore.hasRoutePermission(...)` 与 `hasRoutePermissionAnyScope(...)`。
+- 主菜单、路由守卫和大部分业务页已按规则模型工作，但共享筛选区和局部图表仍残留少量旧 `actions[]` 判断。
+- 当前真实管理入口是 `/:cluster/admin/*`；`/settings/ai`、`/settings/access-control`、`/settings/cache`、`/settings/ldap-cache` 只是兼容重定向入口，不应再写成主要操作路径。
+- 全局设计 token 已集中在 `frontend/src/style.css`，按钮语义也已有 `ui-button-primary|warning|danger|secondary|ghost`；本轮样式问题主要是个别组件仍在局部硬编码 segmented button、输入框和 badge 视觉。
 
-- 文件：`frontend/index.html`
-- 问题：浏览器标签页标题仍为 `Slurm-web`。
-- 修复：统一改为 `Slurm Web Plus`。
+## 3. 已确认并修复的问题
 
-### 2.2 登录页、匿名访问页和品牌组件仍混用旧名称
+### 3.1 共享权限消费点仍依赖旧 `actions[]`
 
-- 文件：
-  - `frontend/src/views/LoginView.vue`
-  - `frontend/src/views/AnonymousView.vue`
-  - `frontend/src/components/BrandLogo.vue`
-- 问题：用户在登录和匿名入口仍会看到旧品牌文案或旧 `alt` 文本。
-- 修复：统一改为 `Slurm Web Plus`。
+已修复：
 
-### 2.3 前端运行日志仍输出旧网关品牌名
+- `DashboardView` 分区筛选改为按 `jobs/filter-partitions:view:*` 或 `resources/filter-partitions:view:*`
+- `NodeView` 节点作业轮询改为按 `jobs:view:*`
+- `JobsFiltersPanel` 的 `Accounts / QOS / Partitions` 筛选改为按对应 filter resource
+- `DashboardCharts` 改为按 `resources:view:*` 与 `jobs:view:*`
+- `ResourcesFiltersPanel` 的分区筛选改为按 `resources/filter-partitions:view:*`
 
-- 文件：`frontend/src/composables/RESTAPI.ts`
-- 问题：控制台日志继续打印 `Slurm-web gateway API ...`，不利于发布后排障一致性。
-- 修复：改为 `Slurm Web Plus gateway API ...`。
+影响：
 
-### 2.4 前端锁文件根包名与 `package.json` 不一致
+- 菜单、路由和页内局部控件的权限口径更一致
+- 前端不再要求旧 `view-partitions`、`view-qos`、`view-accounts` 等动作必须同时存在才能显示新规则已允许的内容
 
-- 文件：`frontend/package-lock.json`
-- 问题：锁文件根包仍是 `slurm-web-frontend`，与 `package.json` 的 `slurm-web-plus-frontend` 不一致。
-- 修复：同步锁文件根包名，避免发布物元数据割裂。
+### 3.2 `userWorkspace` 默认参数与当前调用方式不一致
 
-### 2.5 前端开发说明仍使用旧 URL 前缀示例
+已修复：
 
-- 文件：`frontend/README.md`
-- 问题：`VITE_BASE_PATH` 示例仍为 `/slurm-web/`。
-- 修复：示例更新为 `/slurm-web-plus/`。
+- `canViewUserProfile()` 与 `canViewUserAnalytics()` 的 `self` 参数改为默认 `false`
 
-## 3. 当前结论
+影响：
 
-- 本次快速审查未发现前端运行时阻塞级功能 bug。
-- 已修复的问题主要集中在发布品牌一致性和构建元数据一致性。
-- 现有前端设计 token 中的 `slurmweb` 类名和 CSS 变量当前更接近内部实现名，不属于必须立即替换的用户可见品牌问题。
+- 保持现有调用点和测试夹具语义稳定
+- 仍保留必要的 legacy fallback，但不会因为缺少显式第四个参数而把普通用户误判成 `self`
 
-## 4. 风险点
+## 4. 当前剩余风险
 
-### 4.1 网关实际公开路径仍需和部署层一起确认
+### 4.1 `runtime.ts` 仍保留 `hasPermission()` / `hasClusterPermission()`
 
-- 当前文档与前端示例已开始使用 `/slurm-web-plus/` 作为发布路径示例。
-- 但运行时真正生效的公开路径仍取决于网关配置、反向代理和构建产物中的 base path 替换逻辑。
-- 如果部署层仍保留旧前缀，前端不能单方面宣称“线上路径已切换完成”。
+- 这两个接口仍被兼容逻辑和少量 fallback 使用。
+- 目前它们不是主鉴权入口，但如果后续继续扩展页面功能，新增代码应优先使用 `hasRoutePermission(...)`。
 
-### 4.2 前端还有少量内部实现常量保留旧前缀
+### 4.2 前端仍存在少量 action 级测试夹具
 
-- 例如 `__SLURMWEB_BASE__`、样式 token `slurmweb` 等。
-- 这些当前不直接暴露给终端用户，不建议为了表面统一在发布前做大范围替换。
-- 若后续决定彻底改名，应先确认哪些是公共契约，哪些只是内部实现常量。
+- 当前主路径测试已经开始向 `rules[]` 收口。
+- 仓库里仍有部分旧夹具继续依赖 `actions[]`，后续扩大回归时应逐步迁移，避免形成新的双口径测试基线。
 
-## 5. 待确认项
+## 5. 建议
 
-- 生产环境公开路径是否最终切换到 `/slurm-web-plus/`
-- 文档站和仓库外链何时从旧 `/slurm-web/` slug 切换
-- 是否需要把前端内部 token/占位符也一并改名，还是继续作为兼容实现细节保留
+- 新增页面或按钮显示条件时，默认先从资源名反推路由规则，不再先找旧 action 名。
+- 兼容入口文档统一写成“旧 Settings 路由重定向到 `/:cluster/admin/*`”，避免使用者误解为两个并行管理中心。
+- 前端样式继续优先复用 `ui-button-*`、`ui-panel-soft`、`ui-input-field`，不要在筛选器和局部导航上重复定义一套按钮视觉。
 
 ## 6. 验证记录
 
-已执行：
+已通过：
 
 - `npm --prefix frontend run type-check`
-- `npx vitest run tests/components/BrandLogo.spec.ts`
-- `npx vitest run tests/views/LoginView.spec.ts tests/components/BrandLogo.spec.ts`
-- `npx vitest run tests/composables/GatewayAPI.spec.ts tests/components/user/UserToolAnalysisChart.spec.ts`
+- `cd frontend && npx vitest run tests/views/DashboardView.spec.ts tests/views/NodeView.spec.ts tests/components/jobs/JobsFiltersPanel.spec.ts tests/components/dashboard/DashboardCharts.spec.ts tests/composables/userWorkspace.spec.ts`
 
-结果：
+说明：
 
-- 类型检查通过
-- `BrandLogo` 相关测试通过
-- `LoginView` 相关测试通过
-- `GatewayAPI` 与 `UserToolAnalysisChart` 相关测试通过
-
-## 7. 本次涉及文件
-
-- `frontend/index.html`
-- `frontend/README.md`
-- `frontend/package-lock.json`
-- `frontend/src/components/BrandLogo.vue`
-- `frontend/src/composables/RESTAPI.ts`
-- `frontend/src/views/LoginView.vue`
-- `frontend/src/views/AnonymousView.vue`
-- `docs/review/frontend-review.md`
+- 上述验证覆盖了本轮修复的共享权限消费点。
+- 全量 `vitest` 未在本轮第一阶段作为唯一验收条件；后续样式修复和测试审查完成后再继续补跑定向集。

@@ -47,7 +47,11 @@ describe('DashboardView.vue', () => {
     runtimeStore.availableClusters = [
       {
         name: 'foo',
-        permissions: { roles: [], actions: ['view-partitions'] },
+        permissions: {
+          roles: [],
+          actions: ['view-partitions'],
+          rules: ['jobs/filter-partitions:view:*']
+        },
         racksdb: true,
         infrastructure: 'foo',
         metrics: true,
@@ -273,7 +277,11 @@ describe('DashboardView.vue', () => {
   test('updates partition source when cluster prop changes', async () => {
     runtimeStore.availableClusters.push({
       name: 'bar',
-      permissions: { roles: [], actions: ['view-partitions'] },
+      permissions: {
+        roles: [],
+        actions: ['view-partitions'],
+        rules: ['jobs/filter-partitions:view:*']
+      },
       racksdb: true,
       infrastructure: 'bar',
       metrics: true,
