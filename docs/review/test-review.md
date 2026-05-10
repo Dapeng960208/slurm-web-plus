@@ -1,118 +1,113 @@
-﻿# 测试审查报告
+# 测试审查报告
 
 ## 1. 审查范围
 
-本次测试审查覆盖：
+本次测试审查聚焦以下主题：
 
-- `frontend/tests/**`
-- `slurmweb/tests/**`
-- `tests/**`
-- 与测试执行直接相关的构建/入口验证命令
+- 权限规则与共享权限消费点的关键测试是否覆盖
+- 本地源码目录运行测试时是否还会被环境问题提前阻断
+- 前端样式/权限本轮修复点是否有定向测试
+- 当前未验证范围是否被明确记录
 
-目标是识别：
+重点核对文件：
 
-- 当前已通过的定向验证
-- 因改名或后端修复而失效的测试基线
-- 发布前必须补齐的测试空白
+- `frontend/tests/stores/runtime.spec.ts`
+- `frontend/tests/router/AdminPermissions.spec.ts`
+- `frontend/tests/components/MainMenu.spec.ts`
+- `frontend/tests/views/settings/SettingsAccessControl.spec.ts`
+- `frontend/tests/views/DashboardView.spec.ts`
+- `frontend/tests/views/NodeView.spec.ts`
+- `frontend/tests/components/jobs/JobsFiltersPanel.spec.ts`
+- `frontend/tests/components/dashboard/DashboardCharts.spec.ts`
+- `frontend/tests/composables/userWorkspace.spec.ts`
+- `slurmweb/tests/test_permission_rules.py`
+- `slurmweb/tests/test_access_control_policy.py`
+- `slurmweb/tests/test_access_control_store.py`
+- `slurmweb/tests/views/test_agent_permissions.py`
+- `slurmweb/tests/views/test_gateway_permissions.py`
+- `slurmweb/tests/test_version.py`
 
-## 2. 已确认通过的验证
+## 2. 已确认通过的关键验证
 
 ### 2.1 前端
 
 已通过：
 
 - `npm --prefix frontend run type-check`
-- `npm --prefix frontend run build`
-- `npx vitest run`
-- `npx vitest run tests/components/BrandLogo.spec.ts`
-- `npx vitest run tests/views/LoginView.spec.ts tests/components/BrandLogo.spec.ts`
-- `npx vitest run tests/composables/GatewayAPI.spec.ts tests/components/user/UserToolAnalysisChart.spec.ts`
+- `cd frontend && npx vitest run tests/views/DashboardView.spec.ts tests/views/NodeView.spec.ts tests/components/jobs/JobsFiltersPanel.spec.ts tests/components/dashboard/DashboardCharts.spec.ts tests/composables/userWorkspace.spec.ts`
 
 结论：
 
-- 本次品牌名调整没有破坏当前已覆盖的登录页和品牌组件测试。
-- `GatewayAPI` 权限归一化和 `UserToolAnalysisChart` 新版 DOM 呈现的测试基线已同步到当前实现。
-- 前端完整单测当前为 `78 passed / 508 passed`，构建产物也能正常生成。
+- 本轮共享权限消费点的修复都有对应定向 Vitest 覆盖。
+- 新增断言已经开始优先使用 `rules[]`，而不是继续把旧 `actions[]` 作为唯一测试基线。
 
 ### 2.2 后端
 
 已通过：
 
-- `.\\.venv\\Scripts\\python.exe -m pytest -q slurmweb/tests/apps/test_agent_ai.py -k database_support_missing`
-- `.\\.venv\\Scripts\\python.exe -m pytest -q slurmweb/tests/exec/test_main.py`
-- `.\\.venv\\Scripts\\python.exe -m pytest -q slurmweb/tests/apps/test_genjwt.py`
-- `.\\.venv\\Scripts\\python.exe -m pytest -q slurmweb/tests/apps/test_load_ldap_password_from_file.py slurmweb/tests/apps/test_showconf.py slurmweb/tests/test_ui.py`
-- `.\\.venv\\Scripts\\python.exe -m pytest -q slurmweb/tests/views/test_agent_metrics_requests.py -k user_activity_summary`
-- `.\\.venv\\Scripts\\python.exe -m compileall slurmweb/apps`
+- `.venv\\Scripts\\python.exe -m pytest -q slurmweb/tests/test_version.py`
+- `.venv\\Scripts\\python.exe -m pytest -q slurmweb/tests/test_permission_rules.py slurmweb/tests/test_access_control_policy.py slurmweb/tests/test_access_control_store.py slurmweb/tests/views/test_agent_permissions.py slurmweb/tests/views/test_gateway_permissions.py`
 
 结论：
 
-- “AI 显式启用但数据库不可用时记录明确告警” 的补丁已被定向验证覆盖。
-- CLI 改名兼容和 `gen-jwt-key` 新行为对应的后端测试基线已补齐。
-- `user_activity_summary` / `user_metrics_history` 的权限 scope 解析 bug 已补测通过。
-- `slurmweb/apps` 目录编译通过。
+- 权限规则解析、策略合并、数据库兼容逻辑和网关/Agent 权限主链路已有定向回归。
+- 源码 checkout 直接跑后端测试时，`get_version()` 的包元数据缺失问题已有专门回归测试。
 
-## 3. 已直接修复的测试基线缺口
+## 3. 已确认并已修复的测试基线问题
 
-### 3.1 `test_main.py` 已同步新旧 CLI 命名兼容策略
+### 3.1 源码目录运行后端测试会因缺少包元数据提前失败
 
-- 变更：`slurmweb/tests/exec/test_main.py` 已同时覆盖默认名 `slurm-web-plus` 与旧兼容名 `slurm-web`。
-- 当前结果：`.\\.venv\\Scripts\\python.exe -m pytest -q slurmweb/tests/exec/test_main.py` -> `10 passed`
-- 说明：这类断言以后凡是改 CLI help/version 文案，都要同步检查。
+已修复：
 
-### 3.2 `test_genjwt.py` 已同步 `setfacl` 与日志新行为
+- `slurmweb/version.py` 在找不到已安装包元数据时，回退读取仓库 `pyproject.toml` 的 `project.version`
+- `slurmweb/tests/test_version.py` 覆盖“回退成功”和“回退仍缺失”两条路径
 
-- 变更：`slurmweb/tests/apps/test_genjwt.py` 已同步 `check=True`、现有告警与平台兼容分支。
-- 当前结果：`.\\.venv\\Scripts\\python.exe -m pytest -q slurmweb/tests/apps/test_genjwt.py` -> `6 passed`
-- 说明：后端修复若改变日志集合或外部命令参数，测试应同轮更新，避免制造 CI 假失败。
+影响：
 
-## 4. 发布风险
+- 本地或 CI 直接在源码目录运行 `pytest slurmweb/tests` 时，不会因为 `PackageNotFoundError` 在导入阶段提前中断
 
-### 4.1 Windows 不能代表后端最终发布验证环境
+### 3.2 无 `python-ldap` 环境下 gateway / ldap 测试会在 collection 阶段失败
 
-- 全量 `pytest -q` 仍受 `pwd`、`racksdb`、`slurmweb4.2` 兼容树等平台与依赖问题影响。
-- 即使把入口收敛到 `pytest -q slurmweb/tests`，当前 Windows 环境下仍存在一批路径、权限、平台语义差异导致的既有失败，不能作为“后端全量已绿”的依据。
-- 当前 Windows 本地验证只能做定向检查，不能替代 Linux 完整回归。
+已修复：
 
-### 4.2 还缺少“新旧命名兼容策略”的测试说明
+- `slurmweb/tests/lib/gateway.py` 的测试侧 `ldap` stub 已补 `ldap.filter` 子模块
 
-当前代码已经进入“对外名改为 `slurm-web-plus`，内部兼容保留 `slurm-web`”阶段，但测试尚未明确覆盖：
+影响：
 
-- systemd/service 名称与部署路径是否继续保留旧名
-- 发布后文档中的命令示例
-- 旧路径/旧服务名是否继续兼容
+- GitHub Linux runner 在未安装 `python-ldap` 的情况下，仍可完成 gateway / ldap 相关测试收集
 
-说明：
+### 3.3 前端部分时间窗测试会因全量 fake timers 干扰 `vue-i18n`
 
-- 默认 CLI 输出与旧别名启动帮助信息已经在 `slurmweb/tests/exec/test_main.py` 覆盖。
-- 仍未形成自动化验证的是部署层兼容策略，而不是当前 Python 入口本身。
+已修复：
 
-## 5. 发布前建议执行清单
-
-- 在 Linux 环境执行至少一轮后端定向回归：
-  - `slurmweb/tests/exec/test_main.py`
-  - `slurmweb/tests/apps/test_genjwt.py`
-  - `slurmweb/tests/apps/test_agent_ai.py`
-- 视发布范围补充部署兼容性验证：
-  - systemd unit 名称
-  - `/etc/slurm-web` 与 `/etc/slurm-web-plus` 路径策略
-  - 旧服务名、旧命令名是否继续并存
-- 若继续扩展前端用户空间分析页面，保持 `UserToolAnalysisChart` 的 DOM 结构测试与 `GatewayAPI` 权限归一化测试同步更新
-
-## 6. 本次涉及文件
-
-- `docs/review/test-review.md`
-- `frontend/tests/composables/GatewayAPI.spec.ts`
-- `frontend/tests/components/user/UserToolAnalysisChart.spec.ts`
-- `frontend/tests/components/MainMenuAIContract.spec.ts`
-- `frontend/tests/views/JobHistoryView.spec.ts`
-- `frontend/tests/views/JobView.spec.ts`
+- `frontend/tests/components/MetricRangeSelector.spec.ts`
 - `frontend/tests/views/UserAnalysisView.spec.ts`
-- `slurmweb/tests/exec/test_main.py`
-- `slurmweb/tests/apps/test_genjwt.py`
-- `slurmweb/tests/apps/test_load_ldap_password_from_file.py`
-- `slurmweb/tests/apps/test_showconf.py`
-- `slurmweb/tests/test_ui.py`
-- `slurmweb/tests/views/test_agent_metrics_requests.py`
 
-本次审查已直接补齐一批失效测试基线；当前剩余风险主要集中在 Linux 发布验证和部署层命名兼容策略。
+处理方式：
+
+- 改为 `vi.useFakeTimers({ toFake: ['Date'] })`
+- 只冻结当前时间，不接管 `performance`
+
+## 4. 当前缺口与风险
+
+### 4.1 仍有部分前端测试夹具以旧 `actions[]` 为主
+
+- 本轮触达的共享权限消费点已经补了 `rules[]` 覆盖。
+- 仓库中仍有部分未改到的旧夹具，后续扩大权限回归时需要继续迁移。
+
+### 4.2 当前没有把全量测试作为本轮唯一验收标准
+
+- Windows 本地环境不适合把 `pytest -q` 作为最终结论。
+- 全量前端 `vitest` 虽可继续执行，但当前更有价值的是围绕改动点做定向验证，避免把历史噪音误记为本轮失败。
+
+## 5. 未验证范围
+
+- 本轮未重新全量执行 `cd frontend && npx vitest run`
+- 本轮未重新执行全量 `pytest -q`
+- 本轮未在 Linux 发布环境重跑完整后端回归
+
+## 6. 建议
+
+- 新增权限相关页面时，测试夹具优先提供 `rules[]`，`actions[]` 只作为兼容补充。
+- 对会受运行时环境影响的测试问题，优先先做“源码态可收集、可运行”的稳定性修复，再讨论扩大回归范围。
+- 若后续继续调整 `Admin` / `Settings` 权限资源名，必须同步补 `MainMenu`、路由守卫和页面局部控件的定向测试。

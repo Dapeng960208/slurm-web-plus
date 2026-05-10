@@ -1,203 +1,112 @@
-﻿# 后端代码审查报告
+# 后端审查报告
 
 ## 1. 审查范围
 
-本次仅审查后端范围内文件：
+本次后端审查聚焦以下主题：
 
-- `slurmweb/**`
-- `lib/**`
-- `conf/**`
-- 顶层后端打包/入口相关文件（本次主要观察 `pyproject.toml`）
+- 权限规则解析、兼容映射和数据库角色合并是否与当前实现一致
+- `Admin` / `Settings` / `AI` 等资源的真实后端权限口径
+- 旧 `actions[]` 兼容残留是否仍会影响当前授权结果
+- 与权限链路直接相关的后端测试覆盖是否到位
 
-重点检查项：
+重点核对文件：
 
-- 明显 bug 与低风险可修复问题
-- 权限、接口、配置、数据库、发布阻塞项
-- 对外暴露仍为 `slurm-web` 的后端命名点
+- `slurmweb/permission_rules.py`
+- `slurmweb/access_control.py`
+- `slurmweb/persistence/access_control_store.py`
+- `slurmweb/tests/test_permission_rules.py`
+- `slurmweb/tests/test_access_control_policy.py`
+- `slurmweb/tests/test_access_control_store.py`
+- `slurmweb/tests/views/test_agent_permissions.py`
+- `slurmweb/tests/views/test_gateway_permissions.py`
+- `slurmweb/tests/apps/test_ai_service.py`
 
-## 2. 已直接修复的问题
+## 2. 当前结论
 
-### 2.1 `gen-jwt-key` 在非 Unix 平台导入阶段直接失败
+- 当前后端真实权限模型已经是 `resource:operation:scope`，最终判定入口在 `AccessControlPolicyManager.allowed_user_permission()`。
+- 文件策略层仍可提供旧 `actions[]`，但会先通过 `legacy_permission_map` 转成 `rules[]` 再参与合并。
+- 数据库角色当前主字段是 `roles.permissions`，`roles.actions` 只作为兼容输入继续读取。
+- 当前主管理资源是 `admin/ai`、`admin/access-control`、`admin/cache`、`admin/ldap-cache`；`settings/ai`、`settings/access-control`、`settings/cache`、`settings/ldap-cache` 不再是主资源名。
 
-- 文件：`slurmweb/apps/genjwt.py`
-- 问题：模块顶层直接导入 `pwd`，在 Windows 等非 Unix 平台会在导入阶段抛出 `ModuleNotFoundError`，导致命令与相关测试无法继续。
-- 修复：
-  - 为 `pwd` 增加兼容降级逻辑，避免模块导入即失败。
-  - 为缺失 `os.geteuid()` 的平台提供兼容兜底，避免运行期再次中断。
-- 影响：降低平台相关导入失败风险，不改变 Linux 主路径行为。
+## 3. 已确认实现正确的关键点
 
-### 2.2 `setfacl` 失败时原逻辑不会真正报错
+### 3.1 规则匹配逻辑与当前设计一致
 
-- 文件：`slurmweb/apps/genjwt.py`
-- 问题：`subprocess.run(cmd)` 未启用 `check=True`，即使 `setfacl` 失败也不会进入 `CalledProcessError` 分支，ACL 设置失败可能被静默忽略。
-- 修复：改为 `subprocess.run(cmd, check=True)`。
-- 影响：JWT key ACL 设置失败时能够被记录，避免发布后权限问题被静默吞掉。
+`slurmweb/permission_rules.py` 当前已覆盖：
 
-### 2.3 AI 显式启用但数据库初始化失败时缺少专门告警
+- 精确资源匹配
+- `admin/*` 这类前缀资源匹配
+- `*:*:*` 全局通配
+- `edit` / `delete` 自动满足 `view`
+- `self` scope
+- 默认种子角色 `user` / `admin` / `super-admin`
 
-- 文件：`slurmweb/apps/__init__.py`、`slurmweb/apps/agent.py`
-- 问题：当站点配置里显式写了 `[ai] enabled=yes`，但数据库连接初始化失败时，日志只会出现数据库失败告警，缺少 AI 依赖链断裂的明确提示。
-- 修复：
-  - 在基础应用初始化时保留站点配置文件路径。
-  - Agent 启动时回读原始 INI，识别是否显式请求 AI。
-  - 若请求 AI 且数据库不可用，补充明确告警。
-- 影响：发布和排障时更容易识别 “AI 不可用的根因是数据库不可用”。
+其中普通用户默认不拥有 `jobs:view:*`，而是：
 
-## 3. 发布阻塞项
+- 非 `admin/*` 页面只读
+- `jobs:view:self`
+- `jobs:edit:self`
+- `jobs:delete:self`
+- `user/profile:view:self`
+- `user/analysis:view:self`
 
-### 3.1 后端命名迁移到 `slurm-web-plus` 仍未完成
+### 3.2 文件策略与数据库角色的合并口径一致
 
-当前工作区里 Python 包元数据已开始切到 `slurm-web-plus`，但后端仍有大量对外暴露点保留旧名 `slurm-web`，发布会出现命名割裂：
+`slurmweb/access_control.py` 当前真实链路是：
 
-- 配置默认路径仍是旧前缀：
-  - `conf/vendor/agent.yml`
-  - `conf/vendor/gateway.yml`
-  - `slurmweb/apps/_defaults.py`
-- systemd/uWSGI/兼容脚本仍是旧服务名与旧命令名：
-  - `lib/systemd/slurm-web-agent.service`
-  - `lib/systemd/slurm-web-gateway.service`
-  - `lib/wsgi/**`
-  - `lib/exec/slurm-web-compat`
-  - `lib/sysusers/slurm-web.conf`
-- CLI 与应用展示名仍为旧名：
-  - `slurmweb/apps/agent.py`
-  - `slurmweb/apps/gateway.py`
-  - `slurmweb/apps/connect.py`
-  - `slurmweb/apps/ldap.py`
-  - `slurmweb/apps/showconf.py`
-  - `slurmweb/apps/genjwt.py`
-  - `slurmweb/exec/agent.py`
-  - `slurmweb/exec/gateway.py`
-  - `slurmweb/exec/connect.py`
-  - `slurmweb/exec/ldap.py`
-  - `slurmweb/exec/showconf.py`
-  - `slurmweb/exec/genjwt.py`
-- 包项目链接仍指向旧仓库命名：
-  - `pyproject.toml`
-
-结论：后端还不能宣称“已完整切换为 `slurm-web-plus`”，当前最多是“包元数据开始迁移，运行时/部署层未完成同步”。
-
-### 3.2 发布验证环境仍应以 Linux 为准
-
-本地验证是在 Windows PowerShell 下完成，后端测试中存在大量 POSIX 假设：
-
-- `pwd`
-- `setfacl`
-- `/dev/null`
-- `/var/lib/slurm-web/...`
-- Unix 权限位与符号链接能力
-
-这意味着：
-
-- Windows 下的部分失败不能直接认定为后端业务缺陷。
-- 正式发布前必须在 Linux CI 或 Linux 构建机上完成后端测试与打包验证。
-
-## 4. 风险点
-
-### 4.1 系统用户与目录命名迁移未定稿
-
-`gen-jwt-key`、systemd unit、uWSGI 配置、默认 JWT 路径仍围绕 `slurm-web` 用户和目录：
-
-- `slurmweb/apps/genjwt.py`
-- `lib/systemd/*.service`
-- `lib/wsgi/**/*.ini`
-- `conf/vendor/*.yml`
-
-如果发布目标是彻底更名为 `slurm-web-plus`，需要确认以下迁移策略：
-
-- 系统用户是否仍保留 `slurm-web`
-- `/etc/slurm-web`、`/usr/share/slurm-web`、`/var/lib/slurm-web` 是否保留兼容路径
-- 旧服务名是否保留别名或软链接
-
-未定稿前，不建议直接替换所有默认路径，否则会破坏现有部署升级。
-
-### 4.2 兼容包装脚本仍以旧统一命令为中心
-
-- 文件：`lib/exec/slurm-web-compat`
-- 现状：仍把旧命令族转发到 `slurm-web`
-- 风险：若发布后主命令实际变成 `slurm-web-plus`，该兼容脚本会把用户继续引向旧命令，命名策略会自相矛盾。
-
-### 4.3 测试基线尚未跟随命名迁移
-
-已观察到测试中仍大量断言旧 CLI 名称和旧路径，例如：
-
-- `slurmweb/tests/exec/test_main.py`
-- `slurmweb/tests/views/test_gateway_ui.py`
-- `slurmweb/tests/slurmrestd/test_auth.py`
+1. 文件策略读出 `roles + actions`
+2. 旧动作通过 `legacy_actions_to_rules()` 转成 `rules`
+3. 数据库角色返回 `roles + actions + permissions`
+4. 两侧统一合并为：
+   - `roles`
+   - `actions`
+   - `rules`
+   - `sources.policy/custom/merged`
 
 说明：
 
-- `slurmweb/tests/exec/test_main.py` 已在本轮同步修正并通过。
-- 仍需继续检查更大范围测试树中是否还有旧命名硬编码。
+- 当前前端应优先消费 `rules` 或 `sources.merged.rules`
+- `actions` 继续存在，主要用于兼容旧页面、旧测试数据和角色展示
 
-## 5. 待确认项
+### 3.3 数据库存储层的兼容迁移仍在正常工作
 
-### 5.1 `slurm-web-plus` 的兼容策略
+`slurmweb/persistence/access_control_store.py` 当前会：
 
-需要明确以下策略后，后端才能继续批量改名：
+- 优先使用 `permissions`
+- 当 `permissions` 为空时，从 `actions` 推导
+- 启动时清理 7 个已移除旧动作
+- 把历史 `admin-manage` 归一为 `*:*:*`
+- 在空表时自动种子 `user` / `admin` / `super-admin`
 
-- 是否同时保留 `slurm-web-plus` 与 `slurm-web` 两个 CLI
-- 是否保留旧 systemd service 名称
-- 是否保留旧配置目录和数据目录
-- `pyproject.toml` 中 `Homepage` / `Bug Tracker` 是否也要切到新仓库地址
+## 4. 当前风险
 
-### 5.2 发布物命名范围
+### 4.1 文档和测试仍容易把 `Settings` 管理页误写成主资源
 
-需要确认“更名”覆盖到什么层级：
+- 路由兼容入口仍然存在，容易让文档误把 `/settings/ai` 等路径写成正式管理入口。
+- 但后端目录与前端主菜单口径已经转到 `admin/*`。
 
-- 仅 PyPI 包名
-- CLI 名
-- systemd/unit 文件名
-- sysusers 用户名
-- `/etc`、`/usr/share`、`/var/lib` 路径
+### 4.2 兼容层仍然存在，新增代码若继续消费 `actions[]` 会重新制造双口径
 
-如果范围不明确，后端只能做局部迁移，无法保证发布成品一致。
+- 当前兼容层是必要的，但它不应该继续成为新功能的默认实现路径。
+- 新增鉴权应直接围绕资源规则编写，并让测试夹具优先提供 `rules[]`。
 
-## 6. 需前端/测试跟进
+## 5. 建议
 
-### 6.1 需要测试侧跟进
+- 继续把页面、测试夹具和说明文档统一到 `admin/*` 与 `resource:operation:scope`。
+- 对 `self` 场景的前端判定只做辅助显示，最终安全边界仍以后端 owner-aware 校验为准。
+- 后续如果继续清理 legacy 权限，优先从前端未迁移消费点和旧测试夹具入手，而不是先删兼容字段。
 
-- 更新后端测试基线，覆盖：
-  - `slurm-web-plus` 新命令名
-  - `gen-jwt-key` 现在会校验 `setfacl` 返回码
-  - Linux/Windows 差异场景要么分平台断言，要么限制到 Linux CI
+## 6. 验证记录
 
-### 6.2 需要前端侧确认
+已通过：
 
-- 网关 UI 对外展示名、页面文案、静态资源路径是否也要统一迁移到 `slurm-web-plus`
-- 若 UI 对 API 根路径、品牌名、下载说明仍写旧名，需要与前端文档一起同步
+- `.venv\\Scripts\\python.exe -m pytest -q slurmweb/tests/test_permission_rules.py`
+- `.venv\\Scripts\\python.exe -m pytest -q slurmweb/tests/test_access_control_policy.py`
+- `.venv\\Scripts\\python.exe -m pytest -q slurmweb/tests/test_access_control_store.py`
+- `.venv\\Scripts\\python.exe -m pytest -q slurmweb/tests/views/test_agent_permissions.py`
+- `.venv\\Scripts\\python.exe -m pytest -q slurmweb/tests/views/test_gateway_permissions.py`
 
-## 7. 本次涉及文件
+说明：
 
-本次我实际修改的后端文件：
-
-- `slurmweb/apps/__init__.py`
-- `slurmweb/apps/agent.py`
-- `slurmweb/apps/genjwt.py`
-- `docs/review/backend-review.md`
-
-本次重点核查但未直接改动的发布相关文件：
-
-- `pyproject.toml`
-- `conf/vendor/agent.yml`
-- `conf/vendor/gateway.yml`
-- `slurmweb/apps/_defaults.py`
-- `lib/systemd/*`
-- `lib/wsgi/*`
-- `lib/exec/slurm-web-compat`
-
-## 8. 验证记录
-
-已执行：
-
-- `.\.venv\Scripts\python.exe -m pytest -q slurmweb/tests/apps/test_agent_ai.py -k database_support_missing`
-- `.\.venv\Scripts\python.exe -m pytest -q slurmweb/tests/exec/test_main.py`
-- `.\.venv\Scripts\python.exe -m pytest -q slurmweb/tests/apps/test_genjwt.py`
-- `.\.venv\Scripts\python.exe -m pytest -q slurmweb/tests/apps/test_load_ldap_password_from_file.py slurmweb/tests/apps/test_showconf.py slurmweb/tests/test_ui.py`
-- `.\.venv\Scripts\python.exe -m compileall slurmweb/apps`
-
-结果：
-
-- AI 告警补丁对应测试已通过。
-- CLI 改名兼容与 `gen-jwt-key` 新行为对应测试已通过。
-- `slurmweb/apps` 编译通过。
+- 以上验证覆盖了规则解析、策略合并、数据库兼容和网关/Agent 权限主链路。
+- `slurmweb/tests/apps/test_ai_service.py` 仅在涉及 AI 权限映射改动时需要追加执行；本轮前端权限消费收口未改动 AI 后端授权逻辑。

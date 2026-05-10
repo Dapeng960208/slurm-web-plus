@@ -1,135 +1,127 @@
-﻿# 访问控制测试计划
+# 访问控制测试计划
 
 ## 1. 目标
 
-验证新的 `resource:operation:scope` 权限系统、旧权限兼容映射、预置角色种子和前端资源矩阵在数据库启用与关闭两种模式下都行为正确。
+验证当前 `resource:operation:scope` 权限模型、旧动作兼容映射、数据库角色兼容逻辑，以及前端菜单/路由/局部控件的权限消费口径是否一致。
 
 ## 2. 后端测试
 
 ### 2.1 规则匹配
 
-覆盖以下场景：
+至少覆盖：
 
 - 精确资源匹配
-- 前缀资源匹配
-- `*:view:*` / `*:edit:*`
-- `*:*:*`
+- `admin/*` 前缀资源匹配
+- `*:view:*`、`*:edit:*`、`*:*:*`
 - `self`
 - `edit` / `delete` 满足 `view`
-- 旧权限映射到新规则
-- `cache-reset` -> `admin/cache:edit:*`
-- `admin-manage` -> `*:*:*`
+- 旧动作映射到新规则
+- `cache-reset -> admin/cache:edit:*`
+- `admin-manage -> *:*:*`
 
 对应重点：
 
 - `slurmweb/permission_rules.py`
 - `slurmweb/tests/test_permission_rules.py`
 - `slurmweb/tests/test_access_control_policy.py`
-- `slurmweb/tests/views/test_agent_permissions.py`
 
-### 2.2 能力推导
+### 2.2 策略合并与数据库兼容
 
-覆盖以下场景：
+至少覆盖：
 
-- 数据库开启后自动启用：
-  - LDAP Cache
-  - Jobs History
-  - Access Control
-  - AI
-- Prometheus 开启后自动启用：
-  - metrics
-  - node metrics
-- 数据库 + Prometheus 开启后自动启用：
-  - user metrics
-  - user analytics
+- 文件策略动作转规则
+- 数据库 `roles.permissions` 读取
+- 仅有 `roles.actions` 时的规则推导
+- 历史 7 个已移除旧动作的清理/迁移
+- `admin-manage` 的超级管理员兼容行为
+- 空角色表自动种子 `user`、`admin`、`super-admin`
 
 对应重点：
 
-- `slurmweb/tests/apps/test_agent.py`
+- `slurmweb/access_control.py`
+- `slurmweb/persistence/access_control_store.py`
+- `slurmweb/tests/test_access_control_store.py`
 
-### 2.3 数据库存储
+### 2.3 网关 / Agent 权限链路
 
-覆盖以下场景：
+至少覆盖：
 
-- `roles.permissions` 迁移生效
-- 角色新旧字段双读双写
-- 旧角色只有 `actions[]` 时可推导出 `permissions[]`
-- 历史 `roles.actions` 中的 7 个已移除旧动作会在启动时迁入 `permissions[]` 后清理
-- 历史 `roles.actions` 中的 `admin-manage` 会在启动时补齐 `*:*:*`
-- 角色表为空时自动写入 `user`、`admin`、`super-admin`
-- `user` 默认值为“非 admin 页面只读 + jobs:view|edit|delete:self + user/analysis:view:self”
-- `admin` 默认值为 `*:view:*` + `*:edit:*`
+- `allowed_user_permission()` 主判定链路
+- `jobs:self`、`user/profile:self`、`user/analysis:self`
+- 普通用户与管理员分支
+- Gateway / Agent 权限接口返回
+
+对应重点：
+
+- `slurmweb/tests/views/test_agent_permissions.py`
+- `slurmweb/tests/views/test_gateway_permissions.py`
+- 如涉及 AI 权限映射，再补 `slurmweb/tests/apps/test_ai_service.py`
 
 ## 3. 前端测试
 
 ### 3.1 运行时权限
 
-覆盖以下场景：
+至少覆盖：
 
-- `hasRoutePermission(...)` 能正确匹配规则
-- 旧 `actions[]` 测试夹具仍能通过兼容回退参与判定
-- `self` 场景下 `/me` 与 `/users/:user` 行为正确
+- `hasRoutePermission(...)`
+- `hasRoutePermissionAnyScope(...)`
+- `rules[]` 优先口径
+- 旧 `actions[]` fallback
+- `self` 场景
 
-### 3.2 页面与导航
+对应重点：
 
-覆盖以下场景：
+- `frontend/tests/stores/runtime.spec.ts`
+- `frontend/tests/router/AdminPermissions.spec.ts`
+- `frontend/tests/composables/userWorkspace.spec.ts`
 
-- 主菜单按新规则显示主路由
-- 路由守卫按新规则跳转 `/forbidden`
-- Settings Tabs 按新规则显示
-- `SettingsAI`、`SettingsCache`、`SettingsLdapCache`
-- `AssistantView`
-- `UserView`
+### 3.2 导航与页面
 
-### 3.3 Access Control 页面
+至少覆盖：
 
-覆盖以下场景：
+- 主菜单显示
+- 路由守卫跳转 `/forbidden`
+- `Admin` 入口与 `AI` 入口权限对齐
+- `SettingsAccessControl` 的只读 / 可编辑 / 可删除状态
 
-- `GET /access/catalog` 成功加载
-- 角色权限矩阵回填正确
-- 保存时提交 `permissions[]`
-- 兼容动作 `actions[]` 可回显
-- 只读模式不可编辑
-- 用户角色绑定保存正确
+对应重点：
 
-## 4. 端到端场景
+- `frontend/tests/components/MainMenu.spec.ts`
+- `frontend/tests/views/settings/SettingsAccessControl.spec.ts`
 
-最少验证以下组合：
+### 3.3 本轮共享权限消费点
 
-1. 仅数据库开启
-2. 仅 Prometheus 开启
-3. 数据库 + Prometheus 同时开启
-4. 旧角色只有 `actions[]`，启用新权限后页面仍可访问
+至少覆盖：
 
-## 5. 本轮矩阵审查结论
+- `DashboardView`
+- `NodeView`
+- `JobsFiltersPanel`
+- `DashboardCharts`
+- `ResourcesFiltersPanel`
+- `userWorkspace`
 
-已确认并已补/修正的关键断言：
+说明：
 
-- 普通用户默认权限不是 `jobs:view:*`，而是非 `admin/*` 页面只读 + `jobs:view|edit|delete:self`
-- `admin` 默认角色不是全量 delete，而是 `*:view:*` + `*:edit:*`
-- `admin` 子树不再使用 `settings/ai|cache|ldap-cache|access-control` 资源名，统一切到 `admin/*`
-- 7 个已移除旧动作不会再出现在 `legacy_map`、`/permissions.actions` 和前端角色页
-- `admin-manage` 只在 `*:*:*` 场景下回显，`admin` 默认角色不会推出该动作
+- 这几处应优先以 `rules[]` 夹具断言，不再把旧 action 作为唯一测试前提。
 
-仍待主线程继续补齐的缺口：
+## 4. 本轮建议执行顺序
 
-- 前端只读模式矩阵仍需继续覆盖 `Admin` 页面下各 tab 的禁用/隐藏细节
-- 仍有部分前端测试夹具以旧 `actions[]` 为主，需要逐步收敛到 `rules[]`
-- Windows 本地环境不适合直接用全量后端 pytest 作为唯一验收结论
+1. `npm --prefix frontend run type-check`
+2. `cd frontend && npx vitest run tests/views/DashboardView.spec.ts tests/views/NodeView.spec.ts tests/components/jobs/JobsFiltersPanel.spec.ts tests/components/dashboard/DashboardCharts.spec.ts tests/composables/userWorkspace.spec.ts`
+3. `.venv\\Scripts\\python.exe -m pytest -q slurmweb/tests/test_permission_rules.py slurmweb/tests/test_access_control_policy.py slurmweb/tests/test_access_control_store.py slurmweb/tests/views/test_agent_permissions.py slurmweb/tests/views/test_gateway_permissions.py`
+4. 如涉及 AI 权限映射，再执行 `.venv\\Scripts\\python.exe -m pytest -q slurmweb/tests/apps/test_ai_service.py`
 
-## 6. 已执行的定向验证
+## 5. 未验证范围记录要求
 
-已通过：
+如果本轮无法完成：
 
-- `npm --prefix frontend run type-check`
-- `npx vitest run tests/stores/runtime.spec.ts tests/views/settings/SettingsAccessControl.spec.ts`
-- `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/test_permission_rules.py`
-- `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/test_access_control_policy.py`
-- `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/test_access_control_store.py`
-- `.venv\Scripts\python.exe -m pytest slurmweb/tests/views/test_agent_permissions.py -q`
-- `.venv\Scripts\python.exe -m pytest slurmweb/tests/apps/test_agent.py -q`
+- 全量 `vitest`
+- 全量 `pytest -q`
+- Linux 发布环境回归
 
-未在本次变更中完整重跑：
+则必须在 review / tracking 文档中明确写出：
 
-- 全量前端 Vitest
-- 全量后端 pytest
+- 未执行项
+- 阻塞原因
+- 未验证范围
+- 风险

@@ -39,7 +39,7 @@ Browser (Vue SPA)
    - `actions`
    - `rules`
    - `sources.policy/custom/merged`
-5. 前端运行时使用 `hasRoutePermission(...)` 按 `resource:operation:scope` 判定访问
+5. 前端运行时使用 `hasRoutePermission(...)` 与 `hasRoutePermissionAnyScope(...)` 按 `resource:operation:scope` 判定访问
 
 对应核心实现：
 
@@ -48,12 +48,17 @@ Browser (Vue SPA)
 - `slurmweb/persistence/access_control_store.py`
 - `frontend/src/stores/runtime.ts`
 
-与本轮管理扩展直接相关的资源已经迁移为：
+与当前管理主路径直接相关的资源已经迁移为：
 
 - `admin/ai`
 - `admin/cache`
 - `admin/ldap-cache`
 - `admin/access-control`
+
+补充说明：
+
+- `/settings/ai`、`/settings/access-control`、`/settings/cache`、`/settings/ldap-cache` 当前只保留为兼容重定向入口
+- 路由主入口和菜单入口都以 `/:cluster/admin/*` 为准
 
 补充说明：
 
@@ -228,7 +233,7 @@ Vue 页面
 - `QosView.vue`
 - `ClusterAnalysisView.vue`
 
-旧 `hasClusterPermission(...)` 仍保留，用于兼容尚未迁移的 action 级消费点和旧测试数据。
+旧 `hasClusterPermission(...)` 与 `hasPermission(...)` 仍保留，用于兼容少量 fallback 和旧测试数据，但不再是前端主鉴权入口。
 
 ## 9. 前端页面滚动边界
 

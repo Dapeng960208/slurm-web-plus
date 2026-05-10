@@ -1,5 +1,14 @@
 # 最新功能
 
+## 本轮：Review 文档与访问控制专题已按当前实现重写
+
+本轮对 `docs/review/*` 和访问控制专题文档做了事实校准，去掉旧的专项流水账口径，统一到当前代码实现：
+
+- `docs/review/backend-review.md`、`frontend-review.md`、`test-review.md` 已改为当前仓库真实审查结论
+- 新增 `docs/review/open-questions.md` 记录无法仅靠静态代码确认的事项
+- `docs/features/access-control/requirements.md` 与 `test-plan.md` 已统一到当前 `resource:operation:scope`、`admin/*` 主路径和 `rules[]` 优先口径
+- `docs/overview/project-overview.md` 与 `architecture-overview.md` 已明确 `/:cluster/admin/*` 是主管理入口，`/settings/*` 相关管理页仅保留兼容重定向
+
 ## 本轮：前端共享权限消费点已统一优先走 `resource:operation:scope`
 
 本轮对几处仍依赖旧 `actions[]` 的共享权限判断做了收口，避免菜单、路由和页内局部控件继续出现不同步的授权口径：

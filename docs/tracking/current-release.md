@@ -37,6 +37,12 @@
 
 ## 2. 已完成项
 
+- Review 文档与访问控制专题已按当前实现重写：
+  - `docs/review/backend-review.md`、`frontend-review.md`、`test-review.md` 已改为当前仓库真实 review 结论
+  - 新增 `docs/review/open-questions.md` 单独记录无法静态确认的事项
+  - `docs/features/access-control/requirements.md` 与 `test-plan.md` 已统一到当前 `resource:operation:scope`、`admin/*` 主路径和 `rules[]` 优先口径
+  - `docs/overview/project-overview.md` 与 `architecture-overview.md` 已同步说明 `/:cluster/admin/*` 是主管理入口，`/settings/*` 相关管理页仅为兼容重定向
+
 - 前端共享权限消费点已继续向 `resource:operation:scope` 收口：
   - `DashboardView` 的分区筛选改为按 `jobs/filter-partitions:view:*` 或 `resources/filter-partitions:view:*` 判断
   - `NodeView` 的节点作业轮询改为按 `jobs:view:*` 判断
