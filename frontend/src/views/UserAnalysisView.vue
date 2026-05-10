@@ -46,37 +46,39 @@ const userMetricsEnabled = computed(
       <button
         @click="router.push({ name: 'user', params: { cluster, user } })"
         type="button"
-        class="ui-button-secondary self-start"
+        class="ui-button-secondary self-start shrink-0"
       >
         <ChevronLeftIcon class="-ml-0.5 h-5 w-5" aria-hidden="true" />
         Back to user detail
       </button>
 
-      <div class="ui-section-stack">
-        <PageHeader
-          kicker="User Analysis"
-          :title="user"
-          description="Submission trends, tool usage analysis and execution summaries for this user."
-        >
-          <template #actions>
-            <div class="flex flex-wrap gap-3">
-              <RouterLink
-                :to="{ name: 'user', params: { cluster, user } }"
-                class="ui-button-secondary"
-              >
-                User detail
-              </RouterLink>
-              <RouterLink
-                :to="{ name: 'jobs', params: { cluster }, query: { users: user } }"
-                class="ui-button-primary"
-              >
-                View jobs
-              </RouterLink>
-            </div>
-          </template>
-        </PageHeader>
+      <div class="ui-scroll-region min-h-0 flex-1 pr-1">
+        <div class="ui-section-stack pb-2">
+          <PageHeader
+            kicker="User Analysis"
+            :title="user"
+            description="Submission trends, tool usage analysis and execution summaries for this user."
+          >
+            <template #actions>
+              <div class="flex flex-wrap gap-3">
+                <RouterLink
+                  :to="{ name: 'user', params: { cluster, user } }"
+                  class="ui-button-secondary"
+                >
+                  User detail
+                </RouterLink>
+                <RouterLink
+                  :to="{ name: 'jobs', params: { cluster }, query: { users: user } }"
+                  class="ui-button-primary"
+                >
+                  View jobs
+                </RouterLink>
+              </div>
+            </template>
+          </PageHeader>
 
-        <UserAnalyticsPanels :cluster="cluster" :user="user" :enabled="userMetricsEnabled" />
+          <UserAnalyticsPanels :cluster="cluster" :user="user" :enabled="userMetricsEnabled" />
+        </div>
       </div>
     </div>
   </ClusterMainLayout>

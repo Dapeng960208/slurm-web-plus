@@ -403,49 +403,50 @@ function hasDifferentQos(userAssociation: ClusterAssociation): boolean {
       <button
         @click="router.push({ name: 'accounts', params: { cluster } })"
         type="button"
-        class="ui-button-secondary self-start"
+        class="ui-button-secondary self-start shrink-0"
       >
         <ChevronLeftIcon class="-ml-0.5 h-5 w-5" aria-hidden="true" />
         Back to accounts
       </button>
 
-      <div class="ui-section-stack">
-        <div id="account-heading">
-          <PageHeader
-            kicker="Account Detail"
-            :title="account"
-            description="Hierarchy, inherited policy and per-user overrides for the selected Slurm account."
-            :metric-value="loaded && accountAssociation ? userAssociations.length : undefined"
-            :metric-label="`user association${userAssociations.length === 1 ? '' : 's'}`"
-          >
-            <template #actions>
-              <div class="flex flex-wrap gap-3">
-                <RouterLink
-                  :to="{ name: 'jobs', params: { cluster }, query: { accounts: account } }"
-                  class="ui-button-primary"
-                >
-                  View jobs
-                </RouterLink>
-                <button
-                  v-if="canEditAccount"
-                  type="button"
-                  class="ui-button-warning"
-                  @click="editOpen = true"
-                >
-                  Edit
-                </button>
-                <button
-                  v-if="canDeleteAccount"
-                  type="button"
-                  class="ui-button-danger"
-                  @click="deleteOpen = true"
-                >
-                  Delete
-                </button>
-              </div>
-            </template>
-          </PageHeader>
-        </div>
+      <div class="ui-scroll-region min-h-0 flex-1 pr-1">
+        <div class="ui-section-stack pb-2">
+          <div id="account-heading">
+            <PageHeader
+              kicker="Account Detail"
+              :title="account"
+              description="Hierarchy, inherited policy and per-user overrides for the selected Slurm account."
+              :metric-value="loaded && accountAssociation ? userAssociations.length : undefined"
+              :metric-label="`user association${userAssociations.length === 1 ? '' : 's'}`"
+            >
+              <template #actions>
+                <div class="flex flex-wrap gap-3">
+                  <RouterLink
+                    :to="{ name: 'jobs', params: { cluster }, query: { accounts: account } }"
+                    class="ui-button-primary"
+                  >
+                    View jobs
+                  </RouterLink>
+                  <button
+                    v-if="canEditAccount"
+                    type="button"
+                    class="ui-button-warning"
+                    @click="editOpen = true"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    v-if="canDeleteAccount"
+                    type="button"
+                    class="ui-button-danger"
+                    @click="deleteOpen = true"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </template>
+            </PageHeader>
+          </div>
 
         <template v-if="initialLoading && !unable">
           <StatCardSkeleton :cards="4" />
@@ -705,6 +706,7 @@ function hasDifferentQos(userAssociation: ClusterAssociation): boolean {
           </div>
         </div>
       </div>
+        </div>
       </div>
     </div>
 

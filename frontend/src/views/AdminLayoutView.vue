@@ -16,7 +16,9 @@ defineProps<{ cluster: string }>()
 <template>
   <ClusterMainLayout menu-entry="admin" :cluster="cluster" :breadcrumb="[{ title: 'Admin' }]">
     <div class="ui-page ui-page-readable ui-content-workspace">
-      <RouterView />
+      <div class="ui-scroll-region min-h-0 flex-1 pr-1">
+        <RouterView />
+      </div>
     </div>
   </ClusterMainLayout>
 </template>

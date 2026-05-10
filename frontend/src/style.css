@@ -31,6 +31,10 @@
   --color-brand-success: #7bbf1f;
   --color-brand-warning: #ef9b28;
   --color-brand-danger: #d84b50;
+  --color-brand-scrollbar-thumb: rgba(80, 105, 127, 0.42);
+  --color-brand-scrollbar-thumb-hover: rgba(80, 105, 127, 0.58);
+  --color-brand-scrollbar-track: rgba(255, 255, 255, 0.42);
+  --color-brand-scrollbar-track-edge: rgba(80, 105, 127, 0.08);
 
   --radius-shell: 32px;
   --radius-panel: 24px;
@@ -166,7 +170,7 @@
     flex-direction: column;
     overflow-y: auto;
     overscroll-behavior: contain;
-    scrollbar-gutter: stable;
+    scrollbar-gutter: auto;
   }
 
   .ui-public-shell {
@@ -387,6 +391,7 @@
     min-height: 0;
     overflow-y: auto;
     overscroll-behavior: contain;
+    scrollbar-gutter: stable;
   }
 
   .ui-results-layout {
@@ -478,6 +483,92 @@
   .ui-assistant-chat-scroll {
     height: 100%;
     max-height: 100%;
+  }
+
+  .ui-content-scroll,
+  .ui-scroll-region,
+  .ui-results-scroll,
+  .ui-table-scroll,
+  .ui-tree-scroll,
+  .ui-assistant-chat-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-brand-scrollbar-thumb) transparent;
+  }
+
+  .ui-content-scroll::-webkit-scrollbar,
+  .ui-scroll-region::-webkit-scrollbar,
+  .ui-results-scroll::-webkit-scrollbar,
+  .ui-table-scroll::-webkit-scrollbar,
+  .ui-tree-scroll::-webkit-scrollbar,
+  .ui-assistant-chat-scroll::-webkit-scrollbar {
+    width: 12px;
+    height: 12px;
+  }
+
+  .ui-content-scroll::-webkit-scrollbar-track,
+  .ui-scroll-region::-webkit-scrollbar-track,
+  .ui-results-scroll::-webkit-scrollbar-track,
+  .ui-table-scroll::-webkit-scrollbar-track,
+  .ui-tree-scroll::-webkit-scrollbar-track,
+  .ui-assistant-chat-scroll::-webkit-scrollbar-track {
+    border-radius: 999px;
+    background: linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.18),
+      var(--color-brand-scrollbar-track) 55%,
+      rgba(220, 230, 236, 0.32)
+    );
+    box-shadow:
+      inset 0 0 0 1px var(--color-brand-scrollbar-track-edge),
+      inset 0 10px 18px rgba(255, 255, 255, 0.24);
+  }
+
+  .ui-content-scroll::-webkit-scrollbar-thumb,
+  .ui-scroll-region::-webkit-scrollbar-thumb,
+  .ui-results-scroll::-webkit-scrollbar-thumb,
+  .ui-table-scroll::-webkit-scrollbar-thumb,
+  .ui-tree-scroll::-webkit-scrollbar-thumb,
+  .ui-assistant-chat-scroll::-webkit-scrollbar-thumb {
+    border: 3px solid transparent;
+    border-radius: 999px;
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.32), rgba(255, 255, 255, 0)) padding-box,
+      linear-gradient(
+        180deg,
+        rgba(182, 232, 44, 0.84),
+        var(--color-brand-scrollbar-thumb-hover) 52%,
+        rgba(80, 105, 127, 0.82)
+      )
+      border-box;
+    box-shadow:
+      0 10px 20px rgba(80, 105, 127, 0.12),
+      inset 0 1px 0 rgba(255, 255, 255, 0.36);
+  }
+
+  .ui-content-scroll::-webkit-scrollbar-thumb:hover,
+  .ui-scroll-region::-webkit-scrollbar-thumb:hover,
+  .ui-results-scroll::-webkit-scrollbar-thumb:hover,
+  .ui-table-scroll::-webkit-scrollbar-thumb:hover,
+  .ui-tree-scroll::-webkit-scrollbar-thumb:hover,
+  .ui-assistant-chat-scroll::-webkit-scrollbar-thumb:hover {
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.36), rgba(255, 255, 255, 0.02)) padding-box,
+      linear-gradient(
+        180deg,
+        rgba(182, 232, 44, 0.92),
+        rgba(123, 191, 31, 0.88) 28%,
+        var(--color-brand-scrollbar-thumb-hover)
+      )
+      border-box;
+  }
+
+  .ui-content-scroll::-webkit-scrollbar-corner,
+  .ui-scroll-region::-webkit-scrollbar-corner,
+  .ui-results-scroll::-webkit-scrollbar-corner,
+  .ui-table-scroll::-webkit-scrollbar-corner,
+  .ui-tree-scroll::-webkit-scrollbar-corner,
+  .ui-assistant-chat-scroll::-webkit-scrollbar-corner {
+    background: transparent;
   }
 
   .ui-panel {

@@ -21,6 +21,11 @@
 - 现象：页面真实实现仍存在跳转按钮，但 `tests/views/DashboardView.spec.ts` 使用 `wrapper.text()` 或直接查 `RouterLinkStub` 时断言失败；同组 dashboard 测试其余用例全部通过，失败集中在头部 actions 区域文案检查
 - 解决办法：改为断言 `[data-testid="dashboard-header-tools"] .ui-button-primary` 的存在性，直接覆盖头部操作区真实 DOM
 
+### 2026-05-09：固定应用壳下非表格内容页缺少内部滚动容器会导致正文无法下滚
+- 时间：2026-05-09
+- 现象：`Dashboard`、`Analysis` 以及 `/:cluster/admin/*` 子页面在使用固定高度 `ui-shell` / `ui-content-workspace` 时，若正文直接堆叠在工作区下方而没有内部 `ui-scroll-region`，页面会出现“表格区域能滚动，但详情或配置内容无法继续向下滚动”的共性问题
+- 解决办法：为非表格内容页统一补充 `ui-scroll-region min-h-0 flex-1 pr-1` 作为正文滚动容器；对管理页改在 `AdminLayoutView` 父布局统一包裹 `RouterView`，避免在各管理子页面重复修补
+
 ### 2026-05-07：本地提交流程被 `.git/index.lock` 短暂阻断
 - 时间：2026-05-07
 - 现象：Git 返回 `fatal: Unable to create '.../.git/index.lock': File exists.`，导致暂存失败

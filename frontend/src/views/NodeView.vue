@@ -480,7 +480,8 @@ onUnmounted(() => {
     <div class="ui-page ui-page-readable ui-content-workspace">
       <BackToResourcesButton :cluster="cluster" />
 
-      <div class="ui-section-stack">
+      <div class="ui-scroll-region min-h-0 flex-1 pr-1">
+        <div class="ui-section-stack pb-2">
         <PageHeader
           kicker="Node Detail"
           :title="`Node ${nodeName}`"
@@ -889,6 +890,7 @@ onUnmounted(() => {
               </div>
             </div>
           </div>
+        </div>
         </div>
       </div>
     </div>

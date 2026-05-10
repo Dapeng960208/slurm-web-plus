@@ -425,333 +425,335 @@ onUnmounted(() => {
 
       <ErrorAlert v-if="error">{{ error }}</ErrorAlert>
 
-      <template v-else-if="loading">
-        <div class="ui-panel ui-section">
-          <div class="flex items-center gap-3 text-[var(--color-brand-muted)]">
-            <LoadingSpinner :size="4" />
-            Building the cluster analysis workspace...
-          </div>
-        </div>
-      </template>
-
-      <template v-else>
-        <div class="flex flex-wrap items-center justify-between gap-3">
-          <div class="flex flex-wrap gap-2">
-            <span class="ui-chip">Status: {{ analysis.scoreLabel }}</span>
-            <span v-if="updatedAtLabel" class="ui-chip">Updated {{ updatedAtLabel }}</span>
-            <span v-if="refreshing" class="ui-chip">Refreshing</span>
-          </div>
-
-          <MetricRangeSelector
-            :model-value="selectedRange"
-            aria-label="Select cluster analysis range"
-            @update:model-value="renderRange"
-          />
-        </div>
-
-        <div class="ui-summary-strip">
-          <div v-for="card in analysis.summaryCards" :key="card.id" class="ui-summary-item">
-            <div class="ui-summary-label">{{ card.label }}</div>
-            <div class="ui-summary-value">{{ card.value }}</div>
-            <div class="ui-summary-subtle">{{ card.detail }}</div>
+      <div class="ui-scroll-region min-h-0 flex-1 pr-1">
+        <div v-if="loading" class="ui-section-stack pb-2">
+          <div class="ui-panel ui-section">
+            <div class="flex items-center gap-3 text-[var(--color-brand-muted)]">
+              <LoadingSpinner :size="4" />
+              Building the cluster analysis workspace...
+            </div>
           </div>
         </div>
 
-        <div class="grid gap-6 xl:grid-cols-[minmax(0,1.18fr)_minmax(320px,0.82fr)]">
-          <section class="ui-panel ui-section">
-            <div class="mb-4">
-              <h2 class="ui-panel-title">Capacity Envelope</h2>
-              <p class="ui-panel-description mt-2">
-                Current utilization and schedulable headroom across the cluster.
-              </p>
+        <div v-else class="ui-section-stack pb-2">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div class="flex flex-wrap gap-2">
+              <span class="ui-chip">Status: {{ analysis.scoreLabel }}</span>
+              <span v-if="updatedAtLabel" class="ui-chip">Updated {{ updatedAtLabel }}</span>
+              <span v-if="refreshing" class="ui-chip">Refreshing</span>
             </div>
 
-            <div class="space-y-4">
-              <div
-                v-for="metric in analysis.capacityMetrics"
-                :key="metric.id"
-                class="ui-analysis-meter"
-              >
-                <div class="flex items-center justify-between gap-4">
-                  <div>
-                    <div class="ui-stat-label">{{ metric.label }}</div>
-                    <div class="mt-2 text-sm text-[var(--color-brand-muted)]">
-                      {{ metric.detail }}
-                    </div>
-                  </div>
-                  <div class="text-right">
-                    <PercentMetric :value="metric.value" :maximum-fraction-digits="0" />
-                  </div>
-                </div>
-                <div class="ui-analysis-meter-track">
-                  <div
-                    class="ui-analysis-meter-fill"
-                    :style="{ width: `${metric.value ?? 0}%` }"
-                  />
-                </div>
-              </div>
-            </div>
-          </section>
-
-          <section class="ui-panel ui-section">
-            <div class="mb-4">
-              <h2 class="ui-panel-title">Queue Blockers</h2>
-              <p class="ui-panel-description mt-2">
-                Why jobs are waiting, and whether the queue is blocked by capacity, policy or packing.
-              </p>
-            </div>
-
-            <div class="space-y-3">
-              <div v-if="!canViewJobs" class="ui-panel-soft px-4 py-4 text-sm text-[var(--color-brand-muted)]">
-                Job visibility is required to analyze queue blockers.
-              </div>
-              <div v-else-if="jobsUnavailable" class="ui-panel-soft px-4 py-4 text-sm text-[var(--color-brand-muted)]">
-                Job queue data is currently unavailable.
-              </div>
-              <div
-                v-else-if="analysis.topReasons.length === 0"
-                class="ui-panel-soft px-4 py-4 text-sm text-[var(--color-brand-muted)]"
-              >
-                No pending jobs are currently blocking the queue.
-              </div>
-              <div v-for="reason in analysis.topReasons" :key="reason.reason" class="ui-analysis-reason">
-                <div class="flex items-center justify-between gap-4">
-                  <div>
-                    <div class="font-semibold text-[var(--color-brand-ink-strong)]">
-                      {{ reason.reason }}
-                    </div>
-                    <div class="mt-1 text-sm text-[var(--color-brand-muted)]">
-                      {{ reason.count }} pending job(s)
-                    </div>
-                  </div>
-                  <PercentMetric
-                    :value="Math.round(reason.share * 100)"
-                    size="sm"
-                    :maximum-fraction-digits="0"
-                  />
-                </div>
-                <div class="ui-analysis-meter-track mt-3">
-                  <div
-                    class="ui-analysis-meter-fill"
-                    :style="{ width: `${Math.round(reason.share * 100)}%` }"
-                  />
-                </div>
-              </div>
-
-              <div class="ui-metric-surface px-4 py-4">
-                <div class="ui-stat-label">Packing signal</div>
-                <div class="mt-2 text-2xl font-bold text-[var(--color-brand-ink-strong)]">
-                  {{ analysis.fragmentationJobs }}
-                </div>
-                <div class="mt-1.5 text-sm text-[var(--color-brand-muted)]">
-                  pending single-node job(s) appear blocked by fragmentation while
-                  {{ analysis.freeSchedulableCpu }} schedulable CPU(s) remain free.
-                </div>
-              </div>
-            </div>
-          </section>
-        </div>
-
-        <div class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(360px,0.92fr)]">
-          <section class="ui-panel ui-section">
-            <div class="mb-4">
-              <h2 class="ui-panel-title">Partition Hotspots</h2>
-              <p class="ui-panel-description mt-2">
-                Partition-level pressure helps decide whether to expand hardware, rebalance jobs or adjust QOS.
-              </p>
-            </div>
-
-            <div v-if="!canViewJobs || !canViewNodes" class="ui-panel-soft px-4 py-4 text-sm text-[var(--color-brand-muted)]">
-              Both job and node visibility are required for partition pressure analysis.
-            </div>
-            <div v-else-if="analysis.partitionPressure.length === 0" class="ui-panel-soft px-4 py-4 text-sm text-[var(--color-brand-muted)]">
-              No partition-level pressure is currently visible.
-            </div>
-            <div v-else class="space-y-3">
-              <div
-                v-for="partition in analysis.partitionPressure"
-                :key="partition.name"
-                class="ui-metric-surface px-4 py-4"
-              >
-                <div class="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <div class="font-semibold text-[var(--color-brand-ink-strong)]">
-                      {{ partition.name }}
-                    </div>
-                    <div class="mt-1 text-sm text-[var(--color-brand-muted)]">
-                      {{ partition.pendingJobs }} pending, {{ partition.runningJobs }} active
-                    </div>
-                  </div>
-                  <span class="ui-chip">CPU {{ partition.runningCpu }}/{{ partition.schedulableCpu || partition.totalCpu }}</span>
-                </div>
-                <div class="mt-3 grid gap-2 text-sm text-[var(--color-brand-muted)] sm:grid-cols-3">
-                  <div>Pending CPU: {{ partition.pendingCpu }}</div>
-                  <div>Total CPU: {{ partition.totalCpu }}</div>
-                  <div>Schedulable CPU: {{ partition.schedulableCpu }}</div>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          <section class="ui-panel ui-section">
-            <div class="mb-4">
-              <h2 class="ui-panel-title">Historical Pressure</h2>
-              <p class="ui-panel-description mt-2">
-                Fast historical snapshots show whether capacity pressure is steady, bursty or policy-driven.
-              </p>
-            </div>
-
-            <InfoAlert v-if="!metricsEnabled">
-              Metrics collection is disabled for this cluster. Live analysis remains available.
-            </InfoAlert>
-            <InfoAlert v-else-if="metricsUnavailable">
-              Historical metrics are temporarily unavailable.
-            </InfoAlert>
-            <div v-else class="grid gap-3 sm:grid-cols-2">
-              <div v-for="card in historicalCards" :key="card.id" class="ui-metric-surface px-4 py-3">
-                <div class="ui-stat-label">{{ card.label }}</div>
-                <div class="mt-2 text-2xl font-bold text-[var(--color-brand-ink-strong)]">
-                  {{ card.value }}
-                </div>
-                <div class="mt-1.5 text-sm text-[var(--color-brand-muted)]">
-                  {{ card.detail }}
-                </div>
-              </div>
-            </div>
-
-            <div class="mt-4 space-y-3">
-              <div class="ui-metric-surface px-4 py-3">
-                <div class="ui-stat-label">Latest telemetry</div>
-                <div class="mt-2 text-lg font-semibold text-[var(--color-brand-ink-strong)]">
-                  {{ renderNumber(analysis.history.latestPending, 'pending') }} /
-                  {{ renderNumber(analysis.history.latestRunning, 'running') }}
-                </div>
-                <div class="mt-1.5 text-sm text-[var(--color-brand-muted)]">
-                  Jobs at the most recent metric sample in the selected range.
-                </div>
-              </div>
-
-              <div class="ui-metric-surface px-4 py-3">
-                <div class="ui-stat-label">Wait samples</div>
-                <div class="mt-2 text-lg font-semibold text-[var(--color-brand-ink-strong)]">
-                  {{
-                    analysis.waitStats.medianMinutes == null
-                      ? '--'
-                      : `${analysis.waitStats.medianMinutes} min median`
-                  }}
-                </div>
-                <div class="mt-1.5 text-sm text-[var(--color-brand-muted)]">
-                  <template v-if="analysis.waitStats.samples > 0">
-                    p90 {{ analysis.waitStats.p90Minutes }} min from {{ analysis.waitStats.samples }}
-                    recent completed jobs.
-                  </template>
-                  <template v-else-if="waitSamplesUnavailable">
-                    Job history samples are unavailable for this cluster or time range.
-                  </template>
-                  <template v-else>
-                    Historical wait samples are not enabled on this cluster.
-                  </template>
-                </div>
-              </div>
-            </div>
-          </section>
-        </div>
-
-        <section class="ui-panel ui-section">
-          <div class="mb-4">
-            <h2 class="ui-panel-title">Recommended Actions</h2>
-            <p class="ui-panel-description mt-2">
-              The list below is generated from live telemetry to help reduce queue time and increase job throughput.
-            </p>
+            <MetricRangeSelector
+              :model-value="selectedRange"
+              aria-label="Select cluster analysis range"
+              @update:model-value="renderRange"
+            />
           </div>
 
-          <div class="grid gap-4 xl:grid-cols-3">
-            <article
-              v-for="recommendation in analysis.recommendations"
-              :key="recommendation.id"
-              class="ui-analysis-recommendation"
-            >
-              <div class="ui-stat-label">{{ recommendation.tone }}</div>
-              <h3 class="mt-2 text-lg font-semibold text-[var(--color-brand-ink-strong)]">
-                {{ recommendation.title }}
-              </h3>
-              <p class="mt-3 text-sm leading-6 text-[var(--color-brand-muted)]">
-                {{ recommendation.summary }}
-              </p>
-              <p class="mt-4 border-t border-[rgba(80,105,127,0.12)] pt-4 text-sm leading-6 text-[var(--color-brand-blue)]">
-                {{ recommendation.evidence }}
-              </p>
-            </article>
-          </div>
-        </section>
-
-        <section class="ui-panel ui-section">
-          <div class="mb-4">
-            <h2 class="ui-panel-title">Controller Health</h2>
-            <p class="ui-panel-description mt-2">
-              Lightweight controller status checks from the Slurm `ping` and `diag` endpoints.
-            </p>
+          <div class="ui-summary-strip">
+            <div v-for="card in analysis.summaryCards" :key="card.id" class="ui-summary-item">
+              <div class="ui-summary-label">{{ card.label }}</div>
+              <div class="ui-summary-value">{{ card.value }}</div>
+              <div class="ui-summary-subtle">{{ card.detail }}</div>
+            </div>
           </div>
 
-          <div class="grid gap-4 xl:grid-cols-2">
-            <article class="ui-panel-soft px-4 py-4">
-              <div class="flex items-center justify-between gap-3">
-                <div class="ui-stat-label">Ping</div>
-                <span class="ui-chip">{{ pingUnavailable ? 'Unavailable' : 'Ready' }}</span>
+          <div class="grid gap-6 xl:grid-cols-[minmax(0,1.18fr)_minmax(320px,0.82fr)]">
+            <section class="ui-panel ui-section">
+              <div class="mb-4">
+                <h2 class="ui-panel-title">Capacity Envelope</h2>
+                <p class="ui-panel-description mt-2">
+                  Current utilization and schedulable headroom across the cluster.
+                </p>
               </div>
-              <InfoAlert v-if="pingUnavailable" class="mt-4">
-                Ping data is currently unavailable for this cluster.
-              </InfoAlert>
-              <div v-else-if="pingCards.length" class="mt-4 grid gap-3">
+
+              <div class="space-y-4">
                 <div
-                  v-for="card in pingCards"
-                  :key="card.title"
-                  class="rounded-[20px] border border-[rgba(80,105,127,0.12)] bg-white/84 px-4 py-3"
+                  v-for="metric in analysis.capacityMetrics"
+                  :key="metric.id"
+                  class="ui-analysis-meter"
                 >
-                  <div class="flex items-center justify-between gap-3">
-                    <div class="font-semibold text-[var(--color-brand-ink-strong)]">
-                      {{ card.title }}
-                    </div>
-                    <span v-if="card.badge" class="ui-chip">{{ card.badge }}</span>
-                  </div>
-                  <div class="ui-detail-list mt-3">
-                    <dl>
-                      <div v-for="field in card.fields" :key="field.key" class="ui-detail-row">
-                        <dt class="ui-detail-term">{{ field.label }}</dt>
-                        <dd class="ui-detail-value">{{ field.value }}</dd>
+                  <div class="flex items-center justify-between gap-4">
+                    <div>
+                      <div class="ui-stat-label">{{ metric.label }}</div>
+                      <div class="mt-2 text-sm text-[var(--color-brand-muted)]">
+                        {{ metric.detail }}
                       </div>
-                    </dl>
+                    </div>
+                    <div class="text-right">
+                      <PercentMetric :value="metric.value" :maximum-fraction-digits="0" />
+                    </div>
+                  </div>
+                  <div class="ui-analysis-meter-track">
+                    <div
+                      class="ui-analysis-meter-fill"
+                      :style="{ width: `${metric.value ?? 0}%` }"
+                    />
                   </div>
                 </div>
               </div>
-              <p v-else class="ui-panel-description mt-4">
-                No controller ping fields are available in the current response.
-              </p>
-            </article>
+            </section>
 
-            <article class="ui-panel-soft px-4 py-4">
-              <div class="flex items-center justify-between gap-3">
-                <div class="ui-stat-label">Diag</div>
-                <span class="ui-chip">{{ diagUnavailable ? 'Unavailable' : 'Ready' }}</span>
+            <section class="ui-panel ui-section">
+              <div class="mb-4">
+                <h2 class="ui-panel-title">Queue Blockers</h2>
+                <p class="ui-panel-description mt-2">
+                  Why jobs are waiting, and whether the queue is blocked by capacity, policy or packing.
+                </p>
               </div>
-              <InfoAlert v-if="diagUnavailable" class="mt-4">
-                Diagnostic data is currently unavailable for this cluster.
-              </InfoAlert>
-              <div v-else-if="diagFields.length" class="ui-detail-list mt-4">
-                <dl>
-                  <div v-for="field in diagFields" :key="field.key" class="ui-detail-row">
-                    <dt class="ui-detail-term">{{ field.label }}</dt>
-                    <dd class="ui-detail-value">{{ field.value }}</dd>
+
+              <div class="space-y-3">
+                <div v-if="!canViewJobs" class="ui-panel-soft px-4 py-4 text-sm text-[var(--color-brand-muted)]">
+                  Job visibility is required to analyze queue blockers.
+                </div>
+                <div v-else-if="jobsUnavailable" class="ui-panel-soft px-4 py-4 text-sm text-[var(--color-brand-muted)]">
+                  Job queue data is currently unavailable.
+                </div>
+                <div
+                  v-else-if="analysis.topReasons.length === 0"
+                  class="ui-panel-soft px-4 py-4 text-sm text-[var(--color-brand-muted)]"
+                >
+                  No pending jobs are currently blocking the queue.
+                </div>
+                <div v-for="reason in analysis.topReasons" :key="reason.reason" class="ui-analysis-reason">
+                  <div class="flex items-center justify-between gap-4">
+                    <div>
+                      <div class="font-semibold text-[var(--color-brand-ink-strong)]">
+                        {{ reason.reason }}
+                      </div>
+                      <div class="mt-1 text-sm text-[var(--color-brand-muted)]">
+                        {{ reason.count }} pending job(s)
+                      </div>
+                    </div>
+                    <PercentMetric
+                      :value="Math.round(reason.share * 100)"
+                      size="sm"
+                      :maximum-fraction-digits="0"
+                    />
                   </div>
-                </dl>
+                  <div class="ui-analysis-meter-track mt-3">
+                    <div
+                      class="ui-analysis-meter-fill"
+                      :style="{ width: `${Math.round(reason.share * 100)}%` }"
+                    />
+                  </div>
+                </div>
+
+                <div class="ui-metric-surface px-4 py-4">
+                  <div class="ui-stat-label">Packing signal</div>
+                  <div class="mt-2 text-2xl font-bold text-[var(--color-brand-ink-strong)]">
+                    {{ analysis.fragmentationJobs }}
+                  </div>
+                  <div class="mt-1.5 text-sm text-[var(--color-brand-muted)]">
+                    pending single-node job(s) appear blocked by fragmentation while
+                    {{ analysis.freeSchedulableCpu }} schedulable CPU(s) remain free.
+                  </div>
+                </div>
               </div>
-              <p v-else class="ui-panel-description mt-4">
-                No diagnostic summary fields are available in the current response.
-              </p>
-            </article>
+            </section>
           </div>
-        </section>
-      </template>
+
+          <div class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(360px,0.92fr)]">
+            <section class="ui-panel ui-section">
+              <div class="mb-4">
+                <h2 class="ui-panel-title">Partition Hotspots</h2>
+                <p class="ui-panel-description mt-2">
+                  Partition-level pressure helps decide whether to expand hardware, rebalance jobs or adjust QOS.
+                </p>
+              </div>
+
+              <div v-if="!canViewJobs || !canViewNodes" class="ui-panel-soft px-4 py-4 text-sm text-[var(--color-brand-muted)]">
+                Both job and node visibility are required for partition pressure analysis.
+              </div>
+              <div v-else-if="analysis.partitionPressure.length === 0" class="ui-panel-soft px-4 py-4 text-sm text-[var(--color-brand-muted)]">
+                No partition-level pressure is currently visible.
+              </div>
+              <div v-else class="space-y-3">
+                <div
+                  v-for="partition in analysis.partitionPressure"
+                  :key="partition.name"
+                  class="ui-metric-surface px-4 py-4"
+                >
+                  <div class="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <div class="font-semibold text-[var(--color-brand-ink-strong)]">
+                        {{ partition.name }}
+                      </div>
+                      <div class="mt-1 text-sm text-[var(--color-brand-muted)]">
+                        {{ partition.pendingJobs }} pending, {{ partition.runningJobs }} active
+                      </div>
+                    </div>
+                    <span class="ui-chip">CPU {{ partition.runningCpu }}/{{ partition.schedulableCpu || partition.totalCpu }}</span>
+                  </div>
+                  <div class="mt-3 grid gap-2 text-sm text-[var(--color-brand-muted)] sm:grid-cols-3">
+                    <div>Pending CPU: {{ partition.pendingCpu }}</div>
+                    <div>Total CPU: {{ partition.totalCpu }}</div>
+                    <div>Schedulable CPU: {{ partition.schedulableCpu }}</div>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section class="ui-panel ui-section">
+              <div class="mb-4">
+                <h2 class="ui-panel-title">Historical Pressure</h2>
+                <p class="ui-panel-description mt-2">
+                  Fast historical snapshots show whether capacity pressure is steady, bursty or policy-driven.
+                </p>
+              </div>
+
+              <InfoAlert v-if="!metricsEnabled">
+                Metrics collection is disabled for this cluster. Live analysis remains available.
+              </InfoAlert>
+              <InfoAlert v-else-if="metricsUnavailable">
+                Historical metrics are temporarily unavailable.
+              </InfoAlert>
+              <div v-else class="grid gap-3 sm:grid-cols-2">
+                <div v-for="card in historicalCards" :key="card.id" class="ui-metric-surface px-4 py-3">
+                  <div class="ui-stat-label">{{ card.label }}</div>
+                  <div class="mt-2 text-2xl font-bold text-[var(--color-brand-ink-strong)]">
+                    {{ card.value }}
+                  </div>
+                  <div class="mt-1.5 text-sm text-[var(--color-brand-muted)]">
+                    {{ card.detail }}
+                  </div>
+                </div>
+              </div>
+
+              <div class="mt-4 space-y-3">
+                <div class="ui-metric-surface px-4 py-3">
+                  <div class="ui-stat-label">Latest telemetry</div>
+                  <div class="mt-2 text-lg font-semibold text-[var(--color-brand-ink-strong)]">
+                    {{ renderNumber(analysis.history.latestPending, 'pending') }} /
+                    {{ renderNumber(analysis.history.latestRunning, 'running') }}
+                  </div>
+                  <div class="mt-1.5 text-sm text-[var(--color-brand-muted)]">
+                    Jobs at the most recent metric sample in the selected range.
+                  </div>
+                </div>
+
+                <div class="ui-metric-surface px-4 py-3">
+                  <div class="ui-stat-label">Wait samples</div>
+                  <div class="mt-2 text-lg font-semibold text-[var(--color-brand-ink-strong)]">
+                    {{
+                      analysis.waitStats.medianMinutes == null
+                        ? '--'
+                        : `${analysis.waitStats.medianMinutes} min median`
+                    }}
+                  </div>
+                  <div class="mt-1.5 text-sm text-[var(--color-brand-muted)]">
+                    <template v-if="analysis.waitStats.samples > 0">
+                      p90 {{ analysis.waitStats.p90Minutes }} min from {{ analysis.waitStats.samples }}
+                      recent completed jobs.
+                    </template>
+                    <template v-else-if="waitSamplesUnavailable">
+                      Job history samples are unavailable for this cluster or time range.
+                    </template>
+                    <template v-else>
+                      Historical wait samples are not enabled on this cluster.
+                    </template>
+                  </div>
+                </div>
+              </div>
+            </section>
+          </div>
+
+          <section class="ui-panel ui-section">
+            <div class="mb-4">
+              <h2 class="ui-panel-title">Recommended Actions</h2>
+              <p class="ui-panel-description mt-2">
+                The list below is generated from live telemetry to help reduce queue time and increase job throughput.
+              </p>
+            </div>
+
+            <div class="grid gap-4 xl:grid-cols-3">
+              <article
+                v-for="recommendation in analysis.recommendations"
+                :key="recommendation.id"
+                class="ui-analysis-recommendation"
+              >
+                <div class="ui-stat-label">{{ recommendation.tone }}</div>
+                <h3 class="mt-2 text-lg font-semibold text-[var(--color-brand-ink-strong)]">
+                  {{ recommendation.title }}
+                </h3>
+                <p class="mt-3 text-sm leading-6 text-[var(--color-brand-muted)]">
+                  {{ recommendation.summary }}
+                </p>
+                <p class="mt-4 border-t border-[rgba(80,105,127,0.12)] pt-4 text-sm leading-6 text-[var(--color-brand-blue)]">
+                  {{ recommendation.evidence }}
+                </p>
+              </article>
+            </div>
+          </section>
+
+          <section class="ui-panel ui-section">
+            <div class="mb-4">
+              <h2 class="ui-panel-title">Controller Health</h2>
+              <p class="ui-panel-description mt-2">
+                Lightweight controller status checks from the Slurm `ping` and `diag` endpoints.
+              </p>
+            </div>
+
+            <div class="grid gap-4 xl:grid-cols-2">
+              <article class="ui-panel-soft px-4 py-4">
+                <div class="flex items-center justify-between gap-3">
+                  <div class="ui-stat-label">Ping</div>
+                  <span class="ui-chip">{{ pingUnavailable ? 'Unavailable' : 'Ready' }}</span>
+                </div>
+                <InfoAlert v-if="pingUnavailable" class="mt-4">
+                  Ping data is currently unavailable for this cluster.
+                </InfoAlert>
+                <div v-else-if="pingCards.length" class="mt-4 grid gap-3">
+                  <div
+                    v-for="card in pingCards"
+                    :key="card.title"
+                    class="rounded-[20px] border border-[rgba(80,105,127,0.12)] bg-white/84 px-4 py-3"
+                  >
+                    <div class="flex items-center justify-between gap-3">
+                      <div class="font-semibold text-[var(--color-brand-ink-strong)]">
+                        {{ card.title }}
+                      </div>
+                      <span v-if="card.badge" class="ui-chip">{{ card.badge }}</span>
+                    </div>
+                    <div class="ui-detail-list mt-3">
+                      <dl>
+                        <div v-for="field in card.fields" :key="field.key" class="ui-detail-row">
+                          <dt class="ui-detail-term">{{ field.label }}</dt>
+                          <dd class="ui-detail-value">{{ field.value }}</dd>
+                        </div>
+                      </dl>
+                    </div>
+                  </div>
+                </div>
+                <p v-else class="ui-panel-description mt-4">
+                  No controller ping fields are available in the current response.
+                </p>
+              </article>
+
+              <article class="ui-panel-soft px-4 py-4">
+                <div class="flex items-center justify-between gap-3">
+                  <div class="ui-stat-label">Diag</div>
+                  <span class="ui-chip">{{ diagUnavailable ? 'Unavailable' : 'Ready' }}</span>
+                </div>
+                <InfoAlert v-if="diagUnavailable" class="mt-4">
+                  Diagnostic data is currently unavailable for this cluster.
+                </InfoAlert>
+                <div v-else-if="diagFields.length" class="ui-detail-list mt-4">
+                  <dl>
+                    <div v-for="field in diagFields" :key="field.key" class="ui-detail-row">
+                      <dt class="ui-detail-term">{{ field.label }}</dt>
+                      <dd class="ui-detail-value">{{ field.value }}</dd>
+                    </div>
+                  </dl>
+                </div>
+                <p v-else class="ui-panel-description mt-4">
+                  No diagnostic summary fields are available in the current response.
+                </p>
+              </article>
+            </div>
+          </section>
+        </div>
+      </div>
     </div>
   </ClusterMainLayout>
 </template>

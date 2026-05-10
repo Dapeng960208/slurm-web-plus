@@ -191,64 +191,68 @@ watch(
         <span class="font-medium">{{ cluster }}</span></ErrorAlert
       >
 
-      <div class="dashboard-surface mt-6 px-4 py-4 sm:px-5">
-        <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-          <div class="min-w-0">
-            <p class="dashboard-toolbar-kicker">Live Controls</p>
-            <h2 class="ui-panel-title">Realtime Metrics</h2>
-            <p class="ui-panel-description">
-              Filter dashboard stats by queue and adjust the live window from one aligned toolbar.
-            </p>
-          </div>
-          <div data-testid="dashboard-toolbar" class="dashboard-toolbar-fields">
-            <label
-              v-if="canSelectPartition"
-              class="dashboard-toolbar-field"
-            >
-              <span class="dashboard-toolbar-label">Partition / Queue</span>
-              <select
-                id="dashboard-partition"
-                v-model="runtimeStore.dashboard.partition"
-                class="dashboard-toolbar-select"
-              >
-                <option
-                  v-for="option in partitionOptions"
-                  :key="option.value || '__all__'"
-                  :value="option.value"
+      <div class="ui-scroll-region min-h-0 flex-1 pr-1">
+        <div class="ui-section-stack pb-2">
+          <div class="dashboard-surface mt-6 px-4 py-4 sm:px-5">
+            <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+              <div class="min-w-0">
+                <p class="dashboard-toolbar-kicker">Live Controls</p>
+                <h2 class="ui-panel-title">Realtime Metrics</h2>
+                <p class="ui-panel-description">
+                  Filter dashboard stats by queue and adjust the live window from one aligned toolbar.
+                </p>
+              </div>
+              <div data-testid="dashboard-toolbar" class="dashboard-toolbar-fields">
+                <label
+                  v-if="canSelectPartition"
+                  class="dashboard-toolbar-field"
                 >
-                  {{ option.label }}
-                </option>
-              </select>
-            </label>
+                  <span class="dashboard-toolbar-label">Partition / Queue</span>
+                  <select
+                    id="dashboard-partition"
+                    v-model="runtimeStore.dashboard.partition"
+                    class="dashboard-toolbar-select"
+                  >
+                    <option
+                      v-for="option in partitionOptions"
+                      :key="option.value || '__all__'"
+                      :value="option.value"
+                    >
+                      {{ option.label }}
+                    </option>
+                  </select>
+                </label>
 
-            <div class="dashboard-toolbar-field">
-              <span class="dashboard-toolbar-label">Time Range</span>
-              <MetricRangeSelector
-                :model-value="runtimeStore.dashboard.range"
-                aria-label="Select dashboard metrics range"
-                @update:model-value="setRange"
-              />
+                <div class="dashboard-toolbar-field">
+                  <span class="dashboard-toolbar-label">Time Range</span>
+                  <MetricRangeSelector
+                    :model-value="runtimeStore.dashboard.range"
+                    aria-label="Select dashboard metrics range"
+                    @update:model-value="setRange"
+                  />
+                </div>
+              </div>
             </div>
           </div>
+
+          <div v-if="!unable" class="ui-stat-grid mt-4">
+            <div v-for="card in statsCards" :key="card.id" class="ui-stat-card dashboard-surface">
+              <p class="ui-stat-label">{{ card.label }}</p>
+              <span
+                :id="`metric-${card.id}`"
+                :class="[
+                  card.muted ? 'ui-stat-value text-[var(--color-brand-muted)]/35' : 'ui-stat-value'
+                ]"
+              >
+                {{ card.value }}
+              </span>
+              <p v-if="card.subtle" class="ui-stat-subtle">{{ card.subtle }}</p>
+            </div>
+          </div>
+
+          <DashboardCharts v-if="runtimeStore.getCluster(cluster)?.metrics" :cluster="cluster" />
         </div>
       </div>
-
-      <div v-if="!unable" class="ui-stat-grid mt-4">
-        <div v-for="card in statsCards" :key="card.id" class="ui-stat-card dashboard-surface">
-          <p class="ui-stat-label">{{ card.label }}</p>
-          <span
-            :id="`metric-${card.id}`"
-            :class="[
-              card.muted ? 'ui-stat-value text-[var(--color-brand-muted)]/35' : 'ui-stat-value'
-            ]"
-          >
-            {{ card.value }}
-          </span>
-          <p v-if="card.subtle" class="ui-stat-subtle">{{ card.subtle }}</p>
-        </div>
-      </div>
-
-      <DashboardCharts v-if="runtimeStore.getCluster(cluster)?.metrics" :cluster="cluster" />
     </div>
   </ClusterMainLayout>
 </template>

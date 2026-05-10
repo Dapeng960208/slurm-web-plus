@@ -104,6 +104,9 @@ describe('JobView.vue', () => {
     expect(details.text()).toContain('Requested')
     expect(details.text()).toContain('Allocated')
     expect(details.text()).not.toContain('Exit Code')
+    expect(wrapper.find('.ui-scroll-region').classes()).toEqual(
+      expect.arrayContaining(['ui-scroll-region', 'min-h-0', 'flex-1', 'pr-1'])
+    )
   })
 
   test('highlights a job field from the route hash', async () => {

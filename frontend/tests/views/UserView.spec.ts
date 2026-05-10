@@ -98,6 +98,9 @@ describe('UserView.vue', () => {
 
     const breadcrumbs = userAssociationsTable.findAllComponents(AccountBreadcrumb)
     expect(breadcrumbs.length).toBeGreaterThan(0)
+    expect(wrapper.find('.ui-scroll-region').classes()).toEqual(
+      expect.arrayContaining(['ui-scroll-region', 'min-h-0', 'flex-1', 'pr-1'])
+    )
   })
 
   test('shows analysis shortcut when feature is enabled', async () => {

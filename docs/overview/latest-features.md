@@ -1,6 +1,30 @@
-﻿# 最新功能
+# 最新功能
+
+## 本轮：`Dashboard`、`Analysis` 与 `Admin` 内容页已补统一内部滚动
+
+本轮继续收口固定应用壳下的内容页滚动问题，重点解决“表格能滚动，但非表格正文和配置内容无法继续下滚”的共性缺陷：
+
+- `DashboardView` 已补共享 `ui-scroll-region`，页头保留在工作区顶部，筛选面板、统计卡片和图表区域改为在固定内容区内滚动。
+- `ClusterAnalysisView` 已补同一套正文滚动容器，分析摘要、容量卡、建议区与控制器健康区不再被固定 shell 裁切。
+- `AdminLayoutView` 现已在 `RouterView` 外层统一提供内部滚动区，`admin/ai`、`admin/access-control`、`admin/cache`、`admin/ldap-cache` 以及管理员 AI 会话详情等子页面无需各自重复修补即可恢复内容滚动。
+- 本轮修复继续保留表格页各自的局部滚动结构，不改变已存在的 `ui-table-scroll`、`ui-results-scroll` 和分页停靠方式。
+
+本轮新增验证：
+
+- `cd frontend && npx vitest run tests/views/DashboardView.spec.ts tests/views/ClusterAnalysisView.spec.ts tests/views/AdminLayoutView.spec.ts tests/views/settings/SettingsAI.spec.ts tests/views/settings/SettingsAccessControl.spec.ts tests/views/settings/SettingsCache.spec.ts tests/views/settings/SettingsLdapCache.spec.ts tests/views/settings/SettingsAIConversationDetail.spec.ts`
+- `npm --prefix frontend run type-check`
 
 ## 本轮：内容页滚动层级、按钮语义与 AI 工作区已统一收口
+
+补充修正：
+
+- `User`、`Account`、`Job`、`Job History`、`Node` 与 `User Analysis` 详情页现已补回正文内部滚动区。
+- 详情页顶部返回按钮继续保留在工作区内，正文内容改为通过共享 `ui-scroll-region` 在固定可视区内滚动。
+- 这次修复解决了“表格类页面仍可滚动，但非表格详情内容在固定 shell 中被裁切后无法继续下滚”的回归。
+
+本轮新增验证：
+
+- `cd frontend && npx vitest run tests/views/UserView.spec.ts tests/views/JobView.spec.ts tests/views/NodeView.spec.ts tests/views/UserAnalysisView.spec.ts`
 
 ## 本轮：开发错误库已简化为时间、现象、解决办法三项
 

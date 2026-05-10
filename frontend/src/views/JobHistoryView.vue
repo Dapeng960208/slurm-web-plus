@@ -366,32 +366,33 @@ watch(
     <div class="ui-page ui-page-readable ui-content-workspace">
       <JobBackButton :cluster="cluster" route-name="jobs-history" />
 
-      <div class="ui-section-stack">
-        <PageHeader
-          kicker="Job History"
-          :title="`Job ${job?.job_id ?? id}`"
-          description="Recorded timeline, scheduler context and resource details captured for this finished job."
-        >
-          <template #actions>
-            <div v-if="job" class="flex flex-wrap items-center justify-end gap-3">
-              <JobStatusBadge
-                :status="splitJobHistoryState(job.job_state)"
-                :large="true"
+      <div class="ui-scroll-region min-h-0 flex-1 pr-1">
+        <div class="ui-section-stack pb-2">
+          <PageHeader
+            kicker="Job History"
+            :title="`Job ${job?.job_id ?? id}`"
+            description="Recorded timeline, scheduler context and resource details captured for this finished job."
+          >
+            <template #actions>
+              <div v-if="job" class="flex flex-wrap items-center justify-end gap-3">
+                <JobStatusBadge
+                  :status="splitJobHistoryState(job.job_state)"
+                  :large="true"
+                />
+                <RouterLink
+                  :to="{ name: 'job', params: { cluster, id: job.job_id } }"
+                  class="ui-button-secondary"
+                >
+                  Live job
+                </RouterLink>
+              </div>
+              <div
+                v-else-if="initialLoading"
+                class="h-10 w-28 animate-pulse rounded-full bg-[rgba(80,105,127,0.12)]"
               />
-              <RouterLink
-                :to="{ name: 'job', params: { cluster, id: job.job_id } }"
-                class="ui-button-secondary"
-              >
-                Live job
-              </RouterLink>
-            </div>
-            <div
-              v-else-if="initialLoading"
-              class="h-10 w-28 animate-pulse rounded-full bg-[rgba(80,105,127,0.12)]"
-            />
-          </template>
-        </PageHeader>
-        <DetailSummaryStrip v-if="job" :items="summaryItems" />
+            </template>
+          </PageHeader>
+          <DetailSummaryStrip v-if="job" :items="summaryItems" />
 
         <div
           v-if="initialLoading && !error"
@@ -565,6 +566,7 @@ watch(
           </div>
         </div>
       </div>
+        </div>
       </div>
     </div>
   </ClusterMainLayout>

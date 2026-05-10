@@ -107,6 +107,9 @@
 - `JobsView`、`JobsHistoryView`、`ResourcesView`、`QosView`、`ReservationsView` 结果区存在独立 `.ui-table-scroll`，分页节点位于 `.ui-results-dock .ui-results-pagination`，而不再留在 `.ui-table-shell` 内部
 - `AccountsView` 账户树列表存在独立 `.ui-tree-scroll`，分页固定在工作区底部
 - `ClusterMainLayout` 的 `main.ui-content-scroll` 具备显式 `flex-1` 与 `min-h-0`，作为浏览器可视区内框，而不是随子内容增长的普通文档流容器
+- `UserView`、`AccountView`、`JobView`、`JobHistoryView`、`NodeView`、`UserAnalysisView` 详情页正文存在独立 `.ui-scroll-region`，返回按钮保留在工作区顶部，非表格详情内容可以在固定 shell 内继续下滚
+- `DashboardView` 与 `ClusterAnalysisView` 页面正文存在独立 `.ui-scroll-region`，页头保留在工作区顶部，非表格内容区可以在固定 shell 内继续下滚
+- `AdminLayoutView` 会在 `RouterView` 外层提供 `.ui-scroll-region`，保证 `admin/ai`、`admin/access-control`、`admin/cache`、`admin/ldap-cache` 与管理员详情子页面在固定 shell 中仍可滚动
 - `ResourcesView` 不再渲染节点行尾 `Manage` / `Delete` 按钮，节点名称仍可跳转详情
 - `NodeView` 的 Edit Node 中 `state` 渲染为下拉框，并按所选状态提交 `update_node`
 
@@ -154,6 +157,8 @@
 - `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/slurmrestd/test_slurmrestd_write_operations.py`
 - `cd frontend && npx vitest run tests/views/JobsView.spec.ts tests/views/JobView.spec.ts tests/views/JobsHistoryView.spec.ts tests/views/JobHistoryView.spec.ts tests/views/AccountView.spec.ts tests/views/UserView.spec.ts tests/composables/GatewayAPI.spec.ts tests/composables/ClusterAnalysis.spec.ts tests/components/operations/ActionDialog.spec.ts`
 - `cd frontend && npx vitest run tests/views/resources/ResourcesView.spec.ts tests/views/NodeView.spec.ts tests/components/operations/ActionDialog.spec.ts tests/components/jobs/UserFilterSelector.spec.ts`
+- `cd frontend && npx vitest run tests/views/UserView.spec.ts tests/views/JobView.spec.ts tests/views/NodeView.spec.ts tests/views/UserAnalysisView.spec.ts`
+- `cd frontend && npx vitest run tests/views/DashboardView.spec.ts tests/views/ClusterAnalysisView.spec.ts tests/views/AdminLayoutView.spec.ts tests/views/settings/SettingsAI.spec.ts tests/views/settings/SettingsAccessControl.spec.ts tests/views/settings/SettingsCache.spec.ts tests/views/settings/SettingsLdapCache.spec.ts tests/views/settings/SettingsAIConversationDetail.spec.ts`
 - `npm --prefix frontend run type-check`
 - `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/apps/test_ai_service.py slurmweb/tests/slurmrestd/test_slurmrestd_write_operations.py slurmweb/tests/views/test_agent_operations.py`
 

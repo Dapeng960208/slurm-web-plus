@@ -219,6 +219,23 @@ describe('DashboardView.vue', () => {
     expect(wrapper.findAll('.dashboard-surface').length).toBeGreaterThan(2)
   })
 
+  test('wraps dashboard content in an internal scroll region', () => {
+    const wrapper = mount(DashboardView, {
+      props: {
+        cluster: 'foo'
+      },
+      global: {
+        stubs: {
+          DashboardCharts: true
+        }
+      }
+    })
+
+    expect(wrapper.find('.ui-scroll-region').classes()).toEqual(
+      expect.arrayContaining(['ui-scroll-region', 'min-h-0', 'flex-1', 'pr-1'])
+    )
+  })
+
   test('should not display charts when metrics are disabled', () => {
     // Disable metrics on cluster foo
     runtimeStore.availableClusters[0].metrics = false

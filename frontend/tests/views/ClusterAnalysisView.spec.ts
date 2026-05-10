@@ -231,5 +231,8 @@ describe('ClusterAnalysisView.vue', () => {
     )
     expect(mockGatewayAPI.analysis_ping).toHaveBeenCalledWith('foo')
     expect(mockGatewayAPI.analysis_diag).toHaveBeenCalledWith('foo')
+    expect(wrapper.find('.ui-scroll-region').classes()).toEqual(
+      expect.arrayContaining(['ui-scroll-region', 'min-h-0', 'flex-1', 'pr-1'])
+    )
   })
 })

@@ -217,12 +217,13 @@ async function removeUser() {
     :breadcrumb="breadcrumb"
   >
     <div class="ui-page ui-page-readable ui-content-workspace">
-      <button @click="goBack" type="button" class="ui-button-secondary self-start">
+      <button @click="goBack" type="button" class="ui-button-secondary self-start shrink-0">
         <ChevronLeftIcon class="-ml-0.5 h-5 w-5" aria-hidden="true" />
         {{ sections.self ? 'Back to dashboard' : 'Back to accounts' }}
       </button>
 
-      <div class="ui-section-stack">
+      <div class="ui-scroll-region min-h-0 flex-1 pr-1">
+        <div class="ui-section-stack pb-2">
         <div id="user-heading">
           <PageHeader
             kicker="User Workspace"
@@ -551,6 +552,7 @@ async function removeUser() {
             </p>
           </div>
         </section>
+        </div>
       </div>
     </div>
 

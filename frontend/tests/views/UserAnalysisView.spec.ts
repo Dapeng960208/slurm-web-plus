@@ -120,6 +120,9 @@ describe('UserAnalysisView.vue', () => {
     expect(wrapper.find('.user-analytics-window-control').exists()).toBe(true)
     expect(wrapper.find('.user-analytics-main-grid').exists()).toBe(true)
     expect(wrapper.findAll('.user-analytics-metric-card')).toHaveLength(4)
+    expect(wrapper.find('.ui-scroll-region').classes()).toEqual(
+      expect.arrayContaining(['ui-scroll-region', 'min-h-0', 'flex-1', 'pr-1'])
+    )
     expect(mockGatewayAPI.user_tools_analysis).toHaveBeenCalledWith(
       'foo',
       'root',

@@ -40,6 +40,17 @@
   - `docs/standards/development-error-summary.md` 已同步改为新的最小记录模板
   - `docs/standards/ai-development-standard.md` 已同步调整错误库字段描述，避免规范冲突
 
+- 详情页正文滚动已补回：
+  - `User`、`Account`、`Job`、`Job History`、`Node`、`User Analysis` 详情页已统一改为“顶部返回按钮保留在工作区内，正文区使用内部 `ui-scroll-region` 滚动”
+  - 修复了表格页仍可滚动、但非表格详情内容在固定 shell 中被裁切后无法继续向下查看的问题
+  - 本轮已补对应详情页结构回归测试，覆盖 `UserView`、`JobView`、`NodeView`、`UserAnalysisView`
+
+- 通用内容页滚动缺陷已继续向 `dashboard` / `analysis` / `admin` 子树收口：
+  - `DashboardView` 与 `ClusterAnalysisView` 已补统一正文内部滚动容器，页面头部继续保留在工作区顶端
+  - `AdminLayoutView` 已为 `RouterView` 外层补统一 `ui-scroll-region`，修复 `admin/ai`、`admin/access-control`、`admin/cache`、`admin/ldap-cache` 以及管理员 AI 会话详情等子页面在固定 shell 中无法继续下滚的问题
+  - 这次修复继续保持表格页自身的 `ui-table-scroll` / `ui-results-scroll` 局部滚动策略，不改变现有表格分页布局
+  - 本轮已补对应结构回归测试，覆盖 `DashboardView`、`ClusterAnalysisView`、`AdminLayoutView`
+
 - 内容页滚动层级、按钮语义与 AI 工作区已完成一轮统一收口：
   - `ClusterMainLayout`、`SettingsLayout` 与共享样式已补齐 `min-h-0`、`flex-1`、`overflow` 约束，业务内容页改为优先在内容区、表格区、消息区和侧栏内部滚动，不再持续推高最外层页面壳
   - `ui-content-scroll` 现已固定为 header 下方的浏览器可视区内框，并保留与左侧桌面导航一致的底部留白；主内容区不会再因为内部结果集或聊天记录变长而继续向下扩展
@@ -410,6 +421,7 @@
 - `docs/overview/latest-features.md`
 - `docs/standards/development-error-summary.md`
 - `docs/standards/ai-development-standard.md`
+- `docs/features/management-center/test-plan.md`
 - `docs/features/access-control/requirements.md`
 - `docs/features/access-control/test-plan.md`
 - `docs/features/ai/requirements.md`
@@ -439,6 +451,8 @@
 - `Get-Content -Encoding UTF8 docs/tracking/error-log.md`
 - `Get-Content -Encoding UTF8 docs/standards/development-error-summary.md`
 - `Get-Content -Encoding UTF8 docs/standards/ai-development-standard.md`
+- `cd frontend && npx vitest run tests/views/UserView.spec.ts tests/views/JobView.spec.ts tests/views/NodeView.spec.ts tests/views/UserAnalysisView.spec.ts`
+- `cd frontend && npx vitest run tests/views/DashboardView.spec.ts tests/views/ClusterAnalysisView.spec.ts tests/views/AdminLayoutView.spec.ts tests/views/settings/SettingsAI.spec.ts tests/views/settings/SettingsAccessControl.spec.ts tests/views/settings/SettingsCache.spec.ts tests/views/settings/SettingsLdapCache.spec.ts tests/views/settings/SettingsAIConversationDetail.spec.ts`
 - `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/slurmrestd/test_slurmrestd_write_operations.py`
 - `cd frontend && npx vitest run tests/views/QosView.spec.ts tests/views/AccountView.spec.ts tests/composables/GatewayAPI.spec.ts`
 - `npm --prefix frontend run type-check`

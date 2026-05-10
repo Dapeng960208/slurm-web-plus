@@ -201,6 +201,9 @@ describe('NodeView.vue', () => {
     expect(wrapper.get('dl div#arch dd').text()).toBe(nodeAllocated.architecture)
     expect(wrapper.get('dl div#memory dd').text()).toBe(getMBHumanUnit(nodeAllocated.real_memory))
     expect(wrapper.get('dl div#partitions dd').text()).toBe(nodeAllocated.partitions[0])
+    expect(wrapper.find('.ui-scroll-region').classes()).toEqual(
+      expect.arrayContaining(['ui-scroll-region', 'min-h-0', 'flex-1', 'pr-1'])
+    )
   })
 
   test('rounds CPU percentage correctly', async () => {
