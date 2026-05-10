@@ -7,14 +7,21 @@
 -->
 
 <script setup lang="ts">
+import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { CheckCircleIcon, XCircleIcon } from '@heroicons/vue/24/outline'
 import { XMarkIcon } from '@heroicons/vue/20/solid'
 import { useRuntimeStore } from '@/stores/runtime'
 import type { Notification } from '@/stores/runtime'
 
 const runtimeStore = useRuntimeStore()
+const { t } = useI18n()
 
 const { notification } = defineProps<{ notification: Notification }>()
+
+const typeLabel = computed(() =>
+  notification.type === 'INFO' ? t('common.notifications.info') : t('common.notifications.error')
+)
 </script>
 
 <template>
@@ -36,7 +43,7 @@ const { notification } = defineProps<{ notification: Notification }>()
       </div>
       <div class="ml-3 w-0 flex-1 pt-0.5">
         <p class="text-sm font-semibold tracking-[0.14em] text-[var(--color-brand-muted)] uppercase">
-          {{ notification.type }}
+          {{ typeLabel }}
         </p>
         <p class="mt-1 text-sm leading-6 text-[var(--color-brand-ink)]">{{ notification.message }}</p>
       </div>
@@ -46,7 +53,7 @@ const { notification } = defineProps<{ notification: Notification }>()
           @click="runtimeStore.removeNotification(notification)"
           class="inline-flex rounded-full bg-[rgba(239,244,246,0.88)] p-2 text-[var(--color-brand-muted)] transition hover:bg-white hover:text-[var(--color-brand-ink-strong)] focus:outline-hidden"
         >
-          <span class="sr-only">Close</span>
+          <span class="sr-only">{{ t('common.notifications.close') }}</span>
           <XMarkIcon class="h-5 w-5" aria-hidden="true" />
         </button>
       </div>

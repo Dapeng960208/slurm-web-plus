@@ -8,6 +8,7 @@
 
 import { ref, onUnmounted, onMounted } from 'vue'
 import type { Ref } from 'vue'
+import { i18n } from '@/plugins/i18n'
 import {
   AuthenticationError,
   PermissionError,
@@ -52,7 +53,7 @@ export function useClusterDataPoller<Type>(
   let _timeout: number = -1
 
   function reportOtherError(error: Error) {
-    runtime.reportError(`Server error: ${error.message}`)
+    runtime.reportError(i18n.global.t('errors.server', { message: error.message }))
     unable.value = true
   }
 

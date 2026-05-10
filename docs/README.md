@@ -28,6 +28,9 @@
   - [测试计划](./features/dashboard-partition-filter/test-plan.md)
   - [后端说明](./features/dashboard-partition-filter/backend.md)
   - [验证说明](./features/dashboard-partition-filter/verification.md)
+- 国际化
+  - [需求说明](./features/i18n/requirements.md)
+  - [测试计划](./features/i18n/test-plan.md)
 - 访问控制
   - [需求说明](./features/access-control/requirements.md)
   - [测试计划](./features/access-control/test-plan.md)

@@ -10,6 +10,7 @@
 import { computed, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { RouterView } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { useRuntimeStore } from '@/stores/runtime'
 import { useRuntimeConfiguration } from '@/plugins/runtimeConfiguration'
 import LeaveSettingsButton from '@/components/settings/LeaveSettingsButton.vue'
@@ -20,6 +21,7 @@ import UserMenu from '@/components/UserMenu.vue'
 const sidebarOpen = ref(false)
 const runtimeStore = useRuntimeStore()
 const runtimeConfiguration = useRuntimeConfiguration()
+const { t } = useI18n()
 
 const navigationCluster = computed(() => {
   if (runtimeStore.currentCluster) return runtimeStore.currentCluster
@@ -42,7 +44,7 @@ const navigationCluster = computed(() => {
         class="-m-2.5 rounded-full p-2.5 text-[var(--color-brand-ink)] transition hover:bg-[rgba(182,232,44,0.14)] lg:hidden"
         @click="sidebarOpen = true"
       >
-        <span class="sr-only">Open sidebar</span>
+        <span class="sr-only">{{ t('shell.mainMenu.openSidebar') }}</span>
         <Bars3Icon class="h-6 w-6" aria-hidden="true" />
       </button>
 
@@ -52,10 +54,10 @@ const navigationCluster = computed(() => {
         <div class="relative flex flex-1 items-center gap-3 overflow-hidden">
           <div class="min-w-0">
             <div class="truncate text-sm font-semibold text-[var(--color-brand-ink-strong)]">
-              Settings
+              {{ t('shell.settings.title') }}
             </div>
             <div class="truncate text-xs text-[var(--color-brand-muted)]">
-              Global preferences and service state
+              {{ t('shell.settings.subtitle') }}
             </div>
           </div>
         </div>

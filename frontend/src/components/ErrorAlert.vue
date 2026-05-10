@@ -7,9 +7,11 @@
 -->
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import { XCircleIcon } from '@heroicons/vue/20/solid'
 
 const { showErrorsLink = true } = defineProps<{ showErrorsLink?: boolean }>()
+const { t } = useI18n()
 </script>
 
 <template>
@@ -27,7 +29,7 @@ const { showErrorsLink = true } = defineProps<{ showErrorsLink?: boolean }>()
             :to="{ name: 'settings-errors' }"
             class="font-medium whitespace-nowrap text-[var(--color-brand-danger)] transition hover:opacity-80"
           >
-            See Errors
+            {{ t('alerts.seeErrors') }}
             <span aria-hidden="true"> &rarr;</span>
           </RouterLink>
         </p>

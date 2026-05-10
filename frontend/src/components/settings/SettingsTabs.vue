@@ -9,14 +9,16 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 
 const { entry } = defineProps<{ entry: string }>()
+const { t } = useI18n()
 
 const tabs = computed(() => {
   return [
-    { name: 'General', href: 'settings' },
-    { name: 'Errors', href: 'settings-errors' },
-    { name: 'Account', href: 'settings-account' }
+    { name: 'General', labelKey: 'shell.settings.general', href: 'settings' },
+    { name: 'Errors', labelKey: 'shell.settings.errors', href: 'settings-errors' },
+    { name: 'Account', labelKey: 'shell.settings.account', href: 'settings-account' }
   ]
 })
 </script>
@@ -25,10 +27,10 @@ const tabs = computed(() => {
     <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
       <div>
         <h3 class="text-base leading-6 font-semibold text-[var(--color-brand-ink-strong)]">
-          Settings
+          {{ t('shell.settings.tabsTitle') }}
         </h3>
         <p class="mt-1 text-sm text-[var(--color-brand-muted)]">
-          Personal preferences, session diagnostics and account visibility.
+          {{ t('shell.settings.tabsDescription') }}
         </p>
       </div>
       <div class="mt-1">
@@ -44,7 +46,7 @@ const tabs = computed(() => {
               'rounded-full px-4 py-2.5 text-sm font-medium whitespace-nowrap transition'
             ]"
             :aria-current="entry == tab.name ? 'page' : undefined"
-            >{{ tab.name }}</RouterLink
+            >{{ t(tab.labelKey) }}</RouterLink
           >
         </nav>
       </div>

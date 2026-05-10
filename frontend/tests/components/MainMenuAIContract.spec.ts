@@ -7,7 +7,7 @@ const source = readFileSync(sourcePath, 'utf8')
 
 describe('MainMenu AI contract', () => {
   test('binds AI menu entry to the new route and permission gate', () => {
-    expect(source).toContain("name: 'AI'")
+    expect(source).toContain("labelKey: 'shell.mainMenu.ai'")
     expect(source).toContain("route: 'ai'")
     expect(source).toContain("resource: 'ai'")
     expect(source).toContain("operation: 'view'")

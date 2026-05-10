@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { LockClosedIcon } from '@heroicons/vue/24/outline'
 import BrandLogo from '@/components/BrandLogo.vue'
 
 const route = useRoute()
 const router = useRouter()
+const { t } = useI18n()
 
 const cluster = computed(() => (typeof route.query.cluster === 'string' ? route.query.cluster : null))
 const permission = computed(() =>
@@ -14,9 +16,9 @@ const permission = computed(() =>
 
 const detail = computed(() => {
   if (permission.value) {
-    return `Missing required permission: ${permission.value}`
+    return t('publicPages.forbidden.missingPermission', { permission: permission.value })
   }
-  return 'Your current role does not grant access to this page.'
+  return t('publicPages.forbidden.genericDetail')
 })
 
 const homeTarget = computed(() => {
@@ -38,10 +40,12 @@ function goBack() {
         <div class="space-y-6">
           <BrandLogo size="lg" />
           <div class="space-y-4">
-            <p class="ui-page-kicker">Access Restricted</p>
-            <h1 class="text-4xl font-bold text-white md:text-5xl">Permission required</h1>
+            <p class="ui-page-kicker">{{ t('publicPages.forbidden.kicker') }}</p>
+            <h1 class="text-4xl font-bold text-white md:text-5xl">
+              {{ t('publicPages.forbidden.title') }}
+            </h1>
             <p class="max-w-xl text-sm leading-7 text-white/72 md:text-base">
-              This page is protected. Contact your administrator to request the required access.
+              {{ t('publicPages.forbidden.description') }}
             </p>
           </div>
         </div>
@@ -55,19 +59,21 @@ function goBack() {
           <div class="space-y-4 text-center">
             <h2 class="text-3xl font-bold text-[var(--color-brand-ink-strong)]">403</h2>
             <p class="text-base font-semibold text-[var(--color-brand-ink-strong)]">
-              当前页面无访问权限
+              {{ t('publicPages.forbidden.deniedTitle') }}
             </p>
             <p class="text-sm leading-7 text-[var(--color-brand-muted)]">
               {{ detail }}
             </p>
             <p class="text-sm leading-7 text-[var(--color-brand-muted)]">
-              请联系管理员申请权限。
+              {{ t('publicPages.forbidden.contactAdmin') }}
             </p>
           </div>
           <div class="flex flex-wrap justify-center gap-3">
-            <button type="button" class="ui-button-secondary" @click="goBack">Go back</button>
+            <button type="button" class="ui-button-secondary" @click="goBack">
+              {{ t('common.buttons.goBack') }}
+            </button>
             <RouterLink :to="homeTarget" class="ui-button-primary">
-              {{ cluster ? 'Open dashboard' : 'Go to clusters' }}
+              {{ cluster ? t('publicPages.forbidden.openDashboard') : t('publicPages.forbidden.goToClusters') }}
             </RouterLink>
           </div>
         </div>

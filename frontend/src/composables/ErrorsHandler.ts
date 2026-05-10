@@ -7,6 +7,7 @@
  */
 
 import { useRouter } from 'vue-router'
+import { i18n } from '@/plugins/i18n'
 import { useRuntimeStore } from '@/stores/runtime'
 import { useAuthStore } from '@/stores/auth'
 import { AuthenticationError, PermissionError } from '@/composables/HTTPErrors'
@@ -30,7 +31,7 @@ export function useErrorsHandler() {
    * @param error - The AuthenticationError instance
    */
   function reportAuthenticationError(error: AuthenticationError) {
-    runtime.reportError(`Authentication error: ${error.message}`)
+    runtime.reportError(i18n.global.t('errors.authentication', { message: error.message }))
     // Set returnUrl to current route before redirecting to signout
     authStore.returnUrl = router.currentRoute.value.fullPath
     router.push({ name: 'signout' })
@@ -42,7 +43,7 @@ export function useErrorsHandler() {
    * @param error - The PermissionError instance
    */
   function reportPermissionError(error: PermissionError) {
-    runtime.reportError(`Permission error: ${error.message}`)
+    runtime.reportError(i18n.global.t('errors.permission', { message: error.message }))
   }
 
   /**
@@ -51,7 +52,7 @@ export function useErrorsHandler() {
    * @param error - The Error instance
    */
   function reportServerError(error: Error) {
-    runtime.reportError(`Server error: ${error.message}`)
+    runtime.reportError(i18n.global.t('errors.server', { message: error.message }))
   }
 
   return {

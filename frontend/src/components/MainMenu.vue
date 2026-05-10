@@ -10,6 +10,7 @@
 import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
 import type { RouteLocationRaw } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { Dialog, DialogPanel, TransitionChild, TransitionRoot } from '@headlessui/vue'
 import {
   CalendarIcon,
@@ -41,6 +42,7 @@ const sidebarOpen = defineModel<boolean>()
 
 const runtimeStore = useRuntimeStore()
 const runtimeConfiguration = useRuntimeConfiguration()
+const { t } = useI18n()
 const ADMIN_NAVIGATION = [
   { route: 'admin-ai', resource: 'admin/ai' },
   { route: 'admin-cache', resource: 'admin/cache' },
@@ -48,7 +50,7 @@ const ADMIN_NAVIGATION = [
   { route: 'admin-access-control', resource: 'admin/access-control' }
 ] as const
 const navigation: Array<{
-  name: string
+  labelKey: string
   route: string
   icon: object
   resource: string
@@ -56,7 +58,7 @@ const navigation: Array<{
   feature?: string
 }> = [
   {
-    name: 'Dashboard',
+    labelKey: 'shell.mainMenu.dashboard',
     route: 'dashboard',
     icon: HomeIcon,
     resource: 'dashboard',
@@ -64,7 +66,7 @@ const navigation: Array<{
     feature: undefined
   },
   {
-    name: 'Analysis',
+    labelKey: 'shell.mainMenu.analysis',
     route: 'analysis',
     icon: ChartBarSquareIcon,
     resource: 'analysis',
@@ -72,7 +74,7 @@ const navigation: Array<{
     feature: undefined
   },
   {
-    name: 'Jobs',
+    labelKey: 'shell.mainMenu.jobs',
     route: 'jobs',
     icon: PlayCircleIcon,
     resource: 'jobs',
@@ -80,7 +82,7 @@ const navigation: Array<{
     feature: undefined
   },
   {
-    name: 'Jobs History',
+    labelKey: 'shell.mainMenu.jobsHistory',
     route: 'jobs-history',
     icon: ClockIcon,
     resource: 'jobs-history',
@@ -88,7 +90,7 @@ const navigation: Array<{
     feature: 'job_history'
   },
   {
-    name: 'Resources',
+    labelKey: 'shell.mainMenu.resources',
     route: 'resources',
     icon: CpuChipIcon,
     resource: 'resources',
@@ -96,7 +98,7 @@ const navigation: Array<{
     feature: undefined
   },
   {
-    name: 'QOS',
+    labelKey: 'shell.mainMenu.qos',
     route: 'qos',
     icon: SwatchIcon,
     resource: 'qos',
@@ -104,7 +106,7 @@ const navigation: Array<{
     feature: undefined
   },
   {
-    name: 'Reservations',
+    labelKey: 'shell.mainMenu.reservations',
     route: 'reservations',
     icon: CalendarIcon,
     resource: 'reservations',
@@ -112,7 +114,7 @@ const navigation: Array<{
     feature: undefined
   },
   {
-    name: 'Accounts',
+    labelKey: 'shell.mainMenu.accounts',
     route: 'accounts',
     icon: UserGroupIcon,
     resource: 'accounts',
@@ -120,7 +122,7 @@ const navigation: Array<{
     feature: undefined
   },
   {
-    name: 'AI',
+    labelKey: 'shell.mainMenu.ai',
     route: 'ai',
     icon: ChatBubbleLeftRightIcon,
     resource: 'ai',
@@ -128,7 +130,7 @@ const navigation: Array<{
     feature: 'ai'
   },
   {
-    name: 'Admin',
+    labelKey: 'shell.mainMenu.admin',
     route: 'admin',
     icon: ShieldCheckIcon,
     resource: 'admin',
@@ -224,11 +226,11 @@ function navigationTarget(route: string): RouteLocationRaw {
               enter-to="opacity-100"
               leave="ease-in-out duration-300"
               leave-from="opacity-100"
-              leave-to="opacity-0"
+                      leave-to="opacity-0"
             >
               <div class="absolute top-0 left-full flex w-16 justify-center pt-5">
                 <button type="button" class="-m-2.5 p-2.5" @click="sidebarOpen = false">
-                  <span class="sr-only">Close sidebar</span>
+                  <span class="sr-only">{{ t('shell.mainMenu.closeSidebar') }}</span>
                   <XMarkIcon class="h-6 w-6 text-white" aria-hidden="true" />
                 </button>
               </div>
@@ -244,7 +246,9 @@ function navigationTarget(route: string): RouteLocationRaw {
               <div
                 class="mx-2 flex items-center justify-between rounded-full border border-white/10 bg-white/6 px-3 py-2 text-xs text-white/70"
               >
-                <span class="font-semibold tracking-[0.18em] uppercase">Cluster Ops</span>
+                <span class="font-semibold tracking-[0.18em] uppercase">{{
+                  t('shell.mainMenu.clusterOps')
+                }}</span>
                 <TagIcon class="inline size-3" aria-hidden="true" />
                 <!-- {{ runtimeConfiguration.version }} -->
               </div>
@@ -252,7 +256,7 @@ function navigationTarget(route: string): RouteLocationRaw {
                 <ul role="list" class="flex flex-1 flex-col gap-y-7">
                   <li>
                     <ul role="list" class="space-y-1.5">
-                      <li v-for="item in navigation" :key="item.name">
+                      <li v-for="item in navigation" :key="item.route">
                         <RouterLink
                           v-if="
                             hasNavigationPermission(item.resource, item.operation) &&
@@ -277,7 +281,7 @@ function navigationTarget(route: string): RouteLocationRaw {
                             ]"
                             aria-hidden="true"
                           />
-                          {{ item.name }}
+                          {{ t(item.labelKey) }}
                         </RouterLink>
                       </li>
                     </ul>
@@ -291,7 +295,7 @@ function navigationTarget(route: string): RouteLocationRaw {
                         class="h-6 w-6 shrink-0 text-white/60 group-hover:text-white"
                         aria-hidden="true"
                       />
-                      Settings
+                      {{ t('shell.mainMenu.settings') }}
                     </RouterLink>
                   </li>
                 </ul>
@@ -314,7 +318,9 @@ function navigationTarget(route: string): RouteLocationRaw {
       <div
         class="flex items-center justify-between rounded-full border border-white/10 bg-white/6 px-3 py-2 text-xs text-white/70"
       >
-        <span class="font-semibold tracking-[0.18em] uppercase">Slurm Monitor</span>
+        <span class="font-semibold tracking-[0.18em] uppercase">{{
+          t('shell.mainMenu.slurmMonitor')
+        }}</span>
         <span
           ><TagIcon class="mr-1 inline size-3" aria-hidden="true" />
           {{ runtimeConfiguration.version }}</span
@@ -324,7 +330,7 @@ function navigationTarget(route: string): RouteLocationRaw {
         <ul role="list" class="flex flex-1 flex-col gap-y-7">
           <li>
             <ul role="list" class="space-y-1.5">
-              <li v-for="item in navigation" :key="item.name">
+              <li v-for="item in navigation" :key="item.route">
                 <RouterLink
                   v-if="hasNavigationPermission(item.resource, item.operation) && isFeatureEnabled(item.feature)"
                   :to="navigationTarget(item.route)"
@@ -345,7 +351,7 @@ function navigationTarget(route: string): RouteLocationRaw {
                     ]"
                     aria-hidden="true"
                   />
-                  {{ item.name }}
+                  {{ t(item.labelKey) }}
                 </RouterLink>
               </li>
             </ul>
@@ -359,7 +365,7 @@ function navigationTarget(route: string): RouteLocationRaw {
                 class="h-6 w-6 shrink-0 text-white/60 group-hover:text-white"
                 aria-hidden="true"
               />
-              Settings
+              {{ t('shell.mainMenu.settings') }}
             </RouterLink>
           </li>
         </ul>

@@ -1,6 +1,7 @@
 import { afterEach, describe, test, expect, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import MetricRangeSelector from '@/components/MetricRangeSelector.vue'
+import { i18n } from '@/plugins/i18n'
 
 describe('MetricRangeSelector.vue', () => {
   afterEach(() => {
@@ -9,6 +10,9 @@ describe('MetricRangeSelector.vue', () => {
 
   test('opens custom range dialog and applies start and end inputs', async () => {
     const wrapper = mount(MetricRangeSelector, {
+      global: {
+        plugins: [i18n]
+      },
       props: {
         modelValue: 'hour',
         enableCustomWindow: true,
@@ -37,6 +41,9 @@ describe('MetricRangeSelector.vue', () => {
 
   test('keeps dialog open when the custom range is invalid', async () => {
     const wrapper = mount(MetricRangeSelector, {
+      global: {
+        plugins: [i18n]
+      },
       props: {
         modelValue: 'hour',
         enableCustomWindow: true,
@@ -57,6 +64,9 @@ describe('MetricRangeSelector.vue', () => {
 
   test('emits reset from the custom range dialog', async () => {
     const wrapper = mount(MetricRangeSelector, {
+      global: {
+        plugins: [i18n]
+      },
       props: {
         modelValue: 'day',
         enableCustomWindow: true,
@@ -77,6 +87,9 @@ describe('MetricRangeSelector.vue', () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-04-24T12:30'))
     const wrapper = mount(MetricRangeSelector, {
+      global: {
+        plugins: [i18n]
+      },
       props: {
         modelValue: 'day',
         enableCustomWindow: true,

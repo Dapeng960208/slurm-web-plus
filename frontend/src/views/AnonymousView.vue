@@ -9,6 +9,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import type { Ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
 import { useRuntimeStore } from '@/stores/runtime'
 import { useRuntimeConfiguration } from '@/plugins/runtimeConfiguration'
@@ -22,15 +23,16 @@ const gateway = useGatewayAPI()
 const authStore = useAuthStore()
 const runtimeStore = useRuntimeStore()
 const runtimeConfiguration = useRuntimeConfiguration()
+const { t } = useI18n()
 
 function reportAuthenticationError(message: string) {
-  runtimeStore.reportError(`Authentication error: ${message}`)
-  msg.value = `Anonymous access failed: ${message}`
+  runtimeStore.reportError(t('errors.authentication', { message }))
+  msg.value = t('publicPages.anonymous.authFailed', { message })
 }
 
 onMounted(async () => {
   if (runtimeConfiguration.authentication) {
-    msg.value = 'Anonymous access is blocked because authentication is enabled.'
+    msg.value = t('publicPages.anonymous.authBlocked')
   } else {
     try {
       const response = await gateway.anonymousLogin()
@@ -39,7 +41,7 @@ onMounted(async () => {
       if (error instanceof AuthenticationError) {
         reportAuthenticationError(error.message)
       } else if (error instanceof Error) {
-        runtimeStore.reportError(`Other error: ${error.message}`)
+        runtimeStore.reportError(t('errors.other', { message: error.message }))
       }
     }
   }
@@ -53,11 +55,12 @@ onMounted(async () => {
         <div class="space-y-6">
           <BrandLogo size="lg" />
           <div class="space-y-4">
-            <p class="ui-page-kicker">Anonymous Access</p>
-            <h1 class="text-4xl font-bold text-white md:text-5xl">Preparing public session access.</h1>
+            <p class="ui-page-kicker">{{ t('publicPages.anonymous.kicker') }}</p>
+            <h1 class="text-4xl font-bold text-white md:text-5xl">
+              {{ t('publicPages.anonymous.title') }}
+            </h1>
             <p class="max-w-xl text-sm leading-7 text-white/72 md:text-base">
-              When authentication is disabled, Slurm Web Plus can still route visitors into the
-              control center with a lightweight anonymous session.
+              {{ t('publicPages.anonymous.description') }}
             </p>
           </div>
         </div>
@@ -65,7 +68,7 @@ onMounted(async () => {
       <div class="ui-public-panel flex items-center justify-center px-5 py-6 sm:px-8">
         <div class="max-w-lg space-y-4 text-center">
           <BrandLogo size="sm" />
-          <p class="ui-page-kicker mx-auto w-fit">Status</p>
+          <p class="ui-page-kicker mx-auto w-fit">{{ t('publicPages.anonymous.status') }}</p>
           <p class="text-2xl font-bold text-[var(--color-brand-ink-strong)]">{{ msg }}</p>
         </div>
       </div>

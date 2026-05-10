@@ -1,10 +1,14 @@
 import { describe, test, expect } from 'vitest'
 import { mount } from '@vue/test-utils'
 import SettingsHeader from '@/components/settings/SettingsHeader.vue'
+import { i18n } from '@/plugins/i18n'
 
 describe('SettingsHeader.vue', () => {
   test('renders title and description', () => {
     const wrapper = mount(SettingsHeader, {
+      global: {
+        plugins: [i18n]
+      },
       props: {
         title: 'Test Title',
         description: 'Test description'

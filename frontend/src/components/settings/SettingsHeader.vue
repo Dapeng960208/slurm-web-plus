@@ -7,20 +7,24 @@
 -->
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
 defineProps<{
   title: string
   description?: string
 }>()
+
+const { t } = useI18n()
 </script>
 
 <template>
   <div class="ui-page-header">
     <div class="ui-page-copy">
       <h1 class="ui-page-title">
-        {{ title }}
+        {{ t(title) }}
       </h1>
       <p v-if="description" class="ui-page-description">
-        {{ description }}
+        {{ t(description) }}
       </p>
     </div>
   </div>

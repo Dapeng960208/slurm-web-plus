@@ -9,6 +9,7 @@
 <script setup lang="ts">
 import { onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
 import { useRuntimeStore } from '@/stores/runtime'
 import { useRuntimeConfiguration } from '@/plugins/runtimeConfiguration'
@@ -17,10 +18,11 @@ const authStore = useAuthStore()
 const runtimeStore = useRuntimeStore()
 const router = useRouter()
 const runtimeConfiguration = useRuntimeConfiguration()
+const { t } = useI18n()
 
 onMounted(() => {
   authStore.logout()
-  runtimeStore.reportInfo('You have been signed out')
+  runtimeStore.reportInfo(t('publicPages.signout.done'))
 
   if (runtimeConfiguration.authentication) {
     router.push({ name: 'login' })
@@ -31,5 +33,5 @@ onMounted(() => {
 </script>
 
 <template>
-  <main>Bye!</main>
+  <main>{{ t('publicPages.signout.bye') }}</main>
 </template>

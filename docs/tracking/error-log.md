@@ -21,6 +21,11 @@
 - 现象：页面真实实现仍存在跳转按钮，但 `tests/views/DashboardView.spec.ts` 使用 `wrapper.text()` 或直接查 `RouterLinkStub` 时断言失败；同组 dashboard 测试其余用例全部通过，失败集中在头部 actions 区域文案检查
 - 解决办法：改为断言 `[data-testid="dashboard-header-tools"] .ui-button-primary` 的存在性，直接覆盖头部操作区真实 DOM
 
+### 2026-05-10：前端接入 `vue-i18n` 后，旧测试基线会因缺少插件和硬编码文案断言失败
+- 时间：2026-05-10
+- 现象：执行 `cd frontend && npx vitest run` 时，部分组件测试因新组件调用 `useI18n()` 但挂载时未注入 `i18n` 插件而报 `Need to install with app.use function`；另有少量测试仍直接断言旧英文菜单字段或固定中文文案，导致国际化改造后全量回归失败
+- 解决办法：为相关组件测试统一注入 `i18n` 插件；对语言敏感测试显式设置 locale；把旧硬编码菜单/页面文案断言改为翻译 key 或当前 locale 下的目标文案
+
 ### 2026-05-09：固定应用壳下非表格内容页缺少内部滚动容器会导致正文无法下滚
 - 时间：2026-05-09
 - 现象：`Dashboard`、`Analysis` 以及 `/:cluster/admin/*` 子页面在使用固定高度 `ui-shell` / `ui-content-workspace` 时，若正文直接堆叠在工作区下方而没有内部 `ui-scroll-region`，页面会出现“表格区域能滚动，但详情或配置内容无法继续向下滚动”的共性问题

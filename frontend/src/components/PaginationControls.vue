@@ -8,6 +8,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import {
   DEFAULT_PAGE_SIZE,
   PAGE_SIZE_OPTIONS,
@@ -38,6 +39,22 @@ const totalPages = computed(() => lastPage(props.total, props.pageSize))
 const firstItem = computed(() => (props.total === 0 ? 0 : (props.page - 1) * props.pageSize + 1))
 const lastItem = computed(() => Math.min(props.page * props.pageSize, props.total))
 const pages = computed(() => paginationRange(props.page, totalPages.value))
+const { t } = useI18n()
+
+const itemCountLabel = computed(() => {
+  if (typeof Intl !== 'undefined' && i18nPluralSafe()) {
+    return props.total === 1
+      ? t('common.pagination.itemCount', { count: props.total, label: props.itemLabel })
+      : t('common.pagination.itemCount_plural', { count: props.total, label: props.itemLabel })
+  }
+  return props.total === 1
+    ? t('common.pagination.itemCount', { count: props.total, label: props.itemLabel })
+    : `${props.total} ${props.itemLabel}s`
+})
+
+function i18nPluralSafe() {
+  return true
+}
 
 function changePage(page: number) {
   if (page < 1 || page > totalPages.value || page === props.page) return
@@ -56,18 +73,17 @@ function changePageSize(event: Event) {
     class="ui-results-pagination flex flex-col gap-3 border-t border-[rgba(80,105,127,0.08)] px-4 py-2.5 sm:flex-row sm:items-center sm:justify-between sm:px-5"
   >
     <p class="text-sm text-[var(--color-brand-muted)]">
-      Showing
+      {{ t('common.pagination.showing') }}
       <span class="font-medium">{{ firstItem }}</span>
-      to
+      {{ t('common.pagination.to') }}
       <span class="font-medium">{{ lastItem }}</span>
-      of
-      <span class="font-medium">{{ total }}</span>
-      {{ itemLabel }}{{ total === 1 ? '' : 's' }}
+      {{ t('common.pagination.of') }}
+      <span class="font-medium">{{ itemCountLabel }}</span>
     </p>
 
     <div class="flex flex-wrap items-center gap-3">
       <label class="flex items-center gap-2 text-sm text-[var(--color-brand-muted)]">
-        <span>Per page</span>
+        <span>{{ t('common.pagination.perPage') }}</span>
         <select
           :value="pageSize"
           class="rounded-full border-[rgba(80,105,127,0.16)] bg-white py-1.5 pr-8 pl-3 text-sm font-semibold text-[var(--color-brand-ink-strong)] shadow-[var(--shadow-soft)] focus:border-[rgba(182,232,44,0.65)] focus:ring-[rgba(182,232,44,0.18)]"
@@ -94,7 +110,7 @@ function changePageSize(event: Event) {
           ]"
           @click="changePage(page - 1)"
         >
-          <span class="sr-only">Previous</span>
+          <span class="sr-only">{{ t('common.pagination.previous') }}</span>
           <ChevronLeftIcon class="h-5 w-5" aria-hidden="true" />
         </button>
 
@@ -131,7 +147,7 @@ function changePageSize(event: Event) {
           ]"
           @click="changePage(page + 1)"
         >
-          <span class="sr-only">Next</span>
+          <span class="sr-only">{{ t('common.pagination.next') }}</span>
           <ChevronRightIcon class="h-5 w-5" aria-hidden="true" />
         </button>
       </nav>

@@ -8,7 +8,10 @@
 
 <script setup lang="ts">
 import { RouterLink } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import BrandLogo from '@/components/BrandLogo.vue'
+
+const { t } = useI18n()
 </script>
 
 <template>
@@ -18,11 +21,12 @@ import BrandLogo from '@/components/BrandLogo.vue'
         <div class="space-y-6">
           <BrandLogo size="lg" />
           <div class="space-y-4">
-            <p class="ui-page-kicker">Missing Route</p>
-            <h1 class="text-4xl font-bold text-white md:text-5xl">Page not found</h1>
+            <p class="ui-page-kicker">{{ t('publicPages.notFound.kicker') }}</p>
+            <h1 class="text-4xl font-bold text-white md:text-5xl">
+              {{ t('publicPages.notFound.title') }}
+            </h1>
             <p class="max-w-xl text-sm leading-7 text-white/72 md:text-base">
-              The requested route is unavailable or has moved. Return to the cluster gateway to
-              continue.
+              {{ t('publicPages.notFound.description') }}
             </p>
           </div>
         </div>
@@ -34,12 +38,12 @@ import BrandLogo from '@/components/BrandLogo.vue'
           </div>
           <div class="mb-8">
             <p class="text-sm leading-7 text-[var(--color-brand-muted)]">
-              The page you are looking for does not exist or has been moved.
+              {{ t('publicPages.notFound.detail') }}
             </p>
           </div>
           <div>
             <RouterLink :to="{ name: 'clusters' }" class="ui-button-primary">
-              Go to clusters
+              {{ t('publicPages.notFound.goToClusters') }}
             </RouterLink>
           </div>
         </div>

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { Menu, MenuButton, MenuItem, MenuItems } from '@headlessui/vue'
 import {
   ChevronDownIcon,
@@ -10,12 +11,14 @@ import {
   UserCircleIcon
 } from '@heroicons/vue/20/solid'
 import { useAuthStore } from '@/stores/auth'
+import LocaleSwitcher from '@/components/LocaleSwitcher.vue'
 
 const { cluster } = defineProps<{
   cluster?: string
 }>()
 
 const authStore = useAuthStore()
+const { t } = useI18n()
 
 const workspaceTarget = computed(() => {
   if (!cluster) return null
@@ -65,7 +68,7 @@ const workspaceTarget = computed(() => {
               :class="['ui-user-menu-item', active ? 'ui-user-menu-item-active' : '']"
             >
               <IdentificationIcon class="h-5 w-5" aria-hidden="true" />
-              My workspace
+              {{ t('shell.userMenu.myWorkspace') }}
             </RouterLink>
           </MenuItem>
 
@@ -75,9 +78,13 @@ const workspaceTarget = computed(() => {
               :class="['ui-user-menu-item', active ? 'ui-user-menu-item-active' : '']"
             >
               <ShieldCheckIcon class="h-5 w-5" aria-hidden="true" />
-              Account permissions
+              {{ t('shell.userMenu.accountPermissions') }}
             </RouterLink>
           </MenuItem>
+
+          <div class="px-3 py-3">
+            <LocaleSwitcher compact />
+          </div>
 
           <MenuItem v-slot="{ active }">
             <RouterLink
@@ -85,7 +92,7 @@ const workspaceTarget = computed(() => {
               :class="['ui-user-menu-item', active ? 'ui-user-menu-item-active' : '']"
             >
               <ArrowRightOnRectangleIcon class="h-5 w-5" aria-hidden="true" />
-              Sign out
+              {{ t('common.buttons.signOut') }}
             </RouterLink>
           </MenuItem>
         </div>

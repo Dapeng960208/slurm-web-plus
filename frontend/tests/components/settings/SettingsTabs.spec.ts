@@ -1,10 +1,11 @@
-import { describe, test, expect } from 'vitest'
+import { beforeEach, describe, test, expect } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { createTestingPinia } from '@pinia/testing'
 import { nextTick } from 'vue'
 import SettingsTabs from '@/components/settings/SettingsTabs.vue'
 import { runtimeConfiguration } from '@/plugins/runtimeConfiguration'
 import { useRuntimeStore } from '@/stores/runtime'
+import { i18n } from '@/plugins/i18n'
 
 function mountTabs(
   authentication: boolean,
@@ -18,6 +19,7 @@ function mountTabs(
         RouterLink: { template: '<a><slot /></a>' }
       },
       plugins: [
+        i18n,
         [runtimeConfiguration, { api_server: 'http://localhost', authentication }],
         createTestingPinia({ stubActions: false })
       ]
@@ -32,6 +34,10 @@ function mountTabs(
 }
 
 describe('SettingsTabs.vue', () => {
+  beforeEach(() => {
+    i18n.global.locale.value = 'en'
+  })
+
   test('does not show LDAP Cache tab after admin-page migration', async () => {
     const wrapper = mountTabs(true, [
       {
@@ -135,5 +141,16 @@ describe('SettingsTabs.vue', () => {
     expect(wrapper.text()).not.toContain('Access Control')
     expect(wrapper.text()).not.toContain('Cache')
     expect(wrapper.text()).not.toContain('LDAP Cache')
+  })
+
+  test('renders translated tab labels', async () => {
+    const wrapper = mountTabs(true, [])
+
+    i18n.global.locale.value = 'zh-CN'
+    await nextTick()
+
+    expect(wrapper.text()).toContain('常规')
+    expect(wrapper.text()).toContain('错误')
+    expect(wrapper.text()).toContain('账户')
   })
 })

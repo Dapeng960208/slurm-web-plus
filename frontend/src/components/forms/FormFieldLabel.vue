@@ -7,6 +7,7 @@
 -->
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import { InformationCircleIcon } from '@heroicons/vue/20/solid'
 
 defineProps<{
@@ -15,26 +16,28 @@ defineProps<{
   hint?: string
   tooltip?: string
 }>()
+
+const { t } = useI18n()
 </script>
 
 <template>
   <div>
     <div class="ui-form-label">
-      <span class="ui-form-label-text">{{ label }}</span>
+      <span class="ui-form-label-text">{{ t(label) }}</span>
       <span
         :class="[
           'ui-form-badge',
           required ? 'ui-form-badge-required' : 'ui-form-badge-optional'
         ]"
       >
-        {{ required ? 'Required' : 'Optional' }}
+        {{ required ? t('common.forms.required') : t('common.forms.optional') }}
       </span>
-      <span v-if="tooltip" class="ui-help-badge" :title="tooltip" :aria-label="tooltip">
+      <span v-if="tooltip" class="ui-help-badge" :title="t(tooltip)" :aria-label="t(tooltip)">
         <InformationCircleIcon class="h-4 w-4" aria-hidden="true" />
       </span>
     </div>
     <p v-if="hint" class="ui-form-hint">
-      {{ hint }}
+      {{ t(hint) }}
     </p>
   </div>
 </template>

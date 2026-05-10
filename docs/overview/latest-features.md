@@ -1,5 +1,20 @@
 # 最新功能
 
+## 本轮：前端已接入浏览器优先的中英文切换
+
+本轮在前端落地了第一阶段国际化能力，重点覆盖登录入口、共享导航、设置页和前端提示文案：
+
+- 前端已接入 `vue-i18n`，支持 `zh-CN` 与 `en` 两种语言。
+- 首次进入会优先读取 `localStorage['locale']`；若没有本地偏好，则按浏览器语言自动判定，`zh*` 默认中文，其余默认英文。
+- 登录页新增语言切换入口，登录后可在右上 `UserMenu` 中切换语言，`Settings > General` 也提供语言偏好入口。
+- 主导航、用户菜单、Settings 导航、Settings General / Errors、通知类型标签、分页文案、公共弹窗和前端生成的错误提示已接入翻译资源。
+- 当前国际化只覆盖前端静态文案和前端生成消息，不翻译后端直接返回的原始错误内容与业务实体值。
+
+本轮新增验证：
+
+- `npm --prefix frontend run type-check`
+- `cd frontend && npx vitest run tests/stores/locale.spec.ts tests/views/LoginView.spec.ts tests/components/MainMenu.spec.ts tests/components/UserMenu.spec.ts tests/components/settings/SettingsTabs.spec.ts tests/views/settings/SettingsMain.spec.ts tests/components/NotificationsPanel.spec.ts tests/components/PaginationControls.spec.ts`
+
 ## 本轮：`Dashboard`、`Analysis` 与 `Admin` 内容页已补统一内部滚动
 
 本轮继续收口固定应用壳下的内容页滚动问题，重点解决“表格能滚动，但非表格正文和配置内容无法继续下滚”的共性缺陷：

@@ -7,12 +7,15 @@
 -->
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import SettingsTabs from '@/components/settings/SettingsTabs.vue'
 import SettingsHeader from '@/components/settings/SettingsHeader.vue'
 import { useRuntimeStore } from '@/stores/runtime'
 import { Switch } from '@headlessui/vue'
+import LocaleSwitcher from '@/components/LocaleSwitcher.vue'
 
 const runtimeStore = useRuntimeStore()
+const { t } = useI18n()
 </script>
 
 <template>
@@ -20,20 +23,29 @@ const runtimeStore = useRuntimeStore()
     <SettingsTabs entry="General" />
     <div class="ui-panel ui-section">
       <SettingsHeader
-        title="General Settings"
-        description="Configure general application preferences."
+        title="settings.general.title"
+        description="settings.general.description"
       />
       <div class="ui-panel-soft mt-6 rounded-[24px] px-5">
         <dl class="divide-y divide-[rgba(80,105,127,0.1)] text-sm/6">
           <div class="py-6 sm:flex">
             <dt class="font-medium text-[var(--color-brand-ink-strong)] sm:w-72 sm:flex-none sm:pr-6">
-              Show node names on cluster diagram
+              {{ t('settings.general.localeLabel') }}
+            </dt>
+            <dd class="mt-1 flex justify-between gap-x-6 sm:mt-0 sm:flex-auto sm:items-center">
+              <p class="mt-1 text-xs text-[var(--color-brand-muted)]">
+                {{ t('settings.general.localeDescription') }}
+              </p>
+              <LocaleSwitcher />
+            </dd>
+          </div>
+          <div class="py-6 sm:flex">
+            <dt class="font-medium text-[var(--color-brand-ink-strong)] sm:w-72 sm:flex-none sm:pr-6">
+              {{ t('settings.general.showNodeNames') }}
             </dt>
             <dd class="mt-1 flex justify-between gap-x-6 sm:mt-0 sm:flex-auto">
               <p class="mt-1 text-xs text-[var(--color-brand-muted)]">
-                When enabled, node names are displayed on the cluster diagram, provided there is
-                enough space. Names are shown with adaptive sizing and automatically positioned based
-                on node dimensions.
+                {{ t('settings.general.showNodeNamesHint') }}
               </p>
               <Switch
                 v-model="runtimeStore.resources.showNodeNames"
@@ -44,7 +56,7 @@ const runtimeStore = useRuntimeStore()
                   'relative mt-1 inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none'
                 ]"
               >
-                <span class="sr-only">Use setting</span>
+                <span class="sr-only">{{ t('shell.settings.general') }}</span>
                 <span
                   :class="[
                     runtimeStore.resources.showNodeNames ? 'translate-x-5' : 'translate-x-0',

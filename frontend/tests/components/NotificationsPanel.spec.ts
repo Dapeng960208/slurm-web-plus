@@ -4,10 +4,12 @@ import { useRuntimeStore } from '@/stores/runtime'
 import { init_plugins } from '../lib/common'
 import NotificationsPanel from '@/components/notifications/NotificationsPanel.vue'
 import NotificationMessage from '@/components/notifications/NotificationMessage.vue'
+import { i18n } from '@/plugins/i18n'
 
 describe('DashboardCharts.vue', () => {
   beforeEach(() => {
     init_plugins()
+    i18n.global.locale.value = 'en'
     const cluster = {
       name: 'foo',
       permissions: { roles: ['admin'], actions: ['view-nodes', 'view-jobs'] },
@@ -34,5 +36,18 @@ describe('DashboardCharts.vue', () => {
     const wrapper = mount(NotificationsPanel)
     // check presence of 2 notifications
     expect(wrapper.findAllComponents(NotificationMessage).length).toBe(2)
+  })
+
+  test('should translate notification type labels', async () => {
+    const runtimeStore = useRuntimeStore()
+    runtimeStore.reportInfo('test info')
+    const wrapper = mount(NotificationsPanel)
+
+    expect(wrapper.text()).toContain('Info')
+
+    i18n.global.locale.value = 'zh-CN'
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.text()).toContain('提示')
   })
 })

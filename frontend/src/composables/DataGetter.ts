@@ -8,6 +8,7 @@
 
 import { ref, onMounted, watch, toValue } from 'vue'
 import type { Ref } from 'vue'
+import { i18n } from '@/plugins/i18n'
 import {
   AuthenticationError,
   PermissionError,
@@ -32,7 +33,7 @@ export function useGatewayDataGetter<Type>(
   const { reportAuthenticationError, reportPermissionError } = useErrorsHandler()
 
   function defaultErrorHandler(error: Error) {
-    runtime.reportError(`Server error: ${error.message}`)
+    runtime.reportError(i18n.global.t('errors.server', { message: error.message }))
     unable.value = true
   }
 
@@ -84,7 +85,7 @@ export function useClusterDataGetter<Type>(
   const { reportAuthenticationError, reportPermissionError } = useErrorsHandler()
 
   function reportOtherError(error: Error) {
-    runtime.reportError(`Server error: ${error.message}`)
+    runtime.reportError(i18n.global.t('errors.server', { message: error.message }))
     unable.value = true
   }
 

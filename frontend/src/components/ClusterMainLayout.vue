@@ -10,6 +10,7 @@
 import { RouterLink } from 'vue-router'
 import { onMounted, ref } from 'vue'
 import type { Ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRuntimeStore } from '@/stores/runtime'
 import { useRuntimeConfiguration } from '@/plugins/runtimeConfiguration'
 import { Bars3Icon, ServerStackIcon } from '@heroicons/vue/24/outline'
@@ -33,6 +34,7 @@ const clusterNotFound: Ref<boolean> = ref(false)
 const sidebarOpen = ref(false)
 const runtimeStore = useRuntimeStore()
 const runtimeConfiguration = useRuntimeConfiguration()
+const { t } = useI18n()
 
 onMounted(() => {
   if (!runtimeStore.checkClusterAvailable(cluster)) {
@@ -52,7 +54,7 @@ onMounted(() => {
         class="-m-2.5 rounded-full p-2.5 text-[var(--color-brand-ink)] transition hover:bg-[rgba(182,232,44,0.14)] lg:hidden"
         @click="sidebarOpen = true"
       >
-        <span class="sr-only">Open sidebar</span>
+        <span class="sr-only">{{ t('shell.mainMenu.openSidebar') }}</span>
         <Bars3Icon class="h-6 w-6" aria-hidden="true" />
       </button>
 
@@ -112,7 +114,7 @@ onMounted(() => {
       <div
         class="flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-[36px] border border-white/60 bg-[rgba(255,255,255,0.5)] px-3 py-2.5 shadow-[var(--shadow-soft)] backdrop-blur-sm sm:px-5 sm:py-3 lg:px-6 lg:py-4"
       >
-        <div v-if="clusterNotFound">Cluster not found</div>
+        <div v-if="clusterNotFound">{{ t('alerts.clusterNotFound') }}</div>
         <div v-else class="home ui-page ui-page-wide flex-1">
           <slot></slot>
         </div>

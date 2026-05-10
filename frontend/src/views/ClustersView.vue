@@ -9,6 +9,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { useRuntimeStore } from '@/stores/runtime'
 import { useRuntimeConfiguration } from '@/plugins/runtimeConfiguration'
 import { useGatewayAPI, type ClusterDescription } from '@/composables/GatewayAPI'
@@ -27,6 +28,7 @@ const runtimeConfiguration = useRuntimeConfiguration()
 const gateway = useGatewayAPI()
 const { reportAuthenticationError, reportServerError } = useErrorsHandler()
 const router = useRouter()
+const { t } = useI18n()
 
 const clusters = ref<ClusterDescription[]>([])
 const loaded = ref(false)
@@ -98,7 +100,7 @@ onMounted(() => {
         role="link"
         class="absolute top-4 right-4 z-20 flex items-center gap-2 rounded-full border border-white/70 bg-white/80 px-4 py-2 text-sm font-semibold text-[var(--color-brand-ink)] shadow-[var(--shadow-soft)] backdrop-blur-lg transition hover:bg-white"
       >
-        Signout
+        {{ t('publicPages.clusters.signOut') }}
         <ArrowRightOnRectangleIcon class="h-6 w-6" />
       </button>
     </RouterLink>
@@ -108,30 +110,37 @@ onMounted(() => {
         <div class="space-y-6">
           <BrandLogo size="lg" />
           <div class="space-y-4">
-            <p class="ui-page-kicker">Cluster Gateway</p>
-            <h1 class="text-4xl font-bold text-white md:text-5xl">Select a cluster</h1>
+            <p class="ui-page-kicker">{{ t('publicPages.clusters.kicker') }}</p>
+            <h1 class="text-4xl font-bold text-white md:text-5xl">
+              {{ t('publicPages.clusters.title') }}
+            </h1>
             <p class="max-w-xl text-sm leading-7 text-white/72 md:text-base">
-              Compare visible environments, inspect availability and jump straight into the shared
-              operations console.
+              {{ t('publicPages.clusters.description') }}
             </p>
           </div>
         </div>
         <div class="grid gap-3 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
           <div class="rounded-[22px] border border-white/10 bg-white/6 p-4">
-            <p class="text-xs font-semibold tracking-[0.14em] text-white/50 uppercase">Clusters</p>
+            <p class="text-xs font-semibold tracking-[0.14em] text-white/50 uppercase">
+              {{ t('publicPages.clusters.statsTitle') }}
+            </p>
             <p class="mt-2 text-3xl font-bold text-white">{{ clusterCount }}</p>
-            <p class="mt-1 text-sm text-white/70">Visible to this session.</p>
+            <p class="mt-1 text-sm text-white/70">{{ t('publicPages.clusters.statsDescription') }}</p>
           </div>
           <div class="rounded-[22px] border border-white/10 bg-white/6 p-4">
-            <p class="text-xs font-semibold tracking-[0.14em] text-white/50 uppercase">Routing</p>
+            <p class="text-xs font-semibold tracking-[0.14em] text-white/50 uppercase">
+              {{ t('publicPages.clusters.routingTitle') }}
+            </p>
             <p class="mt-2 text-sm text-white/80">
-              Permission-aware entry and single-cluster auto redirect.
+              {{ t('publicPages.clusters.routingDescription') }}
             </p>
           </div>
           <div class="rounded-[22px] border border-white/10 bg-white/6 p-4">
-            <p class="text-xs font-semibold tracking-[0.14em] text-white/50 uppercase">Signals</p>
+            <p class="text-xs font-semibold tracking-[0.14em] text-white/50 uppercase">
+              {{ t('publicPages.clusters.signalsTitle') }}
+            </p>
             <p class="mt-2 text-sm text-white/80">
-              Status, version and runtime context before you enter.
+              {{ t('publicPages.clusters.signalsDescription') }}
             </p>
           </div>
         </div>
@@ -139,18 +148,18 @@ onMounted(() => {
 
       <div class="ui-public-panel px-5 py-6 sm:px-8">
         <PageHeader
-          kicker="Cluster Entry"
-          title="Select a cluster"
-          description="Pick an available environment to open the control surface."
+          kicker="publicPages.clusters.entryKicker"
+          title="publicPages.clusters.title"
+          description="publicPages.clusters.entryDescription"
           :metric-value="clusterCount"
-          metric-label="clusters visible"
+          metric-label="publicPages.clusters.clustersVisible"
         />
 
         <div v-if="unable" class="mt-6">
           <ErrorAlert :show-errors-link="false">
-            <strong>Unable to load cluster list</strong>
+            <strong>{{ t('publicPages.clusters.unableTitle') }}</strong>
             <br />
-            Try to refresh…
+            {{ t('publicPages.clusters.retry') }}
           </ErrorAlert>
         </div>
         <div
@@ -158,17 +167,17 @@ onMounted(() => {
           class="ui-panel-soft mt-6 flex min-h-28 items-center justify-center gap-3 rounded-[24px] px-5 text-sm text-[var(--color-brand-muted)]"
         >
           <LoadingSpinner :size="5" />
-          <span>Loading clusters…</span>
+          <span>{{ t('publicPages.clusters.loading') }}</span>
         </div>
         <div v-else-if="clusterCount === 0" class="mt-6">
           <InfoAlert>
-            <strong>Empty cluster list</strong>
+            <strong>{{ t('publicPages.clusters.emptyTitle') }}</strong>
             <br />
-            Try to refresh…
+            {{ t('publicPages.clusters.retry') }}
           </InfoAlert>
         </div>
         <div v-else v-show="!awaitingAutoRedirect || clusterWithError" class="mt-6">
-          <h1 class="sr-only">Select a cluster</h1>
+          <h1 class="sr-only">{{ t('publicPages.clusters.title') }}</h1>
           <ul role="list" class="ui-table-shell divide-y divide-[rgba(80,105,127,0.08)]">
             <ClusterListItem
               v-for="clusterItem in clusters"

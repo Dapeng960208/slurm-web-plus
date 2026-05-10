@@ -4,6 +4,8 @@
 
 本轮发布聚焦以下目标：
 
+- 在前端落地中英文切换，优先覆盖登录页、共享导航、Settings、通知、分页和前端生成错误提示
+
 - 在现有业务页面补单对象管理能力，不做独立全量管理中心
 - 将 `AI`、`LDAP Cache`、`Cache`、`Access Control` 迁移到 `/:cluster/admin`
 - 在 `analysis` 页面补 `Slurm ping` 与 `diag`
@@ -34,6 +36,29 @@
 - 收口 `/:cluster/admin/ai`：模型配置改为表格、审计记录改为表格、统一搜索框样式，并将审计详情迁移到独立详情页
 
 ## 2. 已完成项
+
+- 前端国际化基础层已接入：
+  - `frontend` 已安装并接入 `vue-i18n`
+  - 已新增 `frontend/src/plugins/i18n.ts`、`frontend/src/locales/en.ts`、`frontend/src/locales/zh-CN.ts`
+  - 已新增 locale store，统一管理当前语言、`localStorage['locale']` 持久化与 `document.documentElement.lang`
+  - 首次进入默认策略固定为：优先本地持久化；否则 `navigator.language` 以 `zh` 开头时使用中文，其余使用英文
+- 语言切换入口已落地：
+  - 登录页新增语言切换控件
+  - 登录后 `UserMenu` 新增语言切换控件
+  - `Settings > General` 新增显示语言设置项
+- 共享前端文案已完成第一阶段迁移：
+  - 主导航、用户菜单、Settings tabs、Settings General / Errors
+  - 登录页、匿名页、集群入口页、403、404、登出页
+  - 通知类型标签、分页文案、公共错误提示、公共操作弹窗、通用字段标签
+  - 前端生成的认证错误、权限错误、服务端错误和普通错误通知
+- 本轮新增国际化专题文档：
+  - `docs/features/i18n/requirements.md`
+  - `docs/features/i18n/test-plan.md`
+- 本轮国际化定向验证已通过：
+  - `npm --prefix frontend run type-check`
+  - `cd frontend && npx vitest run tests/stores/locale.spec.ts tests/views/LoginView.spec.ts tests/components/MainMenu.spec.ts tests/components/UserMenu.spec.ts tests/components/settings/SettingsTabs.spec.ts tests/views/settings/SettingsMain.spec.ts tests/components/NotificationsPanel.spec.ts tests/components/PaginationControls.spec.ts`
+- 本轮国际化全量前端回归已通过：
+  - `cd frontend && npx vitest run`
 
 - 开发错误库文档格式已收口：
   - `docs/tracking/error-log.md` 已从长篇复盘格式简化为仅保留 `时间`、`现象`、`解决办法`
@@ -412,10 +437,13 @@
 - 当前 Conversation Audit 搜索只过滤已加载摘要，不搜索完整消息正文；如需全文检索需要扩展审计接口
 - 当前 Conversation Audit 前端过滤只匹配已加载的 `username` 和 `title` 摘要列，不搜索完整消息正文；如需全文检索需要扩展审计接口
 - `cd frontend && npx vitest run` 当前仍会输出一批既有 Vue `inject() can only be used inside setup() or functional components.` 告警；全量前端测试已通过，但这类告警噪音仍值得后续单独清理
+- `cd frontend && npx vitest run` 当前仍会输出一批未完全迁移页面的 `vue-i18n` missing-key 告警；本轮全量前端测试已通过，但剩余业务视图文案仍需继续收口到翻译 key
 
 ## 5. 已同步文档
 
 - `docs/README.md`
+- `docs/features/i18n/requirements.md`
+- `docs/features/i18n/test-plan.md`
 - `docs/overview/project-overview.md`
 - `docs/overview/architecture-overview.md`
 - `docs/overview/latest-features.md`
@@ -516,6 +544,8 @@
 - `cd frontend && npx vitest run`
 - `npm --prefix frontend run build`
 - `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/views/test_agent.py slurmweb/tests/views/test_agent_metrics_requests.py slurmweb/tests/views/test_gateway.py`
+- `npm --prefix frontend run type-check`
+- `cd frontend && npx vitest run`
 
 待同步：
 

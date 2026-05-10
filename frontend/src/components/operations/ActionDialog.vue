@@ -8,6 +8,7 @@
 
 <script setup lang="ts">
 import { computed, reactive, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Dialog, DialogPanel, DialogTitle, TransitionChild, TransitionRoot } from '@headlessui/vue'
 import FormFieldLabel from '@/components/forms/FormFieldLabel.vue'
 
@@ -48,6 +49,7 @@ const emit = defineEmits<{
   close: []
   submit: [payload: Record<string, string>]
 }>()
+const { t } = useI18n()
 
 const form = reactive<Record<string, string>>({})
 const fieldsSignature = computed(() =>
@@ -76,9 +78,9 @@ const submitButtonClass = computed(() => {
 })
 
 const resolvedSubmitTooltip = computed(() => {
-  if (props.submitTooltip) return props.submitTooltip
-  if (props.description) return props.description
-  return `Confirm ${props.submitLabel.toLowerCase()}.`
+  if (props.submitTooltip) return t(props.submitTooltip)
+  if (props.description) return t(props.description)
+  return t('actionDialog.confirm', { action: t(props.submitLabel).toLowerCase() })
 })
 
 function resetForm() {
@@ -139,15 +141,17 @@ watch(
             <DialogPanel class="w-full max-w-2xl rounded-[32px] border border-white/10 bg-white p-6 shadow-[var(--shadow-panel)]">
               <div class="flex items-start justify-between gap-4">
                 <div>
-                  <p class="ui-page-kicker">Cluster Operation</p>
+                  <p class="ui-page-kicker">{{ t('actionDialog.kicker') }}</p>
                   <DialogTitle class="text-2xl font-semibold text-[var(--color-brand-ink-strong)]">
-                    {{ title }}
+                    {{ t(title) }}
                   </DialogTitle>
                   <p v-if="description" class="mt-2 text-sm text-[var(--color-brand-muted)]">
-                    {{ description }}
+                    {{ t(description) }}
                   </p>
                 </div>
-                <button type="button" class="ui-button-secondary" @click="emit('close')">Close</button>
+                <button type="button" class="ui-button-secondary" @click="emit('close')">
+                  {{ t('common.buttons.close') }}
+                </button>
               </div>
 
               <form class="mt-6 space-y-4" @submit.prevent="emit('submit', { ...form })">
@@ -163,21 +167,23 @@ watch(
                     v-model="form[field.key]"
                     rows="4"
                     class="mt-2 block w-full rounded-[20px] border border-[rgba(80,105,127,0.14)] bg-white px-3 py-3 text-sm outline-hidden focus:border-[rgba(182,232,44,0.65)] focus:ring-4 focus:ring-[rgba(182,232,44,0.18)]"
-                    :placeholder="field.placeholder"
+                    :placeholder="field.placeholder ? t(field.placeholder) : undefined"
                   />
                   <select
                     v-else-if="field.type === 'select'"
                     v-model="form[field.key]"
                     class="mt-2 block w-full rounded-[18px] border border-[rgba(80,105,127,0.14)] bg-white px-3 py-2.5 text-sm outline-hidden focus:border-[rgba(182,232,44,0.65)] focus:ring-4 focus:ring-[rgba(182,232,44,0.18)]"
                   >
-                    <option value="" disabled>{{ field.placeholder ?? 'Select an option' }}</option>
+                    <option value="" disabled>{{
+                      field.placeholder ? t(field.placeholder) : t('common.forms.selectOption')
+                    }}</option>
                     <option
                       v-for="option in field.options ?? []"
                       :key="option.value"
                       :value="option.value"
                       :disabled="option.disabled"
                     >
-                      {{ option.label }}
+                      {{ t(option.label) }}
                     </option>
                   </select>
                   <input
@@ -185,21 +191,23 @@ watch(
                     v-model="form[field.key]"
                     :type="field.type === 'number' ? 'number' : 'text'"
                     class="mt-2 block w-full rounded-[18px] border border-[rgba(80,105,127,0.14)] bg-white px-3 py-2.5 text-sm outline-hidden focus:border-[rgba(182,232,44,0.65)] focus:ring-4 focus:ring-[rgba(182,232,44,0.18)]"
-                    :placeholder="field.placeholder"
+                    :placeholder="field.placeholder ? t(field.placeholder) : undefined"
                   />
                 </label>
 
                 <p v-if="error" class="text-sm text-[var(--color-brand-danger)]">{{ error }}</p>
 
                 <div class="flex flex-wrap justify-end gap-2">
-                  <button type="button" class="ui-button-secondary" @click="emit('close')">Cancel</button>
+                  <button type="button" class="ui-button-secondary" @click="emit('close')">
+                    {{ t('common.buttons.cancel') }}
+                  </button>
                   <button
                     type="submit"
                     :class="submitButtonClass"
                     :title="resolvedSubmitTooltip"
                     :disabled="loading || !canSubmit"
                   >
-                    {{ loading ? 'Working...' : submitLabel }}
+                    {{ loading ? t('common.status.working') : t(submitLabel) }}
                   </button>
                 </div>
               </form>

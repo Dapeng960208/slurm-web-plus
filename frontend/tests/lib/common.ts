@@ -4,6 +4,7 @@ import { vi } from 'vitest'
 import { runtimeConfiguration } from '@/plugins/runtimeConfiguration'
 import type { GatewayAnyClusterApiKey } from '@/composables/GatewayAPI'
 import { httpPlugin } from '@/plugins/http'
+import { i18n } from '@/plugins/i18n'
 import { createTestingPinia } from '@pinia/testing'
 import { setActivePinia } from 'pinia'
 import { config, RouterLinkStub } from '@vue/test-utils'
@@ -18,6 +19,7 @@ export function init_plugins(): RouterMock {
   setActivePinia(pinia)
 
   config.global.plugins = [
+    i18n,
     [
       runtimeConfiguration,
       {

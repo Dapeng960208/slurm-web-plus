@@ -1,6 +1,7 @@
 import { describe, test, expect, beforeEach, vi } from 'vitest'
 import { shallowMount, mount } from '@vue/test-utils'
 import { nextTick } from 'vue'
+import { i18n } from '@/plugins/i18n'
 import LoginView from '@/views/LoginView.vue'
 import { init_plugins } from '../lib/common'
 import { useAuthStore } from '@/stores/auth'
@@ -8,6 +9,7 @@ import { useRuntimeStore } from '@/stores/runtime'
 import { AuthenticationError } from '@/composables/HTTPErrors'
 import LoginServiceMessage from '@/components/login/LoginServiceMessage.vue'
 import InfoAlert from '@/components/InfoAlert.vue'
+import { useLocaleStore } from '@/stores/locale'
 
 const mockGatewayAPI = {
   login: vi.fn()
@@ -22,6 +24,8 @@ let router
 describe('LoginView.vue', () => {
   beforeEach(() => {
     router = init_plugins()
+    i18n.global.locale.value = 'en'
+    localStorage.clear()
   })
   test('should display login form', () => {
     const wrapper = shallowMount(LoginView, {})
@@ -123,5 +127,18 @@ describe('LoginView.vue', () => {
     expect(infoAlert.text()).toBe('Please log in to access the requested page.')
     // Clean up
     authStore.returnUrl = null
+  })
+
+  test('should switch visible login copy after locale update', async () => {
+    const wrapper = mount(LoginView, {})
+    const localeStore = useLocaleStore()
+
+    expect(wrapper.text()).toContain('Access Slurm Web Plus')
+
+    localeStore.setLocale('zh-CN')
+    await nextTick()
+
+    expect(wrapper.text()).toContain('访问 Slurm Web Plus')
+    expect(wrapper.text()).toContain('登录名')
   })
 })

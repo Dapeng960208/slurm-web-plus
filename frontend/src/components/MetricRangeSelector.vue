@@ -8,6 +8,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import type { MetricRange } from '@/composables/GatewayAPI'
 
 interface MetricWindowLocal {
@@ -56,6 +57,7 @@ const emit = defineEmits<{
   (event: 'apply-window', value: MetricWindowLocal): void
   (event: 'reset-window'): void
 }>()
+const { t } = useI18n()
 
 const dialogOpen = ref(false)
 const draftStart = ref('')
@@ -123,11 +125,11 @@ function applyCustomWindow() {
   const startDate = parseDateTimeLocal(draftStart.value)
   const endDate = parseDateTimeLocal(draftEnd.value)
   if (!startDate || !endDate) {
-    windowError.value = 'Start and end time must both be valid datetimes.'
+    windowError.value = t('actionDialog.invalidDateRange')
     return
   }
   if (startDate >= endDate) {
-    windowError.value = 'Start time must be earlier than end time.'
+    windowError.value = t('actionDialog.invalidDateOrder')
     return
   }
   emit('apply-window', {
@@ -153,7 +155,7 @@ watch(
 <template>
   <span
     class="relative inline-flex flex-wrap items-center gap-2"
-    :aria-label="ariaLabel ?? 'Select metric range'"
+    :aria-label="ariaLabel ?? t('actionDialog.customTimeRange')"
     @keydown.escape="closeDialog"
   >
     <span
@@ -193,22 +195,22 @@ watch(
       class="absolute top-full right-0 z-30 mt-2 w-[min(92vw,22rem)] rounded-[18px] border border-[rgba(80,105,127,0.14)] bg-white p-4 text-left shadow-[var(--shadow-soft)]"
       role="dialog"
       aria-modal="true"
-      aria-label="Custom metric time range"
+      :aria-label="t('actionDialog.customTimeRange')"
       data-testid="metric-range-dialog"
     >
       <div class="flex items-start justify-between gap-3">
         <div>
           <div class="text-sm font-semibold text-[var(--color-brand-ink-strong)]">
-            Custom time range
+            {{ t('actionDialog.customTimeRange') }}
           </div>
           <div class="mt-1 text-xs text-[var(--color-brand-muted)]">
-            Select start and end time to the minute.
+            {{ t('actionDialog.customTimeRangeDescription') }}
           </div>
         </div>
         <button
           type="button"
           class="ui-button-secondary px-2 py-1 text-xs"
-          aria-label="Close custom time range"
+          :aria-label="t('actionDialog.closeCustomTimeRange')"
           @click="closeDialog"
         >
           x
@@ -230,7 +232,7 @@ watch(
         </div>
 
         <label class="block text-xs font-semibold text-[var(--color-brand-ink-strong)]">
-          Start time
+          {{ t('actionDialog.startTime') }}
           <input
             v-model="draftStart"
             type="datetime-local"
@@ -239,7 +241,7 @@ watch(
           />
         </label>
         <label class="block text-xs font-semibold text-[var(--color-brand-ink-strong)]">
-          End time
+          {{ t('actionDialog.endTime') }}
           <input
             v-model="draftEnd"
             type="datetime-local"
@@ -268,7 +270,7 @@ watch(
           data-testid="metric-range-apply"
           @click="applyCustomWindow"
         >
-          Apply
+          {{ t('common.buttons.apply') }}
         </button>
       </div>
     </div>
