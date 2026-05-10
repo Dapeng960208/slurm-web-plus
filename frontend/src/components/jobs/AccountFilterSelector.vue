@@ -50,7 +50,7 @@ const { data } = useClusterDataGetter<AccountDescription[]>(cluster, 'accounts')
   <div class="relative mt-2">
     <Combobox as="div" v-model="runtimeStore.jobs.filters.accounts" multiple>
       <ComboboxInput
-        class="focus:ring-slurmweb w-full rounded-md border-0 bg-white py-1.5 pr-12 pl-3 shadow-xs ring-1 ring-gray-300 ring-inset focus:ring-2 focus:ring-inset sm:text-sm sm:leading-6 dark:bg-gray-800 dark:ring-gray-700"
+        class="ui-combobox-input"
         @change="query = $event.target.value"
         :placeholder="queryPlaceholder()"
       />
@@ -62,7 +62,7 @@ const { data } = useClusterDataGetter<AccountDescription[]>(cluster, 'accounts')
 
       <ComboboxOptions
         v-if="filteredAccounts.length > 0"
-        class="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black/5 focus:outline-none sm:text-sm dark:bg-gray-800"
+        class="ui-combobox-menu absolute z-10 mt-1 max-h-60 w-full text-base focus:outline-none sm:text-sm"
       >
         <ComboboxOption
           v-for="account in filteredAccounts"
@@ -73,10 +73,8 @@ const { data } = useClusterDataGetter<AccountDescription[]>(cluster, 'accounts')
         >
           <li
             :class="[
-              'relative cursor-default py-2 pr-9 pl-3 select-none',
-              active
-                ? 'bg-slurmweb dark:bg-slurmweb-dark text-white'
-                : 'text-gray-900 dark:text-gray-400'
+              'ui-combobox-option',
+              active && 'ui-combobox-option-active'
             ]"
           >
             <div class="flex">
@@ -89,7 +87,7 @@ const { data } = useClusterDataGetter<AccountDescription[]>(cluster, 'accounts')
               v-if="selected"
               :class="[
                 'absolute inset-y-0 right-0 flex items-center pr-4',
-                active ? 'text-white' : 'text-slurmweb'
+                active ? 'text-[var(--color-brand-deep)]' : 'text-[var(--color-brand-blue)]'
               ]"
             >
               <CheckIcon class="h-5 w-5" aria-hidden="true" />

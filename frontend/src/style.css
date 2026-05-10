@@ -739,6 +739,42 @@
     color: var(--color-brand-blue);
   }
 
+  .ui-segmented-control {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.16rem;
+    border-radius: 999px;
+    border: 1px solid rgba(80, 105, 127, 0.14);
+    background: rgba(255, 255, 255, 0.92);
+    padding: 0.22rem;
+    box-shadow: var(--shadow-soft);
+  }
+
+  .ui-segmented-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    padding: 0.52rem 0.92rem;
+    color: var(--color-brand-muted);
+    font-size: 0.78rem;
+    font-weight: 700;
+    line-height: 1;
+  }
+
+  .ui-segmented-button:hover {
+    color: var(--color-brand-ink-strong);
+    background: rgba(239, 244, 246, 0.82);
+  }
+
+  .ui-segmented-button-active {
+    background: linear-gradient(135deg, var(--color-slurmweb), var(--color-slurmweb-darker));
+    color: var(--color-brand-deep);
+    box-shadow:
+      0 10px 22px rgba(182, 232, 44, 0.24),
+      inset 0 1px 0 rgba(255, 255, 255, 0.34);
+  }
+
   .ui-input-field,
   .ui-select-field,
   .ui-textarea-field {
@@ -778,6 +814,55 @@
     box-shadow:
       0 0 0 4px rgba(182, 232, 44, 0.18),
       var(--shadow-soft);
+  }
+
+  .ui-combobox-input {
+    display: block;
+    width: 100%;
+    border: 1px solid rgba(80, 105, 127, 0.16);
+    border-radius: 18px;
+    background: white;
+    color: var(--color-brand-ink-strong);
+    box-shadow: var(--shadow-soft);
+    outline: none;
+    padding: 0.72rem 2.9rem 0.72rem 0.95rem;
+    font-size: 0.88rem;
+    line-height: 1.4;
+  }
+
+  .ui-combobox-input::placeholder {
+    color: var(--color-brand-muted);
+  }
+
+  .ui-combobox-input:focus {
+    border-color: rgba(182, 232, 44, 0.65);
+    box-shadow:
+      0 0 0 4px rgba(182, 232, 44, 0.18),
+      var(--shadow-soft);
+  }
+
+  .ui-combobox-menu {
+    overflow: auto;
+    border-radius: 20px;
+    border: 1px solid rgba(80, 105, 127, 0.12);
+    background: rgba(255, 255, 255, 0.96);
+    box-shadow: var(--shadow-panel);
+    backdrop-filter: blur(14px);
+    padding: 0.35rem;
+  }
+
+  .ui-combobox-option {
+    position: relative;
+    cursor: default;
+    user-select: none;
+    border-radius: 16px;
+    padding: 0.6rem 2.2rem 0.6rem 0.82rem;
+    color: var(--color-brand-ink-strong);
+  }
+
+  .ui-combobox-option-active {
+    background: linear-gradient(135deg, rgba(182, 232, 44, 0.96), rgba(123, 191, 31, 0.92));
+    color: var(--color-brand-deep);
   }
 
   .ui-chip {

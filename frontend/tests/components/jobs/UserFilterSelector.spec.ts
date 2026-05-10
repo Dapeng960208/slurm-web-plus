@@ -39,6 +39,7 @@ describe('UserFilterSelector.vue', () => {
     })
 
     await wrapper.get('input').setValue('  charlie  ')
+    expect(wrapper.get('input').classes()).toContain('ui-combobox-input')
     await wrapper.get('button.ui-button-primary').trigger('click')
 
     expect(useRuntimeStore().jobs.filters.users).toEqual(['charlie'])

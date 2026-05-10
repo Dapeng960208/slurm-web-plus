@@ -42,6 +42,7 @@ describe('AccountTreeNode.vue', () => {
 
     // Get root account card
     const rootCard = wrapper.get('div#account-tree-node-root')
+    expect(rootCard.classes()).toContain('ui-panel-soft')
 
     // Verify expand button is present
     const expandButton = rootCard.get('button')
@@ -53,7 +54,6 @@ describe('AccountTreeNode.vue', () => {
       name: 'account',
       params: { cluster: 'foo', account: 'root' }
     })
-
     // Verify admin account card is not expanded
     const adminCard = wrapper.find('div#account-tree-node-admin')
     expect(adminCard.exists()).toBe(false)

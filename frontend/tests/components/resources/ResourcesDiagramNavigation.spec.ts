@@ -23,11 +23,11 @@ describe('ResourcesDiagramNavigation.vue', () => {
     expect(buttons).toHaveLength(2)
 
     // Check that nodes button is active
-    expect(buttons[0].classes()).toContain('bg-slurmweb')
+    expect(buttons[0].classes()).toContain('ui-segmented-button-active')
     expect(buttons[0].text()).toBe('Nodes')
 
     // Check that cores button is not active
-    expect(buttons[1].classes()).not.toContain('bg-slurmweb')
+    expect(buttons[1].classes()).not.toContain('ui-segmented-button-active')
     expect(buttons[1].text()).toBe('Cores')
   })
 
@@ -43,11 +43,11 @@ describe('ResourcesDiagramNavigation.vue', () => {
     expect(buttons).toHaveLength(2)
 
     // Check that cores button is active
-    expect(buttons[1].classes()).toContain('bg-slurmweb')
+    expect(buttons[1].classes()).toContain('ui-segmented-button-active')
     expect(buttons[1].text()).toBe('Cores')
 
     // Check that nodes button is not active
-    expect(buttons[0].classes()).not.toContain('bg-slurmweb')
+    expect(buttons[0].classes()).not.toContain('ui-segmented-button-active')
     expect(buttons[0].text()).toBe('Nodes')
   })
 

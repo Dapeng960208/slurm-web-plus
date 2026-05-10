@@ -37,6 +37,11 @@
 
 ## 2. 已完成项
 
+- 前端共享局部样式已继续收口：
+  - `ResourcesDiagramNavigation` 与 `ChartResourcesHistogram` 改为共享 segmented 控件样式
+  - `AccountFilterSelector`、`QosFilterSelector`、`UserFilterSelector` 改为共享 combobox 输入与下拉样式
+  - `ResourcesFiltersBar`、`QosHelpModal`、`AccountTreeNode` 已改为复用现有 `ui-panel-soft`、`ui-chip` 和 `ui-button-secondary`
+
 - Review 文档与访问控制专题已按当前实现重写：
   - `docs/review/backend-review.md`、`frontend-review.md`、`test-review.md` 已改为当前仓库真实 review 结论
   - 新增 `docs/review/open-questions.md` 单独记录无法静态确认的事项

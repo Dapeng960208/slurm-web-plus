@@ -55,6 +55,19 @@
 - 保持现有调用点和测试夹具语义稳定
 - 仍保留必要的 legacy fallback，但不会因为缺少显式第四个参数而把普通用户误判成 `self`
 
+### 3.3 局部控件样式仍有明显硬编码分叉
+
+已修复：
+
+- `ResourcesDiagramNavigation` 与 `ChartResourcesHistogram` 改为共享 segmented 控件样式
+- `AccountFilterSelector`、`QosFilterSelector`、`UserFilterSelector` 改为共享 combobox 输入与下拉样式
+- `ResourcesFiltersBar`、`QosHelpModal`、`AccountTreeNode` 改为复用现有 `ui-panel-soft`、`ui-chip` 和 `ui-button-secondary`
+
+影响：
+
+- 同类按钮和筛选控件的颜色、圆角、阴影和 hover 反馈已统一到现有设计系统
+- 后续同类控件可直接复用共享类，避免继续散落局部 Tailwind 组合
+
 ## 4. 当前剩余风险
 
 ### 4.1 `runtime.ts` 仍保留 `hasPermission()` / `hasClusterPermission()`
@@ -79,6 +92,7 @@
 
 - `npm --prefix frontend run type-check`
 - `cd frontend && npx vitest run tests/views/DashboardView.spec.ts tests/views/NodeView.spec.ts tests/components/jobs/JobsFiltersPanel.spec.ts tests/components/dashboard/DashboardCharts.spec.ts tests/composables/userWorkspace.spec.ts`
+- `cd frontend && npx vitest run tests/components/resources/ResourcesDiagramNavigation.spec.ts tests/components/accounts/AccountTreeNode.spec.ts tests/components/jobs/UserFilterSelector.spec.ts`
 
 说明：
 

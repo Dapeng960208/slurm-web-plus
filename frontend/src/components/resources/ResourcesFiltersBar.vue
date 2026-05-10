@@ -63,7 +63,7 @@ const activeFiltersGroups: Array<{
     </div>
 
     <!-- Active filters -->
-    <div v-show="!runtimeStore.resources.emptyFilters()" class="bg-gray-100 dark:bg-gray-800">
+    <div v-show="!runtimeStore.resources.emptyFilters()" class="ui-panel-soft rounded-[24px]">
       <div class="mx-auto px-4 py-3 sm:flex sm:items-center sm:px-6 lg:px-8">
         <h3 class="text-sm font-medium text-gray-500">
           <FunnelIcon class="mr-1 h-4 w-4" />
@@ -83,7 +83,7 @@ const activeFiltersGroups: Array<{
                 :key="activeFilter"
                 :class="[
                   activeFilterGroup.colors.badge,
-                  'm-1 inline-flex items-center rounded-full border py-1.5 pr-2 pl-3 text-xs font-medium text-white'
+                  'm-1 inline-flex items-center rounded-full border py-1.5 pr-2 pl-3 text-xs font-medium text-white shadow-xs'
                 ]"
               >
                 <component :is="activeFilterGroup.icon" class="mr-1 h-4 w-4"></component>

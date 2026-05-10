@@ -1,5 +1,15 @@
 # 最新功能
 
+## 本轮：共享 segmented 控件与筛选输入样式已统一
+
+本轮继续收口前端明显不一致的局部控件，优先复用现有设计 token，不做页面结构重写：
+
+- `ResourcesDiagramNavigation` 与 `ChartResourcesHistogram` 改为共享 `ui-segmented-control` / `ui-segmented-button`
+- `AccountFilterSelector`、`QosFilterSelector`、`UserFilterSelector` 改为共享 `ui-combobox-*` 输入与下拉样式
+- `ResourcesFiltersBar` 的 active filters 容器改为复用 `ui-panel-soft`
+- `QosHelpModal` 改为复用共享 surface 和 `ui-button-secondary`
+- `AccountTreeNode` 的卡片与统计 badge 改为复用 `ui-panel-soft` 与 `ui-chip`
+
 ## 本轮：Review 文档与访问控制专题已按当前实现重写
 
 本轮对 `docs/review/*` 和访问控制专题文档做了事实校准，去掉旧的专项流水账口径，统一到当前代码实现：

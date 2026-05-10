@@ -75,7 +75,7 @@ const { data } = useGatewayDataGetter<UserDescription[]>('users')
       <div class="flex gap-2">
         <div class="relative min-w-0 flex-1">
           <ComboboxInput
-            class="focus:ring-slurmweb w-full rounded-md border-0 bg-white py-1.5 pr-12 pl-3 shadow-xs ring-1 ring-gray-300 ring-inset focus:ring-2 focus:ring-inset sm:text-sm sm:leading-6 dark:bg-gray-800 dark:ring-gray-700"
+            class="ui-combobox-input"
             :value="query"
             @input="updateQuery"
             :placeholder="queryPlaceholder()"
@@ -98,7 +98,7 @@ const { data } = useGatewayDataGetter<UserDescription[]>('users')
 
       <ComboboxOptions
         v-if="filteredUsers.length > 0"
-        class="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black/5 focus:outline-none sm:text-sm dark:bg-gray-800"
+        class="ui-combobox-menu absolute z-10 mt-1 max-h-60 w-full text-base focus:outline-none sm:text-sm"
       >
         <ComboboxOption
           v-for="user in filteredUsers"
@@ -109,17 +109,20 @@ const { data } = useGatewayDataGetter<UserDescription[]>('users')
         >
           <li
             :class="[
-              'relative cursor-default py-2 pr-9 pl-3 select-none',
-              active
-                ? 'bg-slurmweb dark:bg-slurmweb-dark text-white'
-                : 'text-gray-900 dark:text-gray-400'
+              'ui-combobox-option',
+              active && 'ui-combobox-option-active'
             ]"
           >
             <div class="flex">
               <span :class="['truncate', selected && 'font-semibold']">
                 {{ user.fullname }}
               </span>
-              <span :class="['ml-2 truncate', active ? 'text-indigo-200' : 'text-gray-500']">
+              <span
+                :class="[
+                  'ml-2 truncate',
+                  active ? 'text-[rgba(32,42,53,0.72)]' : 'text-[var(--color-brand-muted)]'
+                ]"
+              >
                 {{ user.login }}
               </span>
             </div>
@@ -128,7 +131,7 @@ const { data } = useGatewayDataGetter<UserDescription[]>('users')
               v-if="selected"
               :class="[
                 'absolute inset-y-0 right-0 flex items-center pr-4',
-                active ? 'text-white' : 'text-slurmweb'
+                active ? 'text-[var(--color-brand-deep)]' : 'text-[var(--color-brand-blue)]'
               ]"
             >
               <CheckIcon class="h-5 w-5" aria-hidden="true" />
