@@ -40,6 +40,7 @@
 - CI
   - [需求说明](./features/ci/requirements.md)
   - [验证说明](./features/ci/verification.md)
+  - 本地脚本：`scripts/fetch-github-ci-result.ps1`、`scripts/watch-github-ci.ps1`、`scripts/continue-from-github-ci.ps1`、`scripts/push-and-watch-github-ci.ps1`
 - Management Center
   - [需求说明](./features/management-center/requirements.md)
   - [测试计划](./features/management-center/test-plan.md)

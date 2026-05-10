@@ -100,6 +100,10 @@
 
 - 自动查看：GitHub Checks + Job Summary + artifacts
 - 手工聚合：`CI Triage` workflow
+- 本地自动拉取：`scripts/fetch-github-ci-result.ps1`
+- 本地轮询等待：`scripts/watch-github-ci.ps1`
+- 本地继续修复：`scripts/continue-from-github-ci.ps1`
+- 本地推送并跟踪：`scripts/push-and-watch-github-ci.ps1`
 
 ## 6. AI 能力边界
 
@@ -115,7 +119,10 @@
 
 1. CI 自动产出结构化结果
 2. `CI Triage` 聚合某次 run 的 artifact
-3. 后续独立接入外部 AI / agent 读取 `triage-context.json`
+3. 本地脚本可通过 `gh run list/view/download` 自动抓取最新 run 和失败日志
+4. 本地可生成 `codex-autofix-prompt.md` 并显式调用 `codex exec` 继续修复
+5. 本地可按当前 `HEAD` 提交 `git push` 后自动追踪对应 GitHub Actions run
+6. 后续独立接入外部 AI / agent 读取 `triage-context.json` 或本地抓取结果
 
 ## 7. 降级与边界
 

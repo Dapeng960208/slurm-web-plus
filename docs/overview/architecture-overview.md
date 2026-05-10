@@ -282,6 +282,16 @@ GitHub push / pull_request(main)
 - `ci-triage.yml`
   - 手工聚合结构化 CI artifact
 
+仓库外的本地辅助链路：
+
+- `gh auth status`
+- `scripts/fetch-github-ci-result.ps1`
+- `scripts/watch-github-ci.ps1`
+- `scripts/continue-from-github-ci.ps1`
+- `scripts/push-and-watch-github-ci.ps1`
+
+这条链路用于本机主动读取 GitHub Actions run、下载 artifact、导出失败日志，并可按当前 commit 推送后自动追踪 run，再显式生成面向 `codex exec` 的修复提示词，供后续人工排查或外部 agent 继续处理
+
 仓库内置 AI 当前不在这条链路内：
 
 - 不直接读取 GitHub Actions run

@@ -1,5 +1,29 @@
 # 最新功能
 
+## 本轮：已补本地 GitHub CI 拉取脚本
+
+本轮已为本机协作补两条 PowerShell 脚本，方便直接读取 GitHub Actions 返回的测试结果并继续修复：
+
+- `scripts/fetch-github-ci-result.ps1`
+  - 可按 `run_id` 或 `workflow + branch` 拉取最新 run 概要
+  - 可选下载 artifact
+  - 可选导出 `gh run view --log-failed` 到本地
+- `scripts/watch-github-ci.ps1`
+  - 可按 workflow 轮询最新 run
+  - run 完成后自动调用抓取脚本导出结果
+- `scripts/continue-from-github-ci.ps1`
+  - 基于已抓取的 artifact、`failure-context.json`、`result.json` 和 `failed.log` 生成 `codex-autofix-prompt.md`
+  - 显式追加 `-RunCodex` 时，可直接调用本机 `codex exec` 继续修复
+- `scripts/push-and-watch-github-ci.ps1`
+  - 可按当前 `HEAD` 提交推送到 GitHub
+  - 自动等待对应 commit 的 GitHub Actions run 完成
+  - 完成后直接接到 `continue-from-github-ci.ps1`
+
+当前约束：
+
+- 依赖本机已安装并登录 `gh`
+- 默认只生成修复上下文，不会在未显式授权时自动改代码或提交
+
 ## 本轮：共享 segmented 控件与筛选输入样式已统一
 
 本轮继续收口前端明显不一致的局部控件，优先复用现有设计 token，不做页面结构重写：

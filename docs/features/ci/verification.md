@@ -80,7 +80,32 @@
 - `scope=backend` 时只聚合 `backend-*` artifact
 - `scope=frontend` 时只聚合 `frontend-*` artifact
 
-## 5. 不在本轮范围
+## 5. 本地 `gh` 拉取脚本验证
+
+前置条件：
+
+- 本机已安装 `gh`
+- `gh auth status` 已通过
+
+执行：
+
+- `powershell -ExecutionPolicy Bypass -File scripts/fetch-github-ci-result.ps1 -Workflow "Backend Tests" -Conclusion failure -DownloadArtifacts -ShowFailedLog`
+- `powershell -ExecutionPolicy Bypass -File scripts/watch-github-ci.ps1 -Workflow "Backend Tests"`
+- `powershell -ExecutionPolicy Bypass -File scripts/continue-from-github-ci.ps1 -Workflow "Backend Tests"`
+- `powershell -ExecutionPolicy Bypass -File scripts/push-and-watch-github-ci.ps1 -Workflow "Backend Tests" -SkipPush`
+
+预期：
+
+- 脚本会在 `.ci-results/github/` 下按 `workflow-runid` 创建目录
+- 至少生成 `run-summary.json`
+- 开启 `-DownloadArtifacts` 时会下载对应 GitHub Actions artifact
+- 开启 `-ShowFailedLog` 时会生成 `failed.log`
+- `watch-github-ci.ps1` 会轮询到目标 workflow 完成后自动调用抓取脚本
+- `continue-from-github-ci.ps1` 会在 run 目录内生成 `codex-autofix-prompt.md`
+- 显式追加 `-RunCodex` 时，脚本会调用本机 `codex exec`，并把最终消息写到 `codex-last-message.txt`
+- `push-and-watch-github-ci.ps1` 会按当前 `HEAD` commit 追踪对应 run；生产使用时默认执行 `push`，验证时可用 `-SkipPush` 复用已存在的远端 run
+
+## 6. 不在本轮范围
 
 以下内容不作为本轮验收目标：
 

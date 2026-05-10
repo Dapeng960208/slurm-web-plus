@@ -37,6 +37,14 @@
 
 ## 2. 已完成项
 
+- 本机 GitHub CI 结果拉取链路已补齐：
+  - 已安装并验证 `gh` 登录
+  - 新增 `scripts/fetch-github-ci-result.ps1`，可拉取指定或最新 workflow run、下载 artifact、导出失败日志
+  - 新增 `scripts/watch-github-ci.ps1`，可按 workflow 轮询 run 完成后自动抓取结果
+  - 新增 `scripts/continue-from-github-ci.ps1`，可基于 GitHub artifact 自动生成 `codex` 修复提示词，并在显式开关下调用本机 `codex exec`
+  - 新增 `scripts/push-and-watch-github-ci.ps1`，可按当前 `HEAD` 提交推送并自动追踪对应 GitHub Actions run，再接管到本地修复流程
+  - `docs/features/ci/*`、`docs/overview/*` 与 `docs/README.md` 已同步补用法与边界说明
+
 - LDAP 用户缓存管理页已统一改名为 `Users`：
   - 正式管理路由改为 `/:cluster/admin/ldap-users`
   - 兼容 settings 入口改为 `/settings/ldap-users`
@@ -522,6 +530,10 @@
 - `slurmweb/tests/test_version.py`
 - `frontend/tests/components/MetricRangeSelector.spec.ts`
 - `frontend/tests/views/UserAnalysisView.spec.ts`
+- `scripts/fetch-github-ci-result.ps1`
+- `scripts/watch-github-ci.ps1`
+- `scripts/continue-from-github-ci.ps1`
+- `scripts/push-and-watch-github-ci.ps1`
 
 ## 6. 验证状态
 
@@ -600,6 +612,13 @@
 - `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/views/test_agent.py slurmweb/tests/views/test_agent_metrics_requests.py slurmweb/tests/views/test_gateway.py`
 - `npm --prefix frontend run type-check`
 - `cd frontend && npx vitest run`
+- `gh auth status`
+- `gh repo view --json name,owner,defaultBranchRef,url`
+- `gh run list --limit 5 --json databaseId,workflowName,status,conclusion,headBranch,displayTitle,createdAt,url`
+- `powershell -ExecutionPolicy Bypass -File scripts/fetch-github-ci-result.ps1 -Workflow "Backend Tests" -Conclusion failure -DownloadArtifacts -ShowFailedLog`
+- `powershell -ExecutionPolicy Bypass -File scripts/fetch-github-ci-result.ps1 -Workflow "Frontend Tests" -Conclusion success`
+- `powershell -ExecutionPolicy Bypass -File scripts/continue-from-github-ci.ps1 -Workflow "Backend Tests"`
+- `powershell -ExecutionPolicy Bypass -File scripts/push-and-watch-github-ci.ps1 -Workflow "Backend Tests" -SkipPush`
 
 待同步：
 

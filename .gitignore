@@ -5,6 +5,7 @@ build/
 dist/
 .venv/
 .vite/
+.ci-results/
 generated-doc
 node_modules
 /frontend/dist
