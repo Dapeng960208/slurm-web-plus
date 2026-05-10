@@ -215,6 +215,25 @@ describe('Runtime Store', () => {
     expect(runtime.hasRoutePermission('foo', 'admin/cache', 'delete')).toBe(true)
   })
 
+  test('legacy view-ai fallback still grants AI route access', () => {
+    const runtime = useRuntimeStore()
+    runtime.addCluster({
+      name: 'foo',
+      infrastructure: 'foo',
+      racksdb: true,
+      metrics: true,
+      cache: true,
+      permissions: {
+        roles: ['user'],
+        actions: ['view-ai'],
+        rules: []
+      }
+    })
+
+    expect(runtime.hasRoutePermission('foo', 'ai', 'view')).toBe(true)
+    expect(runtime.hasRoutePermission('foo', 'admin/ai', 'view')).toBe(false)
+  })
+
   test('wildcard admin rules grant global view and edit without implying delete', () => {
     const runtime = useRuntimeStore()
     runtime.addCluster({

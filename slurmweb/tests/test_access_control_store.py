@@ -11,9 +11,8 @@ from slurmweb.persistence.access_control_store import AccessControlStore
 
 
 class TestAccessControlStore(unittest.TestCase):
-    def test_normalize_legacy_role_actions_moves_removed_actions_into_permissions(self):
+    def test_normalize_legacy_role_actions_drops_invalid_actions_but_keeps_view_ai_and_admin_manage(self):
         store = AccessControlStore(settings=mock.Mock(), legacy_permission_map={
-            "edit-own-jobs": ["jobs:edit:self"],
             "view-ai": ["ai:view:*"],
             "admin-manage": ["*:*:*"],
         })
@@ -37,9 +36,9 @@ class TestAccessControlStore(unittest.TestCase):
         update_call = cur.execute.call_args_list[1]
         self.assertEqual(update_call.args[0].strip().splitlines()[0], "UPDATE roles")
         self.assertEqual(update_call.args[1][2], 1)
-        self.assertEqual(update_call.args[1][0].adapted, ["admin-manage"])
+        self.assertEqual(update_call.args[1][0].adapted, ["admin-manage", "view-ai"])
         self.assertCountEqual(
             update_call.args[1][1].adapted,
-            ["jobs:view:self", "jobs:edit:self", "ai:view:*", "*:*:*"],
+            ["jobs:view:self", "ai:view:*", "*:*:*"],
         )
         conn.commit.assert_called_once_with()

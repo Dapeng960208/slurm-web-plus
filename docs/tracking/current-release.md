@@ -325,14 +325,14 @@
   - `admin/ldap-cache`
   - `admin/access-control`
 - `default_seed_roles()` 已收紧，普通 `user` 不再默认带 `admin/*`
-- `policy.yml` / `policy.ini` 已移除 7 个旧动作配置入口：
+- `policy.yml` / `policy.ini` 已移除 6 个旧动作配置入口：
   - `view-own-jobs`
   - `edit-own-jobs`
   - `cancel-own-jobs`
   - `roles-view`
   - `roles-manage`
-  - `view-ai`
   - `manage-ai`
+- `view-ai` 保留为 `ai:view:*` 兼容别名
 - 默认角色已进一步修正为：
   - `user`：非 `Admin` 页面默认只读 + `jobs:view|edit|delete:self` + `user/analysis:view:self`
   - `admin`：`*:view:*` + `*:edit:*`
@@ -457,7 +457,7 @@
 ## 4. 风险与阻塞
 
 - 当前前端对 `accounts/users/qos/reservation` 使用的是高频结构化字段，不覆盖全部官方 JSON 细节
-- `admin/ldap-cache:edit:*` 已在权限模型中预留，但当前没有对应实质写接口
+- `admin/ldap-cache:edit:*` 当前表示 LDAP 缓存维护动作，例如刷新、重建或失效缓存；不表示修改 LDAP 源数据
 - `.venv\Scripts\python.exe -m pytest -q slurmweb/tests` 在当前 Windows 环境下仍不适合作为本轮唯一验收结论
 - Windows 本地执行 `pip install -e ".[agent,tests,gateway]"` 会继续卡在 `RacksDB[web] -> PyGObject` 编译；后端依赖修复已通过定向 AI pytest 验证，但完整 agent extra 仍更适合以 Ubuntu CI 为准
 - 部分前端测试夹具仍以旧 `actions[]` 为主，若继续扩大回归范围，需继续向 `rules[]` 夹具收敛

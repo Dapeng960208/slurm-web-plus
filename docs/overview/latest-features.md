@@ -621,16 +621,16 @@
 
 本轮继续收紧权限与配置契约：
 
-- `policy.yml` / `policy.ini` 已移除 7 个旧动作配置入口：
+- `policy.yml` / `policy.ini` 已移除 6 个旧动作配置入口：
   - `view-own-jobs`
   - `edit-own-jobs`
   - `cancel-own-jobs`
   - `roles-view`
   - `roles-manage`
-  - `view-ai`
   - `manage-ai`
-- `GET /permissions.actions` 与 `GET /access/catalog.legacy_map` 不再暴露这 7 个动作
-- 管理端角色页不再派生或展示这 7 个 compatibility actions
+- `view-ai` 保留为 `ai:view:*` 兼容别名
+- `GET /permissions.actions` 与 `GET /access/catalog.legacy_map` 不再暴露这 6 个无效旧动作
+- 管理端角色页不再派生或展示这 6 个无效 compatibility actions；`view-ai` 继续按 `ai:view:*` 兼容
 - `admin-manage` 现在只等价于 `*:*:*`
 - 只有 `super-admin` 或其他实际拥有 `*:*:*` 的角色/用户才会回显 `admin-manage`
 - `default_seed_roles().user` 继续保留：
@@ -790,7 +790,14 @@
 - 支持 `self` 场景，例如 `user/profile:view:self`
 - 支持全局最高权限 `*:*:*`
 
-当前兼容层只保留少量仍在使用的动作映射；`view-own-jobs`、`edit-own-jobs`、`cancel-own-jobs`、`roles-view`、`roles-manage`、`view-ai`、`manage-ai` 已不再作为正式配置入口或 API 回显动作。
+当前兼容层只保留少量仍在使用的动作映射；`view-own-jobs`、`edit-own-jobs`、`cancel-own-jobs`、`roles-view`、`roles-manage`、`manage-ai` 已不再作为正式配置入口或 API 回显动作，`view-ai` 继续兼容映射到 `ai:view:*`。
+
+## 本轮：删除 6 个无效旧动作兼容并保留 `view-ai`
+
+- 后端 `roles.actions` 归一化现在只保留 `view-ai` 与 `admin-manage` 的权限补齐
+- `view-own-jobs`、`edit-own-jobs`、`cancel-own-jobs`、`roles-view`、`roles-manage`、`manage-ai` 会在角色归一化时直接丢弃，不再迁移到 `roles.permissions`
+- 前端运行时补回 `view-ai -> ai:view:*` fallback，确保旧 `actions[]` 集群仍能正确显示 `AI` 页面入口
+- `admin/ldap-cache:edit:*` 已正式定义为 LDAP 缓存维护动作，不表示修改 LDAP 源数据
 
 ## 2. Access Control 页面改为资源矩阵
 

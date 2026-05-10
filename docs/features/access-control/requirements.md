@@ -120,14 +120,17 @@ Admin 资源：
 | `associations-view` | `accounts:view:*` + `user/profile:view:*` |
 | `view-accounts` | `jobs/filter-accounts:view:*` |
 | `view-partitions` | `jobs/filter-partitions:view:*` + `resources/filter-partitions:view:*` |
+| `view-ai` | `ai:view:*` |
 | `cache-view` | `admin/cache:view:*` + `admin/ldap-cache:view:*` |
 | `cache-reset` | `admin/cache:edit:*` |
 | `admin-manage` | `*:*:*` |
 
 说明：
 
+- `view-ai` 当前继续作为 `ai:view:*` 的兼容别名。
 - `admin-manage` 当前只作为 `*:*:*` 的兼容别名。
-- `view-own-jobs`、`edit-own-jobs`、`cancel-own-jobs`、`roles-view`、`roles-manage`、`view-ai`、`manage-ai` 已不再作为正式配置入口。
+- `view-own-jobs`、`edit-own-jobs`、`cancel-own-jobs`、`roles-view`、`roles-manage` 已彻底失效，不再作为正式配置入口，也不再参与兼容推导。
+- `manage-ai` 已不再作为正式配置入口。
 
 ## 7. 数据模型与接口
 
@@ -147,7 +150,8 @@ Admin 资源：
   - `rules`
   - `sources.policy/custom/merged`
 - `GET /permissions.actions`
-  - 不再返回上述 7 个已移除旧动作
+  - 不再返回 `view-own-jobs`、`edit-own-jobs`、`cancel-own-jobs`、`roles-view`、`roles-manage`、`manage-ai`
+  - 仍可能返回保留兼容项 `view-ai` 与 `admin-manage`
 - `GET /access/catalog`
   - 资源目录
   - 操作列表

@@ -75,7 +75,8 @@
 - 旧 `settings/*` 管理路由重定向到 `admin/*`
 - 主菜单 `Admin` 入口只在具备任一 `admin/*:view:*` 时显示
 - 主菜单 `Admin` 入口在拥有 `admin-manage`（即 `*:*:*`）时也显示
-- 角色页不再展示 `view-own-jobs`、`edit-own-jobs`、`cancel-own-jobs`、`roles-view`、`roles-manage`、`view-ai`、`manage-ai`
+- 角色页不再展示 `view-own-jobs`、`edit-own-jobs`、`cancel-own-jobs`、`roles-view`、`roles-manage`、`manage-ai`
+- 旧 `view-ai` 仍可作为兼容动作存在，但应继续映射到 `ai:view:*`
 
 对应重点：
 

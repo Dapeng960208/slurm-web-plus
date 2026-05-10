@@ -91,5 +91,6 @@
 补充说明：
 
 - 旧动作兼容目前只保留 `cache-view`、`cache-reset` 与 `admin-manage`；其中 `admin-manage` 仅是 `*:*:*` 的兼容别名。
-- `view-own-jobs`、`edit-own-jobs`、`cancel-own-jobs`、`roles-view`、`roles-manage`、`view-ai`、`manage-ai` 已不再作为可配置权限入口。
+- `view-own-jobs`、`edit-own-jobs`、`cancel-own-jobs`、`roles-view`、`roles-manage`、`manage-ai` 已彻底失效，不再兼容。
+- `view-ai` 仍兼容映射到 `ai:view:*`；`admin-manage` 仍兼容映射到 `*:*:*`。
 - Agent 配置中已移除 `persistence.enabled`、`persistence.access_control_enabled`、`user_metrics.enabled`、`node_metrics.enabled`、`ai.enabled`，能力只按基础依赖自动推导。

@@ -10,6 +10,8 @@ describe('GatewayAPI admin contract', () => {
     expect(source).toContain("'cache-view'")
     expect(source).toContain('admin/cache:view:*')
     expect(source).toContain('admin/ldap-cache:view:*')
+    expect(source).toContain("'view-ai'")
+    expect(source).toContain('ai:view:*')
     expect(source).toContain("'cache-reset'")
     expect(source).toContain('admin/cache:edit:*')
     expect(source).not.toContain("'edit-own-jobs'")

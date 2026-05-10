@@ -32,7 +32,7 @@
 - 文件策略动作转规则
 - 数据库 `roles.permissions` 读取
 - 仅有 `roles.actions` 时的规则推导
-- 历史 7 个已移除旧动作的清理/迁移
+- 历史无效旧动作的清理，以及 `view-ai` / `admin-manage` 的保留兼容
 - `admin-manage` 的超级管理员兼容行为
 - 空角色表自动种子 `user`、`admin`、`super-admin`
 

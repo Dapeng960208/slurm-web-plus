@@ -42,6 +42,7 @@ export type PermissionRule = string
 
 const LEGACY_PERMISSION_RULES: Record<string, PermissionRule[]> = {
   'view-stats': ['dashboard:view:*', 'analysis:view:*'],
+  'view-ai': ['ai:view:*'],
   'view-jobs': ['jobs:view:*'],
   'view-history-jobs': ['jobs-history:view:*'],
   'view-nodes': ['resources:view:*'],

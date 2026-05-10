@@ -74,7 +74,7 @@
 
 - 优先使用 `permissions`
 - 当 `permissions` 为空时，从 `actions` 推导
-- 启动时清理 7 个已移除旧动作
+- 启动时清理 6 个无效旧动作，并仅保留 `view-ai` / `admin-manage` 的兼容补齐
 - 把历史 `admin-manage` 归一为 `*:*:*`
 - 在空表时自动种子 `user` / `admin` / `super-admin`
 

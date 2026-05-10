@@ -16,7 +16,6 @@ REMOVED_ROLE_ACTIONS = {
     "cancel-own-jobs",
     "roles-view",
     "roles-manage",
-    "view-ai",
     "manage-ai",
 }
 
@@ -68,7 +67,7 @@ class AccessControlStore:
         )
         normalized_permissions = set(permissions or [])
         for action in actions or []:
-            if action in REMOVED_ROLE_ACTIONS or action == "admin-manage":
+            if action == "admin-manage" or action == "view-ai":
                 normalized_permissions.update(self._legacy_permission_map.get(action, []))
         return normalized_actions, sorted(normalized_permissions)
 

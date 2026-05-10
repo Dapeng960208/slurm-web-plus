@@ -193,8 +193,12 @@
 - `cancel-own-jobs`
 - `roles-view`
 - `roles-manage`
-- `view-ai`
 - `manage-ai`
+
+仍保留的旧动作兼容：
+
+- `view-ai` -> `ai:view:*`
+- `admin-manage` -> `*:*:*`
 
 普通用户默认拥有 `jobs:*:self` 与 `user/analysis:view:self`，现在来自数据库种子角色 `user`，不再来自 vendor policy 动作；无数据库模式下也不再提供这组旧动作兜底。
 
@@ -231,7 +235,7 @@
 
 ## 9. 降级与边界
 
-- `admin/ldap-cache:edit:*` 已在权限模型中预留，但当前未提供实质写接口
+- `admin/ldap-cache:edit:*` 当前表示 LDAP 缓存维护动作，例如刷新、重建或失效缓存；不表示修改 LDAP 源数据
 - `accounts/users/qos/reservation` 当前前端使用轻量结构化表单，不覆盖全部官方 JSON 细节
 - 全量后端回归仍需 Linux 环境补充
 

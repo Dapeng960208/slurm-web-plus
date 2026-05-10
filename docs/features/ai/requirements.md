@@ -49,7 +49,8 @@ AI 当前按数据库能力自动启用：
 
 收口说明：
 
-- `view-ai` 与 `manage-ai` 已不再作为可配置动作入口，也不会再出现在 `/permissions.actions` 或角色页兼容动作列表中。
+- `view-ai` 当前仍兼容映射到 `ai:view:*`，用于旧 `actions[]` 数据过渡。
+- `manage-ai` 已不再作为可配置动作入口，也不会再出现在 `/permissions.actions` 或角色页兼容动作列表中。
 - `admin-manage` 只是 `*:*:*` 的兼容别名，不是 AI 专属权限。
 - 默认 `user` 角色应具备 `ai:view:*`，因此普通用户可以看到并使用 `/:cluster/ai`。
 - 普通用户若没有任何 `admin/*` 或 `*:*:*` 权限，不能看到也不能进入 `/:cluster/admin/*`。

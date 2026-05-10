@@ -55,6 +55,7 @@ type PermissionScope = '*' | 'self'
 
 const LEGACY_PERMISSION_RULES: Record<string, string[]> = {
   'view-stats': ['dashboard:view:*', 'analysis:view:*'],
+  'view-ai': ['ai:view:*'],
   'view-jobs': ['jobs:view:*'],
   'view-history-jobs': ['jobs-history:view:*'],
   'view-nodes': ['resources:view:*'],

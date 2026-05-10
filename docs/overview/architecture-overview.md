@@ -62,7 +62,8 @@ Browser (Vue SPA)
 
 补充说明：
 
-- `policy.yml` / `policy.ini` 已移除 `view-own-jobs`、`edit-own-jobs`、`cancel-own-jobs`、`roles-view`、`roles-manage`、`view-ai`、`manage-ai` 这 7 个旧动作入口。
+- `policy.yml` / `policy.ini` 已移除 `view-own-jobs`、`edit-own-jobs`、`cancel-own-jobs`、`roles-view`、`roles-manage`、`manage-ai` 这 6 个旧动作入口。
+- `view-ai` 仍作为 `ai:view:*` 的旧动作兼容别名保留。
 - `admin-manage` 现在只对应 `*:*:*`，仅作为 `super-admin` 兼容别名保留。
 - `jobs` 资源同时支持 `*` 与 `self` scope，最终 owner 判定只在 Agent 后端执行。
 
@@ -196,7 +197,8 @@ Vue 页面
 
 说明：
 
-- 当前仍兼容读取 `roles.actions`，但启动时会把已废弃的 7 个旧动作迁入 `roles.permissions` 后移除。
+- 当前仍兼容读取 `roles.actions`，但启动时只会把 `view-ai` 和 `admin-manage` 继续补齐到 `roles.permissions`。
+- `view-own-jobs`、`edit-own-jobs`、`cancel-own-jobs`、`roles-view`、`roles-manage`、`manage-ai` 这 6 个无效旧动作会被直接丢弃，不再迁移。
 - 历史 `roles.actions` 中如果存在 `admin-manage`，启动时会统一补齐 `*:*:*` 到 `roles.permissions`。
 - `permissions` 为空时，后端仍会根据剩余兼容动作自动推导规则。
 - `ai_tool_calls` 当前新增：
