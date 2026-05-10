@@ -261,7 +261,7 @@ GitHub push / pull_request(main)
 
 - `python-ci.yml`
   - 自动后端单元测试
-  - 固定 `Python 3.12`
+  - 固定 `Python 3.9`
   - 仅收集 `slurmweb/tests`
 - `frontend-ci.yml`
   - 自动前端单元测试

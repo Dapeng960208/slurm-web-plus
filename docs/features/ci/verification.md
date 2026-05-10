@@ -21,7 +21,7 @@
 
 预期：
 
-- `Backend Tests` 固定使用 `Python 3.12`
+- `Backend Tests` 固定使用 `Python 3.9`
 - `Backend Tests` 只收集 `slurmweb/tests`
 - `Backend Tests` 安装 `.[agent]`、`.[gateway]`、`.[tests]` 后，AI 相关测试可正常导入 `cryptography`
 - `Frontend Tests` 固定使用 `Node 18`

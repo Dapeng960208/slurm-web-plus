@@ -1,5 +1,19 @@
 # 最新功能
 
+## 本轮：GitHub `Backend Tests` 已改为 `Python 3.9`
+
+本轮把提交到 GitHub 后自动触发的后端主线测试版本从 `Python 3.12` 调整为 `Python 3.9`：
+
+- `.github/workflows/python-ci.yml` 的 `actions/setup-python` 已固定改为 `python-version: "3.9"`
+- job 展示名已同步改为 `Python unit tests (Python 3.9)`
+- 结构化结果 artifact 目录名已同步改为 `backend-python-3.9`
+- 前端自动测试、前端静态检查、手工 `python-os-ci.yml` 和 `CI Triage` 的触发方式与职责不变
+
+本轮新增验证：
+
+- `Get-Content -Raw -Encoding UTF8 .github/workflows/python-ci.yml | npx --yes yaml valid`
+- `rg -n "Python 3\\.12|backend-python-3\\.12|python-version: \\\"3\\.12\\\"" .github docs`
+
 ## 本轮：前端已接入浏览器优先的中英文切换
 
 本轮在前端落地了第一阶段国际化能力，重点覆盖登录入口、共享导航、设置页和前端提示文案：
@@ -509,7 +523,7 @@
 
 当前自动 CI 固定版本为：
 
-- 后端 `Python 3.12`
+- 后端 `Python 3.9`
 - 前端 `Node 18`
 
 本轮自动运行的检查包括：

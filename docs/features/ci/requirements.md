@@ -17,7 +17,7 @@
 
 - `.github/workflows/python-ci.yml`
   - 后端单元测试
-  - 固定 `Python 3.12`
+  - 固定 `Python 3.9`
   - 测试入口固定为 `pytest slurmweb/tests`
   - 依赖安装固定包含 `.[agent]`、`.[gateway]`、`.[tests]`，其中 `cryptography` 由 `agent/tests` extras 提供
 - `.github/workflows/frontend-ci.yml`
