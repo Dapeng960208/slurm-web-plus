@@ -24,6 +24,7 @@
     - File naming and placement must follow `docs/standards/document-naming-convention.md`.
     - `docs/overview/latest-features.md` is the global change log entry point; any perceptible change must be appended with a summary there.
 - **Error Logging**: When encountering a reproducible error, a retrospective must be written into `docs/tracking/error-log.md` (following `docs/standards/development-error-summary.md`).
+- **GitHub CI Workflow**: When checking remote GitHub Actions results, downloading failed logs/artifacts, or continuing from CI failures, the AI must use the repository `github-ci-autofix` flow and the repo-local scripts under `scripts/` first (`fetch-github-ci-result.ps1`, `watch-github-ci.ps1`, `continue-from-github-ci.ps1`, `push-and-watch-github-ci.ps1`) instead of inventing an ad hoc process.
 - **Chinese Encoding (Windows)**: When reading Chinese `.md` files, never use bare `Get-Content`. Always use `Get-Content -Encoding UTF8`. If terminal garbling persists, first set `[Console]::InputEncoding`, `[Console]::OutputEncoding`, and `$OutputEncoding` to UTF-8 before reading; alternatively, use `[System.IO.File]::ReadAllText(<path>, [System.Text.UTF8Encoding]::new($false))`.
 - **Minor Changes**: Even for trivial fixes, you must evaluate whether documentation updates are required—never skip this step by default.
 - **Frontend Changes**: Any frontend-related changes must use the frontend-skill and must read the global stylesheet at `frontend\src\style.css`.

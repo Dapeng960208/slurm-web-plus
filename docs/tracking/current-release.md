@@ -44,6 +44,7 @@
   - 新增 `scripts/continue-from-github-ci.ps1`，可基于 GitHub artifact 自动生成 `codex` 修复提示词，并在显式开关下调用本机 `codex exec`
   - 新增 `scripts/push-and-watch-github-ci.ps1`，可按当前 `HEAD` 提交推送并自动追踪对应 GitHub Actions run，再接管到本地修复流程
   - `docs/features/ci/*`、`docs/overview/*` 与 `docs/README.md` 已同步补用法与边界说明
+  - `AGENTS.md` 与 `docs/standards/ai-development-standard.md` 已新增仓库级执行规则：后续凡是查询远端 GitHub Actions 结果、下载 CI 失败日志/产物、从某次 run 继续修复或推送后等待 workflow 完成时，AI 必须优先使用这套 `github-ci-autofix` 流程和仓库 `scripts/*github-ci*.ps1`
 
 - LDAP 用户缓存管理页已统一改名为 `Users`：
   - 正式管理路由改为 `/:cluster/admin/ldap-users`

@@ -123,3 +123,24 @@ git status --porcelain
   - 同栏目卡片是否视觉层级一致
   - 同类组件是否复用同一套间距、边框、背景和圆角 token
   - 差异是否来自真实语义，而不是局部随手写样式
+
+## 11. GitHub CI 结果查询与修复流程（强制）
+
+- 当任务涉及以下任一事项时，AI 必须优先使用仓库既有 `github-ci-autofix` 流程，而不是临时拼装 `gh` / `curl` / 网页点查步骤：
+  - 查询远端 GitHub Actions 结果
+  - 下载 failed log 或 artifacts
+  - 基于某次失败 run 继续本地分析或修复
+  - 推送当前提交并等待匹配 workflow 完成
+- 对本仓库，默认入口固定为：
+  - `scripts/fetch-github-ci-result.ps1`
+  - `scripts/watch-github-ci.ps1`
+  - `scripts/continue-from-github-ci.ps1`
+  - `scripts/push-and-watch-github-ci.ps1`
+- 推荐顺序：
+  1. 先用 `fetch-github-ci-result.ps1` 或 `watch-github-ci.ps1` 获取结构化结果
+  2. 需要继续修复时，再用 `continue-from-github-ci.ps1`
+  3. 需要把当前提交推送并绑定到对应 CI run 时，用 `push-and-watch-github-ci.ps1`
+- 约束：
+  - 不要绕过仓库脚本重复发明一套 CI 结果目录结构
+  - 不要只凭 GitHub 网页摘要行判断失败原因，优先读取 `failed.log`、`result.json`、`failure-context.json`
+  - 若网络不可用导致无法 push 或无法拉取远端结果，仍需按第 4 节要求完成本地记录，并在 `docs/tracking/` 中写清阻塞状态

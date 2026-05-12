@@ -52,6 +52,10 @@
 - 依赖本机已安装并登录 `gh`
 - 默认只生成修复上下文，不会在未显式授权时自动改代码或提交
 
+补充约束：
+
+- 仓库级 AI 规则已新增要求：当任务涉及远端 GitHub Actions 结果查询、failed log/artifact 下载、CI 失败续修或推送后等待 workflow 完成时，必须优先复用这套 `github-ci-autofix` 仓库流程和 `scripts/*github-ci*.ps1`，不再临时发明 ad hoc 流程
+
 ## 本轮：共享 segmented 控件与筛选输入样式已统一
 
 本轮继续收口前端明显不一致的局部控件，优先复用现有设计 token，不做页面结构重写：
