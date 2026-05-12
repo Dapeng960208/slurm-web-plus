@@ -75,6 +75,7 @@ AI 当前按数据库能力自动启用：
   - 能查询或写入什么
   - 需要哪些输入
   - 是否为写接口
+- AI 工具层当前以 `query_agent_interface` / `mutate_agent_interface` 作为标准 tool name；若模型错误地直接把接口名（例如 `job/cancel`）当成 tool name，后端会按同名接口做兼容分发，而不是直接返回 `Unsupported tool`
 - 模型可在同一轮问题处理中连续调用多个接口，例如：
   - 先查 `job`
   - 再查 `jobs/history`

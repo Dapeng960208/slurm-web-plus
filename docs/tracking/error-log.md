@@ -11,6 +11,11 @@
 
 ## 条目
 
+### 2026-05-12：AI 直接输出 `job/cancel` 作为 tool name 时会被后端误判为不支持工具
+- 时间：2026-05-12
+- 现象：超级管理员在 AI 对话中执行取消作业时，模型直接输出 `job/cancel` 作为 tool name，`slurmweb.ai.tools.AIToolRegistry` 只接受 `query_agent_interface` / `mutate_agent_interface`，最终返回 `Unsupported tool job/cancel` 并在前端表现为接口 `500`
+- 解决办法：AI 工具层增加“直接接口名”兼容分发；当 tool name 命中已注册 Agent interface 时，按接口读写属性自动映射到 `dynamic-query` 或 `dynamic-mutate`，并继续复用原有权限与 owner-aware 校验
+
 ### 2026-04-24：示例标题（用一句话概括）
 - 时间：2026-04-24
 - 现象：

@@ -53,6 +53,38 @@ class AIToolRegistry:
     def interface_catalog(self, user):
         return self.interfaces.catalog(user)
 
+    def _resolve_tool_call(self, tool_name: str, arguments: dict):
+        tool_name = str(tool_name or "").strip()
+        arguments = arguments or {}
+        if tool_name == "query_agent_interface":
+            return {
+                "permission": "dynamic-query",
+                "interface_key": str(arguments.get("interface_key") or "").strip(),
+                "interface_arguments": arguments.get("arguments") or {},
+            }
+        if tool_name == "mutate_agent_interface":
+            return {
+                "permission": "dynamic-mutate",
+                "interface_key": str(arguments.get("interface_key") or "").strip(),
+                "interface_arguments": arguments.get("arguments") or {},
+            }
+
+        definition = self.interfaces.definition(tool_name)
+        if definition is None:
+            raise AIToolExecutionError(f"Unsupported tool {tool_name}")
+
+        direct_arguments = arguments
+        wrapped_interface_key = str(arguments.get("interface_key") or "").strip()
+        wrapped_arguments = arguments.get("arguments")
+        if wrapped_interface_key == tool_name and isinstance(wrapped_arguments, dict):
+            direct_arguments = wrapped_arguments
+
+        return {
+            "permission": "dynamic-mutate" if definition.write else "dynamic-query",
+            "interface_key": tool_name,
+            "interface_arguments": direct_arguments,
+        }
+
     def _record_tool_call(
         self,
         *,
@@ -88,20 +120,14 @@ class AIToolRegistry:
     def execute(self, user, conversation_id: int, tool_name: str, arguments: dict, message_id=None):
         arguments = arguments or {}
         started = time.time()
-        permission = "dynamic-query"
-        interface_key = str(arguments.get("interface_key") or "").strip()
-        interface_arguments = arguments.get("arguments") or {}
+        tool_call = self._resolve_tool_call(tool_name, arguments)
+        permission = tool_call["permission"]
+        interface_key = tool_call["interface_key"]
+        interface_arguments = tool_call["interface_arguments"]
         if not isinstance(interface_arguments, dict):
             interface_arguments = {}
         status_code = None
         try:
-            if tool_name == "query_agent_interface":
-                permission = "dynamic-query"
-            elif tool_name == "mutate_agent_interface":
-                permission = "dynamic-mutate"
-            else:
-                raise AIToolExecutionError(f"Unsupported tool {tool_name}")
-
             if not interface_key:
                 raise AIToolExecutionError("interface_key is required")
 

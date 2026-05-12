@@ -116,6 +116,9 @@ npm --prefix frontend run test:unit
 ### 3.6 内部工具 envelope 防泄漏
 
 - 正常 `tool_call -> final` 流程通过
+- 若模型把接口名直接当成 tool name，例如 `job/cancel`
+  - 服务端应兼容映射到同名 Agent interface
+  - 不应返回 `Unsupported tool ...` 之类的 500 错误
 - 若模型输出仅包含 `tool_request` / `interface_key` / `arguments` 等内部字段，但没有合法 `type`
   - 该输出不能透传给前端
   - 该输出不能持久化为最终 assistant 消息

@@ -1,5 +1,17 @@
 # 最新功能
 
+## 本轮：AI 直接取消作业工具名兼容已补齐
+
+本轮修复了 AI 执行作业取消时的一条兼容性缺陷：
+
+- 标准 AI tool 仍然是 `query_agent_interface` 和 `mutate_agent_interface`。
+- 若模型错误地直接输出接口名作为 tool name，例如 `job/cancel`，后端现在会按同名 Agent interface 做兼容分发。
+- 超级管理员或具备对应权限的用户通过 AI 取消作业时，不再因为 `Unsupported tool job/cancel` 冒成接口 `500`。
+
+本轮新增验证：
+
+- `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/apps/test_ai_service.py`
+
 ## 本轮：集群分析、用户分析、资源与分区页面补齐分析视图增强
 
 本轮围绕 `Cluster Analysis`、`User Analysis`、`Resources` 和新的分区详情页补了一组前端与接口增强，并同步补齐中英文文案：

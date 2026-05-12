@@ -750,6 +750,62 @@ class TestAIService(TestCase):
         self.assertEqual(result["status_code"], 200)
         self.assertEqual(self.conversation_store.tool_calls[-1]["status"], "ok")
 
+    def test_direct_interface_tool_alias_executes_with_raw_arguments(self):
+        self._create_model()
+        self.app.policy = DummyPolicy({"jobs:delete:self"})
+        self.service.tools.app = self.app
+
+        result = self.service.tools.execute(
+            self.user,
+            conversation_id=1,
+            tool_name="job/cancel",
+            arguments={"job_id": 123},
+            message_id=1,
+        )
+
+        self.assertEqual(result["tool_name"], "job/cancel")
+        self.assertEqual(result["permission"], "dynamic-mutate")
+        self.assertEqual(result["interface_key"], "job/cancel")
+        self.assertEqual(result["status_code"], 200)
+        self.assertEqual(self.conversation_store.tool_calls[-1]["tool_name"], "job/cancel")
+        self.assertEqual(self.conversation_store.tool_calls[-1]["interface_key"], "job/cancel")
+        self.assertEqual(self.conversation_store.tool_calls[-1]["permission"], "dynamic-mutate")
+        self.assertEqual(self.conversation_store.tool_calls[-1]["status"], "ok")
+
+    def test_stream_chat_accepts_direct_interface_tool_alias(self):
+        self._create_model()
+        self.app.policy = DummyPolicy(
+            {
+                "dashboard:view:*",
+                "analysis:view:*",
+                "jobs:view:*",
+                "jobs:delete:self",
+                "resources:view:*",
+                "jobs/filter-partitions:view:*",
+                "qos:view:*",
+                "reservations:view:*",
+                "accounts:view:*",
+                "jobs-history:view:*",
+            }
+        )
+        self.service.tools.app = self.app
+        provider = mock.Mock()
+        provider.complete.side_effect = [
+            '{"type":"tool_call","tool":"job/cancel","arguments":{"job_id":"123"}}',
+            '{"type":"final","content":"Job 123 has been cancelled."}',
+        ]
+
+        with mock.patch("slurmweb.ai.service.get_provider_client", return_value=provider):
+            generator = self.service.stream_chat(self.user, {"message": "cancel job 123"})
+            output = "".join(list(generator()))
+
+        self.assertIn("event: tool_start", output)
+        self.assertIn("event: tool_end", output)
+        self.assertIn("Job 123 has been cancelled.", output)
+        self.assertEqual(self.conversation_store.tool_calls[-1]["tool_name"], "job/cancel")
+        self.assertEqual(self.conversation_store.tool_calls[-1]["interface_key"], "job/cancel")
+        self.assertEqual(self.conversation_store.tool_calls[-1]["status"], "ok")
+
     def test_get_conversation_detail_includes_tool_calls(self):
         self._create_model()
         conversation = self.conversation_store.create_conversation(

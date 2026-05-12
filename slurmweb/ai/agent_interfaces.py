@@ -974,6 +974,9 @@ class AIAgentInterfaceRegistry:
             )
         return sorted(catalog, key=lambda item: (item["write"], item["key"]))
 
+    def definition(self, interface_key: str) -> Optional[AIAgentInterfaceDefinition]:
+        return self._definitions.get(interface_key)
+
     def execute(self, user, interface_key: str, arguments: dict | None = None) -> AIAgentInterfaceResult:
         definition = self._definitions.get(interface_key)
         if definition is None:
