@@ -152,6 +152,8 @@ describe('views/settings/SettingsAI.vue', () => {
     expect(wrapper.text()).toContain('Default')
     expect(wrapper.text()).toContain(i18n.global.t('common.buttons.delete'))
     expect(wrapper.find('[data-testid="ai-config-row"]').exists()).toBe(true)
+    expect(wrapper.find('.admin-ai-shell').exists()).toBe(true)
+    expect(wrapper.findAll('.admin-ai-section').length).toBeGreaterThan(0)
   })
 
   test('filters admin audit records in table view and exposes detail page links', async () => {

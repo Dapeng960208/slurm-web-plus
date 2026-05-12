@@ -3,14 +3,28 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { ref } from 'vue'
 import DashboardView from '@/views/DashboardView.vue'
 import { useRuntimeStore } from '@/stores/runtime'
-import type { ClusterPartition, ClusterStats } from '@/composables/GatewayAPI'
+import type { ClusterJob, ClusterNode, ClusterPartition, ClusterStats } from '@/composables/GatewayAPI'
 import ErrorAlert from '@/components/ErrorAlert.vue'
 import { init_plugins, getMockClusterDataPoller } from '../lib/common'
 import stats from '../assets/stats.json'
+import jobs from '../assets/jobs.json'
+import nodes from '../assets/nodes.json'
 
 const mockClusterDataPoller = getMockClusterDataPoller<ClusterStats>()
 const mockPartitionsGetter = {
   data: ref([{ name: 'debug', node_sets: 'a' }, { name: 'gpu', node_sets: 'b' }] as ClusterPartition[]),
+  unable: ref(false),
+  loaded: ref(true),
+  setCluster: vi.fn()
+}
+const mockNodesGetter = {
+  data: ref(nodes as ClusterNode[]),
+  unable: ref(false),
+  loaded: ref(true),
+  setCluster: vi.fn()
+}
+const mockJobsGetter = {
+  data: ref(jobs as ClusterJob[]),
   unable: ref(false),
   loaded: ref(true),
   setCluster: vi.fn()
@@ -21,7 +35,12 @@ vi.mock('@/composables/DataPoller', () => ({
 }))
 
 vi.mock('@/composables/DataGetter', () => ({
-  useClusterDataGetter: () => mockPartitionsGetter
+  useClusterDataGetter: ((cluster: string, callback: string) => {
+    if (callback === 'partitions') return mockPartitionsGetter
+    if (callback === 'nodes') return mockNodesGetter
+    if (callback === 'jobs') return mockJobsGetter
+    return mockPartitionsGetter
+  }) as typeof import('@/composables/DataGetter').useClusterDataGetter
 }))
 
 describe('DashboardView.vue', () => {
@@ -39,11 +58,15 @@ describe('DashboardView.vue', () => {
     ;(mockClusterDataPoller.setCluster as ReturnType<typeof vi.fn>).mockClear()
     ;(mockClusterDataPoller.setParam as ReturnType<typeof vi.fn>).mockClear()
     ;(mockPartitionsGetter.setCluster as ReturnType<typeof vi.fn>).mockClear()
+    ;(mockNodesGetter.setCluster as ReturnType<typeof vi.fn>).mockClear()
+    ;(mockJobsGetter.setCluster as ReturnType<typeof vi.fn>).mockClear()
     mockPartitionsGetter.data.value = [
       { name: 'debug', node_sets: 'a' },
       { name: 'gpu', node_sets: 'b' }
     ]
     mockPartitionsGetter.loaded.value = true
+    mockNodesGetter.data.value = nodes as ClusterNode[]
+    mockJobsGetter.data.value = jobs as ClusterJob[]
     runtimeStore.availableClusters = [
       {
         name: 'foo',
@@ -171,6 +194,29 @@ describe('DashboardView.vue', () => {
       name: 'dashboard',
       query: {}
     })
+  })
+
+  test('recomputes visible stat cards from partition scoped nodes and jobs', async () => {
+    mockPartitionsGetter.data.value = [{ name: 'normal', node_sets: 'cn[1-8]' }]
+
+    const wrapper = mount(DashboardView, {
+      props: {
+        cluster: 'foo'
+      },
+      global: {
+        stubs: {
+          DashboardCharts: true
+        }
+      }
+    })
+
+    await wrapper.get('#dashboard-partition').setValue('normal')
+    await flushPromises()
+
+    expect(wrapper.get('span#metric-nodes').text()).toBe('4')
+    expect(wrapper.get('span#metric-cores').text()).toBe('256')
+    expect(wrapper.get('span#metric-jobs-running').text()).toBe('7')
+    expect(wrapper.get('span#metric-jobs-total').text()).toBe('14')
   })
 
   test('hides partition selector and ignores partition query without permission', async () => {
@@ -303,6 +349,8 @@ describe('DashboardView.vue', () => {
 
     expect(mockClusterDataPoller.setCluster).toHaveBeenCalledWith('bar')
     expect(mockPartitionsGetter.setCluster).toHaveBeenCalledWith('bar')
+    expect(mockNodesGetter.setCluster).toHaveBeenCalledWith('bar')
+    expect(mockJobsGetter.setCluster).toHaveBeenCalledWith('bar')
   })
 
   test('clears partition selection when switching to a cluster without permission', async () => {

@@ -100,4 +100,41 @@ describe('router admin permissions', () => {
     expect(router.currentRoute.value.name).toBe('forbidden')
     expect(router.currentRoute.value.query.permission).toBe('admin/cache:view:*')
   })
+
+  test('blocks the top-level admin route for a regular AI user', async () => {
+    const [{ default: router }, { useAuthStore }, { useRuntimeStore }] = await Promise.all([
+      import('@/router'),
+      import('@/stores/auth'),
+      import('@/stores/runtime')
+    ])
+    const authStore = useAuthStore()
+    const runtimeStore = useRuntimeStore()
+
+    authStore.token = 'token'
+    runtimeStore.availableClusters = [
+      {
+        name: 'foo',
+        permissions: {
+          roles: ['user'],
+          actions: [],
+          rules: ['dashboard:view:*', 'analysis:view:*', 'ai:view:*', 'jobs:view:self']
+        },
+        capabilities: {
+          ai: {
+            enabled: true
+          }
+        },
+        racksdb: true,
+        infrastructure: 'foo',
+        metrics: true,
+        cache: true
+      }
+    ] as never
+
+    await router.push({ name: 'admin', params: { cluster: 'foo' } })
+    await router.isReady()
+
+    expect(router.currentRoute.value.name).toBe('forbidden')
+    expect(router.currentRoute.value.query.permission).toBe('admin/*:view:*')
+  })
 })

@@ -11,6 +11,16 @@
 
 ## 条目
 
+### 2026-05-12：Dashboard 分区切换后统计卡仍可能显示整集群资源，且队列下拉框与外层描边重叠
+- 时间：2026-05-12
+- 现象：在 `/:cluster/dashboard` 选择具体分区后，下方统计卡仍可能继续显示整集群的节点、CPU、内存和作业总量；同时分区下拉框的内层描边与外层 pill 容器边缘叠在一起，视觉上像“双层挤压”
+- 解决办法：Dashboard 视图在选中分区且具备 `jobs/resources` 可见性时，优先按当前分区的节点和作业数据在前端重算统计卡，避免继续误显全局资源；同时收紧下拉框内边距、去掉额外外框并改为聚焦光环，消除与外层 toolbar 容器的描边重叠
+
+### 2026-05-12：普通用户可直接访问 `/:cluster/admin` 顶层入口
+- 时间：2026-05-12
+- 现象：虽然普通用户没有任何 `admin/*` 权限时不会通过 `admin-cache` 等子路由守卫，但直接访问 `/:cluster/admin` 会先命中默认重定向到 `analysis`，导致前端没有先返回 `forbidden`，形成后台入口越权跳转
+- 解决办法：把 `admin` 默认子路由改为带权限判断的 `redirect`；只有具备任一 `admin/*:view:*` 或 `*:*:*` 时才允许执行默认跳转，否则直接返回 `forbidden` 并携带 `admin/*:view:*` 缺权信息
+
 ### 2026-05-12：AI 直接输出 `job/cancel` 作为 tool name 时会被后端误判为不支持工具
 - 时间：2026-05-12
 - 现象：超级管理员在 AI 对话中执行取消作业时，模型直接输出 `job/cancel` 作为 tool name，`slurmweb.ai.tools.AIToolRegistry` 只接受 `query_agent_interface` / `mutate_agent_interface`，最终返回 `Unsupported tool job/cancel` 并在前端表现为接口 `500`

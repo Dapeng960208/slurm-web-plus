@@ -178,10 +178,17 @@ const router = createRouter({
             {
               path: '',
               name: 'admin',
-              redirect: (to: RouteLocation) => ({
-                name: 'analysis',
-                params: { cluster: to.params.cluster }
-              })
+              redirect: (to: RouteLocation) => {
+                const runtime = useRuntimeStore()
+                const clusterName = to.params.cluster as string
+                if (!clusterHasAdminAccess(runtime, clusterName)) {
+                  return forbiddenRoute(clusterName, 'admin/*:view:*')
+                }
+                return {
+                  name: 'analysis',
+                  params: { cluster: clusterName }
+                }
+              }
             },
             {
               path: 'ai',
@@ -425,6 +432,8 @@ function clusterRoutePermission(
     case 'admin-ai':
     case 'admin-ai-conversation':
       return { resource: 'admin/ai', operation: 'view' }
+    case 'admin':
+      return { resource: 'admin/*', operation: 'view' }
     case 'admin-access-control':
       return { resource: 'admin/access-control', operation: 'view' }
     case 'admin-cache':

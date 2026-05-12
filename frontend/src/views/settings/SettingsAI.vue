@@ -441,17 +441,17 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="ui-section-stack">
+  <div class="ui-section-stack admin-ai-workspace">
     <component :is="tabsComponent" entry="ai" :cluster="currentClusterName" />
 
-    <div class="ui-panel ui-section">
-      <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+    <div class="ui-panel ui-section admin-ai-shell">
+      <div class="admin-ai-hero">
         <component
           :is="headerComponent"
           title="settings.ai.title"
           description="settings.ai.description"
         />
-        <div class="flex flex-wrap gap-2">
+        <div class="admin-ai-hero-actions">
           <RouterLink
             v-if="currentClusterName && canViewChat"
             :to="{ name: 'ai', params: { cluster: currentClusterName } }"
@@ -483,20 +483,22 @@ onMounted(async () => {
     </InfoAlert>
 
     <template v-else>
-      <ErrorAlert v-if="error">
-        {{ error }}
-      </ErrorAlert>
-      <ErrorAlert v-if="submitError">
-        {{ submitError }}
-      </ErrorAlert>
-      <InfoAlert v-if="submitSuccess">
-        {{ submitSuccess }}
-      </InfoAlert>
-      <InfoAlert v-if="!canManage">
-        {{ t('settings.ai.alerts.readOnly') }}
-      </InfoAlert>
+      <div class="admin-ai-status-stack">
+        <ErrorAlert v-if="error">
+          {{ error }}
+        </ErrorAlert>
+        <ErrorAlert v-if="submitError">
+          {{ submitError }}
+        </ErrorAlert>
+        <InfoAlert v-if="submitSuccess">
+          {{ submitSuccess }}
+        </InfoAlert>
+        <InfoAlert v-if="!canManage">
+          {{ t('settings.ai.alerts.readOnly') }}
+        </InfoAlert>
+      </div>
 
-      <section class="ui-panel ui-section">
+      <section class="ui-panel ui-section admin-ai-section">
         <div class="ui-page-tools">
           <div>
             <h2 class="ui-panel-title">{{ t('settings.ai.configs.title') }}</h2>
@@ -637,7 +639,7 @@ onMounted(async () => {
         </div>
       </section>
 
-      <section v-if="isAdminRoute" class="ui-panel ui-section">
+      <section v-if="isAdminRoute" class="ui-panel ui-section admin-ai-section admin-ai-section-muted">
         <div class="ui-page-tools">
           <div>
             <h2 class="ui-panel-title">{{ t('settings.ai.audit.title') }}</h2>
@@ -974,3 +976,54 @@ onMounted(async () => {
     </TransitionRoot>
   </div>
 </template>
+
+<style scoped>
+.admin-ai-workspace {
+  gap: 1rem;
+}
+
+.admin-ai-shell {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(239, 244, 246, 0.88)),
+    radial-gradient(circle at top left, rgba(182, 232, 44, 0.1), transparent 34%);
+}
+
+.admin-ai-hero {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.admin-ai-hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.admin-ai-status-stack {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.admin-ai-section {
+  border-radius: calc(var(--radius-panel) - 4px);
+}
+
+.admin-ai-section-muted {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(236, 242, 244, 0.86)),
+    radial-gradient(circle at top left, rgba(80, 105, 127, 0.06), transparent 42%);
+}
+
+@media (min-width: 1024px) {
+  .admin-ai-hero {
+    align-items: flex-start;
+    flex-direction: row;
+    justify-content: space-between;
+  }
+
+  .admin-ai-hero-actions {
+    justify-content: flex-end;
+  }
+}
+</style>

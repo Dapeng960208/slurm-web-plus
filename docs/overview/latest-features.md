@@ -1,5 +1,21 @@
 # 最新功能
 
+## 本轮：Dashboard 分区统计、Admin 门禁与 AI 管理页样式已继续收口
+
+本轮继续修正一组已经在真实页面上暴露出的前端问题：
+
+- `Dashboard`
+  - 选择具体分区后，顶部统计卡现在会优先按当前分区的节点与作业数据本地重算，不再继续误显整集群资源总量。
+  - `Partition / Queue` 下拉框已去掉与外层 pill 容器重叠的双层描边，聚焦态改为统一光环样式。
+- `Admin`
+  - 普通用户即使直接访问 `/:cluster/admin`，现在也会先命中 `admin/*:view:*` 门禁；没有任何管理权限时不再被静默重定向到 `analysis`。
+  - `Admin > AI` 页面继续沿用现有视觉系统，但已把头部和两块主内容收口为更清晰的工作区层级，减少大卡片纵向堆叠带来的压迫感。
+
+本轮新增验证：
+
+- `cd frontend && npx vitest run tests/views/DashboardView.spec.ts tests/router/AdminPermissions.spec.ts tests/components/MainMenu.spec.ts tests/views/settings/SettingsAI.spec.ts`
+- `npm --prefix frontend run type-check`
+
 ## 本轮：AI 直接取消作业工具名兼容已补齐
 
 本轮修复了 AI 执行作业取消时的一条兼容性缺陷：

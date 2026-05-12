@@ -15,6 +15,7 @@ import { useClusterDataGetter } from '@/composables/DataGetter'
 import { getMBHumanUnit } from '@/composables/GatewayAPI'
 import type { ClusterStats } from '@/composables/GatewayAPI'
 import type { ClusterPartition } from '@/composables/GatewayAPI'
+import type { ClusterJob, ClusterNode } from '@/composables/GatewayAPI'
 import { isMetricRange, type MetricRange } from '@/composables/GatewayAPI'
 import { useRuntimeStore } from '@/stores/runtime'
 import { useClusterDataPoller } from '@/composables/DataPoller'
@@ -51,6 +52,20 @@ const {
   'partitions',
   undefined,
   canSelectPartition
+)
+const { data: nodes, setCluster: setNodesCluster } = useClusterDataGetter<ClusterNode[]>(
+  cluster.value,
+  'nodes',
+  undefined,
+  computed(
+    () => !!runtimeStore.dashboard.partition && runtimeStore.hasRoutePermission(cluster.value, 'resources', 'view')
+  )
+)
+const { data: jobs, setCluster: setJobsCluster } = useClusterDataGetter<ClusterJob[]>(
+  cluster.value,
+  'jobs',
+  undefined,
+  computed(() => !!runtimeStore.dashboard.partition && runtimeStore.hasRoutePermissionAnyScope(cluster.value, 'jobs', 'view'))
 )
 
 const partitionOptions = computed(() => [
@@ -108,6 +123,8 @@ watch(
   (newCluster) => {
     setCluster(newCluster)
     setPartitionsCluster(newCluster)
+    setNodesCluster(newCluster)
+    setJobsCluster(newCluster)
   }
 )
 
@@ -128,41 +145,75 @@ watch(
   { immediate: true }
 )
 
+const partitionScopedStats = computed<ClusterStats | null>(() => {
+  const selectedPartition = runtimeStore.dashboard.partition
+  if (!selectedPartition || !nodes.value || !jobs.value) return null
+
+  const scopedNodes = nodes.value.filter((node) => node.partitions.includes(selectedPartition))
+  const scopedJobs = jobs.value.filter((job) => job.partition === selectedPartition)
+
+  return {
+    resources: {
+      nodes: scopedNodes.length,
+      cores: scopedNodes.reduce((sum, node) => sum + node.cpus, 0),
+      memory: scopedNodes.reduce((sum, node) => sum + node.real_memory, 0),
+      memory_allocated: scopedNodes.reduce((sum, node) => sum + (node.real_memory * node.alloc_cpus) / Math.max(node.cpus, 1), 0),
+      memory_available: scopedNodes.reduce((sum, node) => {
+        const allocatedMemory = (node.real_memory * node.alloc_cpus) / Math.max(node.cpus, 1)
+        return sum + Math.max(node.real_memory - allocatedMemory, 0)
+      }, 0),
+      gpus: scopedNodes.reduce((sum, node) => {
+        const matches = [...node.gres.matchAll(/gpu(?::[^:,()]*)?(?::(\d+))?/g)]
+        return (
+          sum +
+          matches.reduce((gpuSum, match) => gpuSum + Number.parseInt(match[1] ?? '1', 10), 0)
+        )
+      }, 0)
+    },
+    jobs: {
+      running: scopedJobs.filter((job) => job.job_state.includes('RUNNING')).length,
+      total: scopedJobs.length
+    }
+  }
+})
+
+const displayedStats = computed(() => partitionScopedStats.value ?? data.value ?? null)
+
 const statsCards = computed(() => {
-  if (!data.value) return []
+  if (!displayedStats.value) return []
   return [
-    { id: 'nodes', label: t('pages.dashboard.stats.nodes'), value: String(data.value.resources.nodes) },
-    { id: 'cores', label: t('pages.dashboard.stats.cores'), value: String(data.value.resources.cores) },
+    { id: 'nodes', label: t('pages.dashboard.stats.nodes'), value: String(displayedStats.value.resources.nodes) },
+    { id: 'cores', label: t('pages.dashboard.stats.cores'), value: String(displayedStats.value.resources.cores) },
     {
       id: 'memory-total',
       label: t('pages.dashboard.stats.totalMemory'),
-      value: getMBHumanUnit(data.value.resources.memory),
+      value: getMBHumanUnit(displayedStats.value.resources.memory),
       subtle: t('pages.dashboard.stats.clusterCapacity')
     },
     {
       id: 'memory-allocated',
       label: t('pages.dashboard.stats.allocatedMemory'),
-      value: getMBHumanUnit(data.value.resources.memory_allocated),
+      value: getMBHumanUnit(displayedStats.value.resources.memory_allocated),
       subtle: t('pages.dashboard.stats.requestedByJobs')
     },
     {
       id: 'memory-available',
       label: t('pages.dashboard.stats.availableMemory'),
-      value: getMBHumanUnit(data.value.resources.memory_available),
+      value: getMBHumanUnit(displayedStats.value.resources.memory_available),
       subtle: t('pages.dashboard.stats.totalMinusAllocated')
     },
     {
       id: 'gpus',
       label: t('common.labels.gpu'),
-      value: String(data.value.resources.gpus),
-      muted: data.value.resources.gpus === 0
+      value: String(displayedStats.value.resources.gpus),
+      muted: displayedStats.value.resources.gpus === 0
     },
     {
       id: 'jobs-running',
       label: t('pages.dashboard.stats.runningJobs'),
-      value: String(data.value.jobs.running)
+      value: String(displayedStats.value.jobs.running)
     },
-    { id: 'jobs-total', label: t('pages.dashboard.stats.totalJobs'), value: String(data.value.jobs.total) }
+    { id: 'jobs-total', label: t('pages.dashboard.stats.totalJobs'), value: String(displayedStats.value.jobs.total) }
   ]
 })
 
@@ -346,7 +397,7 @@ watch(
   border-radius: 999px;
   border: 1px solid rgba(80, 105, 127, 0.12);
   background: rgba(255, 255, 255, 0.82);
-  padding: 0.45rem 0.55rem 0.45rem 0.95rem;
+  padding: 0.32rem 0.4rem 0.32rem 0.92rem;
 }
 
 .dashboard-toolbar-label {
@@ -361,18 +412,22 @@ watch(
 .dashboard-toolbar-select {
   min-width: 14rem;
   border-radius: 999px;
-  border: 1px solid rgba(80, 105, 127, 0.18);
-  background: white;
-  padding: 0.62rem 1rem;
+  border: 0;
+  background: rgba(255, 255, 255, 0.98);
+  padding: 0.72rem 1rem;
   color: var(--color-brand-ink-strong);
   font-size: 0.92rem;
-  box-shadow: var(--shadow-soft);
+  box-shadow: inset 0 0 0 1px rgba(80, 105, 127, 0.12);
   outline: none;
-  transition: border-color 160ms ease;
+  transition:
+    box-shadow 160ms ease,
+    background-color 160ms ease;
 }
 
 .dashboard-toolbar-select:focus {
-  border-color: var(--color-brand-accent);
+  box-shadow:
+    inset 0 0 0 1px rgba(182, 232, 44, 0.8),
+    0 0 0 4px rgba(182, 232, 44, 0.12);
 }
 
 @media (min-width: 1024px) {

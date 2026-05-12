@@ -9,12 +9,15 @@
 <script setup lang="ts">
 import { useTemplateRef, watch } from 'vue'
 import { useLiveHistogram } from '@/composables/charts/LiveHistogram'
-import type { MetricJobState } from '@/composables/GatewayAPI'
+import type { DashboardMetricsQuery, MetricJobState } from '@/composables/GatewayAPI'
 import { useRuntimeStore } from '@/stores/runtime'
 import ChartSkeleton from '@/components/ChartSkeleton.vue'
 import ErrorAlert from '@/components/ErrorAlert.vue'
 
-const { cluster } = defineProps<{ cluster: string }>()
+const props = defineProps<{
+  cluster: string
+  metricsQuery?: DashboardMetricsQuery
+}>()
 
 const runtimeStore = useRuntimeStore()
 const chartCanvas = useTemplateRef<HTMLCanvasElement>('chartCanvas')
@@ -60,30 +63,34 @@ const labels: Record<string, { group: MetricJobState[]; color: string }> = {
 }
 
 const liveChart = useLiveHistogram<MetricJobState>(
-  cluster,
+  props.cluster,
   'metrics_jobs',
   chartCanvas,
   labels,
   runtimeStore.dashboard.range,
-  runtimeStore.dashboard.metricsQuery()
+  props.metricsQuery ?? runtimeStore.dashboard.metricsQuery()
 )
 
+function currentMetricsQuery() {
+  return props.metricsQuery ?? runtimeStore.dashboard.metricsQuery()
+}
+
 watch(
-  () => [runtimeStore.dashboard.range, runtimeStore.dashboard.start, runtimeStore.dashboard.end],
+  () => [runtimeStore.dashboard.range, runtimeStore.dashboard.start, runtimeStore.dashboard.end, props.metricsQuery],
   () => {
-    liveChart.setRange(runtimeStore.dashboard.range, runtimeStore.dashboard.metricsQuery())
+    liveChart.setRange(runtimeStore.dashboard.range, currentMetricsQuery())
   }
 )
 
 watch(
-  () => runtimeStore.dashboard.partition,
+  () => [runtimeStore.dashboard.partition, props.metricsQuery],
   () => {
-    liveChart.setRange(runtimeStore.dashboard.range, runtimeStore.dashboard.metricsQuery())
+    liveChart.setRange(runtimeStore.dashboard.range, currentMetricsQuery())
   }
 )
 
 watch(
-  () => cluster,
+  () => props.cluster,
   (new_cluster) => {
     liveChart.setCluster(new_cluster)
   }

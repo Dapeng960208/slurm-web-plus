@@ -16,6 +16,7 @@ import { isChartResourcesType } from '@/stores/runtime/dashboard'
 import { useLiveHistogram } from '@/composables/charts/LiveHistogram'
 import { formatGigabytes } from '@/composables/charts/formatters'
 import type {
+  DashboardMetricsQuery,
   GatewayAnyClusterApiKey,
   MetricMemoryState,
   MetricResourceState
@@ -23,7 +24,10 @@ import type {
 import ChartSkeleton from '@/components/ChartSkeleton.vue'
 import ErrorAlert from '@/components/ErrorAlert.vue'
 
-const { cluster } = defineProps<{ cluster: string }>()
+const props = defineProps<{
+  cluster: string
+  metricsQuery?: DashboardMetricsQuery
+}>()
 
 const router = useRouter()
 const route = useRoute()
@@ -108,14 +112,18 @@ function resourcesLabels(): Record<
 }
 
 const liveChart = useLiveHistogram<ChartResourceMetricState>(
-  cluster,
+  props.cluster,
   resourcesTypeCallback(),
   chartCanvas,
   resourcesLabels(),
   runtimeStore.dashboard.range,
-  runtimeStore.dashboard.metricsQuery(),
+  props.metricsQuery ?? runtimeStore.dashboard.metricsQuery(),
   formatResourceValue
 )
+
+function currentMetricsQuery() {
+  return props.metricsQuery ?? runtimeStore.dashboard.metricsQuery()
+}
 
 function setResourceType(resourceType: ChartResourcesType) {
   runtimeStore.dashboard.chartResourcesType = resourceType
@@ -134,21 +142,21 @@ watch(
 )
 
 watch(
-  () => [runtimeStore.dashboard.range, runtimeStore.dashboard.start, runtimeStore.dashboard.end],
+  () => [runtimeStore.dashboard.range, runtimeStore.dashboard.start, runtimeStore.dashboard.end, props.metricsQuery],
   () => {
-    liveChart.setRange(runtimeStore.dashboard.range, runtimeStore.dashboard.metricsQuery())
+    liveChart.setRange(runtimeStore.dashboard.range, currentMetricsQuery())
   }
 )
 
 watch(
-  () => runtimeStore.dashboard.partition,
+  () => [runtimeStore.dashboard.partition, props.metricsQuery],
   () => {
-    liveChart.setRange(runtimeStore.dashboard.range, runtimeStore.dashboard.metricsQuery())
+    liveChart.setRange(runtimeStore.dashboard.range, currentMetricsQuery())
   }
 )
 
 watch(
-  () => cluster,
+  () => props.cluster,
   (new_cluster) => {
     liveChart.setCluster(new_cluster)
   }

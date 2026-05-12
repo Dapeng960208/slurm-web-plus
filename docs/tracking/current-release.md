@@ -42,6 +42,15 @@
 
 ## 2. 已完成项
 
+- Dashboard / Admin 前端缺陷已继续收口：
+  - `DashboardView` 选择分区后，统计卡会优先按当前分区节点与作业数据本地聚合，避免继续显示整集群资源总量
+  - Dashboard 分区下拉框已移除与外层 toolbar pill 重叠的双层描边
+  - `/:cluster/admin` 顶层默认入口已补权限判定；普通用户没有任何 `admin/*` 权限时，直接访问该入口也会返回 `forbidden`
+  - `Admin > AI` 页面已把页头和两块主内容收口为更轻的单工作区层级，减少多张大卡片纵向堆叠
+- 本轮前端定向验证已通过：
+  - `cd frontend && npx vitest run tests/views/DashboardView.spec.ts tests/router/AdminPermissions.spec.ts tests/components/MainMenu.spec.ts tests/views/settings/SettingsAI.spec.ts`
+  - `npm --prefix frontend run type-check`
+
 - 本机 GitHub CI 结果拉取链路已补齐：
   - 已安装并验证 `gh` 登录
   - 新增 `scripts/fetch-github-ci-result.ps1`，可拉取指定或最新 workflow run、下载 artifact、导出失败日志
