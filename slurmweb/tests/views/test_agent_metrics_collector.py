@@ -37,6 +37,7 @@ class TestAgentMetricsCollector(TestAgentBase):
             api_version,
             [("slurm-nodes", "nodes"), ("slurm-jobs", "jobs")],
         )
+        self.app.slurmrestd.partitions = mock.Mock(return_value=[])
         response = self.client.get("/metrics")
         self.assertEqual(response.status_code, 200)
         families = list(text_string_to_metric_families(response.text))
@@ -72,6 +73,7 @@ class TestAgentMetricsCollector(TestAgentBase):
             api_version,
             [("slurm-nodes", "nodes"), ("slurm-jobs", "jobs")],
         )
+        self.app.slurmrestd.partitions = mock.Mock(return_value=[])
         self.app.metrics_collector.cache = mock.Mock(spec=CachingService)
         self.app.metrics_collector.cache.metrics.return_value = (
             {"jobs": 10, "nodes": 5},
@@ -124,6 +126,7 @@ class TestAgentMetricsCollector(TestAgentBase):
             )
         )
         self.app.slurmrestd.jobs_states = mock.Mock(return_value=({"running": 2}, 2))
+        self.app.slurmrestd.partitions = mock.Mock(return_value=[])
         self.app.metrics_collector.user_metrics_enabled = True
         self.app.metrics_collector.user_metrics_store = mock.Mock()
         self.app.metrics_collector.user_metrics_store.recent_submission_counts.return_value = {

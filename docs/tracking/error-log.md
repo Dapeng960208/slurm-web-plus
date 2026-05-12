@@ -26,6 +26,11 @@
 - 现象：执行 `cd frontend && npx vitest run` 时，部分组件测试因新组件调用 `useI18n()` 但挂载时未注入 `i18n` 插件而报 `Need to install with app.use function`；另有少量测试仍直接断言旧英文菜单字段或固定中文文案，导致国际化改造后全量回归失败
 - 解决办法：为相关组件测试统一注入 `i18n` 插件；对语言敏感测试显式设置 locale；把旧硬编码菜单/页面文案断言改为翻译 key 或当前 locale 下的目标文案
 
+### 2026-05-12：远端 CI 在前端国际化提交后暴露出 lint 回归和后端旧测试夹具不匹配
+- 时间：2026-05-12
+- 现象：GitHub Actions 中 `Frontend Static Analysis` 的 `Frontend ESLint` 失败，`ClusterAnalysisView.vue` 和 `UserView.vue` 用 `locale.value` 作为无副作用表达式建立响应依赖，被 `@typescript-eslint/no-unused-expressions` 拦截；同一提交的 `Backend Tests` 中，`slurmweb/tests/views/test_agent_metrics_collector.py` 仍按旧行为只 mock `nodes/jobs`，但当前 `SlurmWebMetricsCollector` 已无条件追加分区级指标请求，导致 `/metrics` 视图测试在 CI 中耗尽 mocked slurmrestd 响应并抛 `RuntimeError: generator raised StopIteration`
+- 解决办法：前端把 `ClusterAnalysisView` 的 locale 依赖改为显式传参给 `analyzeCluster()`，移除 `UserView` 中多余的 `locale` 访问，并清理 `SettingsLdapCache.vue` 的未使用导入；后端保持 collector 当前分区指标实现不变，只把 `test_agent_metrics_collector.py` 调整为显式 mock `self.app.slurmrestd.partitions = []`，让该视图层测试继续只验证 `/metrics` 端点基础行为，分区级指标细节仍由 `slurmweb/tests/metrics/test_collector.py` 覆盖
+
 ### 2026-05-10：GitHub `Backend Tests` 在无 `python-ldap` 环境下会因 `import ldap.filter` 在 collection 阶段中断
 - 时间：2026-05-10
 - 现象：GitHub Actions Linux runner 上执行 `pytest slurmweb/tests` 时，`slurmweb/tests/lib/gateway.py` 里的旧 `ldap` stub 只伪造了顶层 `ldap` 模块；`rfl.authentication.ldap` 继续执行 `import ldap.filter` 后报 `ModuleNotFoundError: No module named 'ldap.filter'; 'ldap' is not a package`，导致 gateway / ldap 相关测试在 collection 阶段中断

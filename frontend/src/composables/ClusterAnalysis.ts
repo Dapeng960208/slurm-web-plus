@@ -111,6 +111,7 @@ export interface ClusterAnalysisResult {
 }
 
 export interface ClusterAnalysisInput {
+  locale?: string
   stats?: ClusterStats | null
   jobs?: ClusterJob[] | null
   nodes?: ClusterNode[] | null

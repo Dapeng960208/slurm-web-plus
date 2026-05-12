@@ -102,6 +102,17 @@
   - `npm --prefix frontend run type-check`
   - `cd frontend && npx vitest run`
   - `npm --prefix frontend run build`
+- 国际化首轮推送后的远端 CI 回归缺口已收口：
+  - `ClusterAnalysisView.vue` 与 `UserView.vue` 中用于建立 i18n 响应依赖的裸 `locale.value` 表达式已改掉，`Frontend ESLint` 不再因 `@typescript-eslint/no-unused-expressions` 失败
+  - `SettingsLdapCache.vue` 已清理未使用导入，避免远端静态检查继续报 `no-unused-vars`
+  - `slurmweb/tests/views/test_agent_metrics_collector.py` 已按当前 collector 行为更新，显式 mock 空分区列表，避免 `/metrics` 视图测试继续因 collector 新增分区级指标请求耗尽 mocked slurmrestd 响应
+  - 本轮远端失败项对应的本地复核已通过：
+    - `cd frontend && npx eslint src/views/ClusterAnalysisView.vue src/views/UserView.vue src/views/settings/SettingsLdapCache.vue`
+    - `npm --prefix frontend run type-check`
+    - `cd frontend && npx vitest run`
+    - `npm --prefix frontend run build`
+    - `.venv\Scripts\python.exe -m pytest slurmweb/tests/views/test_agent_metrics_collector.py -q`
+    - `.venv\Scripts\python.exe -m pytest slurmweb/tests/metrics/test_collector.py -q`
 
 - 开发错误库文档格式已收口：
   - `docs/tracking/error-log.md` 已从长篇复盘格式简化为仅保留 `时间`、`现象`、`解决办法`

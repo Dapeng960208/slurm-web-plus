@@ -57,7 +57,7 @@ const router = useRouter()
 const runtimeStore = useRuntimeStore()
 const authStore = useAuthStore()
 const gateway = useGatewayAPI()
-const { t, locale } = useI18n()
+const { t } = useI18n()
 const editOpen = ref(false)
 const deleteOpen = ref(false)
 const operationBusy = ref(false)
@@ -119,7 +119,6 @@ const canDeleteUser = computed(() =>
 )
 
 const breadcrumb = computed(() => {
-  locale.value
   if (sections.value.self) {
     return [
       { title: t('pages.user.breadcrumb.myWorkspace') },

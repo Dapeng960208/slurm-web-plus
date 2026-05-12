@@ -81,8 +81,8 @@ const canViewHistory = computed(
 const canViewResources = computed(() => runtimeStore.hasRoutePermission(cluster, 'resources', 'view'))
 
 const analysis = computed(() => {
-  locale.value
   return analyzeCluster({
+    locale: locale.value,
     stats: stats.value,
     jobs: canViewJobs.value ? jobs.value : [],
     nodes: canViewNodes.value ? nodes.value : [],
