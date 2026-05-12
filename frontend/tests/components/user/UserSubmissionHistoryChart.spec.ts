@@ -28,7 +28,7 @@ describe('UserSubmissionHistoryChart.vue', () => {
     const chart = Chart.getChart(canvas)
 
     expect(chart).toBeDefined()
-    expect(chart?.data.datasets).toHaveLength(2)
+    expect(chart?.data.datasets).toHaveLength(6)
     expect(chart?.data.datasets[0].label).toBe('Submissions')
     expect(chart?.data.datasets[0].data).toEqual([
       { x: 1748004750000, y: 3 },
@@ -39,6 +39,18 @@ describe('UserSubmissionHistoryChart.vue', () => {
       { x: 1748004750000, y: 1 },
       { x: 1748004810000, y: 4 }
     ])
+    expect(chart?.data.datasets.map((dataset) => dataset.label)).toEqual([
+      'Submissions',
+      'Completions',
+      'Running',
+      'Pending',
+      'Failed',
+      'Cancelled'
+    ])
+    expect(chart?.data.datasets[2].data).toEqual([])
+    expect(chart?.data.datasets[3].data).toEqual([])
+    expect(chart?.data.datasets[4].data).toEqual([])
+    expect(chart?.data.datasets[5].data).toEqual([])
   })
 
   test('clears datasets when history becomes null', async () => {

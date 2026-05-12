@@ -17,7 +17,7 @@ const mockGatewayAPI = {
   delete_user: vi.fn()
 }
 const analyticsPanelsStub = {
-  template: '<div>Completed Job Tool Analysis</div>'
+  template: '<div data-testid="user-analytics-panels-stub">Completed Job Tool Analysis</div>'
 }
 
 vi.mock('@/composables/DataPoller', () => ({
@@ -131,8 +131,10 @@ describe('UserView.vue', () => {
     })
     await flushPromises()
 
-    expect(wrapper.text()).toContain('Submission and tool analytics')
-    expect(wrapper.text()).toContain('Completed Job Tool Analysis')
+    expect(wrapper.get('#analysis').exists()).toBe(true)
+    expect(wrapper.get('[data-testid="user-analytics-panels-stub"]').text()).toContain(
+      'Completed Job Tool Analysis'
+    )
   })
 
   test('renders analytics section before profile section by default when both are available', async () => {
@@ -164,7 +166,8 @@ describe('UserView.vue', () => {
     await flushPromises()
 
     const sections = wrapper.findAll('section.ui-panel.ui-section')
-    expect(sections[0].text()).toContain('Submission and tool analytics')
+    expect(sections[0].attributes('id')).toBe('analysis')
+    expect(sections[0].text()).toContain('Completed Job Tool Analysis')
     expect(sections[1].text()).toContain('Account associations and limits')
   })
 

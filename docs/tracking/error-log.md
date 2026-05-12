@@ -26,6 +26,11 @@
 - 现象：在执行扩展后的本地回归 `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/apps/test_user_analytics_store.py ...` 时，`test_user_metrics_history_seven_day_window_matches_naive_utc_buckets` 因 `user_metrics_history()` 现在会额外查询 `running/pending/failed/cancelled` 四条状态时间线，而旧测试只给 `cursor.fetchall.side_effect` 提供“提交/完成”两次返回，最终在第三次读取时抛 `StopIteration`
 - 解决办法：把该测试夹具补齐为 6 次 `fetchall()` 返回，并同时断言新增状态总量为 `0`，避免后续再次把“能力扩展后的正常附加查询”误报成回归
 
+### 2026-05-12：Frontend Tests 仍按旧用户分析文案和双曲线假设断言
+- 时间：2026-05-12
+- 现象：GitHub Actions `Frontend Tests` run `25736916169` 中，`tests/views/UserView.spec.ts` 仍断言 analytics section 包含旧文案 `Submission and tool analytics`，而当前页面通过 stub 只呈现 `Completed Job Tool Analysis`；`tests/components/user/UserSubmissionHistoryChart.spec.ts` 仍假设图表只有 `submissions/completions` 两条数据集，但当前实现已扩展为 `submissions/completions/running/pending/failed/cancelled` 六条曲线，导致远端单测失败
+- 解决办法：把 `UserView` 测试改为断言 `#analysis` 区块存在且 analytics stub 已渲染；把 `UserSubmissionHistoryChart` 测试更新为断言 6 条数据集及新增状态曲线的空数组默认值，避免已实现的多状态分析继续被旧测试误判为失败
+
 ### 2026-05-12：AI 直接输出 `job/cancel` 作为 tool name 时会被后端误判为不支持工具
 - 时间：2026-05-12
 - 现象：超级管理员在 AI 对话中执行取消作业时，模型直接输出 `job/cancel` 作为 tool name，`slurmweb.ai.tools.AIToolRegistry` 只接受 `query_agent_interface` / `mutate_agent_interface`，最终返回 `Unsupported tool job/cancel` 并在前端表现为接口 `500`
