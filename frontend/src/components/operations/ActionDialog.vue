@@ -11,6 +11,7 @@ import { computed, reactive, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Dialog, DialogPanel, DialogTitle, TransitionChild, TransitionRoot } from '@headlessui/vue'
 import FormFieldLabel from '@/components/forms/FormFieldLabel.vue'
+import { translate } from '@/i18n/translate'
 
 export type ActionFieldType = 'text' | 'textarea' | 'number' | 'select'
 export type ActionSubmitVariant = 'primary' | 'warning' | 'danger'
@@ -37,6 +38,9 @@ const props = defineProps<{
   title: string
   description?: string
   submitLabel: string
+  titleParams?: Record<string, unknown>
+  descriptionParams?: Record<string, unknown>
+  submitLabelParams?: Record<string, unknown>
   loading?: boolean
   error?: string | null
   fields: ActionField[]
@@ -60,9 +64,15 @@ const fieldsSignature = computed(() =>
 
 const resolvedSubmitVariant = computed<ActionSubmitVariant>(() => {
   if (props.submitVariant) return props.submitVariant
-  const signal = `${props.title} ${props.submitLabel}`.toLowerCase()
-  if (signal.includes('delete') || signal.includes('cancel')) return 'danger'
-  if (signal.includes('edit') || signal.includes('save')) return 'warning'
+  if (
+    props.submitLabel === 'common.buttons.delete' ||
+    props.submitLabel.startsWith('dialogs.') && props.submitLabel.includes('.delete')
+  ) {
+    return 'danger'
+  }
+  if (props.submitLabel === 'common.buttons.saveChanges' || props.submitLabel === 'common.buttons.edit') {
+    return 'warning'
+  }
   return 'primary'
 })
 
@@ -78,9 +88,9 @@ const submitButtonClass = computed(() => {
 })
 
 const resolvedSubmitTooltip = computed(() => {
-  if (props.submitTooltip) return t(props.submitTooltip)
-  if (props.description) return t(props.description)
-  return t('actionDialog.confirm', { action: t(props.submitLabel).toLowerCase() })
+  if (props.submitTooltip) return translate(props.submitTooltip)
+  if (props.description) return translate(props.description, props.descriptionParams)
+  return t('actionDialog.confirm', { action: translate(props.submitLabel).toLowerCase() })
 })
 
 function resetForm() {
@@ -143,10 +153,10 @@ watch(
                 <div>
                   <p class="ui-page-kicker">{{ t('actionDialog.kicker') }}</p>
                   <DialogTitle class="text-2xl font-semibold text-[var(--color-brand-ink-strong)]">
-                    {{ t(title) }}
+                    {{ translate(title, titleParams) }}
                   </DialogTitle>
                   <p v-if="description" class="mt-2 text-sm text-[var(--color-brand-muted)]">
-                    {{ t(description) }}
+                    {{ translate(description, descriptionParams) }}
                   </p>
                 </div>
                 <button type="button" class="ui-button-secondary" @click="emit('close')">
@@ -167,7 +177,7 @@ watch(
                     v-model="form[field.key]"
                     rows="4"
                     class="mt-2 block w-full rounded-[20px] border border-[rgba(80,105,127,0.14)] bg-white px-3 py-3 text-sm outline-hidden focus:border-[rgba(182,232,44,0.65)] focus:ring-4 focus:ring-[rgba(182,232,44,0.18)]"
-                    :placeholder="field.placeholder ? t(field.placeholder) : undefined"
+                    :placeholder="field.placeholder ? translate(field.placeholder) : undefined"
                   />
                   <select
                     v-else-if="field.type === 'select'"
@@ -175,7 +185,9 @@ watch(
                     class="mt-2 block w-full rounded-[18px] border border-[rgba(80,105,127,0.14)] bg-white px-3 py-2.5 text-sm outline-hidden focus:border-[rgba(182,232,44,0.65)] focus:ring-4 focus:ring-[rgba(182,232,44,0.18)]"
                   >
                     <option value="" disabled>{{
-                      field.placeholder ? t(field.placeholder) : t('common.forms.selectOption')
+                      field.placeholder
+                        ? translate(field.placeholder)
+                        : t('common.forms.selectOption')
                     }}</option>
                     <option
                       v-for="option in field.options ?? []"
@@ -183,7 +195,7 @@ watch(
                       :value="option.value"
                       :disabled="option.disabled"
                     >
-                      {{ t(option.label) }}
+                      {{ translate(option.label) }}
                     </option>
                   </select>
                   <input
@@ -191,7 +203,7 @@ watch(
                     v-model="form[field.key]"
                     :type="field.type === 'number' ? 'number' : 'text'"
                     class="mt-2 block w-full rounded-[18px] border border-[rgba(80,105,127,0.14)] bg-white px-3 py-2.5 text-sm outline-hidden focus:border-[rgba(182,232,44,0.65)] focus:ring-4 focus:ring-[rgba(182,232,44,0.18)]"
-                    :placeholder="field.placeholder ? t(field.placeholder) : undefined"
+                    :placeholder="field.placeholder ? translate(field.placeholder) : undefined"
                   />
                 </label>
 
@@ -207,7 +219,7 @@ watch(
                     :title="resolvedSubmitTooltip"
                     :disabled="loading || !canSubmit"
                   >
-                    {{ loading ? t('common.status.working') : t(submitLabel) }}
+                    {{ loading ? t('common.status.working') : translate(submitLabel, submitLabelParams) }}
                   </button>
                 </div>
               </form>

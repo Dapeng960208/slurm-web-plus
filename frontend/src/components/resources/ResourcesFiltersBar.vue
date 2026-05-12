@@ -12,8 +12,10 @@ import { useRuntimeStore } from '@/stores/runtime'
 import type { ResourcesViewFilters } from '@/stores/runtime/resources'
 import { FunnelIcon, BoltIcon, RectangleGroupIcon } from '@heroicons/vue/20/solid'
 import { PlusSmallIcon } from '@heroicons/vue/24/outline'
+import { useI18n } from 'vue-i18n'
 
 const runtimeStore = useRuntimeStore()
+const { t } = useI18n()
 
 const activeFiltersGroups: Array<{
   group: string
@@ -57,7 +59,7 @@ const activeFiltersGroups: Array<{
           @click="runtimeStore.resources.openFiltersPanel = true"
         >
           <PlusSmallIcon class="-ml-0.5 h-5 w-5" aria-hidden="true" />
-          Add filters
+          {{ t('filters.add') }}
         </button>
       </div>
     </div>
@@ -67,7 +69,7 @@ const activeFiltersGroups: Array<{
       <div class="mx-auto px-4 py-3 sm:flex sm:items-center sm:px-6 lg:px-8">
         <h3 class="text-sm font-medium text-gray-500">
           <FunnelIcon class="mr-1 h-4 w-4" />
-          <span class="sr-only">Filters active</span>
+          <span class="sr-only">{{ t('filters.active') }}</span>
         </h3>
 
         <div aria-hidden="true" class="hidden h-5 w-px bg-gray-300 sm:ml-4 sm:block" />
@@ -99,7 +101,7 @@ const activeFiltersGroups: Array<{
                   "
                 >
                   <span class="sr-only"
-                    >Remove filter for {{ activeFilterGroup.group }}:{{ activeFilter }}</span
+                    >{{ t('filters.remove', { group: activeFilterGroup.group, value: activeFilter }) }}</span
                   >
                   <svg class="h-2 w-2" stroke="currentColor" fill="none" viewBox="0 0 8 8">
                     <path stroke-linecap="round" stroke-width="1.5" d="M1 1l6 6m0-6L1 7" />

@@ -1,9 +1,11 @@
 import { describe, test, expect } from 'vitest'
 import { mount } from '@vue/test-utils'
 import JobResources from '@/components/job/JobResources.vue'
+import { init_plugins } from '../../lib/common'
 
 describe('JobResources.vue', () => {
   test('job with gpus', () => {
+    init_plugins()
     const wrapper = mount(JobResources, {
       props: {
         tres: [
@@ -43,6 +45,7 @@ describe('JobResources.vue', () => {
     expect(items[3].text()).toBe('GPU: 4')
   })
   test('job without gpu', () => {
+    init_plugins()
     const wrapper = mount(JobResources, {
       props: {
         tres: [
@@ -81,6 +84,7 @@ describe('JobResources.vue', () => {
     expect(items[2].text()).toBe('Memory: 64GB')
   })
   test('job with unreliable gpus count', () => {
+    init_plugins()
     const wrapper = mount(JobResources, {
       props: {
         tres: [

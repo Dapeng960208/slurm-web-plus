@@ -22,12 +22,12 @@ describe('ActionDialog.vue', () => {
       },
       props: {
         open: true,
-        title: 'Edit job',
-        submitLabel: 'Save',
+        title: 'pages.job.dialogs.edit.title',
+        submitLabel: 'common.buttons.saveChanges',
         fields: [
           {
             key: 'comment',
-            label: 'Comment'
+            label: 'pages.jobs.dialogs.edit.fields.comment'
           }
         ],
         initialValues: {
@@ -40,8 +40,8 @@ describe('ActionDialog.vue', () => {
     expect(wrapper.emitted('submit')?.[0]).toEqual([{ comment: 'Needs review' }])
 
     await wrapper.setProps({
-      title: 'Cancel job',
-      submitLabel: 'Cancel',
+      title: 'pages.job.dialogs.cancel.title',
+      submitLabel: 'common.buttons.cancel',
       fields: [],
       initialValues: undefined
     })
@@ -64,12 +64,12 @@ describe('ActionDialog.vue', () => {
       },
       props: {
         open: true,
-        title: 'Edit node',
-        submitLabel: 'Save',
+        title: 'pages.node.dialogs.edit.title',
+        submitLabel: 'common.buttons.saveChanges',
         fields: [
           {
             key: 'state',
-            label: 'State',
+            label: 'pages.node.dialogs.edit.fields.state',
             type: 'select',
             required: true,
             options: [
@@ -110,12 +110,12 @@ describe('ActionDialog.vue', () => {
       },
       props: {
         open: true,
-        title: 'Edit account',
-        submitLabel: 'Save',
+        title: 'pages.account.dialogs.edit.title',
+        submitLabel: 'common.buttons.saveChanges',
         fields: [
           {
             key: 'description',
-            label: 'Description'
+            label: 'pages.account.dialogs.fields.description'
           }
         ],
         initialValues: {

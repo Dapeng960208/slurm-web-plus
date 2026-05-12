@@ -1,9 +1,11 @@
 import { describe, test, expect } from 'vitest'
 import { mount } from '@vue/test-utils'
 import JobsHistoryFiltersPanel from '@/components/jobs/JobsHistoryFiltersPanel.vue'
+import { init_plugins } from '../../lib/common'
 
 describe('JobsHistoryFiltersPanel.vue', () => {
   test('supports seconds precision in time range inputs', () => {
+    init_plugins()
     const wrapper = mount(JobsHistoryFiltersPanel, {
       props: {
         open: true,
@@ -41,6 +43,7 @@ describe('JobsHistoryFiltersPanel.vue', () => {
   })
 
   test('emits filter updates instead of mutating props', async () => {
+    init_plugins()
     const wrapper = mount(JobsHistoryFiltersPanel, {
       props: {
         open: true,

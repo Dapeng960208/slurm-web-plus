@@ -8,6 +8,7 @@ import InfoAlert from '@/components/InfoAlert.vue'
 import ActionDialog from '@/components/operations/ActionDialog.vue'
 import { init_plugins, getMockClusterDataPoller } from '../lib/common'
 import { useRuntimeStore } from '@/stores/runtime'
+import { i18n } from '@/plugins/i18n'
 import type { ClusterQos } from '@/composables/GatewayAPI'
 import qos from '../assets/qos.json'
 
@@ -78,7 +79,9 @@ describe('QosView.vue', () => {
         cluster: 'foo'
       }
     })
-    expect(wrapper.getComponent(ErrorAlert).text()).toBe('Unable to retrieve qos from cluster foo')
+    expect(wrapper.getComponent(ErrorAlert).text()).toBe(
+      i18n.global.t('pages.qos.unableToRetrieve', { cluster: 'foo' })
+    )
   })
   test('show info alert when no QOS defined', () => {
     mockClusterDataPoller.data.value = []
@@ -87,7 +90,9 @@ describe('QosView.vue', () => {
         cluster: 'foo'
       }
     })
-    expect(wrapper.getComponent(InfoAlert).text()).toBe('No qos defined on cluster foo')
+    expect(wrapper.getComponent(InfoAlert).text()).toBe(
+      i18n.global.t('pages.qos.noQos', { cluster: 'foo' })
+    )
   })
   test('open qos help modal', async () => {
     mockClusterDataPoller.data.value = qos
@@ -153,10 +158,13 @@ describe('QosView.vue', () => {
       }
     })
 
-    await wrapper.findAll('button').find((button) => button.text() === 'Create QOS')!.trigger('click')
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === i18n.global.t('pages.qos.create'))!
+      .trigger('click')
     const dialog = wrapper
       .findAllComponents(ActionDialog)
-      .find((component) => component.props('title') === 'Create QOS')!
+      .find((component) => component.props('title') === 'pages.qos.dialogs.create.title')!
 
     expect(dialog.props('initialValues')).toStrictEqual({
       max_submit_jobs_per_user: '100',
@@ -215,10 +223,13 @@ describe('QosView.vue', () => {
       }
     })
 
-    await wrapper.findAll('button').filter((button) => button.text() === 'Edit')[1].trigger('click')
+    await wrapper
+      .findAll('button')
+      .filter((button) => button.text() === i18n.global.t('pages.qos.actions.edit'))[1]
+      .trigger('click')
     const dialog = wrapper
       .findAllComponents(ActionDialog)
-      .find((component) => component.props('title') === 'Edit QOS')!
+      .find((component) => component.props('title') === 'pages.qos.dialogs.edit.title')!
 
     expect(dialog.props('initialValues')).toMatchObject({
       max_submit_jobs_per_user: '20',
@@ -307,10 +318,13 @@ describe('QosView.vue', () => {
       }
     })
 
-    await wrapper.findAll('button').filter((button) => button.text() === 'Edit')[0].trigger('click')
+    await wrapper
+      .findAll('button')
+      .filter((button) => button.text() === i18n.global.t('pages.qos.actions.edit'))[0]
+      .trigger('click')
     const dialog = wrapper
       .findAllComponents(ActionDialog)
-      .find((component) => component.props('title') === 'Edit QOS')!
+      .find((component) => component.props('title') === 'pages.qos.dialogs.edit.title')!
 
     expect(dialog.props('initialValues')).toMatchObject({
       max_submit_jobs_per_user: '100',
@@ -342,10 +356,13 @@ describe('QosView.vue', () => {
       }
     })
 
-    await wrapper.findAll('button').find((button) => button.text() === 'Create QOS')!.trigger('click')
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === i18n.global.t('pages.qos.create'))!
+      .trigger('click')
     wrapper
       .findAllComponents(ActionDialog)
-      .find((component) => component.props('title') === 'Create QOS')!
+      .find((component) => component.props('title') === 'pages.qos.dialogs.create.title')!
       .vm.$emit('submit', {
         name: 'debug',
         description: '',
@@ -360,9 +377,9 @@ describe('QosView.vue', () => {
     expect(
       wrapper
         .findAllComponents(ActionDialog)
-        .find((component) => component.props('title') === 'Create QOS')!
+        .find((component) => component.props('title') === 'pages.qos.dialogs.create.title')!
         .props('error')
-    ).toBe('MaxWallDurationPerJob must use days-hh:mm:ss or hh:mm:ss.')
+    ).toBe(i18n.global.t('pages.qos.dialogs.errors.invalidWallDuration'))
     wrapper.unmount()
   })
 })

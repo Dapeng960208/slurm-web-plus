@@ -10,6 +10,7 @@
 import { computed } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { ChevronLeftIcon } from '@heroicons/vue/20/solid'
+import { useI18n } from 'vue-i18n'
 import ClusterMainLayout from '@/components/ClusterMainLayout.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import { useRuntimeStore } from '@/stores/runtime'
@@ -22,6 +23,7 @@ const { cluster, user } = defineProps<{
 
 const router = useRouter()
 const runtimeStore = useRuntimeStore()
+const { t } = useI18n()
 const clusterDetails = computed(() =>
   runtimeStore.availableClusters.find((value) => value.name === cluster)
 )
@@ -37,9 +39,9 @@ const userMetricsEnabled = computed(
     menu-entry="accounts"
     :cluster="cluster"
     :breadcrumb="[
-      { title: 'Accounts', routeName: 'accounts' },
-      { title: `User ${user}`, routeName: 'user' },
-      { title: 'Analysis' }
+      { title: 'shell.mainMenu.accounts', routeName: 'accounts' },
+      { title: t('pages.user.breadcrumb.userPrefix', { user }), routeName: 'user' },
+      { title: 'shell.mainMenu.analysis' }
     ]"
   >
     <div class="ui-page ui-page-readable ui-content-workspace">
@@ -49,15 +51,15 @@ const userMetricsEnabled = computed(
         class="ui-button-secondary self-start shrink-0"
       >
         <ChevronLeftIcon class="-ml-0.5 h-5 w-5" aria-hidden="true" />
-        Back to user detail
+        {{ t('pages.user.analytics.backToUser') }}
       </button>
 
       <div class="ui-scroll-region min-h-0 flex-1 pr-1">
         <div class="ui-section-stack pb-2">
           <PageHeader
-            kicker="User Analysis"
+            kicker="pages.user.analytics.kicker"
             :title="user"
-            description="Submission trends, tool usage analysis and execution summaries for this user."
+            description="pages.user.analytics.description"
           >
             <template #actions>
               <div class="flex flex-wrap gap-3">
@@ -65,13 +67,13 @@ const userMetricsEnabled = computed(
                   :to="{ name: 'user', params: { cluster, user } }"
                   class="ui-button-secondary"
                 >
-                  User detail
+                  {{ t('pages.user.analytics.userDetail') }}
                 </RouterLink>
                 <RouterLink
                   :to="{ name: 'jobs', params: { cluster }, query: { users: user } }"
                   class="ui-button-primary"
                 >
-                  View jobs
+                  {{ t('pages.user.actions.viewJobs') }}
                 </RouterLink>
               </div>
             </template>

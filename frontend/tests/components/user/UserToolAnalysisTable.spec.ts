@@ -1,9 +1,11 @@
 import { describe, test, expect } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import UserToolAnalysisTable from '@/components/user/UserToolAnalysisTable.vue'
+import { init_plugins } from '../../lib/common'
 
 describe('UserToolAnalysisTable.vue', () => {
   test('renders detailed completed job tool metrics in a table', async () => {
+    init_plugins()
     const wrapper = mount(UserToolAnalysisTable, {
       props: {
         totalCompletedJobs: 12,
@@ -60,6 +62,7 @@ describe('UserToolAnalysisTable.vue', () => {
   })
 
   test('renders fallback markers when optional metrics are missing', async () => {
+    init_plugins()
     const wrapper = mount(UserToolAnalysisTable, {
       props: {
         tools: [

@@ -10,6 +10,7 @@
 import type { FunctionalComponent } from 'vue'
 import { useRuntimeStore } from '@/stores/runtime'
 import type { JobsViewFilters } from '@/stores/runtime/jobs'
+import { useI18n } from 'vue-i18n'
 import {
   FunnelIcon,
   BoltIcon,
@@ -20,6 +21,7 @@ import {
 } from '@heroicons/vue/20/solid'
 
 const runtimeStore = useRuntimeStore()
+const { t } = useI18n()
 
 const activeFiltersGroups: Array<{
   group: string
@@ -90,7 +92,7 @@ const activeFiltersGroups: Array<{
     <div class="mx-auto sm:flex sm:items-center">
       <h3 class="text-sm font-semibold text-[var(--color-brand-ink-strong)]">
         <FunnelIcon class="mr-1 h-4 w-4" />
-        <span class="sr-only">Filters active</span>
+        <span class="sr-only">{{ t('filters.active') }}</span>
       </h3>
 
       <div
@@ -120,7 +122,7 @@ const activeFiltersGroups: Array<{
                 @click="activeFilterGroup.removeCallback.call(runtimeStore.jobs, activeFilter)"
               >
                 <span class="sr-only"
-                  >Remove filter for {{ activeFilterGroup.group }}:{{ activeFilter }}</span
+                  >{{ t('filters.remove', { group: activeFilterGroup.group, value: activeFilter }) }}</span
                 >
                 <svg class="h-2 w-2" stroke="currentColor" fill="none" viewBox="0 0 8 8">
                   <path stroke-linecap="round" stroke-width="1.5" d="M1 1l6 6m0-6L1 7" />

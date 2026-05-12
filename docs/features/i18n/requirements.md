@@ -2,7 +2,7 @@
 
 ## 1. 背景与目标
 
-为 Slurm Web Plus 前端增加中英文切换能力，覆盖导航、登录、设置、公共提示、通知和前端自身生成的错误文案，降低中英文用户混用时的理解成本。
+为 Slurm Web Plus 前端增加中英文切换能力，覆盖全站前端静态文案与前端自身生成的展示文案，降低中英文用户混用时的理解成本。
 
 本轮目标是：
 
@@ -10,6 +10,7 @@
 - 首次进入按浏览器语言自动选择中文或英文
 - 用户切换后持久化语言偏好
 - 登录前和登录后都提供语言切换入口
+- 覆盖业务页面标题、按钮、筛选、表格头、图表标签、空态、弹窗、通知和前端状态提示
 
 ## 2. 功能范围
 
@@ -21,6 +22,9 @@
 - Settings General / Errors
 - 公共弹窗、分页、通知、错误提示
 - 前端生成的认证错误、权限错误、服务端错误和普通提示
+- Dashboard、Cluster Analysis、Jobs、Jobs History、Job
+- Resources、Node、Accounts、Account、User、User Analysis
+- QOS、Reservations、相关公共筛选器、时间范围控件和业务分析面板
 
 本轮不覆盖：
 
@@ -63,9 +67,12 @@
 
 - 缺失翻译 key 时回退到英文
 - 不因语言切换刷新页面、不重置路由、不清空当前前端状态
-- 若业务页仍存在未迁移的硬编码文案，则这些文案保持原样显示，不阻断页面功能
+- 后端直接返回的原始错误消息保持原样显示
+- 集群名、用户名、QOS 名、分区名、节点名等实体值保持原样显示
+- 后端原始业务字段值不做翻译；只有前端主动构造的映射 label 才进入 i18n
 
 ## 8. 相关验证入口
 
 - `npm --prefix frontend run type-check`
-- `cd frontend && npx vitest run tests/stores/locale.spec.ts tests/views/LoginView.spec.ts tests/components/MainMenu.spec.ts tests/components/UserMenu.spec.ts tests/components/settings/SettingsTabs.spec.ts tests/views/settings/SettingsMain.spec.ts tests/components/NotificationsPanel.spec.ts tests/components/PaginationControls.spec.ts`
+- `cd frontend && npx vitest run`
+- `npm --prefix frontend run build`

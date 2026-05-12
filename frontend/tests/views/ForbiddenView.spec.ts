@@ -25,9 +25,9 @@ describe('ForbiddenView.vue', () => {
       }
     })
 
-    expect(wrapper.text()).toContain('当前页面无访问权限')
+    expect(wrapper.text()).toContain('当前页面访问受限')
     expect(wrapper.text()).toContain('缺少所需权限：ai:view:*')
-    expect(wrapper.text()).toContain('请联系管理员申请权限。')
+    expect(wrapper.text()).toContain('请联系管理员申请访问权限。')
 
     const dashboardLink = wrapper.findComponent(RouterLinkStub)
     expect(dashboardLink.props('to')).toEqual({

@@ -10,6 +10,7 @@
 import { computed, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { useRoute } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { useGatewayAPI } from '@/composables/GatewayAPI'
 import type { ClusterTRES, JobHistoryRecord } from '@/composables/GatewayAPI'
 import { formatJobExitCode, formatMemoryGB, splitJobHistoryState } from '@/composables/GatewayAPI'
@@ -24,11 +25,13 @@ import PanelSkeleton from '@/components/PanelSkeleton.vue'
 import { HashtagIcon } from '@heroicons/vue/24/outline'
 import { CheckIcon } from '@heroicons/vue/20/solid'
 import DetailSummaryStrip from '@/components/details/DetailSummaryStrip.vue'
+import { translate } from '@/i18n/translate'
 
 const props = defineProps<{ cluster: string; id: number }>()
 
 const route = useRoute()
 const gateway = useGatewayAPI()
+const { t } = useI18n()
 const initialLoading = ref(true)
 const error = ref<string | null>(null)
 const job = ref<JobHistoryRecord | null>(null)
@@ -183,7 +186,9 @@ function fmtDuration(minutes: number | null | undefined) {
   if (minutes == null) return '-'
   const hours = Math.floor(minutes / 60)
   const remainingMinutes = minutes % 60
-  return hours > 0 ? `${hours}h ${remainingMinutes}m` : `${remainingMinutes}m`
+  return hours > 0
+    ? t('pages.jobHistoryDetail.duration.hoursMinutes', { hours, minutes: remainingMinutes })
+    : t('pages.jobHistoryDetail.duration.minutes', { minutes: remainingMinutes })
 }
 
 function fmtCpuCoresAvg(value: number | null | undefined) {
@@ -230,24 +235,39 @@ function timelineSteps(record: JobHistoryRecord): TimelineStep[] {
   const states = splitJobHistoryState(record.job_state)
   const completed = states.includes('COMPLETED')
   return [
-    { id: 'submitted', label: 'Submitted', time: record.submit_time, reached: !!record.submit_time },
-    { id: 'eligible', label: 'Eligible', time: record.eligible_time, reached: !!record.eligible_time },
+    {
+      id: 'submitted',
+      label: t('pages.jobHistoryDetail.timeline.submitted'),
+      time: record.submit_time,
+      reached: !!record.submit_time
+    },
+    {
+      id: 'eligible',
+      label: t('pages.jobHistoryDetail.timeline.eligible'),
+      time: record.eligible_time,
+      reached: !!record.eligible_time
+    },
     {
       id: 'scheduling',
-      label: 'Scheduling',
+      label: t('pages.jobHistoryDetail.timeline.scheduling'),
       time: record.last_sched_evaluation_time ?? record.start_time,
       reached: !!(record.last_sched_evaluation_time ?? record.start_time)
     },
-    { id: 'running', label: 'Running', time: record.start_time, reached: !!record.start_time },
+    {
+      id: 'running',
+      label: t('pages.jobHistoryDetail.timeline.running'),
+      time: record.start_time,
+      reached: !!record.start_time
+    },
     {
       id: 'completed',
-      label: 'Completed',
+      label: t('pages.jobHistoryDetail.timeline.completed'),
       time: completed ? record.end_time : null,
       reached: completed && !!record.end_time
     },
     {
       id: 'terminated',
-      label: 'Terminated',
+      label: t('pages.jobHistoryDetail.timeline.terminated'),
       time: record.end_time,
       reached: !!record.end_time
     }
@@ -255,48 +275,61 @@ function timelineSteps(record: JobHistoryRecord): TimelineStep[] {
 }
 
 const fields = (record: JobHistoryRecord): HistoryFieldRow[] => [
-  textField('job-id', 'Job ID', String(record.job_id)),
-  textField('name', 'Name', fmt(record.job_name)),
-  textField('state-reason', 'State Reason', fmt(record.state_reason)),
-  textField('user', 'User', fmt(record.user_name)),
-  textField('group', 'Group', fmt(record.group)),
-  textField('account', 'Account', fmt(record.account)),
-  textField('partition', 'Partition', fmt(record.partition)),
-  textField('qos', 'QOS', fmt(record.qos)),
-  textField('priority', 'Priority', record.priority != null ? String(record.priority) : '-'),
-  textField('nodes', 'Nodes', fmt(record.nodes)),
+  textField('job-id', 'pages.jobHistoryDetail.fields.jobId', String(record.job_id)),
+  textField('name', 'pages.jobHistoryDetail.fields.name', fmt(record.job_name)),
+  textField('state-reason', 'pages.jobHistoryDetail.fields.stateReason', fmt(record.state_reason)),
+  textField('user', 'pages.jobHistoryDetail.fields.user', fmt(record.user_name)),
+  textField('group', 'pages.jobHistoryDetail.fields.group', fmt(record.group)),
+  textField('account', 'pages.jobHistoryDetail.fields.account', fmt(record.account)),
+  textField('partition', 'pages.jobHistoryDetail.fields.partition', fmt(record.partition)),
+  textField('qos', 'pages.jobHistoryDetail.fields.qos', fmt(record.qos)),
+  textField('priority', 'pages.jobHistoryDetail.fields.priority', record.priority != null ? String(record.priority) : '-'),
+  textField('nodes', 'pages.jobHistoryDetail.fields.nodes', fmt(record.nodes)),
   textField(
     'resources',
-    'Resources',
+    'pages.jobHistoryDetail.fields.resources',
     [
-      hasValue(record.node_count) ? `${record.node_count} node${record.node_count! > 1 ? 's' : ''}` : null,
-      hasValue(record.cpus) ? `${record.cpus} CPU${record.cpus! > 1 ? 's' : ''}` : null,
+      hasValue(record.node_count)
+        ? t(
+            record.node_count === 1
+              ? 'pages.jobHistoryDetail.resourcesLabel.nodes'
+              : 'pages.jobHistoryDetail.resourcesLabel.nodesPlural',
+            { count: record.node_count }
+          )
+        : null,
+      hasValue(record.cpus)
+        ? t(
+            record.cpus === 1
+              ? 'pages.jobHistoryDetail.resourcesLabel.cpus'
+              : 'pages.jobHistoryDetail.resourcesLabel.cpusPlural',
+            { count: record.cpus }
+          )
+        : null,
       record.tres_req_str ?? null
     ]
       .filter(Boolean)
       .join(', ') || '-'
   ),
-  resourceField('requested', 'Requested', record.tres_requested, historyRequestedGPU(record)),
-  resourceField('allocated', 'Allocated', record.tres_allocated, historyAllocatedGPU(record)),
-  textField('tres-per-job', 'TRES/Job', fmt(record.tres_per_job)),
-  textField('tres-per-node', 'TRES/Node', fmt(record.tres_per_node)),
-  textField('gres', 'GRES', fmt(record.gres_detail)),
-  textField('max-memory', 'Max Memory', formatMemoryGB(record.used_memory_gb)),
+  resourceField('requested', 'pages.jobHistoryDetail.fields.requested', record.tres_requested, historyRequestedGPU(record)),
+  resourceField('allocated', 'pages.jobHistoryDetail.fields.allocated', record.tres_allocated, historyAllocatedGPU(record)),
+  textField('tres-per-job', 'pages.jobHistoryDetail.fields.tresPerJob', fmt(record.tres_per_job)),
+  textField('tres-per-node', 'pages.jobHistoryDetail.fields.tresPerNode', fmt(record.tres_per_node)),
+  textField('gres', 'pages.jobHistoryDetail.fields.gres', fmt(record.gres_detail)),
+  textField('max-memory', 'pages.jobHistoryDetail.fields.maxMemory', formatMemoryGB(record.used_memory_gb)),
   textField(
     'used-cpu-cores-avg',
-    'Average CPU Cores Used',
+    'pages.jobHistoryDetail.fields.avgCpuCores',
     fmtCpuCoresAvg(record.used_cpu_cores_avg),
     false,
     {
-      title: 'Average CPU Cores Used',
-      body:
-        'Estimated average concurrent CPU cores used while the job ran. Calculated as sum(step.time.total) / job_elapsed_seconds from the included job steps.'
+      title: t('pages.jobHistoryDetail.helps.avgCpuCoresTitle'),
+      body: t('pages.jobHistoryDetail.helps.avgCpuCoresBody')
     }
   ),
-  textField('time-limit', 'Time Limit', fmtDuration(record.time_limit_minutes)),
-  textField('exit-code', 'Exit Code', formatJobExitCode(record.exit_code)),
-  textField('workdir', 'Working Directory', fmt(record.working_directory), true),
-  textField('command', 'Command', fmt(record.command), true)
+  textField('time-limit', 'pages.jobHistoryDetail.fields.timeLimit', fmtDuration(record.time_limit_minutes)),
+  textField('exit-code', 'pages.jobHistoryDetail.fields.exitCode', formatJobExitCode(record.exit_code)),
+  textField('workdir', 'pages.jobHistoryDetail.fields.workdir', fmt(record.working_directory), true),
+  textField('command', 'pages.jobHistoryDetail.fields.command', fmt(record.command), true)
 ]
 
 const timeline = computed(() => (job.value ? timelineSteps(job.value) : []))
@@ -307,23 +340,23 @@ const fullFields = computed(() =>
 const summaryItems = computed(() => {
   if (!job.value) return []
   return [
-    { id: 'job-id', label: 'Job ID', value: String(job.value.job_id) },
-    { id: 'user', label: 'User', value: fmt(job.value.user_name) },
-    { id: 'account', label: 'Account', value: fmt(job.value.account) },
-    { id: 'partition', label: 'Partition', value: fmt(job.value.partition) },
-    { id: 'nodes', label: 'Nodes', value: fmt(job.value.nodes) },
+    { id: 'job-id', label: 'pages.jobHistoryDetail.summary.jobId', value: String(job.value.job_id) },
+    { id: 'user', label: 'pages.jobHistoryDetail.summary.user', value: fmt(job.value.user_name) },
+    { id: 'account', label: 'pages.jobHistoryDetail.summary.account', value: fmt(job.value.account) },
+    { id: 'partition', label: 'pages.jobHistoryDetail.summary.partition', value: fmt(job.value.partition) },
+    { id: 'nodes', label: 'pages.jobHistoryDetail.summary.nodes', value: fmt(job.value.nodes) },
     {
       id: 'max-memory',
-      label: 'Max Memory',
+      label: 'pages.jobHistoryDetail.summary.maxMemory',
       value: formatMemoryGB(job.value.used_memory_gb)
     },
     {
       id: 'used-cpu-cores-avg',
-      label: 'Avg CPU Cores',
+      label: 'pages.jobHistoryDetail.summary.avgCpuCores',
       value: fmtCpuCoresAvg(job.value.used_cpu_cores_avg),
-      subtle: 'Average concurrent cores used'
+      subtle: 'pages.jobHistoryDetail.summary.avgCpuCoresSubtle'
     },
-    { id: 'exit-code', label: 'Exit Code', value: formatJobExitCode(job.value.exit_code) }
+    { id: 'exit-code', label: 'pages.jobHistoryDetail.summary.exitCode', value: formatJobExitCode(job.value.exit_code) }
   ]
 })
 
@@ -359,7 +392,7 @@ watch(
     menu-entry="jobs-history"
     :cluster="cluster"
     :breadcrumb="[
-      { title: 'Jobs History', routeName: 'jobs-history' },
+      { title: 'shell.mainMenu.jobsHistory', routeName: 'jobs-history' },
       { title: `Job ${job?.job_id ?? id}` }
     ]"
   >
@@ -369,9 +402,9 @@ watch(
       <div class="ui-scroll-region min-h-0 flex-1 pr-1">
         <div class="ui-section-stack pb-2">
           <PageHeader
-            kicker="Job History"
+            kicker="pages.jobHistoryDetail.kicker"
             :title="`Job ${job?.job_id ?? id}`"
-            description="Recorded timeline, scheduler context and resource details captured for this finished job."
+            description="pages.jobHistoryDetail.description"
           >
             <template #actions>
               <div v-if="job" class="flex flex-wrap items-center justify-end gap-3">
@@ -383,7 +416,7 @@ watch(
                   :to="{ name: 'job', params: { cluster, id: job.job_id } }"
                   class="ui-button-secondary"
                 >
-                  Live job
+                  {{ t('pages.jobHistoryDetail.liveJob') }}
                 </RouterLink>
               </div>
               <div
@@ -401,23 +434,25 @@ watch(
           <PanelSkeleton :rows="4" />
           <div class="ui-panel ui-section">
             <div class="mb-5">
-              <h2 class="ui-panel-title">Recorded Fields</h2>
+              <h2 class="ui-panel-title">{{ t('pages.jobHistoryDetail.recordedFieldsTitle') }}</h2>
               <p class="ui-panel-description mt-2">
-                Scheduler metadata and accounting values archived for this historical record.
+                {{ t('pages.jobHistoryDetail.recordedFieldsDescription') }}
               </p>
             </div>
             <DetailSkeletonList :rows="8" />
           </div>
         </div>
 
-      <ErrorAlert v-if="error">Unable to retrieve job history record {{ id }}: {{ error }}</ErrorAlert>
+      <ErrorAlert v-if="error">
+        {{ t('pages.jobHistoryDetail.errors.unableToRetrieve', { id, error }) }}
+      </ErrorAlert>
       <div v-else-if="job">
         <div class="grid gap-6 xl:grid-cols-[minmax(280px,0.68fr)_minmax(0,1.32fr)]">
           <div class="ui-panel ui-section">
             <div class="mb-5">
-              <h2 class="ui-panel-title">Execution Timeline</h2>
+              <h2 class="ui-panel-title">{{ t('pages.jobHistoryDetail.executionTimelineTitle') }}</h2>
               <p class="ui-panel-description mt-2">
-                Historical checkpoints captured across submission, scheduling and completion.
+                {{ t('pages.jobHistoryDetail.executionTimelineDescription') }}
               </p>
             </div>
 
@@ -479,17 +514,17 @@ watch(
 
           <div class="ui-panel ui-section">
             <div class="mb-5">
-              <h2 class="ui-panel-title">Recorded Fields</h2>
+              <h2 class="ui-panel-title">{{ t('pages.jobHistoryDetail.recordedFieldsTitle') }}</h2>
               <p class="ui-panel-description mt-2">
-                Scheduler metadata and accounting values archived for this historical record.
+                {{ t('pages.jobHistoryDetail.recordedFieldsDescription') }}
               </p>
             </div>
             <section class="space-y-6">
               <div>
                 <div class="mb-4">
-                  <h3 class="ui-panel-title">Detailed Resources & Commands</h3>
+                  <h3 class="ui-panel-title">{{ t('pages.jobHistoryDetail.detailedTitle') }}</h3>
                   <p class="ui-panel-description mt-1">
-                    Longer fields stay expanded for readability and copy-friendly access.
+                    {{ t('pages.jobHistoryDetail.detailedDescription') }}
                   </p>
                 </div>
                 <div class="ui-detail-list" data-testid="job-history-detail-list">
@@ -523,7 +558,7 @@ watch(
                             >
                               <HashtagIcon class="h-3.5 w-3.5" aria-hidden="true" />
                             </span>
-                            <span>{{ field.label }}</span>
+                            <span>{{ translate(field.label) }}</span>
                           </span>
                         </a>
                       </dt>

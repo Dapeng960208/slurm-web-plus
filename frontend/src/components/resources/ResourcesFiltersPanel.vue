@@ -9,6 +9,7 @@
 <script setup lang="ts">
 import { useRuntimeStore } from '@/stores/runtime'
 import { resourcesStates } from '@/stores/runtime/resources'
+import { useI18n } from 'vue-i18n'
 import PartitionFilterSelector from '@/components/filters/PartitionFilterSelector.vue'
 import {
   Dialog,
@@ -25,6 +26,7 @@ import { XMarkIcon } from '@heroicons/vue/24/outline'
 const { cluster, nbNodes } = defineProps<{ cluster: string; nbNodes: number }>()
 
 const runtimeStore = useRuntimeStore()
+const { t } = useI18n()
 const canViewPartitionFilter = () =>
   runtimeStore.hasRoutePermission(cluster, 'resources/filter-partitions', 'view')
 </script>
@@ -59,7 +61,7 @@ const canViewPartitionFilter = () =>
           >
             <div class="flex items-center justify-between px-4">
               <h2 class="text-lg font-medium text-gray-900 dark:text-gray-100">
-                Filters
+                {{ t('filters.title') }}
                 <span
                   class="text-slurmweb dark:text-slurmweb-light dark:bg-slurmweb-verydark ml-3 hidden rounded-full bg-indigo-100 px-2.5 py-0.5 text-xs font-medium md:inline-block"
                   >{{ nbNodes }}</span
@@ -70,7 +72,7 @@ const canViewPartitionFilter = () =>
                 class="-mr-2 flex h-10 w-10 items-center justify-center rounded-md p-2 text-gray-400"
                 @click="runtimeStore.resources.openFiltersPanel = false"
               >
-                <span class="sr-only">Close menu</span>
+                <span class="sr-only">{{ t('filters.closeMenu') }}</span>
                 <XMarkIcon class="h-6 w-6" aria-hidden="true" />
               </button>
             </div>
@@ -90,7 +92,7 @@ const canViewPartitionFilter = () =>
                       <BoltIcon
                         class="-mt-1 mr-2 -ml-1 h-8 w-8 rounded-full bg-gray-600 p-2 text-white dark:bg-gray-500"
                       />
-                      <span class="font-medium text-gray-900 dark:text-gray-100">State</span>
+                      <span class="font-medium text-gray-900 dark:text-gray-100">{{ t('common.labels.state') }}</span>
                     </span>
                     <span class="ml-6 flex items-center">
                       <ChevronDownIcon
@@ -139,7 +141,7 @@ const canViewPartitionFilter = () =>
                       <RectangleGroupIcon
                         class="-mt-1 mr-2 -ml-1 h-8 w-8 rounded-full bg-amber-700 p-2 text-white"
                       />
-                      <span class="font-medium text-gray-900 dark:text-gray-100">Partitions</span>
+                      <span class="font-medium text-gray-900 dark:text-gray-100">{{ t('filters.partitions') }}</span>
                     </span>
                     <span class="ml-6 flex items-center">
                       <ChevronDownIcon

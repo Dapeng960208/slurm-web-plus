@@ -9,6 +9,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import type { AccessControlSourceName } from '@/composables/GatewayAPI'
 import { normalizeClusterPermissions } from '@/composables/GatewayAPI'
 import SettingsTabs from '@/components/settings/SettingsTabs.vue'
@@ -18,26 +19,27 @@ import { useAuthStore } from '@/stores/auth'
 
 const runtimeStore = useRuntimeStore()
 const authStore = useAuthStore()
+const { t } = useI18n()
 
 const permissionSources: Array<{
   key: AccessControlSourceName
-  title: string
-  description: string
+  titleKey: string
+  descriptionKey: string
 }> = [
   {
     key: 'policy',
-    title: 'Policy',
-    description: 'Base RBAC roles and actions from the active policy.'
+    titleKey: 'settings.account.permissionSources.policy.title',
+    descriptionKey: 'settings.account.permissionSources.policy.description'
   },
   {
     key: 'custom',
-    title: 'Custom',
-    description: 'Site-specific additions or overrides.'
+    titleKey: 'settings.account.permissionSources.custom.title',
+    descriptionKey: 'settings.account.permissionSources.custom.description'
   },
   {
     key: 'merged',
-    title: 'Merged',
-    description: 'Effective permissions exposed to the application.'
+    titleKey: 'settings.account.permissionSources.merged.title',
+    descriptionKey: 'settings.account.permissionSources.merged.description'
   }
 ]
 
@@ -57,20 +59,23 @@ function sortedValues(values: string[]) {
   <div class="ui-section-stack">
     <SettingsTabs entry="Account" />
     <div class="ui-panel ui-section">
-      <SettingsHeader title="Account" description="Personal identity, group membership and cluster-level permissions." />
+      <SettingsHeader
+        title="settings.account.title"
+        description="settings.account.description"
+      />
 
       <div class="ui-detail-list mt-6">
         <dl>
           <div class="ui-detail-row">
-            <dt class="ui-detail-term">Username</dt>
+            <dt class="ui-detail-term">{{ t('settings.account.username') }}</dt>
             <dd class="ui-detail-value">{{ authStore.username }}</dd>
           </div>
           <div class="ui-detail-row">
-            <dt class="ui-detail-term">Full name</dt>
+            <dt class="ui-detail-term">{{ t('settings.account.fullName') }}</dt>
             <dd class="ui-detail-value">{{ authStore.fullname }}</dd>
           </div>
           <div class="ui-detail-row">
-            <dt class="ui-detail-term">Groups</dt>
+            <dt class="ui-detail-term">{{ t('settings.account.groups') }}</dt>
             <dd class="ui-detail-value">{{ authStore.groups?.join(', ') }}</dd>
           </div>
         </dl>
@@ -85,10 +90,10 @@ function sortedValues(values: string[]) {
       >
         <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <p class="ui-page-kicker">Cluster Permissions</p>
+            <p class="ui-page-kicker">{{ t('settings.account.clusterPermissions') }}</p>
             <h2 class="ui-panel-title">{{ cluster.name }}</h2>
             <p class="ui-panel-description mt-2">
-              Policy, custom overrides and merged permissions resolved for this cluster.
+              {{ t('settings.account.clusterDescription') }}
             </p>
           </div>
 
@@ -97,7 +102,7 @@ function sortedValues(values: string[]) {
               :to="{ name: 'my-profile', params: { cluster: cluster.name } }"
               class="ui-button-secondary"
             >
-              Open my workspace
+              {{ t('settings.account.actions.openWorkspace') }}
             </RouterLink>
             <RouterLink
               v-if="cluster.user_metrics"
@@ -108,14 +113,14 @@ function sortedValues(values: string[]) {
               }"
               class="ui-button-secondary"
             >
-              Open my analysis
+              {{ t('settings.account.actions.openAnalysis') }}
             </RouterLink>
             <RouterLink
               v-if="runtimeStore.hasRoutePermission(cluster.name, 'jobs-history', 'view')"
               :to="{ name: 'jobs-history', params: { cluster: cluster.name }, query: { user: authStore.username } }"
               class="ui-button-secondary"
             >
-              View my history jobs
+              {{ t('settings.account.actions.viewHistoryJobs') }}
             </RouterLink>
           </div>
         </div>
@@ -126,17 +131,19 @@ function sortedValues(values: string[]) {
             :key="`${cluster.name}-${source.key}`"
             class="rounded-[26px] border border-[rgba(80,105,127,0.1)] bg-[rgba(244,248,251,0.82)] px-5 py-5"
           >
-            <p class="ui-page-kicker">{{ source.title }}</p>
+            <p class="ui-page-kicker">{{ t(source.titleKey) }}</p>
             <h3 class="text-base font-semibold text-[var(--color-brand-ink-strong)]">
-              {{ source.title }} Roles & Actions
+              {{ t('settings.account.sourceSummary', { title: t(source.titleKey) }) }}
             </h3>
             <p class="mt-2 text-sm text-[var(--color-brand-muted)]">
-              {{ source.description }}
+              {{ t(source.descriptionKey) }}
             </p>
 
             <div class="mt-5 space-y-5">
               <div>
-                <p class="text-sm font-semibold text-[var(--color-brand-ink-strong)]">Roles</p>
+                <p class="text-sm font-semibold text-[var(--color-brand-ink-strong)]">
+                  {{ t('settings.account.roles') }}
+                </p>
                 <div
                   v-if="cluster.permissions.sources?.[source.key]?.roles.length"
                   class="mt-3 flex flex-wrap gap-2"
@@ -149,11 +156,15 @@ function sortedValues(values: string[]) {
                     {{ role }}
                   </span>
                 </div>
-                <p v-else class="mt-3 text-sm text-[var(--color-brand-muted)]">No roles declared.</p>
+                <p v-else class="mt-3 text-sm text-[var(--color-brand-muted)]">
+                  {{ t('settings.account.emptyRoles') }}
+                </p>
               </div>
 
               <div>
-                <p class="text-sm font-semibold text-[var(--color-brand-ink-strong)]">Actions</p>
+                <p class="text-sm font-semibold text-[var(--color-brand-ink-strong)]">
+                  {{ t('settings.account.actionsLabel') }}
+                </p>
                 <div
                   v-if="cluster.permissions.sources?.[source.key]?.actions.length"
                   class="mt-3 flex flex-wrap gap-2"
@@ -167,12 +178,14 @@ function sortedValues(values: string[]) {
                   </span>
                 </div>
                 <p v-else class="mt-3 text-sm text-[var(--color-brand-muted)]">
-                  No actions declared.
+                  {{ t('settings.account.emptyActions') }}
                 </p>
               </div>
 
               <div>
-                <p class="text-sm font-semibold text-[var(--color-brand-ink-strong)]">Rules</p>
+                <p class="text-sm font-semibold text-[var(--color-brand-ink-strong)]">
+                  {{ t('settings.account.rules') }}
+                </p>
                 <div
                   v-if="cluster.permissions.sources?.[source.key]?.rules.length"
                   class="mt-3 flex flex-wrap gap-2"
@@ -186,7 +199,7 @@ function sortedValues(values: string[]) {
                   </span>
                 </div>
                 <p v-else class="mt-3 text-sm text-[var(--color-brand-muted)]">
-                  No route rules declared.
+                  {{ t('settings.account.emptyRules') }}
                 </p>
               </div>
             </div>

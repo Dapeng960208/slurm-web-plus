@@ -7,18 +7,23 @@
 -->
 
 <script setup lang="ts">
-import { onMounted, onUnmounted, useTemplateRef, watch } from 'vue'
+import { computed, onMounted, onUnmounted, useTemplateRef, watch } from 'vue'
 import { Chart } from 'chart.js/auto'
 import type { Point } from 'chart.js'
 import 'chartjs-adapter-luxon'
+import { useI18n } from 'vue-i18n'
 import type { UserMetricsHistory } from '@/composables/GatewayAPI'
 
 const { history } = defineProps<{
   history: UserMetricsHistory | null
 }>()
 
+const { t, locale } = useI18n()
 const chartCanvas = useTemplateRef<HTMLCanvasElement>('chartCanvas')
 let chart: Chart<'line'> | null = null
+const submissionsLabel = computed(() => t('pages.user.analyticsPanels.chart.submissions'))
+const completionsLabel = computed(() => t('pages.user.analyticsPanels.chart.completions'))
+const jobsUnit = computed(() => t('pages.user.analyticsPanels.chart.jobsUnit'))
 
 function toPoints(series: Array<[number, number]>): Point[] {
   return series.map(([x, y]) => ({ x, y }))
@@ -34,7 +39,7 @@ function updateChart() {
 
   chart.data.datasets = [
     {
-      label: 'Submissions',
+      label: submissionsLabel.value,
       data: toPoints(history.submissions),
       borderColor: '#50697f',
       backgroundColor: 'rgba(80, 105, 127, 0.14)',
@@ -44,7 +49,7 @@ function updateChart() {
       fill: true
     },
     {
-      label: 'Completions',
+      label: completionsLabel.value,
       data: toPoints(history.completions ?? []),
       borderColor: '#ef9b28',
       backgroundColor: 'rgba(239, 155, 40, 0.1)',
@@ -87,7 +92,8 @@ onMounted(() => {
           borderWidth: 1,
           padding: 12,
           callbacks: {
-            label: (context) => `${context.dataset.label}: ${context.parsed.y.toFixed(0)} jobs`
+            label: (context) =>
+              `${context.dataset.label}: ${context.parsed.y.toFixed(0)} ${jobsUnit.value}`
           }
         }
       },
@@ -127,6 +133,8 @@ watch(
   () => updateChart(),
   { deep: true }
 )
+
+watch(locale, () => updateChart())
 
 onUnmounted(() => {
   chart?.destroy()

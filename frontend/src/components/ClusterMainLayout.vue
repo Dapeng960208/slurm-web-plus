@@ -13,6 +13,7 @@ import type { Ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRuntimeStore } from '@/stores/runtime'
 import { useRuntimeConfiguration } from '@/plugins/runtimeConfiguration'
+import { translate } from '@/i18n/translate'
 import { Bars3Icon, ServerStackIcon } from '@heroicons/vue/24/outline'
 import { ChevronRightIcon } from '@heroicons/vue/20/solid'
 import MainMenu from '@/components/MainMenu.vue'
@@ -77,12 +78,12 @@ onMounted(() => {
               v-if="breadcrumbPart.routeName"
               :to="{ name: breadcrumbPart.routeName, params: { cluster } }"
               class="truncate text-sm font-medium text-[var(--color-brand-blue)] transition hover:text-[var(--color-brand-ink-strong)]"
-              >{{ breadcrumbPart.title }}</router-link
+              >{{ translate(breadcrumbPart.title) }}</router-link
             >
             <span
               v-else
               class="truncate text-sm font-semibold text-[var(--color-brand-ink-strong)]"
-              >{{ breadcrumbPart.title }}</span
+              >{{ translate(breadcrumbPart.title) }}</span
             >
           </span>
         </div>

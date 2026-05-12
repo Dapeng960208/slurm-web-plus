@@ -9,6 +9,7 @@
 <script setup lang="ts">
 import { computed, ref, watch, onMounted } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { ChevronLeftIcon } from '@heroicons/vue/20/solid'
 import ClusterMainLayout from '@/components/ClusterMainLayout.vue'
 import InfoAlert from '@/components/InfoAlert.vue'
@@ -39,6 +40,7 @@ const { cluster, account } = defineProps<{
 const router = useRouter()
 const gateway = useGatewayAPI()
 const runtimeStore = useRuntimeStore()
+const { t } = useI18n()
 const editOpen = ref(false)
 const deleteOpen = ref(false)
 const addUserOpen = ref(false)
@@ -113,10 +115,10 @@ const jobLimits = computed(() => {
   if (!accountAssociation.value) return []
   const currentAccount = accountAssociation.value
   return [
-    { id: 'GrpJobs', label: 'Running', value: currentAccount.max.jobs.per.count },
-    { id: 'GrpSubmit', label: 'Submitted', value: currentAccount.max.jobs.per.submitted },
-    { id: 'MaxJobs', label: 'Running / user', value: currentAccount.max.jobs.active },
-    { id: 'MaxSubmit', label: 'Submitted / user', value: currentAccount.max.jobs.total }
+    { id: 'GrpJobs', label: 'pages.account.limits.running', value: currentAccount.max.jobs.per.count },
+    { id: 'GrpSubmit', label: 'pages.account.limits.submitted', value: currentAccount.max.jobs.per.submitted },
+    { id: 'MaxJobs', label: 'pages.account.limits.runningPerUser', value: currentAccount.max.jobs.active },
+    { id: 'MaxSubmit', label: 'pages.account.limits.submittedPerUser', value: currentAccount.max.jobs.total }
   ]
 })
 
@@ -124,9 +126,9 @@ const resourceLimits = computed(() => {
   if (!accountAssociation.value) return []
   const currentAccount = accountAssociation.value
   return [
-    { id: 'GrpTRES', label: 'Total', value: currentAccount.max.tres.total },
-    { id: 'MaxTRES', label: 'Per job', value: currentAccount.max.tres.per.job },
-    { id: 'MaxTRESPerNode', label: 'Per node', value: currentAccount.max.tres.per.node }
+    { id: 'GrpTRES', label: 'pages.account.limits.total', value: currentAccount.max.tres.total },
+    { id: 'MaxTRES', label: 'pages.account.limits.perJob', value: currentAccount.max.tres.per.job },
+    { id: 'MaxTRESPerNode', label: 'pages.account.limits.perNode', value: currentAccount.max.tres.per.node }
   ]
 })
 
@@ -134,8 +136,8 @@ const timeLimits = computed(() => {
   if (!accountAssociation.value) return []
   const currentAccount = accountAssociation.value
   return [
-    { id: 'GrpWall', label: 'Total', value: currentAccount.max.per.account.wall_clock },
-    { id: 'MaxWall', label: 'Per job', value: currentAccount.max.jobs.per.wall_clock }
+    { id: 'GrpWall', label: 'pages.account.limits.total', value: currentAccount.max.per.account.wall_clock },
+    { id: 'MaxWall', label: 'pages.account.limits.perJob', value: currentAccount.max.jobs.per.wall_clock }
   ]
 })
 
@@ -177,7 +179,7 @@ async function saveAccount(payload: Record<string, string>) {
       parent_account: payload.parent_account || undefined,
       qos: parseCsvList(payload.qos)
     })
-    runtimeStore.reportInfo(`Account ${account} update requested.`)
+    runtimeStore.reportInfo(t('pages.account.notifications.updateRequested', { account }))
     await loadAccountDetails()
     editOpen.value = false
   } catch (error: unknown) {
@@ -200,7 +202,9 @@ async function addUserAssociation(payload: Record<string, string>) {
         default_qos: payload.default_qos
       })
     )
-    runtimeStore.reportInfo(`User ${payload.user} association requested for account ${account}.`)
+    runtimeStore.reportInfo(
+      t('pages.account.notifications.addUserRequested', { user: payload.user, account })
+    )
     addUserOpen.value = false
   } catch (error: unknown) {
     operationError.value = error instanceof Error ? error.message : String(error)
@@ -223,7 +227,12 @@ async function saveUserAssociationQos(payload: Record<string, string>) {
         default_qos: payload.default_qos
       })
     )
-    runtimeStore.reportInfo(`QOS update requested for ${selectedAssociation.value.user} on ${account}.`)
+    runtimeStore.reportInfo(
+      t('pages.account.notifications.updateQosRequested', {
+        user: selectedAssociation.value.user,
+        account
+      })
+    )
     editUserQosOpen.value = false
   } catch (error: unknown) {
     operationError.value = error instanceof Error ? error.message : String(error)
@@ -244,7 +253,12 @@ async function removeUserAssociation() {
         user: selectedAssociation.value.user
       })
     )
-    runtimeStore.reportInfo(`User ${selectedAssociation.value.user} removal requested from ${account}.`)
+    runtimeStore.reportInfo(
+      t('pages.account.notifications.removeUserRequested', {
+        user: selectedAssociation.value.user,
+        account
+      })
+    )
     deleteAssociationOpen.value = false
   } catch (error: unknown) {
     operationError.value = error instanceof Error ? error.message : String(error)
@@ -258,7 +272,7 @@ async function removeAccount() {
   operationError.value = null
   try {
     await gateway.delete_account(cluster, account)
-    runtimeStore.reportInfo(`Account ${account} deletion requested.`)
+    runtimeStore.reportInfo(t('pages.account.notifications.deleteRequested', { account }))
     deleteOpen.value = false
   } catch (error: unknown) {
     operationError.value = error instanceof Error ? error.message : String(error)
@@ -285,13 +299,13 @@ function userJobLimits(association: ClusterAssociation) {
   return [
     {
       id: 'MaxJobs',
-      label: 'Running / user',
+      label: 'pages.account.limits.runningPerUser',
       value: association.max.jobs.active,
       different: !compareOptionalNumber(association.max.jobs.active, currentAccount.max.jobs.active)
     },
     {
       id: 'MaxSubmit',
-      label: 'Submitted / user',
+      label: 'pages.account.limits.submittedPerUser',
       value: association.max.jobs.total,
       different: !compareOptionalNumber(association.max.jobs.total, currentAccount.max.jobs.total)
     }
@@ -304,19 +318,19 @@ function userResourceLimits(association: ClusterAssociation) {
   return [
     {
       id: 'GrpTRES',
-      label: 'Total',
+      label: 'pages.account.limits.total',
       value: association.max.tres.total,
       different: !compareTRES(association.max.tres.total, currentAccount.max.tres.total, true)
     },
     {
       id: 'MaxTRES',
-      label: 'Per job',
+      label: 'pages.account.limits.perJob',
       value: association.max.tres.per.job,
       different: !compareTRES(association.max.tres.per.job, currentAccount.max.tres.per.job)
     },
     {
       id: 'MaxTRESPerNode',
-      label: 'Per node',
+      label: 'pages.account.limits.perNode',
       value: association.max.tres.per.node,
       different: !compareTRES(association.max.tres.per.node, currentAccount.max.tres.per.node)
     }
@@ -329,7 +343,7 @@ function userTimeLimits(association: ClusterAssociation) {
   return [
     {
       id: 'GrpWall',
-      label: 'Total',
+      label: 'pages.account.limits.total',
       value: association.max.per.account.wall_clock,
       different: !compareOptionalNumber(
         association.max.per.account.wall_clock,
@@ -339,7 +353,7 @@ function userTimeLimits(association: ClusterAssociation) {
     },
     {
       id: 'MaxWall',
-      label: 'Per job',
+      label: 'pages.account.limits.perJob',
       value: association.max.jobs.per.wall_clock,
       different: !compareOptionalNumber(
         association.max.jobs.per.wall_clock,
@@ -397,7 +411,7 @@ function hasDifferentQos(userAssociation: ClusterAssociation): boolean {
   <ClusterMainLayout
     menu-entry="accounts"
     :cluster="cluster"
-    :breadcrumb="[{ title: 'Accounts', routeName: 'accounts' }, { title: `${account}` }]"
+    :breadcrumb="[{ title: 'shell.mainMenu.accounts', routeName: 'accounts' }, { title: `${account}` }]"
   >
     <div class="ui-page ui-page-readable ui-content-workspace">
       <button
@@ -406,18 +420,22 @@ function hasDifferentQos(userAssociation: ClusterAssociation): boolean {
         class="ui-button-secondary self-start shrink-0"
       >
         <ChevronLeftIcon class="-ml-0.5 h-5 w-5" aria-hidden="true" />
-        Back to accounts
+        {{ t('pages.account.back') }}
       </button>
 
       <div class="ui-scroll-region min-h-0 flex-1 pr-1">
         <div class="ui-section-stack pb-2">
           <div id="account-heading">
             <PageHeader
-              kicker="Account Detail"
+              kicker="pages.account.kicker"
               :title="account"
-              description="Hierarchy, inherited policy and per-user overrides for the selected Slurm account."
+              description="pages.account.description"
               :metric-value="loaded && accountAssociation ? userAssociations.length : undefined"
-              :metric-label="`user association${userAssociations.length === 1 ? '' : 's'}`"
+              :metric-label="
+                userAssociations.length === 1
+                  ? 'pages.account.metricLabel'
+                  : 'pages.account.metricLabelPlural'
+              "
             >
               <template #actions>
                 <div class="flex flex-wrap gap-3">
@@ -425,7 +443,7 @@ function hasDifferentQos(userAssociation: ClusterAssociation): boolean {
                     :to="{ name: 'jobs', params: { cluster }, query: { accounts: account } }"
                     class="ui-button-primary"
                   >
-                    View jobs
+                    {{ t('pages.account.actions.viewJobs') }}
                   </RouterLink>
                   <button
                     v-if="canEditAccount"
@@ -433,7 +451,7 @@ function hasDifferentQos(userAssociation: ClusterAssociation): boolean {
                     class="ui-button-warning"
                     @click="editOpen = true"
                   >
-                    Edit
+                    {{ t('pages.account.actions.edit') }}
                   </button>
                   <button
                     v-if="canDeleteAccount"
@@ -441,7 +459,7 @@ function hasDifferentQos(userAssociation: ClusterAssociation): boolean {
                     class="ui-button-danger"
                     @click="deleteOpen = true"
                   >
-                    Delete
+                    {{ t('pages.account.actions.delete') }}
                   </button>
                 </div>
               </template>
@@ -453,9 +471,9 @@ function hasDifferentQos(userAssociation: ClusterAssociation): boolean {
           <div class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
             <div class="ui-panel ui-section">
               <div class="mb-5">
-                <h2 class="ui-panel-title">Account Overview</h2>
+                <h2 class="ui-panel-title">{{ t('pages.account.overviewTitle') }}</h2>
                 <p class="ui-panel-description mt-2">
-                  Parent hierarchy, scoped QoS and inherited account-wide limits.
+                  {{ t('pages.account.overviewDescription') }}
                 </p>
               </div>
               <DetailSkeletonList :rows="6" />
@@ -465,57 +483,56 @@ function hasDifferentQos(userAssociation: ClusterAssociation): boolean {
         </template>
 
       <ErrorAlert v-if="unable">
-        Unable to retrieve associations for cluster
-        <span class="font-medium">{{ cluster }}</span>
+        {{ t('pages.account.errors.unableToRetrieve', { cluster }) }}
       </ErrorAlert>
       <InfoAlert v-else-if="loaded && !accountKnown">
-        Account <span class="font-semibold">{{ account }}</span> does not exist on this cluster.
+        {{ t('pages.account.noAccount', { account }) }}
       </InfoAlert>
       <div v-else-if="accountKnown" class="ui-section-stack">
         <div class="ui-stat-grid">
           <div class="ui-stat-card">
-            <div class="ui-stat-label">Parent Chain</div>
+            <div class="ui-stat-label">{{ t('pages.account.stats.parentChain') }}</div>
             <div class="ui-stat-value">{{ subaccounts.length }}</div>
-            <div class="ui-stat-subtle">Direct subaccounts</div>
+            <div class="ui-stat-subtle">{{ t('pages.account.stats.directSubaccounts') }}</div>
           </div>
           <div class="ui-stat-card">
-            <div class="ui-stat-label">QoS Scope</div>
+            <div class="ui-stat-label">{{ t('pages.account.stats.qosScope') }}</div>
             <div class="mt-3 text-lg font-bold text-[var(--color-brand-ink-strong)]">
               {{ renderQosLabel(accountAssociation?.qos ?? []) }}
             </div>
-            <div class="ui-stat-subtle">Applied at account level</div>
+            <div class="ui-stat-subtle">{{ t('pages.account.stats.appliedAtAccountLevel') }}</div>
           </div>
           <div class="ui-stat-card">
-            <div class="ui-stat-label">Job Limits</div>
+            <div class="ui-stat-label">{{ t('pages.account.stats.jobLimits') }}</div>
             <div class="ui-stat-value">{{ jobLimits.length }}</div>
-            <div class="ui-stat-subtle">Configured limit entries</div>
+            <div class="ui-stat-subtle">{{ t('pages.account.stats.configuredLimitEntries') }}</div>
           </div>
           <div class="ui-stat-card">
-            <div class="ui-stat-label">Time Limits</div>
+            <div class="ui-stat-label">{{ t('pages.account.stats.timeLimits') }}</div>
             <div class="ui-stat-value">{{ timeLimits.length }}</div>
-            <div class="ui-stat-subtle">Walltime policies</div>
+            <div class="ui-stat-subtle">{{ t('pages.account.stats.walltimePolicies') }}</div>
           </div>
         </div>
 
         <div class="ui-panel ui-section">
           <div class="mb-5">
-            <h2 class="ui-panel-title">Account Overview</h2>
+            <h2 class="ui-panel-title">{{ t('pages.account.overviewTitle') }}</h2>
             <p class="ui-panel-description mt-2">
-              Parent hierarchy, scoped QoS and inherited account-wide limits.
+              {{ t('pages.account.overviewDescription') }}
             </p>
           </div>
 
           <div class="ui-detail-list">
             <dl>
               <div id="parents" class="ui-detail-row">
-                <dt class="ui-detail-term">Parent accounts</dt>
+                <dt class="ui-detail-term">{{ t('pages.account.detail.parentAccounts') }}</dt>
                 <dd class="ui-detail-value">
                   <AccountBreadcrumb :cluster="cluster" :account="account" :associations="data ?? []" />
                 </dd>
               </div>
 
               <div id="subaccounts" class="ui-detail-row">
-                <dt class="ui-detail-term">Subaccounts</dt>
+                <dt class="ui-detail-term">{{ t('pages.account.detail.subaccounts') }}</dt>
                 <dd class="ui-detail-value">
                   <div v-if="subaccounts.length === 0">∅</div>
                   <div v-else class="flex flex-wrap gap-2">
@@ -532,17 +549,17 @@ function hasDifferentQos(userAssociation: ClusterAssociation): boolean {
               </div>
 
               <div id="qos" class="ui-detail-row">
-                <dt class="ui-detail-term">QoS</dt>
+                <dt class="ui-detail-term">{{ t('pages.account.detail.qos') }}</dt>
                 <dd class="ui-detail-value">{{ renderQosLabel(accountAssociation?.qos ?? []) }}</dd>
               </div>
 
               <div id="limits-jobs" class="ui-detail-row">
-                <dt class="ui-detail-term">Job limits</dt>
+                <dt class="ui-detail-term">{{ t('pages.account.detail.jobLimits') }}</dt>
                 <dd class="ui-detail-value">
                   <div v-if="jobLimits.length === 0">-</div>
                   <dl v-else class="space-y-2">
                     <div v-for="limit in jobLimits" :key="limit.id" class="flex flex-wrap items-center gap-2">
-                      <dt class="font-semibold text-[var(--color-brand-ink-strong)]">{{ limit.label }}:</dt>
+                      <dt class="font-semibold text-[var(--color-brand-ink-strong)]">{{ t(limit.label) }}:</dt>
                       <dd>{{ renderClusterOptionalNumber(limit.value) }}</dd>
                     </div>
                   </dl>
@@ -550,12 +567,12 @@ function hasDifferentQos(userAssociation: ClusterAssociation): boolean {
               </div>
 
               <div id="limits-resources" class="ui-detail-row">
-                <dt class="ui-detail-term">Resource limits</dt>
+                <dt class="ui-detail-term">{{ t('pages.account.detail.resourceLimits') }}</dt>
                 <dd class="ui-detail-value">
                   <div v-if="resourceLimits.length === 0">-</div>
                   <dl v-else class="space-y-2">
                     <div v-for="limit in resourceLimits" :key="limit.id" class="flex flex-wrap items-center gap-2">
-                      <dt class="font-semibold text-[var(--color-brand-ink-strong)]">{{ limit.label }}:</dt>
+                      <dt class="font-semibold text-[var(--color-brand-ink-strong)]">{{ t(limit.label) }}:</dt>
                       <dd class="font-mono text-xs">{{ renderClusterTRES(limit.value) }}</dd>
                     </div>
                   </dl>
@@ -563,12 +580,12 @@ function hasDifferentQos(userAssociation: ClusterAssociation): boolean {
               </div>
 
               <div id="limits-time" class="ui-detail-row">
-                <dt class="ui-detail-term">Time limits</dt>
+                <dt class="ui-detail-term">{{ t('pages.account.detail.timeLimits') }}</dt>
                 <dd class="ui-detail-value">
                   <div v-if="timeLimits.length === 0">-</div>
                   <dl v-else class="space-y-2">
                     <div v-for="limit in timeLimits" :key="limit.id" class="flex flex-wrap items-center gap-2">
-                      <dt class="font-semibold text-[var(--color-brand-ink-strong)]">{{ limit.label }}:</dt>
+                      <dt class="font-semibold text-[var(--color-brand-ink-strong)]">{{ t(limit.label) }}:</dt>
                       <dd>{{ renderWalltime(limit.value) }}</dd>
                     </div>
                   </dl>
@@ -579,15 +596,15 @@ function hasDifferentQos(userAssociation: ClusterAssociation): boolean {
         </div>
 
         <InfoAlert v-if="userAssociations.length === 0">
-          Account <span class="font-semibold">{{ account }}</span> has no end-user associations.
+          {{ t('pages.account.noAssociations', { account }) }}
         </InfoAlert>
 
         <div class="ui-table-shell overflow-x-auto">
           <div class="flex flex-wrap items-start justify-between gap-3 border-b border-[rgba(80,105,127,0.08)] px-6 py-5">
             <div>
-              <h2 class="ui-panel-title">User Associations</h2>
+              <h2 class="ui-panel-title">{{ t('pages.account.userAssociationsTitle') }}</h2>
               <p class="ui-panel-description mt-2">
-                User associations attached to this account, with inherited values visually de-emphasized.
+                {{ t('pages.account.userAssociationsDescription') }}
               </p>
             </div>
             <button
@@ -596,24 +613,24 @@ function hasDifferentQos(userAssociation: ClusterAssociation): boolean {
               class="ui-button-primary"
               @click="addUserOpen = true"
             >
-              Add user
+              {{ t('pages.account.actions.addUser') }}
             </button>
           </div>
 
           <InfoAlert v-if="userAssociations.length === 0" class="m-6">
-            Account <span class="font-semibold">{{ account }}</span> has no end-user associations yet.
+            {{ t('pages.account.noAssociationsYet', { account }) }}
           </InfoAlert>
 
           <div v-else class="inline-block min-w-full align-middle">
             <table class="ui-table min-w-full">
               <thead>
                 <tr>
-                  <th scope="col" class="py-3.5 pr-3 pl-6 text-left lg:min-w-[250px]">User</th>
-                  <th scope="col" class="hidden w-72 px-3 py-3.5 text-left sm:table-cell">Job limits</th>
-                  <th scope="col" class="hidden w-72 px-3 py-3.5 text-left lg:table-cell">Resource limits</th>
-                  <th scope="col" class="hidden w-72 px-3 py-3.5 text-left md:table-cell">Time limits</th>
-                  <th scope="col" class="hidden w-48 px-3 py-3.5 text-left 2xl:table-cell">QoS</th>
-                  <th scope="col" class="py-3.5 pr-6 pl-3 text-right">Actions</th>
+                  <th scope="col" class="py-3.5 pr-3 pl-6 text-left lg:min-w-[250px]">{{ t('tables.userAssociations.columns.user') }}</th>
+                  <th scope="col" class="hidden w-72 px-3 py-3.5 text-left sm:table-cell">{{ t('tables.userAssociations.columns.jobLimits') }}</th>
+                  <th scope="col" class="hidden w-72 px-3 py-3.5 text-left lg:table-cell">{{ t('tables.userAssociations.columns.resourceLimits') }}</th>
+                  <th scope="col" class="hidden w-72 px-3 py-3.5 text-left md:table-cell">{{ t('tables.userAssociations.columns.timeLimits') }}</th>
+                  <th scope="col" class="hidden w-48 px-3 py-3.5 text-left 2xl:table-cell">{{ t('tables.userAssociations.columns.qos') }}</th>
+                  <th scope="col" class="py-3.5 pr-6 pl-3 text-right">{{ t('tables.userAssociations.columns.actions') }}</th>
                 </tr>
               </thead>
               <tbody class="text-sm text-[var(--color-brand-muted)]">
@@ -639,7 +656,7 @@ function hasDifferentQos(userAssociation: ClusterAssociation): boolean {
                         :class="limit.different ? '' : 'opacity-40'"
                         class="flex flex-wrap items-center gap-2"
                       >
-                        <dt class="font-semibold text-[var(--color-brand-ink-strong)]">{{ limit.label }}:</dt>
+                        <dt class="font-semibold text-[var(--color-brand-ink-strong)]">{{ t(limit.label) }}:</dt>
                         <dd>{{ renderClusterOptionalNumber(limit.value) }}</dd>
                       </div>
                     </dl>
@@ -653,7 +670,7 @@ function hasDifferentQos(userAssociation: ClusterAssociation): boolean {
                         :class="limit.different ? '' : 'opacity-40'"
                         class="flex flex-wrap items-center gap-2"
                       >
-                        <dt class="font-semibold text-[var(--color-brand-ink-strong)]">{{ limit.label }}:</dt>
+                        <dt class="font-semibold text-[var(--color-brand-ink-strong)]">{{ t(limit.label) }}:</dt>
                         <dd class="font-mono text-xs">{{ renderClusterTRES(limit.value) }}</dd>
                       </div>
                     </dl>
@@ -667,7 +684,7 @@ function hasDifferentQos(userAssociation: ClusterAssociation): boolean {
                         :class="limit.different ? '' : 'opacity-40'"
                         class="flex flex-wrap items-center gap-2"
                       >
-                        <dt class="font-semibold text-[var(--color-brand-ink-strong)]">{{ limit.label }}:</dt>
+                        <dt class="font-semibold text-[var(--color-brand-ink-strong)]">{{ t(limit.label) }}:</dt>
                         <dd>{{ renderWalltime(limit.value) }}</dd>
                       </div>
                     </dl>
@@ -676,7 +693,7 @@ function hasDifferentQos(userAssociation: ClusterAssociation): boolean {
                     <span :class="hasDifferentQos(association) ? '' : 'opacity-40'">
                       {{ renderQosLabel(association.qos) }}
                       <span v-if="association.default?.qos" class="block text-xs">
-                        Default: {{ association.default.qos }}
+                        {{ t('pages.account.tables.defaultQos', { qos: association.default.qos }) }}
                       </span>
                     </span>
                   </td>
@@ -688,7 +705,7 @@ function hasDifferentQos(userAssociation: ClusterAssociation): boolean {
                         class="ui-button-warning"
                         @click="openEditAssociationDialog(association)"
                       >
-                        Edit QOS
+                        {{ t('pages.account.actions.editQos') }}
                       </button>
                       <button
                         v-if="canDeleteAccount"
@@ -696,7 +713,7 @@ function hasDifferentQos(userAssociation: ClusterAssociation): boolean {
                         class="ui-button-danger"
                         @click="openDeleteAssociationDialog(association)"
                       >
-                        Delete
+                        {{ t('pages.account.actions.delete') }}
                       </button>
                     </div>
                   </td>
@@ -712,9 +729,10 @@ function hasDifferentQos(userAssociation: ClusterAssociation): boolean {
 
     <ActionDialog
       :open="editOpen"
-      title="Edit Account"
-      :description="`Update account ${account}.`"
-      submit-label="Save changes"
+      title="pages.account.dialogs.edit.title"
+      :description="'pages.account.dialogs.edit.description'"
+      :description-params="{ account }"
+      submit-label="pages.account.dialogs.edit.submit"
       :loading="operationBusy"
       :error="operationError"
       :initial-values="{
@@ -724,10 +742,10 @@ function hasDifferentQos(userAssociation: ClusterAssociation): boolean {
         qos: stringifyList(accountAssociation?.qos)
       }"
       :fields="[
-        { key: 'description', label: 'Description', type: 'textarea' },
-        { key: 'organization', label: 'Organization', required: true },
-        { key: 'parent_account', label: 'Parent account' },
-        { key: 'qos', label: 'QOS (comma separated)' }
+        { key: 'description', label: 'pages.account.dialogs.fields.description', type: 'textarea' },
+        { key: 'organization', label: 'pages.account.dialogs.fields.organization', required: true },
+        { key: 'parent_account', label: 'pages.account.dialogs.fields.parentAccount' },
+        { key: 'qos', label: 'pages.account.dialogs.fields.qosCsv' }
       ]"
       @close="editOpen = false"
       @submit="saveAccount"
@@ -735,15 +753,16 @@ function hasDifferentQos(userAssociation: ClusterAssociation): boolean {
 
     <ActionDialog
       :open="addUserOpen"
-      title="Add User Association"
-      :description="`Add a user to account ${account}.`"
-      submit-label="Add user"
+      title="pages.account.dialogs.addUserAssociation.title"
+      :description="'pages.account.dialogs.addUserAssociation.description'"
+      :description-params="{ account }"
+      submit-label="pages.account.dialogs.addUserAssociation.submit"
       :loading="operationBusy"
       :error="operationError"
       :fields="[
-        { key: 'user', label: 'Username', required: true },
-        { key: 'qos', label: 'Assigned QOS (comma separated)' },
-        { key: 'default_qos', label: 'Default QOS' }
+        { key: 'user', label: 'pages.account.dialogs.fields.username', required: true },
+        { key: 'qos', label: 'pages.account.dialogs.fields.assignedQosCsv' },
+        { key: 'default_qos', label: 'pages.account.dialogs.fields.defaultQos' }
       ]"
       @close="addUserOpen = false"
       @submit="addUserAssociation"
@@ -751,9 +770,10 @@ function hasDifferentQos(userAssociation: ClusterAssociation): boolean {
 
     <ActionDialog
       :open="editUserQosOpen"
-      title="Edit User QOS"
-      :description="selectedAssociation?.user ? `Update QOS for ${selectedAssociation.user} on ${account}.` : ''"
-      submit-label="Save changes"
+      title="pages.account.dialogs.editUserQos.title"
+      :description="selectedAssociation?.user ? 'pages.account.dialogs.editUserQos.description' : ''"
+      :description-params="selectedAssociation?.user ? { user: selectedAssociation.user, account } : undefined"
+      submit-label="pages.account.dialogs.editUserQos.submit"
       :loading="operationBusy"
       :error="operationError"
       :initial-values="{
@@ -761,8 +781,8 @@ function hasDifferentQos(userAssociation: ClusterAssociation): boolean {
         default_qos: selectedAssociation?.default?.qos ?? ''
       }"
       :fields="[
-        { key: 'qos', label: 'Assigned QOS (comma separated)' },
-        { key: 'default_qos', label: 'Default QOS' }
+        { key: 'qos', label: 'pages.account.dialogs.fields.assignedQosCsv' },
+        { key: 'default_qos', label: 'pages.account.dialogs.fields.defaultQos' }
       ]"
       @close="editUserQosOpen = false"
       @submit="saveUserAssociationQos"
@@ -770,9 +790,10 @@ function hasDifferentQos(userAssociation: ClusterAssociation): boolean {
 
     <ActionDialog
       :open="deleteOpen"
-      title="Delete Account"
-      :description="`Delete account ${account}. This action is destructive.`"
-      submit-label="Delete account"
+      title="pages.account.dialogs.delete.title"
+      :description="'pages.account.dialogs.delete.description'"
+      :description-params="{ account }"
+      submit-label="pages.account.dialogs.delete.submit"
       :loading="operationBusy"
       :error="operationError"
       :fields="[]"
@@ -782,9 +803,10 @@ function hasDifferentQos(userAssociation: ClusterAssociation): boolean {
 
     <ActionDialog
       :open="deleteAssociationOpen"
-      title="Delete User Association"
-      :description="selectedAssociation?.user ? `Remove ${selectedAssociation.user} from account ${account}. This action is destructive.` : ''"
-      submit-label="Delete association"
+      title="pages.account.dialogs.deleteAssociation.title"
+      :description="selectedAssociation?.user ? 'pages.account.dialogs.deleteAssociation.description' : ''"
+      :description-params="selectedAssociation?.user ? { user: selectedAssociation.user, account } : undefined"
+      submit-label="pages.account.dialogs.deleteAssociation.submit"
       :loading="operationBusy"
       :error="operationError"
       :fields="[]"

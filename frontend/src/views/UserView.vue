@@ -9,6 +9,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { ChevronLeftIcon } from '@heroicons/vue/20/solid'
 import {
   IdentificationIcon,
@@ -56,6 +57,7 @@ const router = useRouter()
 const runtimeStore = useRuntimeStore()
 const authStore = useAuthStore()
 const gateway = useGatewayAPI()
+const { t, locale } = useI18n()
 const editOpen = ref(false)
 const deleteOpen = ref(false)
 const operationBusy = ref(false)
@@ -117,12 +119,16 @@ const canDeleteUser = computed(() =>
 )
 
 const breadcrumb = computed(() => {
+  locale.value
   if (sections.value.self) {
-    return [{ title: 'My Workspace' }, { title: viewedUser.value || 'User' }]
+    return [
+      { title: t('pages.user.breadcrumb.myWorkspace') },
+      { title: viewedUser.value || t('common.labels.user') }
+    ]
   }
   return [
-    { title: 'Accounts', routeName: 'accounts' },
-    { title: `User ${viewedUser.value || props.user}` }
+    { title: 'shell.mainMenu.accounts', routeName: 'accounts' },
+    { title: t('pages.user.breadcrumb.userPrefix', { user: viewedUser.value || props.user || '' }) }
   ]
 })
 
@@ -143,23 +149,23 @@ const orderedSections = computed(() => {
 
 function jobLimits(association: ClusterAssociation) {
   return [
-    { id: 'MaxJobs', label: 'Running / user', value: association.max.jobs.active },
-    { id: 'MaxSubmit', label: 'Submitted / user', value: association.max.jobs.total }
+    { id: 'MaxJobs', label: 'pages.user.limits.runningPerUser', value: association.max.jobs.active },
+    { id: 'MaxSubmit', label: 'pages.user.limits.submittedPerUser', value: association.max.jobs.total }
   ]
 }
 
 function resourceLimits(association: ClusterAssociation) {
   return [
-    { id: 'GrpTRES', label: 'Total', value: association.max.tres.total },
-    { id: 'MaxTRES', label: 'Per job', value: association.max.tres.per.job },
-    { id: 'MaxTRESPerNode', label: 'Per node', value: association.max.tres.per.node }
+    { id: 'GrpTRES', label: 'pages.user.limits.total', value: association.max.tres.total },
+    { id: 'MaxTRES', label: 'pages.user.limits.perJob', value: association.max.tres.per.job },
+    { id: 'MaxTRESPerNode', label: 'pages.user.limits.perNode', value: association.max.tres.per.node }
   ]
 }
 
 function timeLimits(association: ClusterAssociation) {
   return [
-    { id: 'GrpWall', label: 'Total', value: association.max.per.account.wall_clock },
-    { id: 'MaxWall', label: 'Per job', value: association.max.jobs.per.wall_clock }
+    { id: 'GrpWall', label: 'pages.user.limits.total', value: association.max.per.account.wall_clock },
+    { id: 'MaxWall', label: 'pages.user.limits.perJob', value: association.max.jobs.per.wall_clock }
   ]
 }
 
@@ -185,7 +191,7 @@ async function saveUser(payload: Record<string, string>) {
       default_wckey: payload.default_wckey || undefined,
       admin_level: payload.admin_level || undefined
     })
-    runtimeStore.reportInfo(`User ${viewedUser.value} update requested.`)
+    runtimeStore.reportInfo(t('pages.user.notifications.updateRequested', { user: viewedUser.value }))
     editOpen.value = false
   } catch (error: unknown) {
     operationError.value = error instanceof Error ? error.message : String(error)
@@ -200,7 +206,7 @@ async function removeUser() {
   operationError.value = null
   try {
     await gateway.delete_user(props.cluster, viewedUser.value)
-    runtimeStore.reportInfo(`User ${viewedUser.value} deletion requested.`)
+    runtimeStore.reportInfo(t('pages.user.notifications.deleteRequested', { user: viewedUser.value }))
     deleteOpen.value = false
   } catch (error: unknown) {
     operationError.value = error instanceof Error ? error.message : String(error)
@@ -219,22 +225,28 @@ async function removeUser() {
     <div class="ui-page ui-page-readable ui-content-workspace">
       <button @click="goBack" type="button" class="ui-button-secondary self-start shrink-0">
         <ChevronLeftIcon class="-ml-0.5 h-5 w-5" aria-hidden="true" />
-        {{ sections.self ? 'Back to dashboard' : 'Back to accounts' }}
+        {{ sections.self ? t('pages.user.backToDashboard') : t('pages.user.backToAccounts') }}
       </button>
 
       <div class="ui-scroll-region min-h-0 flex-1 pr-1">
         <div class="ui-section-stack pb-2">
         <div id="user-heading">
           <PageHeader
-            kicker="User Workspace"
+            kicker="pages.user.kicker"
             :title="viewedUser"
             :description="
               sections.self
-                ? 'Personal identity, effective cluster permissions, account associations and user analytics in one workspace.'
-                : 'Account associations, history shortcuts and analytics for the selected user.'
+                ? 'pages.user.selfDescription'
+                : 'pages.user.description'
             "
             :metric-value="loaded && sections.profile ? associatedAccounts.size : undefined"
-            :metric-label="sections.profile ? `account${associatedAccounts.size === 1 ? '' : 's'} associated` : undefined"
+            :metric-label="
+              sections.profile
+                ? associatedAccounts.size === 1
+                  ? 'pages.user.metricLabel'
+                  : 'pages.user.metricLabelPlural'
+                : undefined
+            "
           >
             <template #actions>
               <div class="flex flex-wrap gap-3">
@@ -242,21 +254,21 @@ async function removeUser() {
                   :to="{ name: 'jobs', params: { cluster }, query: { users: viewedUser } }"
                   class="ui-button-primary"
                 >
-                  View jobs
+                  {{ t('pages.user.actions.viewJobs') }}
                 </RouterLink>
                 <RouterLink
                   v-if="canViewHistoryJobs"
                   :to="{ name: 'jobs-history', params: { cluster }, query: { user: viewedUser } }"
                   class="ui-button-secondary"
                 >
-                  View history jobs
+                  {{ t('pages.user.actions.viewHistoryJobs') }}
                 </RouterLink>
                 <RouterLink
                   v-if="sections.self"
                   :to="{ name: 'settings-account' }"
                   class="ui-button-secondary"
                 >
-                  Account permissions
+                  {{ t('pages.user.actions.accountPermissions') }}
                 </RouterLink>
                 <button
                   v-if="canManageUser"
@@ -264,7 +276,7 @@ async function removeUser() {
                   class="ui-button-warning"
                   @click="editOpen = true"
                 >
-                  Edit user
+                  {{ t('pages.user.actions.editUser') }}
                 </button>
                 <button
                   v-if="canDeleteUser"
@@ -272,7 +284,7 @@ async function removeUser() {
                   class="ui-button-danger"
                   @click="deleteOpen = true"
                 >
-                  Delete user
+                  {{ t('pages.user.actions.deleteUser') }}
                 </button>
               </div>
             </template>
@@ -282,34 +294,34 @@ async function removeUser() {
         <div v-if="sections.self" class="ui-section-stack">
           <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <div class="ui-stat-card">
-              <div class="ui-stat-label">Username</div>
+              <div class="ui-stat-label">{{ t('pages.user.selfStats.username') }}</div>
               <div class="ui-stat-value">{{ authStore.username }}</div>
-              <div class="ui-stat-subtle">{{ authStore.fullname || 'No full name cached' }}</div>
+              <div class="ui-stat-subtle">{{ authStore.fullname || t('pages.user.selfStats.noFullName') }}</div>
             </div>
             <div class="ui-stat-card">
-              <div class="ui-stat-label">Cluster</div>
+              <div class="ui-stat-label">{{ t('pages.user.selfStats.cluster') }}</div>
               <div class="ui-stat-value">{{ cluster }}</div>
-              <div class="ui-stat-subtle">Current workspace context</div>
+              <div class="ui-stat-subtle">{{ t('pages.user.selfStats.currentWorkspaceContext') }}</div>
             </div>
             <div class="ui-stat-card">
-              <div class="ui-stat-label">Effective Roles</div>
+              <div class="ui-stat-label">{{ t('pages.user.selfStats.effectiveRoles') }}</div>
               <div class="ui-stat-value">{{ clusterPermissions.roles.length }}</div>
-              <div class="ui-stat-subtle">Merged policy and custom roles</div>
+              <div class="ui-stat-subtle">{{ t('pages.user.selfStats.mergedPolicyAndCustomRoles') }}</div>
             </div>
             <div class="ui-stat-card">
-              <div class="ui-stat-label">Effective Actions</div>
+              <div class="ui-stat-label">{{ t('pages.user.selfStats.effectiveActions') }}</div>
               <div class="ui-stat-value">{{ clusterPermissions.actions.length }}</div>
-              <div class="ui-stat-subtle">Permissions exposed to the frontend</div>
+              <div class="ui-stat-subtle">{{ t('pages.user.selfStats.permissionsExposed') }}</div>
             </div>
           </div>
 
           <section class="ui-panel ui-section">
             <div class="mb-4 flex items-start justify-between gap-4">
               <div>
-                <p class="ui-page-kicker">Identity Summary</p>
-                <h2 class="ui-panel-title">My account and permissions</h2>
+                <p class="ui-page-kicker">{{ t('pages.user.identity.summaryKicker') }}</p>
+                <h2 class="ui-panel-title">{{ t('pages.user.identity.summaryTitle') }}</h2>
                 <p class="ui-panel-description mt-2">
-                  Local account identity plus merged cluster-level permissions.
+                  {{ t('pages.user.identity.summaryDescription') }}
                 </p>
               </div>
             </div>
@@ -320,19 +332,19 @@ async function removeUser() {
                   <span class="ui-user-workspace-icon">
                     <IdentificationIcon class="h-5 w-5" aria-hidden="true" />
                   </span>
-                  <div class="font-semibold text-[var(--color-brand-ink-strong)]">Identity</div>
+                  <div class="font-semibold text-[var(--color-brand-ink-strong)]">{{ t('pages.user.identity.identity') }}</div>
                 </div>
                 <dl class="mt-4 space-y-3 text-sm text-[var(--color-brand-muted)]">
                   <div class="flex flex-wrap items-center gap-2">
-                    <dt class="font-semibold text-[var(--color-brand-ink-strong)]">Username:</dt>
+                    <dt class="font-semibold text-[var(--color-brand-ink-strong)]">{{ t('pages.user.identity.username') }}</dt>
                     <dd>{{ authStore.username }}</dd>
                   </div>
                   <div class="flex flex-wrap items-center gap-2">
-                    <dt class="font-semibold text-[var(--color-brand-ink-strong)]">Full name:</dt>
+                    <dt class="font-semibold text-[var(--color-brand-ink-strong)]">{{ t('pages.user.identity.fullName') }}</dt>
                     <dd>{{ authStore.fullname || '-' }}</dd>
                   </div>
                   <div class="flex flex-wrap items-center gap-2">
-                    <dt class="font-semibold text-[var(--color-brand-ink-strong)]">Groups:</dt>
+                    <dt class="font-semibold text-[var(--color-brand-ink-strong)]">{{ t('pages.user.identity.groups') }}</dt>
                     <dd>{{ authStore.groups?.join(', ') || '-' }}</dd>
                   </div>
                 </dl>
@@ -343,7 +355,7 @@ async function removeUser() {
                   <span class="ui-user-workspace-icon">
                     <ShieldCheckIcon class="h-5 w-5" aria-hidden="true" />
                   </span>
-                  <div class="font-semibold text-[var(--color-brand-ink-strong)]">Merged actions</div>
+                  <div class="font-semibold text-[var(--color-brand-ink-strong)]">{{ t('pages.user.identity.mergedActions') }}</div>
                 </div>
                 <div class="mt-4 flex flex-wrap gap-2">
                   <span
@@ -357,7 +369,7 @@ async function removeUser() {
                     v-if="clusterPermissions.actions.length === 0"
                     class="text-sm text-[var(--color-brand-muted)]"
                   >
-                    No actions declared.
+                    {{ t('pages.user.identity.noActions') }}
                   </span>
                 </div>
               </div>
@@ -367,7 +379,7 @@ async function removeUser() {
                   <span class="ui-user-workspace-icon">
                     <ShieldCheckIcon class="h-5 w-5" aria-hidden="true" />
                   </span>
-                  <div class="font-semibold text-[var(--color-brand-ink-strong)]">Merged rules</div>
+                  <div class="font-semibold text-[var(--color-brand-ink-strong)]">{{ t('pages.user.identity.mergedRules') }}</div>
                 </div>
                 <div class="mt-4 flex flex-wrap gap-2">
                   <span
@@ -381,7 +393,7 @@ async function removeUser() {
                     v-if="clusterPermissions.rules.length === 0"
                     class="text-sm text-[var(--color-brand-muted)]"
                   >
-                    No route rules declared.
+                    {{ t('pages.user.identity.noRules') }}
                   </span>
                 </div>
               </div>
@@ -392,50 +404,53 @@ async function removeUser() {
         <template v-for="section in orderedSections" :key="section">
           <section v-if="section === 'profile'" class="ui-panel ui-section">
             <div class="mb-5">
-              <p class="ui-page-kicker">User Profile</p>
-              <h2 class="ui-panel-title">Account associations and limits</h2>
+              <p class="ui-page-kicker">{{ t('pages.user.profile.kicker') }}</p>
+              <h2 class="ui-panel-title">{{ t('pages.user.profile.title') }}</h2>
               <p class="ui-panel-description mt-2">
-                LDAP-linked account associations, quota boundaries and job history shortcuts for this user.
+                {{ t('pages.user.profile.description') }}
               </p>
             </div>
 
             <PanelSkeleton v-if="initialLoading && !unable" :rows="8" />
 
             <ErrorAlert v-else-if="unable">
-              Unable to retrieve associations for cluster
-              <span class="font-medium">{{ cluster }}</span>
+              {{ t('pages.account.errors.unableToRetrieve', { cluster }) }}
             </ErrorAlert>
             <div v-else class="ui-section-stack">
               <div v-if="canViewHistoryJobs" class="grid gap-3 sm:grid-cols-2">
                 <div class="ui-panel-soft px-4 py-3">
-                  <div class="ui-stat-label">History Jobs</div>
+                  <div class="ui-stat-label">{{ t('pages.user.profile.historyJobs') }}</div>
                   <div class="mt-2 text-lg font-semibold text-[var(--color-brand-ink-strong)]">
-                    History access granted
+                    {{ t('pages.user.profile.historyAccessGranted') }}
                   </div>
                   <div class="mt-1.5 text-sm text-[var(--color-brand-muted)]">
-                    Jump directly into persisted jobs history filtered on this user.
+                    {{ t('pages.user.profile.historyShortcut') }}
                   </div>
                 </div>
                 <div class="ui-panel-soft px-4 py-3">
-                  <div class="ui-stat-label">Accounts</div>
+                  <div class="ui-stat-label">{{ t('pages.user.profile.accounts') }}</div>
                   <div class="mt-2 text-lg font-semibold text-[var(--color-brand-ink-strong)]">
                     {{ associatedAccounts.size }}
                   </div>
                   <div class="mt-1.5 text-sm text-[var(--color-brand-muted)]">
-                    Account association{{ associatedAccounts.size === 1 ? '' : 's' }} found for this user.
+                    {{
+                      associatedAccounts.size === 1
+                        ? t('pages.user.profile.accountAssociationsFound')
+                        : t('pages.user.profile.accountAssociationsFoundPlural', { count: associatedAccounts.size })
+                    }}
                   </div>
                 </div>
               </div>
 
               <InfoAlert v-if="loaded && !knownUser">
-                User <span class="font-semibold">{{ viewedUser }}</span> has no associations on this cluster.
+                {{ t('pages.user.profile.noAssociations', { user: viewedUser }) }}
               </InfoAlert>
 
               <div v-else-if="loaded" class="ui-table-shell overflow-x-auto">
                 <div class="border-b border-[rgba(80,105,127,0.08)] px-6 py-5">
-                  <h3 class="ui-panel-title">Account Associations</h3>
+                  <h3 class="ui-panel-title">{{ t('pages.user.profile.accountAssociationsTitle') }}</h3>
                   <p class="ui-panel-description mt-2">
-                    Each row represents one account binding and the limits attached to it.
+                    {{ t('pages.user.profile.accountAssociationsDescription') }}
                   </p>
                 </div>
 
@@ -443,11 +458,11 @@ async function removeUser() {
                   <table class="ui-table min-w-full">
                     <thead>
                       <tr>
-                        <th scope="col" class="py-3.5 pr-3 pl-6 text-left lg:min-w-[220px]">Account</th>
-                        <th scope="col" class="hidden w-72 px-3 py-3.5 text-left sm:table-cell">Job limits</th>
-                        <th scope="col" class="hidden w-72 px-3 py-3.5 text-left lg:table-cell">Resource limits</th>
-                        <th scope="col" class="hidden w-72 px-3 py-3.5 text-left md:table-cell">Time limits</th>
-                        <th scope="col" class="hidden w-48 px-3 py-3.5 text-left 2xl:table-cell">QOS</th>
+                        <th scope="col" class="py-3.5 pr-3 pl-6 text-left lg:min-w-[220px]">{{ t('tables.userAssociations.columns.account') }}</th>
+                        <th scope="col" class="hidden w-72 px-3 py-3.5 text-left sm:table-cell">{{ t('tables.userAssociations.columns.jobLimits') }}</th>
+                        <th scope="col" class="hidden w-72 px-3 py-3.5 text-left lg:table-cell">{{ t('tables.userAssociations.columns.resourceLimits') }}</th>
+                        <th scope="col" class="hidden w-72 px-3 py-3.5 text-left md:table-cell">{{ t('tables.userAssociations.columns.timeLimits') }}</th>
+                        <th scope="col" class="hidden w-48 px-3 py-3.5 text-left 2xl:table-cell">{{ t('tables.userAssociations.columns.qos') }}</th>
                       </tr>
                     </thead>
                     <tbody class="text-sm text-[var(--color-brand-muted)]">
@@ -472,7 +487,7 @@ async function removeUser() {
                               class="flex flex-wrap items-center gap-2"
                             >
                               <dt class="font-semibold text-[var(--color-brand-ink-strong)]">
-                                {{ limit.label }}:
+                                {{ t(limit.label) }}:
                               </dt>
                               <dd>{{ renderClusterOptionalNumber(limit.value) }}</dd>
                             </div>
@@ -487,7 +502,7 @@ async function removeUser() {
                               class="flex flex-wrap items-center gap-2"
                             >
                               <dt class="font-semibold text-[var(--color-brand-ink-strong)]">
-                                {{ limit.label }}:
+                                {{ t(limit.label) }}:
                               </dt>
                               <dd class="font-mono text-xs">{{ renderClusterTRES(limit.value) }}</dd>
                             </div>
@@ -502,7 +517,7 @@ async function removeUser() {
                               class="flex flex-wrap items-center gap-2"
                             >
                               <dt class="font-semibold text-[var(--color-brand-ink-strong)]">
-                                {{ limit.label }}:
+                                {{ t(limit.label) }}:
                               </dt>
                               <dd>{{ renderWalltime(limit.value) }}</dd>
                             </div>
@@ -522,10 +537,10 @@ async function removeUser() {
           <section v-else-if="section === 'analytics'" class="ui-panel ui-section" id="analysis">
             <div class="mb-5 flex flex-wrap items-start justify-between gap-4">
               <div>
-                <p class="ui-page-kicker">User Analysis</p>
-                <h2 class="ui-panel-title">Submission and tool analytics</h2>
+                <p class="ui-page-kicker">{{ t('pages.user.analytics.kicker') }}</p>
+                <h2 class="ui-panel-title">{{ t('pages.user.analytics.title') }}</h2>
                 <p class="ui-panel-description mt-2">
-                  Submission trends, dual-metric tool analysis and execution summaries for this user.
+                  {{ t('pages.user.analytics.description') }}
                 </p>
               </div>
               <span class="ui-chip">
@@ -546,9 +561,9 @@ async function removeUser() {
             <ServerStackIcon class="h-6 w-6" aria-hidden="true" />
           </div>
           <div>
-            <h2 class="ui-panel-title">Additional sections are unavailable</h2>
+            <h2 class="ui-panel-title">{{ t('pages.user.emptyState.title') }}</h2>
             <p class="ui-panel-description mt-2">
-              This workspace can show account associations through `user/profile:view:*` and analytics through `user/analysis:view:*` on clusters where user metrics are enabled.
+              {{ t('pages.user.emptyState.description') }}
             </p>
           </div>
         </section>
@@ -558,9 +573,11 @@ async function removeUser() {
 
     <ActionDialog
       :open="editOpen"
-      :title="knownUser ? 'Edit User' : 'Create User'"
-      :description="viewedUser ? `${knownUser ? 'Update' : 'Create'} SlurmDB user ${viewedUser}.` : ''"
-      :submit-label="knownUser ? 'Save changes' : 'Create user'"
+      :title="knownUser ? 'pages.user.dialogs.edit.title' : 'pages.user.dialogs.create.title'"
+      :title-params="viewedUser ? { user: viewedUser } : undefined"
+      :description="viewedUser ? (knownUser ? 'pages.user.dialogs.edit.description' : 'pages.user.dialogs.create.description') : ''"
+      :description-params="viewedUser ? { user: viewedUser } : undefined"
+      :submit-label="knownUser ? 'pages.user.dialogs.edit.submit' : 'pages.user.dialogs.create.submit'"
       :loading="operationBusy"
       :error="operationError"
       :initial-values="{
@@ -569,12 +586,12 @@ async function removeUser() {
         qos: stringifyList([...new Set(userAssociations.flatMap((association) => association.qos ?? []))])
       }"
       :fields="[
-        { key: 'description', label: 'Description', type: 'textarea' },
-        { key: 'default_account', label: 'Default account' },
-        { key: 'default_qos', label: 'Default QOS' },
-        { key: 'qos', label: 'Assigned QOS (comma separated)' },
-        { key: 'default_wckey', label: 'Default WCKEY' },
-        { key: 'admin_level', label: 'Admin level' }
+        { key: 'description', label: 'pages.user.dialogs.fields.description', type: 'textarea' },
+        { key: 'default_account', label: 'pages.user.dialogs.fields.defaultAccount' },
+        { key: 'default_qos', label: 'pages.user.dialogs.fields.defaultQos' },
+        { key: 'qos', label: 'pages.user.dialogs.fields.assignedQosCsv' },
+        { key: 'default_wckey', label: 'pages.user.dialogs.fields.defaultWckey' },
+        { key: 'admin_level', label: 'pages.user.dialogs.fields.adminLevel' }
       ]"
       @close="editOpen = false"
       @submit="saveUser"
@@ -582,9 +599,11 @@ async function removeUser() {
 
     <ActionDialog
       :open="deleteOpen"
-      title="Delete User"
-      :description="viewedUser ? `Delete SlurmDB user ${viewedUser}. This action is destructive.` : ''"
-      submit-label="Delete user"
+      title="pages.user.dialogs.delete.title"
+      :title-params="viewedUser ? { user: viewedUser } : undefined"
+      :description="viewedUser ? 'pages.user.dialogs.delete.description' : ''"
+      :description-params="viewedUser ? { user: viewedUser } : undefined"
+      submit-label="pages.user.dialogs.delete.submit"
       :loading="operationBusy"
       :error="operationError"
       :fields="[]"

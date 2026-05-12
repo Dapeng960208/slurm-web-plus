@@ -10,6 +10,7 @@
 import { computed, onBeforeMount, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import type { LocationQueryRaw } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { useClusterDataGetter } from '@/composables/DataGetter'
 import { getMBHumanUnit } from '@/composables/GatewayAPI'
 import type { ClusterStats } from '@/composables/GatewayAPI'
@@ -26,6 +27,7 @@ import PageHeader from '@/components/PageHeader.vue'
 const runtimeStore = useRuntimeStore()
 const route = useRoute()
 const router = useRouter()
+const { t } = useI18n()
 
 const props = defineProps<{ cluster: string }>()
 const cluster = computed(() => props.cluster)
@@ -52,7 +54,7 @@ const {
 )
 
 const partitionOptions = computed(() => [
-  { label: 'Entire cluster', value: '' },
+  { label: t('pages.dashboard.partitionAll'), value: '' },
   ...((partitions.value ?? []).map((partition) => ({
     label: partition.name,
     value: partition.name
@@ -117,34 +119,38 @@ watch(
 const statsCards = computed(() => {
   if (!data.value) return []
   return [
-    { id: 'nodes', label: 'Nodes', value: String(data.value.resources.nodes) },
-    { id: 'cores', label: 'Cores', value: String(data.value.resources.cores) },
+    { id: 'nodes', label: t('pages.dashboard.stats.nodes'), value: String(data.value.resources.nodes) },
+    { id: 'cores', label: t('pages.dashboard.stats.cores'), value: String(data.value.resources.cores) },
     {
       id: 'memory-total',
-      label: 'Total Memory',
+      label: t('pages.dashboard.stats.totalMemory'),
       value: getMBHumanUnit(data.value.resources.memory),
-      subtle: 'Cluster capacity'
+      subtle: t('pages.dashboard.stats.clusterCapacity')
     },
     {
       id: 'memory-allocated',
-      label: 'Allocated Memory',
+      label: t('pages.dashboard.stats.allocatedMemory'),
       value: getMBHumanUnit(data.value.resources.memory_allocated),
-      subtle: 'Requested by jobs'
+      subtle: t('pages.dashboard.stats.requestedByJobs')
     },
     {
       id: 'memory-available',
-      label: 'Available Memory',
+      label: t('pages.dashboard.stats.availableMemory'),
       value: getMBHumanUnit(data.value.resources.memory_available),
-      subtle: 'Total minus allocated'
+      subtle: t('pages.dashboard.stats.totalMinusAllocated')
     },
     {
       id: 'gpus',
-      label: 'GPU',
+      label: t('common.labels.gpu'),
       value: String(data.value.resources.gpus),
       muted: data.value.resources.gpus === 0
     },
-    { id: 'jobs-running', label: 'Running Jobs', value: String(data.value.jobs.running) },
-    { id: 'jobs-total', label: 'Total Jobs', value: String(data.value.jobs.total) }
+    {
+      id: 'jobs-running',
+      label: t('pages.dashboard.stats.runningJobs'),
+      value: String(data.value.jobs.running)
+    },
+    { id: 'jobs-total', label: t('pages.dashboard.stats.totalJobs'), value: String(data.value.jobs.total) }
   ]
 })
 
@@ -165,42 +171,41 @@ watch(
   <ClusterMainLayout
     menu-entry="dashboard"
     :cluster="cluster"
-    :breadcrumb="[{ title: 'Dashboard' }]"
+    :breadcrumb="[{ title: t('shell.mainMenu.dashboard') }]"
   >
     <div class="ui-page ui-page-wide ui-content-workspace">
       <PageHeader
-        title="Dashboard"
-        description="Live cluster statistics, workload activity and metric trends in a unified control view."
+        title="pages.dashboard.title"
+        description="pages.dashboard.description"
       >
         <template #actions>
           <div data-testid="dashboard-header-tools" class="dashboard-header-tools">
             <div class="dashboard-header-summary dashboard-surface">
-              <span class="dashboard-header-summary-label">Total Jobs</span>
+              <span class="dashboard-header-summary-label">{{ t('pages.dashboard.stats.totalJobs') }}</span>
               <span class="dashboard-header-summary-value">
                 {{ loaded && data ? data.jobs.total : '--' }}
               </span>
             </div>
             <RouterLink :to="{ name: 'analysis', params: { cluster } }" class="ui-button-primary">
-              Open analysis
+              {{ t('pages.dashboard.openAnalysis') }}
             </RouterLink>
           </div>
         </template>
       </PageHeader>
 
-      <ErrorAlert v-if="unable"
-        >Unable to retrieve statistics from cluster
-        <span class="font-medium">{{ cluster }}</span></ErrorAlert
-      >
+      <ErrorAlert v-if="unable">
+        {{ t('pages.dashboard.errors.unableToRetrieve', { cluster }) }}
+      </ErrorAlert>
 
       <div class="ui-scroll-region min-h-0 flex-1 pr-1">
         <div class="ui-section-stack pb-2">
           <div class="dashboard-surface mt-6 px-4 py-4 sm:px-5">
             <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
               <div class="min-w-0">
-                <p class="dashboard-toolbar-kicker">Live Controls</p>
-                <h2 class="ui-panel-title">Realtime Metrics</h2>
+                <p class="dashboard-toolbar-kicker">{{ t('pages.dashboard.toolbar.kicker') }}</p>
+                <h2 class="ui-panel-title">{{ t('pages.dashboard.toolbar.title') }}</h2>
                 <p class="ui-panel-description">
-                  Filter dashboard stats by queue and adjust the live window from one aligned toolbar.
+                  {{ t('pages.dashboard.toolbar.description') }}
                 </p>
               </div>
               <div data-testid="dashboard-toolbar" class="dashboard-toolbar-fields">
@@ -208,7 +213,7 @@ watch(
                   v-if="canSelectPartition"
                   class="dashboard-toolbar-field"
                 >
-                  <span class="dashboard-toolbar-label">Partition / Queue</span>
+                  <span class="dashboard-toolbar-label">{{ t('pages.dashboard.toolbar.partitionQueue') }}</span>
                   <select
                     id="dashboard-partition"
                     v-model="runtimeStore.dashboard.partition"
@@ -225,10 +230,10 @@ watch(
                 </label>
 
                 <div class="dashboard-toolbar-field">
-                  <span class="dashboard-toolbar-label">Time Range</span>
+                  <span class="dashboard-toolbar-label">{{ t('common.labels.timeRange') }}</span>
                   <MetricRangeSelector
                     :model-value="runtimeStore.dashboard.range"
-                    aria-label="Select dashboard metrics range"
+                    :aria-label="t('pages.dashboard.toolbar.selectMetricsRange')"
                     @update:model-value="setRange"
                   />
                 </div>

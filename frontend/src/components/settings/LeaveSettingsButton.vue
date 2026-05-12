@@ -10,9 +10,11 @@
 import { useRouter } from 'vue-router'
 import { useRuntimeStore } from '@/stores/runtime'
 import { ChevronLeftIcon } from '@heroicons/vue/20/solid'
+import { useI18n } from 'vue-i18n'
 
 const runtimeStore = useRuntimeStore()
 const router = useRouter()
+const { t } = useI18n()
 
 function leaveSettings() {
   if (runtimeStore.beforeSettingsRoute) {
@@ -30,6 +32,6 @@ function leaveSettings() {
 <template>
   <button @click="leaveSettings()" type="button" class="ui-button-secondary self-start">
     <ChevronLeftIcon class="-ml-0.5 h-5 w-5" aria-hidden="true" />
-    Back to dashboards
+    {{ t('components.settingsBack.toDashboards') }}
   </button>
 </template>

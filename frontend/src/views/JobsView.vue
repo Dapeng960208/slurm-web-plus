@@ -10,6 +10,7 @@
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import type { LocationQueryRaw } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { useRuntimeStore } from '@/stores/runtime'
 import type { JobSortCriterion, JobSortOrder } from '@/stores/runtime/jobs'
 import { useClusterDataPoller } from '@/composables/DataPoller'
@@ -36,6 +37,7 @@ import { PencilSquareIcon, PlusSmallIcon, WindowIcon, XMarkIcon } from '@heroico
 const { cluster } = defineProps<{ cluster: string }>()
 
 const route = useRoute()
+const { t } = useI18n()
 const { data, unable, loaded, setCluster } = useClusterDataPoller<ClusterJob[]>(
   cluster,
   'jobs',
@@ -137,7 +139,7 @@ async function submitJob(payload: Record<string, string>) {
       account: payload.account || undefined,
       qos: payload.qos || undefined
     })
-    runtimeStore.reportInfo(`Job submission requested on ${cluster}.`)
+    runtimeStore.reportInfo(t('pages.jobs.notifications.submitRequested', { cluster }))
     submitOpen.value = false
   } catch (error: unknown) {
     operationError.value = error instanceof Error ? error.message : String(error)
@@ -163,7 +165,9 @@ async function editJob(payload: Record<string, string>) {
           ? undefined
           : { set: true, infinite: false, number: memoryPerCpu }
     })
-    runtimeStore.reportInfo(`Job ${selectedJob.value.job_id} update requested.`)
+    runtimeStore.reportInfo(
+      t('pages.jobs.notifications.updateRequested', { jobId: selectedJob.value.job_id })
+    )
     editOpen.value = false
   } catch (error: unknown) {
     operationError.value = error instanceof Error ? error.message : String(error)
@@ -176,7 +180,7 @@ function parsePositiveInteger(value: string): number | null {
   if (!value.trim()) return null
   const parsed = Number(value)
   if (!Number.isInteger(parsed) || parsed <= 0) {
-    throw new Error('Memory per CPU must be a positive integer in MB.')
+    throw new Error(t('pages.jobs.dialogs.edit.errors.invalidMemoryPerCpu'))
   }
   return parsed
 }
@@ -190,7 +194,9 @@ async function cancelJob(payload: Record<string, string>) {
       signal: payload.signal || undefined,
       reason: payload.reason || undefined
     })
-    runtimeStore.reportInfo(`Job ${selectedJob.value.job_id} cancel requested.`)
+    runtimeStore.reportInfo(
+      t('pages.jobs.notifications.cancelRequested', { jobId: selectedJob.value.job_id })
+    )
     cancelOpen.value = false
   } catch (error: unknown) {
     operationError.value = error instanceof Error ? error.message : String(error)
@@ -310,15 +316,21 @@ onMounted(async () => {
 </script>
 
 <template>
-  <ClusterMainLayout menu-entry="jobs" :cluster="cluster" :breadcrumb="[{ title: 'Jobs' }]">
+  <ClusterMainLayout
+    menu-entry="jobs"
+    :cluster="cluster"
+    :breadcrumb="[{ title: 'shell.mainMenu.jobs' }]"
+  >
     <div class="ui-page ui-page-wide ui-content-workspace">
       <JobsFiltersPanel :cluster="cluster" :nb-jobs="sortedJobs.length" />
 
       <PageHeader
-        title="Jobs"
-        description="Queue visibility, active states, account context and fast drill-down into job details."
+        title="pages.jobs.title"
+        description="pages.jobs.description"
         :metric-value="loaded ? sortedJobs.length : undefined"
-        :metric-label="`job${sortedJobs.length > 1 ? 's' : ''} found`"
+        :metric-label="
+          sortedJobs.length === 1 ? 'pages.jobs.metricLabel' : 'pages.jobs.metricLabelPlural'
+        "
       >
         <template #actions>
           <div class="ui-page-tools-end">
@@ -328,17 +340,22 @@ onMounted(async () => {
               @click="runtimeStore.jobs.openFiltersPanel = true"
             >
               <PlusSmallIcon class="h-5 w-5" aria-hidden="true" />
-              Add filters
+              {{ t('pages.jobs.addFilters') }}
             </button>
-            <button v-if="canSubmitJobs" type="button" class="ui-button-primary" @click="openSubmitDialog">
-              Submit job
+            <button
+              v-if="canSubmitJobs"
+              type="button"
+              class="ui-button-primary"
+              @click="openSubmitDialog"
+            >
+              {{ t('pages.jobs.submitJob') }}
             </button>
           </div>
         </template>
       </PageHeader>
 
       <section aria-labelledby="filter-heading" class="-mx-4 -my-2 sm:-mx-6 lg:-mx-8">
-        <h2 id="filter-heading" class="sr-only">Filters</h2>
+        <h2 id="filter-heading" class="sr-only">{{ t('pages.jobs.headingFilters') }}</h2>
 
         <div class="pb-4">
           <div class="ui-page-tools mx-auto px-4 sm:px-6 lg:px-8">
@@ -350,11 +367,10 @@ onMounted(async () => {
 
       <div class="ui-results-layout">
         <ErrorAlert v-if="unable"
-          >Unable to retrieve jobs from cluster
-          <span class="font-medium">{{ cluster }}</span></ErrorAlert
+          >{{ t('pages.jobs.unableToRetrieve', { cluster }) }}</ErrorAlert
         >
         <InfoAlert v-else-if="loaded && data?.length == 0"
-          >No jobs found on cluster <span class="font-medium">{{ cluster }}</span></InfoAlert
+          >{{ t('pages.jobs.noJobs', { cluster }) }}</InfoAlert
         >
         <div v-else class="ui-results-workspace">
           <div class="ui-table-shell ui-results-card">
@@ -364,17 +380,29 @@ onMounted(async () => {
               <thead>
                 <tr class="text-sm font-semibold text-gray-900 dark:text-gray-200">
                   <th scope="col" class="w-12 py-3.5 pr-3 text-left sm:pl-6 lg:pl-8">#ID</th>
-                  <th scope="col" class="w-16 px-3 py-3.5 text-left">State</th>
-                  <th scope="col" class="px-3 py-3.5 text-left">User (account)</th>
-                  <th scope="col" class="hidden px-3 py-3.5 text-left sm:table-cell">Resources</th>
-                  <th scope="col" class="hidden px-3 py-3.5 text-left xl:table-cell">Partition</th>
-                  <th scope="col" class="hidden px-3 py-3.5 text-left xl:table-cell">QOS</th>
-                  <th scope="col" class="hidden px-3 py-3.5 text-center sm:table-cell">Priority</th>
+                  <th scope="col" class="w-16 px-3 py-3.5 text-left">
+                    {{ t('tables.jobs.columns.state') }}
+                  </th>
+                  <th scope="col" class="px-3 py-3.5 text-left">
+                    {{ t('tables.jobs.columns.userAccount') }}
+                  </th>
+                  <th scope="col" class="hidden px-3 py-3.5 text-left sm:table-cell">
+                    {{ t('tables.jobs.columns.resources') }}
+                  </th>
+                  <th scope="col" class="hidden px-3 py-3.5 text-left xl:table-cell">
+                    {{ t('tables.jobs.columns.partition') }}
+                  </th>
+                  <th scope="col" class="hidden px-3 py-3.5 text-left xl:table-cell">
+                    {{ t('tables.jobs.columns.qos') }}
+                  </th>
+                  <th scope="col" class="hidden px-3 py-3.5 text-center sm:table-cell">
+                    {{ t('tables.jobs.columns.priority') }}
+                  </th>
                   <th scope="col" class="hidden px-3 py-3.5 text-left 2xl:table-cell 2xl:min-w-[100px]">
-                    Reason
+                    {{ t('tables.jobs.columns.reason') }}
                   </th>
                   <th scope="col" class="max-w-fit py-3.5 pr-4 pl-3 text-right sm:pr-6 lg:pr-8">
-                    Actions
+                    {{ t('tables.jobs.columns.actions') }}
                   </th>
                 </tr>
               </thead>
@@ -424,7 +452,7 @@ onMounted(async () => {
                         @click="openEditDialog(job)"
                       >
                         <PencilSquareIcon class="h-4 w-4" aria-hidden="true" />
-                        Edit
+                        {{ t('pages.jobs.actions.edit') }}
                       </button>
                       <button
                         v-if="canCancelJob(job)"
@@ -433,14 +461,14 @@ onMounted(async () => {
                         @click="openCancelDialog(job)"
                       >
                         <XMarkIcon class="h-4 w-4" aria-hidden="true" />
-                        Cancel
+                        {{ t('pages.jobs.actions.cancel') }}
                       </button>
                       <RouterLink
                         :to="{ name: 'job', params: { cluster: cluster, id: job.job_id } }"
                         class="ui-button-secondary"
                       >
                         <WindowIcon class="h-4 w-4" aria-hidden="true" />
-                        View
+                        {{ t('pages.jobs.actions.view') }}
                       </RouterLink>
                     </div>
                   </td>
@@ -463,7 +491,7 @@ onMounted(async () => {
               :page="runtimeStore.jobs.page"
               :page-size="runtimeStore.jobs.pageSize"
               :total="sortedJobs.length"
-              item-label="job"
+              :item-label="t('common.entities.job')"
               @update:page="updatePage"
               @update:page-size="updatePageSize"
             />
@@ -474,17 +502,22 @@ onMounted(async () => {
 
     <ActionDialog
       :open="submitOpen"
-      title="Submit Job"
-      description="Create a new Slurm job from the Jobs workspace."
-      submit-label="Submit job"
+      title="pages.jobs.dialogs.submit.title"
+      description="pages.jobs.dialogs.submit.description"
+      submit-label="pages.jobs.dialogs.submit.submit"
       :loading="operationBusy"
       :error="operationError"
       :fields="[
-        { key: 'name', label: 'Job name', required: true },
-        { key: 'script', label: 'Script', type: 'textarea', required: true },
-        { key: 'partition', label: 'Partition' },
-        { key: 'account', label: 'Account' },
-        { key: 'qos', label: 'QOS' }
+        { key: 'name', label: 'pages.jobs.dialogs.submit.fields.name', required: true },
+        {
+          key: 'script',
+          label: 'pages.jobs.dialogs.submit.fields.script',
+          type: 'textarea',
+          required: true
+        },
+        { key: 'partition', label: 'pages.jobs.dialogs.submit.fields.partition' },
+        { key: 'account', label: 'pages.jobs.dialogs.submit.fields.account' },
+        { key: 'qos', label: 'pages.jobs.dialogs.submit.fields.qos' }
       ]"
       @close="submitOpen = false"
       @submit="submitJob"
@@ -492,9 +525,10 @@ onMounted(async () => {
 
     <ActionDialog
       :open="editOpen"
-      title="Edit Job"
-      :description="selectedJob ? `Update job ${selectedJob.job_id} on ${cluster}.` : ''"
-      submit-label="Save changes"
+      title="pages.jobs.dialogs.edit.title"
+      :description="selectedJob ? 'pages.jobs.dialogs.edit.description' : undefined"
+      :description-params="selectedJob ? { jobId: selectedJob.job_id, cluster } : undefined"
+      submit-label="pages.jobs.dialogs.edit.submit"
       :loading="operationBusy"
       :error="operationError"
       :initial-values="{
@@ -506,18 +540,18 @@ onMounted(async () => {
         comment: ''
       }"
       :fields="[
-        { key: 'partition', label: 'Partition' },
-        { key: 'qos', label: 'QOS' },
-        { key: 'priority', label: 'Priority', type: 'number' },
+        { key: 'partition', label: 'pages.jobs.dialogs.edit.fields.partition' },
+        { key: 'qos', label: 'pages.jobs.dialogs.edit.fields.qos' },
+        { key: 'priority', label: 'pages.jobs.dialogs.edit.fields.priority', type: 'number' },
         {
           key: 'memory_per_cpu_mb',
-          label: 'Memory per CPU (MB)',
+          label: 'pages.jobs.dialogs.edit.fields.memoryPerCpuMb',
           type: 'number',
-          hint: 'Optional',
-          tooltip: 'Submitted as Slurm REST memory_per_cpu.number when set.'
+          hint: 'pages.jobs.dialogs.edit.fields.memoryPerCpuHint',
+          tooltip: 'pages.jobs.dialogs.edit.fields.memoryPerCpuTooltip'
         },
-        { key: 'time_limit', label: 'Time limit' },
-        { key: 'comment', label: 'Comment', type: 'textarea' }
+        { key: 'time_limit', label: 'pages.jobs.dialogs.edit.fields.timeLimit' },
+        { key: 'comment', label: 'pages.jobs.dialogs.edit.fields.comment', type: 'textarea' }
       ]"
       @close="editOpen = false"
       @submit="editJob"
@@ -525,14 +559,15 @@ onMounted(async () => {
 
     <ActionDialog
       :open="cancelOpen"
-      title="Cancel Job"
-      :description="selectedJob ? `Cancel job ${selectedJob.job_id}. This action is destructive.` : ''"
-      submit-label="Cancel job"
+      title="pages.jobs.dialogs.cancel.title"
+      :description="selectedJob ? 'pages.jobs.dialogs.cancel.description' : undefined"
+      :description-params="selectedJob ? { jobId: selectedJob.job_id } : undefined"
+      submit-label="pages.jobs.dialogs.cancel.submit"
       :loading="operationBusy"
       :error="operationError"
       :fields="[
-        { key: 'signal', label: 'Signal' },
-        { key: 'reason', label: 'Reason', type: 'textarea' }
+        { key: 'signal', label: 'pages.jobs.dialogs.cancel.fields.signal' },
+        { key: 'reason', label: 'pages.jobs.dialogs.cancel.fields.reason', type: 'textarea' }
       ]"
       @close="cancelOpen = false"
       @submit="cancelJob"

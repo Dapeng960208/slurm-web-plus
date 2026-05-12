@@ -81,7 +81,7 @@ describe('JobHistoryView.vue', () => {
         params: { cluster: 'foo', id: 1234 }
       }))
     expect(liveLink).toBeDefined()
-    expect(wrapper.text()).toContain('0 node, 0 CPU')
+    expect(wrapper.text()).toContain('0 nodes, 0 CPUs')
     expect(wrapper.text()).toContain('Exit Code')
     expect(wrapper.get('[data-testid="detail-summary-strip"]').text()).toContain('SUCCESS (0)')
     expect(wrapper.get('[data-testid="detail-summary-strip"]').text()).toContain('Max Memory')

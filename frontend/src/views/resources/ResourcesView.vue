@@ -11,6 +11,7 @@ import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import type { Ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import type { LocationQueryRaw } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { useRuntimeStore } from '@/stores/runtime'
 import { isFiltersClusterNodeMainState } from '@/stores/runtime/resources'
 import { useClusterDataPoller } from '@/composables/DataPoller'
@@ -38,6 +39,7 @@ const foldedNodesShow: Ref<Record<string, boolean>> = ref({})
 const runtimeStore = useRuntimeStore()
 const route = useRoute()
 const router = useRouter()
+const { t } = useI18n()
 const hydratingQuery = ref(false)
 const { data, unable, loaded, initialLoading, setCluster } = useClusterDataPoller<ClusterNode[]>(
   cluster,
@@ -201,16 +203,20 @@ watch(totalPages, (newLastPage) => {
   <ClusterMainLayout
     menu-entry="resources"
     :cluster="cluster"
-    :breadcrumb="[{ title: 'Resources' }]"
+    :breadcrumb="[{ title: 'shell.mainMenu.resources' }]"
   >
     <div class="ui-page ui-page-wide ui-content-workspace">
       <ResourcesFiltersPanel :cluster="cluster" :nbNodes="filteredNodes.length" />
 
       <PageHeader
-        title="Nodes"
-        description="Current node state, allocation pressure and partition visibility across the cluster."
+        title="pages.resources.title"
+        description="pages.resources.description"
         :metric-value="loaded ? filteredNodes.length : undefined"
-        :metric-label="`node${filteredNodes.length > 1 ? 's' : ''} found`"
+        :metric-label="
+          filteredNodes.length === 1
+            ? 'pages.resources.metricLabel'
+            : 'pages.resources.metricLabelPlural'
+        "
       >
         <template #actions>
           <button
@@ -227,7 +233,11 @@ watch(totalPages, (newLastPage) => {
               aria-hidden="true"
             />
             <EyeIcon v-else class="h-4 w-4" aria-hidden="true" />
-            {{ runtimeStore.resources.showRackDiagram ? 'Hide Rack Diagram' : 'Show Rack Diagram' }}
+            {{
+              runtimeStore.resources.showRackDiagram
+                ? t('pages.resources.actions.hideRackDiagram')
+                : t('pages.resources.actions.showRackDiagram')
+            }}
           </button>
         </template>
       </PageHeader>
@@ -240,10 +250,9 @@ watch(totalPages, (newLastPage) => {
       />
       <ResourcesFiltersBar />
 
-      <ErrorAlert v-if="unable"
-        >Unable to retrieve nodes from cluster
-        <span class="font-medium">{{ cluster }}</span></ErrorAlert
-      >
+      <ErrorAlert v-if="unable">
+        {{ t('pages.resources.errors.unableToRetrieve', { cluster }) }}
+      </ErrorAlert>
       <div v-else class="ui-results-layout">
         <div class="ui-results-workspace">
           <div class="ui-table-shell ui-results-card">
@@ -253,14 +262,26 @@ watch(totalPages, (newLastPage) => {
               <thead>
                 <tr class="text-sm font-semibold text-gray-900 dark:text-gray-200">
                   <th scope="col" colspan="2" class="w-12 py-3.5 pr-3 text-left sm:pl-6 lg:pl-8">
-                    Nodename
+                    {{ t('tables.resources.columns.nodeName') }}
                   </th>
-                  <th scope="col" class="w-12 px-3 py-3.5 text-left">State</th>
-                  <th scope="col" class="w-12 px-3 py-3.5 text-left">Allocation</th>
-                  <th scope="col" class="px-3 py-3.5 text-left">CPU</th>
-                  <th scope="col" class="px-3 py-3.5 text-left">Memory</th>
-                  <th scope="col" class="px-3 py-3.5 text-left">GPU</th>
-                  <th scope="col" class="px-3 py-3.5 text-left">Partitions</th>
+                  <th scope="col" class="w-12 px-3 py-3.5 text-left">
+                    {{ t('tables.resources.columns.state') }}
+                  </th>
+                  <th scope="col" class="w-12 px-3 py-3.5 text-left">
+                    {{ t('tables.resources.columns.allocation') }}
+                  </th>
+                  <th scope="col" class="px-3 py-3.5 text-left">
+                    {{ t('tables.resources.columns.cpu') }}
+                  </th>
+                  <th scope="col" class="px-3 py-3.5 text-left">
+                    {{ t('tables.resources.columns.memory') }}
+                  </th>
+                  <th scope="col" class="px-3 py-3.5 text-left">
+                    {{ t('tables.resources.columns.gpu') }}
+                  </th>
+                  <th scope="col" class="px-3 py-3.5 text-left">
+                    {{ t('tables.resources.columns.partitions') }}
+                  </th>
                 </tr>
               </thead>
               <tbody
@@ -275,7 +296,9 @@ watch(totalPages, (newLastPage) => {
                         class="-mr-2 flex h-10 w-10 items-center justify-center rounded-full p-2 text-[var(--color-brand-muted)] transition hover:bg-[rgba(182,232,44,0.12)]"
                         @click="foldedNodesShow[node.name] = !foldedNodesShow[node.name]"
                       >
-                        <span class="sr-only">Toggle folded nodes {{ node.name }}</span>
+                        <span class="sr-only">{{
+                          t('pages.resources.actions.toggleFoldedNodes', { name: node.name })
+                        }}</span>
                         <ChevronRightIcon
                           class="h-6 w-6"
                           aria-hidden="true"
@@ -303,7 +326,9 @@ watch(totalPages, (newLastPage) => {
                         @click="foldedNodesShow[node.name] = !foldedNodesShow[node.name]"
                         class="transition hover:text-[var(--color-brand-ink-strong)]"
                       >
-                        <span class="sr-only">Toggle folded nodes {{ node.name }}</span>
+                        <span class="sr-only">{{
+                          t('pages.resources.actions.toggleFoldedNodes', { name: node.name })
+                        }}</span>
                         <span class="font-mono text-[var(--color-brand-ink-strong)]">{{
                           node.name
                         }}</span>
@@ -398,7 +423,7 @@ watch(totalPages, (newLastPage) => {
               :page="runtimeStore.resources.page"
               :page-size="runtimeStore.resources.pageSize"
               :total="foldedNodes.length"
-              item-label="node group"
+              :item-label="t('common.entities.nodeGroups')"
               @update:page="updatePage"
               @update:page-size="updatePageSize"
             />

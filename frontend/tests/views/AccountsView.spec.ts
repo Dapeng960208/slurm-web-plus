@@ -4,6 +4,7 @@ import AccountsView from '@/views/AccountsView.vue'
 import ActionDialog from '@/components/operations/ActionDialog.vue'
 import { init_plugins, getMockClusterDataPoller } from '../lib/common'
 import { useRuntimeStore } from '@/stores/runtime'
+import { i18n } from '@/plugins/i18n'
 import type { AccountDescription, ClusterAssociation } from '@/composables/GatewayAPI'
 import associations from '../assets/associations.json'
 import ErrorAlert from '@/components/ErrorAlert.vue'
@@ -72,11 +73,11 @@ describe('AccountsView.vue', () => {
       }
     })
 
-    expect(wrapper.get('h1').text()).toBe('Accounts')
-    expect(wrapper.text()).toContain('Accounts defined on cluster')
+    expect(wrapper.get('h1').text()).toBe(i18n.global.t('pages.accounts.title'))
+    expect(wrapper.text()).toContain(i18n.global.t('pages.accounts.description'))
 
     expect(wrapper.text()).toContain('2')
-    expect(wrapper.text()).toContain('accounts')
+    expect(wrapper.text()).toContain(i18n.global.t('pages.accounts.metricLabelPlural'))
     expect(wrapper.find('.ui-tree-scroll').exists()).toBe(true)
     expect(wrapper.find('.ui-results-dock .ui-results-pagination').exists()).toBe(true)
 
@@ -97,7 +98,7 @@ describe('AccountsView.vue', () => {
     })
 
     wrapper.getComponent(PanelSkeleton)
-    expect(wrapper.text()).toContain('Accounts')
+    expect(wrapper.text()).toContain(i18n.global.t('pages.accounts.title'))
   })
 
   test('shows error alert when unable to retrieve accounts', () => {
@@ -115,8 +116,9 @@ describe('AccountsView.vue', () => {
     })
 
     const errorAlert = wrapper.getComponent(ErrorAlert)
-    expect(errorAlert.text()).toContain('Unable to retrieve accounts from cluster')
-    expect(errorAlert.text()).toContain('foo')
+    expect(errorAlert.text()).toContain(
+      i18n.global.t('pages.accounts.unableToRetrieve', { cluster: 'foo' })
+    )
   })
 
   test('shows info alert when no accounts', () => {
@@ -134,8 +136,7 @@ describe('AccountsView.vue', () => {
     })
 
     const infoAlert = wrapper.getComponent(InfoAlert)
-    expect(infoAlert.text()).toContain('No account defined on cluster')
-    expect(infoAlert.text()).toContain('foo')
+    expect(infoAlert.text()).toContain(i18n.global.t('pages.accounts.noAccounts', { cluster: 'foo' }))
   })
 
   test('creates account with organization field', async () => {
@@ -168,10 +169,13 @@ describe('AccountsView.vue', () => {
       }
     })
 
-    await wrapper.findAll('button').find((button) => button.text() === 'Create account')!.trigger('click')
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === i18n.global.t('pages.accounts.create'))!
+      .trigger('click')
     wrapper
       .findAllComponents(ActionDialog)
-      .find((component) => component.props('title') === 'Create Account')!
+      .find((component) => component.props('title') === 'pages.accounts.dialogs.create.title')!
       .vm.$emit('submit', {
         name: 'science',
         description: 'Science',
@@ -212,6 +216,6 @@ describe('AccountsView.vue', () => {
     const treeNodes = wrapper.findAllComponents(AccountTreeNode)
     expect(treeNodes).toHaveLength(1)
     expect(treeNodes[0].props('node').account).toBe('science')
-    expect(wrapper.text()).toContain('1account found')
+    expect(wrapper.text()).toContain(i18n.global.t('pages.accounts.metricLabel'))
   })
 })

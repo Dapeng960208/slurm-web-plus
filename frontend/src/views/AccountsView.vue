@@ -10,6 +10,7 @@
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import type { LocationQueryRaw } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import ClusterMainLayout from '@/components/ClusterMainLayout.vue'
 import { useClusterDataPoller } from '@/composables/DataPoller'
 import { useGatewayAPI } from '@/composables/GatewayAPI'
@@ -36,6 +37,7 @@ const route = useRoute()
 const router = useRouter()
 const gateway = useGatewayAPI()
 const runtimeStore = useRuntimeStore()
+const { t } = useI18n()
 
 const {
   data: associationsData,
@@ -225,7 +227,9 @@ async function createAccount(payload: Record<string, string>) {
     })
     refreshAccounts('accounts')
     refreshAssociations('associations')
-    runtimeStore.reportInfo(`Account ${payload.name || ''} creation requested.`)
+    runtimeStore.reportInfo(
+      t('pages.accounts.notifications.createRequested', { name: payload.name || '' })
+    )
     createOpen.value = false
   } catch (error: unknown) {
     operationError.value = error instanceof Error ? error.message : String(error)
@@ -271,26 +275,38 @@ if (route.query.page_size) {
 </script>
 
 <template>
-  <ClusterMainLayout menu-entry="accounts" :cluster="cluster" :breadcrumb="[{ title: 'Accounts' }]">
+  <ClusterMainLayout
+    menu-entry="accounts"
+    :cluster="cluster"
+    :breadcrumb="[{ title: 'shell.mainMenu.accounts' }]"
+  >
     <div class="ui-page ui-page-wide ui-content-workspace">
     <PageHeader
-      title="Accounts"
-      description="Accounts defined on cluster, with hierarchy, delegated users and structure laid out in one tree."
+      title="pages.accounts.title"
+      description="pages.accounts.description"
       :metric-value="loaded ? availableAccounts.size : undefined"
-      :metric-label="`account${availableAccounts.size > 1 ? 's' : ''} found`"
+      :metric-label="
+        availableAccounts.size === 1
+          ? 'pages.accounts.metricLabel'
+          : 'pages.accounts.metricLabelPlural'
+      "
     >
       <template #actions>
-        <button v-if="canCreateAccount" type="button" class="ui-button-primary" @click="createOpen = true">
-          Create account
+        <button
+          v-if="canCreateAccount"
+          type="button"
+          class="ui-button-primary"
+          @click="createOpen = true"
+        >
+          {{ t('pages.accounts.create') }}
         </button>
       </template>
     </PageHeader>
     <ErrorAlert v-if="unable"
-      >Unable to retrieve accounts from cluster
-      <span class="font-medium">{{ cluster }}</span></ErrorAlert
+      >{{ t('pages.accounts.unableToRetrieve', { cluster }) }}</ErrorAlert
     >
     <InfoAlert v-else-if="loaded && accountsData?.length == 0"
-      >No account defined on cluster <span class="font-medium">{{ cluster }}</span></InfoAlert
+      >{{ t('pages.accounts.noAccounts', { cluster }) }}</InfoAlert
     >
     <div v-else class="ui-results-layout">
       <PanelSkeleton v-if="initialLoading" :rows="7" />
@@ -315,7 +331,7 @@ if (route.query.page_size) {
             :page="page"
             :page-size="pageSize"
             :total="accountTree.length"
-            item-label="root account"
+            :item-label="t('common.entities.rootAccounts')"
             @update:page="updatePage"
             @update:page-size="updatePageSize"
           />
@@ -325,17 +341,26 @@ if (route.query.page_size) {
 
     <ActionDialog
       :open="createOpen"
-      title="Create Account"
-      description="Add a new SlurmDB account from the account tree workspace."
-      submit-label="Create account"
+      title="pages.accounts.dialogs.create.title"
+      description="pages.accounts.dialogs.create.description"
+      submit-label="pages.accounts.dialogs.create.submit"
       :loading="operationBusy"
       :error="operationError"
       :fields="[
-        { key: 'name', label: 'Account name', required: true },
-        { key: 'description', label: 'Description', type: 'textarea', required: true },
-        { key: 'organization', label: 'Organization', required: true },
-        { key: 'parent_account', label: 'Parent account' },
-        { key: 'qos', label: 'QOS (comma separated)' }
+        { key: 'name', label: 'pages.accounts.dialogs.create.fields.name', required: true },
+        {
+          key: 'description',
+          label: 'pages.accounts.dialogs.create.fields.description',
+          type: 'textarea',
+          required: true
+        },
+        {
+          key: 'organization',
+          label: 'pages.accounts.dialogs.create.fields.organization',
+          required: true
+        },
+        { key: 'parent_account', label: 'pages.accounts.dialogs.create.fields.parentAccount' },
+        { key: 'qos', label: 'pages.accounts.dialogs.create.fields.qos' }
       ]"
       @close="createOpen = false"
       @submit="createAccount"

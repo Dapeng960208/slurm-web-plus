@@ -7,10 +7,11 @@
 -->
 
 <script setup lang="ts">
-import { onMounted, onUnmounted, useTemplateRef, watch } from 'vue'
+import { computed, onMounted, onUnmounted, useTemplateRef, watch } from 'vue'
 import { Chart } from 'chart.js/auto'
 import type { Point } from 'chart.js'
 import 'chartjs-adapter-luxon'
+import { useI18n } from 'vue-i18n'
 import type { NodeMetricsHistory } from '@/composables/GatewayAPI'
 import { formatPercentValue } from '@/composables/percentages'
 
@@ -18,8 +19,12 @@ const { history } = defineProps<{
   history: NodeMetricsHistory | null
 }>()
 
+const { t, locale } = useI18n()
 const chartCanvas = useTemplateRef<HTMLCanvasElement>('chartCanvas')
 let chart: Chart<'line'> | null = null
+const cpuLabel = computed(() => t('common.labels.cpu'))
+const memoryLabel = computed(() => t('common.labels.memory'))
+const diskLabel = computed(() => t('pages.node.metrics.disk'))
 
 function toPoints(series: Array<[number, number]>): Point[] {
   return series.map(([x, y]) => ({ x, y }))
@@ -35,7 +40,7 @@ function updateChart() {
 
   chart.data.datasets = [
     {
-      label: 'CPU',
+      label: cpuLabel.value,
       data: toPoints(history.cpu_usage),
       borderColor: '#50697f',
       backgroundColor: 'rgba(80, 105, 127, 0.12)',
@@ -44,7 +49,7 @@ function updateChart() {
       tension: 0.32
     },
     {
-      label: 'Memory',
+      label: memoryLabel.value,
       data: toPoints(history.memory_usage),
       borderColor: '#7bbf1f',
       backgroundColor: 'rgba(123, 191, 31, 0.14)',
@@ -53,7 +58,7 @@ function updateChart() {
       tension: 0.32
     },
     {
-      label: 'Disk',
+      label: diskLabel.value,
       data: toPoints(history.disk_usage),
       borderColor: '#d84b50',
       backgroundColor: 'rgba(216, 75, 80, 0.12)',
@@ -139,6 +144,8 @@ watch(
   () => updateChart(),
   { deep: true }
 )
+
+watch(locale, () => updateChart())
 
 onUnmounted(() => {
   chart?.destroy()

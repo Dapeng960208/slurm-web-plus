@@ -11,6 +11,7 @@ import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
 import { useRuntimeStore } from '@/stores/runtime'
 import { useRuntimeConfiguration } from '@/plugins/runtimeConfiguration'
+import { useI18n } from 'vue-i18n'
 
 const { entry, cluster } = defineProps<{
   entry: string
@@ -19,23 +20,28 @@ const { entry, cluster } = defineProps<{
 
 const runtimeStore = useRuntimeStore()
 const runtimeConfiguration = useRuntimeConfiguration()
+const { t } = useI18n()
 
 const tabs = computed(() => {
-  const result = []
+  const result: Array<{ name: string; labelKey: string; href: string }> = []
   if (runtimeStore.hasRoutePermission(cluster, 'admin/ai', 'view')) {
-    result.push({ name: 'AI', href: 'admin-ai' })
+    result.push({ name: 'AI', labelKey: 'components.admin.ai', href: 'admin-ai' })
   }
   if (runtimeStore.hasRoutePermission(cluster, 'admin/cache', 'view')) {
-    result.push({ name: 'Cache', href: 'admin-cache' })
+    result.push({ name: 'Cache', labelKey: 'components.admin.cache', href: 'admin-cache' })
   }
   if (
     runtimeConfiguration.authentication &&
     runtimeStore.hasRoutePermission(cluster, 'admin/ldap-users', 'view')
   ) {
-    result.push({ name: 'Users', href: 'admin-ldap-users' })
+    result.push({ name: 'Users', labelKey: 'components.admin.users', href: 'admin-ldap-users' })
   }
   if (runtimeStore.hasRoutePermission(cluster, 'admin/access-control', 'view')) {
-    result.push({ name: 'Access Control', href: 'admin-access-control' })
+    result.push({
+      name: 'Access Control',
+      labelKey: 'components.admin.accessControl',
+      href: 'admin-access-control'
+    })
   }
   return result
 })
@@ -46,10 +52,10 @@ const tabs = computed(() => {
     <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
       <div>
         <h3 class="text-base leading-6 font-semibold text-[var(--color-brand-ink-strong)]">
-          Admin
+          {{ t('components.admin.title') }}
         </h3>
         <p class="mt-1 text-sm text-[var(--color-brand-muted)]">
-          Cluster-scoped administration, cache services and access controls.
+          {{ t('components.admin.description') }}
         </p>
       </div>
       <div class="mt-1">
@@ -66,7 +72,7 @@ const tabs = computed(() => {
             ]"
             :aria-current="entry == tab.name ? 'page' : undefined"
           >
-            {{ tab.name }}
+            {{ t(tab.labelKey) }}
           </RouterLink>
         </nav>
       </div>

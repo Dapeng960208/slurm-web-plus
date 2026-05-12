@@ -7,6 +7,7 @@ import JobView from '@/views/JobView.vue'
 import JobBackButton from '@/components/job/JobBackButton.vue'
 import ActionDialog from '@/components/operations/ActionDialog.vue'
 import { init_plugins, getMockClusterDataPoller } from '../lib/common'
+import { i18n } from '@/plugins/i18n'
 import type { ClusterIndividualJob } from '@/composables/GatewayAPI'
 import jobRunning from '../assets/job-running.json'
 import type { RouterMock } from 'vue-router-mock'
@@ -82,28 +83,28 @@ describe('JobView.vue', () => {
     const links = summary.findAllComponents({ name: 'RouterLink' })
     const userLink = links[0]
 
-    expect(summary.text()).toContain('User')
+    expect(summary.text()).toContain(i18n.global.t('pages.job.summary.user'))
     expect(userLink.props('to')).toEqual({
       name: 'user',
       params: { cluster: 'foo', user: jobRunning.user }
     })
-    expect(summary.text()).toContain('Account')
+    expect(summary.text()).toContain(i18n.global.t('pages.job.summary.account'))
     expect(summary.text()).toContain('-')
     expect(links).toHaveLength(1)
-    expect(summary.text()).toContain('Partition')
+    expect(summary.text()).toContain(i18n.global.t('pages.job.summary.partition'))
     expect(summary.text()).toContain(jobRunning.partition)
-    expect(summary.text()).toContain('Nodes')
+    expect(summary.text()).toContain(i18n.global.t('pages.job.summary.nodes'))
     expect(summary.text()).toContain(jobRunning.nodes)
-    expect(summary.text()).toContain('Exit Code')
+    expect(summary.text()).toContain(i18n.global.t('pages.job.summary.exitCode'))
     expect(summary.text()).toContain('SUCCESS (0)')
-    expect(summary.text()).toContain('Requested')
-    expect(summary.text()).toContain('Allocated')
+    expect(summary.text()).toContain(i18n.global.t('pages.job.summary.requested'))
+    expect(summary.text()).toContain(i18n.global.t('pages.job.summary.allocated'))
 
-    expect(details.text()).toContain('Working directory')
+    expect(details.text()).toContain(i18n.global.t('pages.job.fields.workingDirectory'))
     expect(wrapper.get('#workdir').text()).toContain(jobRunning.working_directory)
-    expect(details.text()).toContain('Requested')
-    expect(details.text()).toContain('Allocated')
-    expect(details.text()).not.toContain('Exit Code')
+    expect(details.text()).toContain(i18n.global.t('pages.job.fields.requested'))
+    expect(details.text()).toContain(i18n.global.t('pages.job.fields.allocated'))
+    expect(details.text()).not.toContain(i18n.global.t('pages.job.fields.exitCode'))
     expect(wrapper.find('.ui-scroll-region').classes()).toEqual(
       expect.arrayContaining(['ui-scroll-region', 'min-h-0', 'flex-1', 'pr-1'])
     )
@@ -136,7 +137,7 @@ describe('JobView.vue', () => {
       }
     })
 
-    expect(wrapper.text()).toContain('Job 1234')
+    expect(wrapper.text()).toContain(i18n.global.t('pages.job.title', { jobId: 1234 }))
     expect(wrapper.findComponent(PanelSkeleton).exists()).toBe(true)
   })
 
@@ -168,8 +169,8 @@ describe('JobView.vue', () => {
       }
     })
 
-    expect(wrapper.text()).toContain('Edit')
-    expect(wrapper.text()).toContain('Cancel')
+    expect(wrapper.text()).toContain(i18n.global.t('pages.job.actions.edit'))
+    expect(wrapper.text()).toContain(i18n.global.t('pages.job.actions.cancel'))
   })
 
   test('submits memory per CPU when editing the job', async () => {
@@ -198,11 +199,14 @@ describe('JobView.vue', () => {
       }
     })
 
-    await wrapper.findAll('button').find((button) => button.text() === 'Edit')!.trigger('click')
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === i18n.global.t('pages.job.actions.edit'))!
+      .trigger('click')
     await nextTick()
     wrapper
       .findAllComponents(ActionDialog)
-      .find((dialog) => dialog.props('title') === 'Edit Job')!
+      .find((dialog) => dialog.props('title') === 'pages.job.dialogs.edit.title')!
       .vm.$emit('submit', {
         partition: 'normal',
         qos: 'normal',
@@ -251,7 +255,7 @@ describe('JobView.vue', () => {
       }
     })
 
-    expect(wrapper.text()).not.toContain('Edit')
-    expect(wrapper.text()).not.toContain('Cancel')
+    expect(wrapper.text()).not.toContain(i18n.global.t('pages.job.actions.edit'))
+    expect(wrapper.text()).not.toContain(i18n.global.t('pages.job.actions.cancel'))
   })
 })

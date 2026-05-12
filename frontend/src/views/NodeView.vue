@@ -10,6 +10,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { useRoute, useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { useRuntimeStore } from '@/stores/runtime'
 import ClusterMainLayout from '@/components/ClusterMainLayout.vue'
 import { useClusterDataPoller } from '@/composables/DataPoller'
@@ -53,6 +54,7 @@ const router = useRouter()
 const route = useRoute()
 const runtimeStore = useRuntimeStore()
 const gateway = useGatewayAPI()
+const { t } = useI18n()
 const operationError = ref<string | null>(null)
 const operationBusy = ref(false)
 const editOpen = ref(false)
@@ -140,7 +142,7 @@ function roundToDecimal(value: number, decimals = 1): number {
 }
 
 function formatTimestamp(set: boolean, value: number): string {
-  return set ? new Date(value * 10 ** 3).toLocaleString() : 'N/A'
+  return set ? new Date(value * 10 ** 3).toLocaleString() : t('pages.node.metrics.na')
 }
 
 function pad2(value: number): string {
@@ -209,12 +211,12 @@ const allocationDetails = computed(() => {
   if (!node.data.value) return []
   const details = [
     {
-      label: 'CPU',
+      label: t('common.labels.cpu'),
       text: `${node.data.value.alloc_cpus} / ${node.data.value.cpus}`,
       pct: roundToDecimal((node.data.value.alloc_cpus / node.data.value.cpus) * 100)
     },
     {
-      label: 'Memory',
+      label: t('common.labels.memory'),
       text: `${getMBHumanUnit(node.data.value.alloc_memory)} / ${getMBHumanUnit(
         node.data.value.real_memory
       )}`,
@@ -223,7 +225,7 @@ const allocationDetails = computed(() => {
   ]
   if (node.data.value.gres_used && gpuAvailable.value > 0) {
     details.push({
-      label: 'GPU',
+      label: t('common.labels.gpu'),
       text: `${gpuAllocated.value} / ${gpuAvailable.value}`,
       pct: roundToDecimal((gpuAllocated.value / gpuAvailable.value) * 100)
     })
@@ -304,7 +306,7 @@ async function saveNode(payload: Record<string, string>) {
       state: payload.state || undefined,
       reason: payload.reason || undefined
     })
-    runtimeStore.reportInfo(`Node ${nodeName} update requested.`)
+    runtimeStore.reportInfo(t('pages.node.notifications.updateRequested', { nodeName }))
     editOpen.value = false
   } catch (error: unknown) {
     operationError.value = error instanceof Error ? error.message : String(error)
@@ -318,7 +320,7 @@ async function removeNode() {
   operationError.value = null
   try {
     await gateway.delete_node(cluster, nodeName)
-    runtimeStore.reportInfo(`Node ${nodeName} delete requested.`)
+    runtimeStore.reportInfo(t('pages.node.notifications.deleteRequested', { nodeName }))
     deleteOpen.value = false
     void router.push({ name: 'resources', params: { cluster } })
   } catch (error: unknown) {
@@ -330,7 +332,7 @@ async function removeNode() {
 
 function confirmDeleteNode(payload: Record<string, string>) {
   if (payload.confirmation !== 'DELETE') {
-    operationError.value = 'Type DELETE to confirm.'
+    operationError.value = t('pages.node.errors.deleteConfirmation')
     return
   }
   void removeNode()
@@ -475,7 +477,7 @@ onUnmounted(() => {
   <ClusterMainLayout
     menu-entry="resources"
     :cluster="cluster"
-    :breadcrumb="[{ title: 'Resources', routeName: 'resources' }, { title: `Node ${nodeName}` }]"
+    :breadcrumb="[{ title: 'shell.mainMenu.resources', routeName: 'resources' }, { title: t('pages.node.title', { nodeName }) }]"
   >
     <div class="ui-page ui-page-readable ui-content-workspace">
       <BackToResourcesButton :cluster="cluster" />
@@ -483,9 +485,9 @@ onUnmounted(() => {
       <div class="ui-scroll-region min-h-0 flex-1 pr-1">
         <div class="ui-section-stack pb-2">
         <PageHeader
-          kicker="Node Detail"
-          :title="`Node ${nodeName}`"
-          description="Live allocation status, hardware profile and workload occupancy for the selected node."
+          kicker="pages.node.kicker"
+          :title="t('pages.node.title', { nodeName })"
+          description="pages.node.description"
         >
           <template #actions>
             <div class="flex flex-wrap items-center justify-end gap-3">
@@ -502,19 +504,19 @@ onUnmounted(() => {
                   v-if="canEditNode"
                   type="button"
                   class="ui-button-warning"
-                  title="Edit the node state and set a scheduler-visible reason."
+                  :title="t('pages.node.actions.editTooltip')"
                   @click="editOpen = true"
                 >
-                  Edit
+                  {{ t('pages.node.actions.edit') }}
                 </button>
                 <button
                   v-if="canDeleteNode"
                   type="button"
                   class="ui-button-danger"
-                  title="Delete this node definition from the cluster."
+                  :title="t('pages.node.actions.deleteTooltip')"
                   @click="deleteOpen = true"
                 >
-                  Delete
+                  {{ t('pages.node.actions.delete') }}
                 </button>
               </template>
               <div
@@ -530,10 +532,9 @@ onUnmounted(() => {
           <div class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(320px,0.9fr)]">
             <div class="ui-panel ui-section">
               <div class="mb-3">
-                <h2 class="ui-panel-title">Node Overview</h2>
+                <h2 class="ui-panel-title">{{ t('pages.node.overviewTitle') }}</h2>
                 <p class="ui-panel-description mt-2">
-                  Scheduling status, hardware layout, assigned partitions and currently running
-                  jobs.
+                  {{ t('pages.node.overviewDescription') }}
                 </p>
               </div>
               <DetailSkeletonList :rows="10" />
@@ -543,41 +544,40 @@ onUnmounted(() => {
         </template>
 
         <ErrorAlert v-if="node.unable.value"
-          >Unable to retrieve node {{ nodeName }} from cluster
-          <span class="font-medium">{{ cluster }}</span></ErrorAlert
+          >{{ t('pages.node.errors.unableToRetrieve', { nodeName, cluster }) }}</ErrorAlert
         >
         <div v-else-if="node.data.value" class="ui-section-stack">
           <div class="ui-stat-grid">
             <div class="ui-stat-card">
-              <div class="ui-stat-label">CPU Capacity</div>
+              <div class="ui-stat-label">{{ t('pages.node.stats.cpuCapacity') }}</div>
               <div class="ui-stat-value">{{ node.data.value.cpus }}</div>
               <div class="ui-stat-subtle">
-                {{ node.data.value.sockets }} sockets x {{ node.data.value.cores }} cores
+                {{ t('pages.node.stats.cpuLayout', { sockets: node.data.value.sockets, cores: node.data.value.cores }) }}
               </div>
             </div>
             <div class="ui-stat-card">
-              <div class="ui-stat-label">Memory</div>
+              <div class="ui-stat-label">{{ t('pages.node.stats.memory') }}</div>
               <div class="ui-stat-value">{{ getMBHumanUnit(node.data.value.real_memory) }}</div>
               <div class="ui-stat-subtle">
-                Allocated: {{ getMBHumanUnit(node.data.value.alloc_memory) }}
+                {{ t('pages.node.stats.allocated', { value: getMBHumanUnit(node.data.value.alloc_memory) }) }}
               </div>
             </div>
             <div class="ui-stat-card">
-              <div class="ui-stat-label">GPU Slots</div>
+              <div class="ui-stat-label">{{ t('pages.node.stats.gpuSlots') }}</div>
               <div class="ui-stat-value">{{ gpuAvailable }}</div>
-              <div class="ui-stat-subtle">Allocated: {{ gpuAllocated }}</div>
+              <div class="ui-stat-subtle">{{ t('pages.node.stats.allocated', { value: gpuAllocated }) }}</div>
             </div>
             <div v-if="nodeMetricsEnabled" class="ui-stat-card">
-              <div class="ui-stat-label">Realtime CPU</div>
+              <div class="ui-stat-label">{{ t('pages.node.stats.realtimeCpu') }}</div>
               <div class="mt-3">
                 <PercentMetric :value="nodeMetrics?.cpu_usage" size="lg" />
               </div>
               <div class="ui-stat-subtle">
-                <template v-if="nodeMetricsError">Metrics unavailable</template>
+                <template v-if="nodeMetricsError">{{ t('pages.node.stats.metricsUnavailable') }}</template>
                 <template v-else-if="actualCpuUsage !== null"
-                  >{{ actualCpuUsage }} / {{ node.data.value.cpus }} cores</template
+                  >{{ t('pages.node.stats.actualCpu', { used: actualCpuUsage, total: node.data.value.cpus }) }}</template
                 >
-                <template v-else>Updated every 15s</template>
+                <template v-else>{{ t('pages.node.stats.updatedEvery15s') }}</template>
               </div>
             </div>
           </div>
@@ -585,29 +585,28 @@ onUnmounted(() => {
           <div class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(320px,0.9fr)]">
             <div class="ui-panel ui-section" :class="{ 'xl:col-span-2': !nodeMetricsEnabled }">
               <div class="mb-3">
-                <h2 class="ui-panel-title">Node Overview</h2>
+                <h2 class="ui-panel-title">{{ t('pages.node.overviewTitle') }}</h2>
                 <p class="ui-panel-description mt-2">
-                  Scheduling status, hardware layout, assigned partitions and currently running
-                  jobs.
+                  {{ t('pages.node.overviewDescription') }}
                 </p>
               </div>
 
               <div class="ui-detail-list">
                 <dl>
                   <div id="status" class="ui-detail-row">
-                    <dt class="ui-detail-term">Node status</dt>
+                    <dt class="ui-detail-term">{{ t('pages.node.detail.nodeStatus') }}</dt>
                     <dd class="ui-detail-value">
                       <div class="flex flex-wrap items-center gap-3">
                         <NodeMainState :status="node.data.value.state" />
-                        <span v-if="node.data.value.reason"
-                          >reason: {{ node.data.value.reason }}</span
-                        >
+                        <span v-if="node.data.value.reason">
+                          {{ t('pages.node.detail.reasonLabel', { reason: node.data.value.reason }) }}
+                        </span>
                       </div>
                     </dd>
                   </div>
 
                   <div id="allocation" class="ui-detail-row">
-                    <dt class="ui-detail-term">Allocation status</dt>
+                    <dt class="ui-detail-term">{{ t('pages.node.detail.allocationStatus') }}</dt>
                     <dd class="ui-detail-value space-y-2">
                       <NodeAllocationState :status="node.data.value.state" />
                       <ul class="space-y-1.5">
@@ -629,18 +628,18 @@ onUnmounted(() => {
                   </div>
 
                   <div v-if="jobs" id="jobs" class="ui-detail-row">
-                    <dt class="ui-detail-term">Current jobs</dt>
+                    <dt class="ui-detail-term">{{ t('pages.node.detail.currentJobs') }}</dt>
                     <dd class="ui-detail-value">
                       <div
                         v-if="jobs.unable.value"
                         class="flex items-center gap-2 text-[var(--color-brand-muted)]"
                       >
                         <XCircleIcon class="h-5 w-5" aria-hidden="true" />
-                        Unable to retrieve jobs
+                        {{ t('pages.node.detail.unableToRetrieveJobs') }}
                       </div>
                       <div v-else-if="!jobs.loaded.value" class="text-[var(--color-brand-muted)]">
                         <LoadingSpinner :size="4" />
-                        Loading jobs...
+                        {{ t('pages.node.detail.loadingJobs') }}
                       </div>
                       <ul v-else-if="jobs.data.value?.length" class="flex flex-wrap gap-2">
                         <li v-for="job in jobs.data.value" :key="job.job_id">
@@ -663,7 +662,7 @@ onUnmounted(() => {
                   </div>
 
                   <div id="cpu" class="ui-detail-row">
-                    <dt class="ui-detail-term">CPU layout</dt>
+                    <dt class="ui-detail-term">{{ t('pages.node.detail.cpuLayout') }}</dt>
                     <dd class="ui-detail-value">
                       {{ node.data.value.sockets }} x {{ node.data.value.cores }} =
                       {{ node.data.value.cpus }}
@@ -671,24 +670,24 @@ onUnmounted(() => {
                   </div>
 
                   <div class="ui-detail-row">
-                    <dt class="ui-detail-term">Threads/core</dt>
+                    <dt class="ui-detail-term">{{ t('pages.node.detail.threadsPerCore') }}</dt>
                     <dd class="ui-detail-value">{{ node.data.value.threads }}</dd>
                   </div>
 
                   <div id="arch" class="ui-detail-row">
-                    <dt class="ui-detail-term">Architecture</dt>
+                    <dt class="ui-detail-term">{{ t('pages.node.detail.architecture') }}</dt>
                     <dd class="ui-detail-value font-mono">{{ node.data.value.architecture }}</dd>
                   </div>
 
                   <div id="memory" class="ui-detail-row">
-                    <dt class="ui-detail-term">Memory</dt>
+                    <dt class="ui-detail-term">{{ t('pages.node.detail.memory') }}</dt>
                     <dd class="ui-detail-value">
                       {{ getMBHumanUnit(node.data.value.real_memory) }}
                     </dd>
                   </div>
 
                   <div v-if="node.data.value.gres" class="ui-detail-row">
-                    <dt class="ui-detail-term">GPU</dt>
+                    <dt class="ui-detail-term">{{ t('pages.node.detail.gpu') }}</dt>
                     <dd class="ui-detail-value">
                       <ul class="space-y-2">
                         <li v-for="gpu in getNodeGPU(node.data.value.gres)" :key="gpu">
@@ -699,7 +698,7 @@ onUnmounted(() => {
                   </div>
 
                   <div id="partitions" class="ui-detail-row">
-                    <dt class="ui-detail-term">Partitions</dt>
+                    <dt class="ui-detail-term">{{ t('pages.node.detail.partitions') }}</dt>
                     <dd class="ui-detail-value">
                       <div class="flex flex-wrap gap-2">
                         <span
@@ -714,14 +713,14 @@ onUnmounted(() => {
                   </div>
 
                   <div class="ui-detail-row">
-                    <dt class="ui-detail-term">OS Kernel</dt>
+                    <dt class="ui-detail-term">{{ t('pages.node.detail.osKernel') }}</dt>
                     <dd class="ui-detail-value font-mono">
                       {{ node.data.value.operating_system }}
                     </dd>
                   </div>
 
                   <div class="ui-detail-row">
-                    <dt class="ui-detail-term">Reboot</dt>
+                    <dt class="ui-detail-term">{{ t('pages.node.detail.reboot') }}</dt>
                     <dd class="ui-detail-value">
                       {{
                         formatTimestamp(
@@ -733,7 +732,7 @@ onUnmounted(() => {
                   </div>
 
                   <div class="ui-detail-row">
-                    <dt class="ui-detail-term">Last busy</dt>
+                    <dt class="ui-detail-term">{{ t('pages.node.detail.lastBusy') }}</dt>
                     <dd class="ui-detail-value">
                       {{
                         formatTimestamp(
@@ -749,31 +748,37 @@ onUnmounted(() => {
 
             <div v-if="nodeMetricsEnabled" class="ui-panel ui-section">
               <div class="mb-3">
-                <h2 class="ui-panel-title">Realtime Metrics</h2>
+                <h2 class="ui-panel-title">{{ t('pages.node.realtimeTitle') }}</h2>
                 <p class="ui-panel-description mt-2">
-                  Prometheus-backed realtime and historical usage signals for this node.
+                  {{ t('pages.node.realtimeDescription') }}
                 </p>
               </div>
 
               <template v-if="nodeMetricsError">
-                <ErrorAlert>Unable to retrieve realtime metrics for this node.</ErrorAlert>
+                <ErrorAlert>{{ t('pages.node.metrics.unableRealtime') }}</ErrorAlert>
               </template>
               <template v-else-if="!nodeMetrics">
                 <div class="text-[var(--color-brand-muted)]">
                   <LoadingSpinner :size="4" />
-                  Loading realtime metrics...
+                  {{ t('pages.node.metrics.loadingRealtime') }}
                 </div>
               </template>
               <div v-else class="space-y-3">
                 <div class="ui-panel-soft px-4 py-3">
                   <div class="flex items-center justify-between gap-4">
                     <div>
-                      <div class="ui-stat-label">CPU Usage</div>
+                      <div class="ui-stat-label">{{ t('pages.node.metrics.cpuUsage') }}</div>
                       <div class="mt-2">
                         <PercentMetric :value="nodeMetrics.cpu_usage" />
                       </div>
                       <div class="mt-1.5 text-sm text-[var(--color-brand-muted)]">
-                        Actual: {{ actualCpuUsage !== null ? `${actualCpuUsage} cores` : 'N/A' }}
+                        {{
+                          actualCpuUsage !== null
+                            ? t('pages.node.metrics.actual', {
+                                value: t('pages.user.analyticsPanels.units.cores', { value: actualCpuUsage })
+                              })
+                            : t('pages.node.metrics.noActualValue')
+                        }}
                       </div>
                     </div>
                     <span
@@ -786,8 +791,8 @@ onUnmounted(() => {
                     >
                       {{
                         nodeMetrics.cpu_usage !== null && nodeMetrics.cpu_usage > 90
-                          ? 'High load'
-                          : 'Healthy'
+                          ? t('common.status.highLoad')
+                          : t('common.status.healthy')
                       }}
                     </span>
                   </div>
@@ -796,13 +801,13 @@ onUnmounted(() => {
                 <div class="ui-panel-soft px-4 py-3">
                   <div class="flex items-center justify-between gap-4">
                     <div>
-                      <div class="ui-stat-label">Memory Usage</div>
+                      <div class="ui-stat-label">{{ t('pages.node.metrics.memoryUsage') }}</div>
                       <div class="mt-2">
                         <PercentMetric :value="nodeMetrics.memory_usage" />
                       </div>
                       <div class="mt-1.5 text-sm text-[var(--color-brand-muted)]">
                         Actual:
-                        {{ actualMemoryUsage !== null ? getMBHumanUnit(actualMemoryUsage) : 'N/A' }}
+                        {{ actualMemoryUsage !== null ? getMBHumanUnit(actualMemoryUsage) : t('pages.node.metrics.na') }}
                       </div>
                     </div>
                     <span
@@ -815,8 +820,8 @@ onUnmounted(() => {
                     >
                       {{
                         nodeMetrics.memory_usage !== null && nodeMetrics.memory_usage > 90
-                          ? 'High usage'
-                          : 'Stable'
+                          ? t('common.status.highUsage')
+                          : t('common.status.stable')
                       }}
                     </span>
                   </div>
@@ -825,7 +830,7 @@ onUnmounted(() => {
                 <div class="ui-panel-soft px-4 py-3">
                   <div class="flex items-center justify-between gap-4">
                     <div>
-                      <div class="ui-stat-label">Disk Usage</div>
+                      <div class="ui-stat-label">{{ t('pages.node.metrics.diskUsage') }}</div>
                       <div class="mt-2">
                         <PercentMetric :value="nodeMetrics.disk_usage" />
                       </div>
@@ -840,8 +845,8 @@ onUnmounted(() => {
                     >
                       {{
                         nodeMetrics.disk_usage !== null && nodeMetrics.disk_usage > 90
-                          ? 'Attention'
-                          : 'Nominal'
+                          ? t('common.status.attention')
+                          : t('common.status.nominal')
                       }}
                     </span>
                   </div>
@@ -850,20 +855,20 @@ onUnmounted(() => {
                 <div class="ui-panel-soft px-4 py-3">
                   <div class="flex flex-wrap items-end justify-between gap-3">
                     <div>
-                      <div class="ui-stat-label">Usage History</div>
+                      <div class="ui-stat-label">{{ t('pages.node.usageHistoryTitle') }}</div>
                       <div class="mt-1.5 text-sm text-[var(--color-brand-muted)]">
-                        CPU, memory and disk usage trends across the selected interval.
+                        {{ t('pages.node.usageHistoryDescription') }}
                       </div>
                     </div>
 
                     <MetricRangeSelector
                       :model-value="nodeMetricsRange"
-                      aria-label="Select node metrics range"
+                      :aria-label="t('pages.node.toolbar.selectRange')"
                       enable-custom-window
                       :start-value="nodeMetricsStartLocal"
                       :end-value="nodeMetricsEndLocal"
-                      custom-button-label="Custom"
-                      reset-label="Last hour"
+                      custom-button-label="common.metricRanges.custom"
+                      reset-label="common.metricRanges.lastHour"
                       @update:model-value="setMetricsRange"
                       @apply-window="applyMetricsWindow"
                       @reset-window="resetMetricsWindow"
@@ -872,17 +877,17 @@ onUnmounted(() => {
 
                   <div class="mt-3">
                     <ErrorAlert v-if="nodeMetricsHistoryError">
-                      Unable to retrieve metrics history for this node.
+                      {{ t('pages.node.metrics.unableHistory') }}
                     </ErrorAlert>
                     <div
                       v-else-if="nodeMetricsHistoryLoading"
                       class="text-[var(--color-brand-muted)]"
                     >
                       <LoadingSpinner :size="4" />
-                      Loading history...
+                      {{ t('pages.node.metrics.loadingHistory') }}
                     </div>
                     <p v-else-if="!nodeMetricsHistoryHasData" class="ui-panel-description">
-                      No metrics history is available for this range.
+                      {{ t('pages.node.metrics.noHistory') }}
                     </p>
                     <NodeMetricsHistoryChart v-else :history="nodeMetricsHistory" />
                   </div>
@@ -897,11 +902,12 @@ onUnmounted(() => {
 
     <ActionDialog
       :open="editOpen"
-      title="Edit Node"
-      :description="`Update node ${nodeName} on ${cluster}.`"
-      submit-label="Save changes"
+      title="pages.node.dialogs.edit.title"
+      description="pages.node.dialogs.edit.description"
+      :description-params="{ nodeName, cluster }"
+      submit-label="pages.node.dialogs.edit.submit"
       submit-variant="warning"
-      submit-tooltip="Apply the edited node state and optional reason to the selected cluster node."
+      submit-tooltip="pages.node.dialogs.edit.tooltip"
       :loading="operationBusy"
       :error="operationError"
       :initial-values="{
@@ -911,10 +917,10 @@ onUnmounted(() => {
       :fields="[
         {
           key: 'state',
-          label: 'State',
+          label: 'pages.node.dialogs.edit.fields.state',
           type: 'select',
           required: true,
-          placeholder: 'Select node state',
+          placeholder: 'pages.node.dialogs.edit.fields.statePlaceholder',
           options: [
             { label: 'DRAIN', value: 'DRAIN' },
             { label: 'RESUME', value: 'RESUME' },
@@ -924,16 +930,17 @@ onUnmounted(() => {
             { label: 'FAIL', value: 'FAIL' },
             { label: 'FUTURE', value: 'FUTURE' }
           ],
-          hint: `Current node state: ${nodeCurrentStateLabel(node.data.value?.state)}. Select the Slurm state action to apply to this node.`,
-          tooltip:
-            'Use DRAIN to start draining a node. Slurm may later report the node as DRAINING or DRAINED depending on running jobs.'
+          hint: t('pages.node.dialogs.edit.fields.stateHint', {
+            state: nodeCurrentStateLabel(node.data.value?.state)
+          }),
+          tooltip: 'pages.node.dialogs.edit.fields.stateTooltip'
         },
         {
           key: 'reason',
-          label: 'Reason',
+          label: 'pages.node.dialogs.edit.fields.reason',
           type: 'textarea',
-          hint: 'Optional audit note shown with the node state inside the cluster UI and scheduler output.',
-          tooltip: 'Use this when draining or changing node behavior so operators understand why.'
+          hint: 'pages.node.dialogs.edit.fields.reasonHint',
+          tooltip: 'pages.node.dialogs.edit.fields.reasonTooltip'
         }
       ]"
       @close="editOpen = false"
@@ -942,20 +949,21 @@ onUnmounted(() => {
 
     <ActionDialog
       :open="deleteOpen"
-      title="Delete Node"
-      :description="`Delete node ${nodeName}. This action is destructive.`"
-      submit-label="Delete node"
+      title="pages.node.dialogs.delete.title"
+      description="pages.node.dialogs.delete.description"
+      :description-params="{ nodeName }"
+      submit-label="pages.node.dialogs.delete.submit"
       submit-variant="danger"
-      submit-tooltip="Permanently remove the node definition after confirmation."
+      submit-tooltip="pages.node.dialogs.delete.tooltip"
       :loading="operationBusy"
       :error="operationError"
       :fields="[
         {
           key: 'confirmation',
-          label: 'Type DELETE to confirm',
+          label: 'pages.node.dialogs.delete.fields.confirmation',
           required: true,
-          hint: 'Enter DELETE exactly to unlock this destructive action.',
-          tooltip: 'This safeguard prevents accidental node removal.'
+          hint: 'pages.node.dialogs.delete.fields.confirmationHint',
+          tooltip: 'pages.node.dialogs.delete.fields.confirmationTooltip'
         }
       ]"
       @close="deleteOpen = false"

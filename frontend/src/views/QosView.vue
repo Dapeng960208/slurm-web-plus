@@ -11,6 +11,7 @@ import { computed, ref, watch } from 'vue'
 import type { Ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import type { LocationQueryRaw } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import ClusterMainLayout from '@/components/ClusterMainLayout.vue'
 import { useClusterDataPoller } from '@/composables/DataPoller'
 import { useGatewayAPI } from '@/composables/GatewayAPI'
@@ -44,6 +45,7 @@ const route = useRoute()
 const router = useRouter()
 const gateway = useGatewayAPI()
 const runtimeStore = useRuntimeStore()
+const { t } = useI18n()
 
 const { data, unable, loaded, setCluster } = useClusterDataPoller<ClusterQos[]>(
   cluster,
@@ -125,7 +127,7 @@ function parseOptionalPositiveInteger(value: string): number | undefined {
   const trimmed = value.trim()
   const parsed = Number(trimmed)
   if (!Number.isInteger(parsed) || parsed < 0) {
-    throw new Error('QOS job limits must be positive integer values.')
+    throw new Error(t('pages.qos.dialogs.errors.invalidPositiveInteger'))
   }
   return parsed
 }
@@ -134,14 +136,14 @@ function parseWallDurationMinutes(value: string): number | undefined {
   const trimmed = value.trim()
   const match = trimmed.match(/^(?:(\d+)-)?(\d{1,2}):(\d{2}):(\d{2})$/)
   if (!match) {
-    throw new Error('MaxWallDurationPerJob must use days-hh:mm:ss or hh:mm:ss.')
+    throw new Error(t('pages.qos.dialogs.errors.invalidWallDuration'))
   }
   const days = match[1] ? Number(match[1]) : 0
   const hours = Number(match[2])
   const minutes = Number(match[3])
   const seconds = Number(match[4])
   if (hours > 23 || minutes > 59 || seconds > 59) {
-    throw new Error('MaxWallDurationPerJob must use valid hours, minutes and seconds.')
+    throw new Error(t('pages.qos.dialogs.errors.invalidWallDurationRange'))
   }
   return days * 24 * 60 + hours * 60 + minutes + (seconds > 0 ? 1 : 0)
 }
@@ -181,7 +183,7 @@ async function createQos(payload: Record<string, string>) {
       priority: payload.priority ? Number(payload.priority) : undefined,
       ...qosLimitPayload(payload)
     })
-    runtimeStore.reportInfo(`QOS ${payload.name || ''} creation requested.`)
+    runtimeStore.reportInfo(t('pages.qos.notifications.createRequested', { name: payload.name || '' }))
     createOpen.value = false
   } catch (error: unknown) {
     operationError.value = error instanceof Error ? error.message : String(error)
@@ -201,7 +203,9 @@ async function updateQos(payload: Record<string, string>) {
       priority: payload.priority ? Number(payload.priority) : undefined,
       ...qosLimitPayload(payload)
     })
-    runtimeStore.reportInfo(`QOS ${selectedQos.value.name} update requested.`)
+    runtimeStore.reportInfo(
+      t('pages.qos.notifications.updateRequested', { name: selectedQos.value.name })
+    )
     editOpen.value = false
   } catch (error: unknown) {
     operationError.value = error instanceof Error ? error.message : String(error)
@@ -216,7 +220,9 @@ async function removeQos() {
   operationError.value = null
   try {
     await gateway.delete_qos(cluster, selectedQos.value.name)
-    runtimeStore.reportInfo(`QOS ${selectedQos.value.name} deletion requested.`)
+    runtimeStore.reportInfo(
+      t('pages.qos.notifications.deleteRequested', { name: selectedQos.value.name })
+    )
     deleteOpen.value = false
   } catch (error: unknown) {
     operationError.value = error instanceof Error ? error.message : String(error)
@@ -227,17 +233,25 @@ async function removeQos() {
 
 function qosJobLimits(qos: ClusterQos) {
   return [
-    { id: 'GrpJobs', label: 'Global', value: qos.limits.max.active_jobs.count },
-    { id: 'MaxSubmitJobsPerUser', label: 'Submit / User', value: qos.limits.max.jobs.per.user },
+    { id: 'GrpJobs', label: 'pages.qos.limits.global', value: qos.limits.max.active_jobs.count },
+    {
+      id: 'MaxSubmitJobsPerUser',
+      label: 'pages.qos.limits.submitPerUser',
+      value: qos.limits.max.jobs.per.user
+    },
     {
       id: 'MaxSubmitJobsPerAccount',
-      label: 'Submit / Account',
+      label: 'pages.qos.limits.submitPerAccount',
       value: qos.limits.max.jobs.per.account
     },
-    { id: 'MaxJobsPerUser', label: 'Max / User', value: qos.limits.max.jobs.active_jobs.per.user },
+    {
+      id: 'MaxJobsPerUser',
+      label: 'pages.qos.limits.maxPerUser',
+      value: qos.limits.max.jobs.active_jobs.per.user
+    },
     {
       id: 'MaxJobsPerAccount',
-      label: 'Max / Account',
+      label: 'pages.qos.limits.maxPerAccount',
       value: qos.limits.max.jobs.active_jobs.per.account
     }
   ]
@@ -245,11 +259,15 @@ function qosJobLimits(qos: ClusterQos) {
 
 function qosResourcesLimits(qos: ClusterQos) {
   return [
-    { id: 'GrpTRES', label: 'Global', value: qos.limits.max.tres.total },
-    { id: 'MaxTRESPerUser', label: 'Max / User', value: qos.limits.max.tres.per.user },
-    { id: 'MaxTRESPerAccount', label: 'Max / Account', value: qos.limits.max.tres.per.account },
-    { id: 'MaxTRESPerJob', label: 'Max / Job', value: qos.limits.max.tres.per.job },
-    { id: 'MaxTRESPerNode', label: 'Max / Node', value: qos.limits.max.tres.per.node }
+    { id: 'GrpTRES', label: 'pages.qos.limits.global', value: qos.limits.max.tres.total },
+    { id: 'MaxTRESPerUser', label: 'pages.qos.limits.maxPerUser', value: qos.limits.max.tres.per.user },
+    {
+      id: 'MaxTRESPerAccount',
+      label: 'pages.qos.limits.maxPerAccount',
+      value: qos.limits.max.tres.per.account
+    },
+    { id: 'MaxTRESPerJob', label: 'pages.qos.limits.maxPerJob', value: qos.limits.max.tres.per.job },
+    { id: 'MaxTRESPerNode', label: 'pages.qos.limits.maxPerNode', value: qos.limits.max.tres.per.node }
   ]
 }
 
@@ -276,17 +294,21 @@ if (route.query.page_size) {
 </script>
 
 <template>
-  <ClusterMainLayout menu-entry="qos" :cluster="cluster" :breadcrumb="[{ title: 'QOS' }]">
+  <ClusterMainLayout
+    menu-entry="qos"
+    :cluster="cluster"
+    :breadcrumb="[{ title: 'shell.mainMenu.qos' }]"
+  >
     <div class="ui-page ui-page-wide ui-content-workspace">
       <PageHeader
-        title="QOS"
-        description="Quality-of-service policies, resource ceilings and scheduling constraints defined on this cluster."
+        title="pages.qos.title"
+        description="pages.qos.description"
         :metric-value="loaded ? data?.length : undefined"
-        metric-label="qos policies"
+        metric-label="pages.qos.metricLabel"
       >
         <template #actions>
           <button v-if="canEditQos" type="button" class="ui-button-primary" @click="openCreateDialog">
-            Create QOS
+            {{ t('pages.qos.create') }}
           </button>
         </template>
       </PageHeader>
@@ -296,11 +318,10 @@ if (route.query.page_size) {
         @close-help-modal="closeHelpModal"
       />
       <ErrorAlert v-if="unable"
-        >Unable to retrieve qos from cluster
-        <span class="font-medium">{{ cluster }}</span></ErrorAlert
+        >{{ t('pages.qos.unableToRetrieve', { cluster }) }}</ErrorAlert
       >
       <InfoAlert v-else-if="loaded && data?.length == 0"
-        >No qos defined on cluster <span class="font-medium">{{ cluster }}</span></InfoAlert
+        >{{ t('pages.qos.noQos', { cluster }) }}</InfoAlert
       >
       <div v-else class="ui-results-layout">
         <div class="ui-results-workspace">
@@ -311,14 +332,26 @@ if (route.query.page_size) {
                 <thead>
                   <tr class="text-sm font-semibold text-gray-900 dark:text-gray-200">
                     <th scope="col" class="py-3.5 pr-3 text-left align-top sm:pl-6 lg:min-w-[250px] lg:pl-8">
-                      Name
+                      {{ t('tables.qos.columns.name') }}
                     </th>
-                    <th scope="col" class="w-24 px-3 py-3.5 text-left align-top">Priority</th>
-                    <th scope="col" class="hidden w-72 px-3 py-3.5 text-left lg:table-cell">Jobs</th>
-                    <th scope="col" class="hidden w-72 px-3 py-3.5 text-left lg:table-cell">Resources</th>
-                    <th scope="col" class="w-12 px-3 py-3.5 text-left">Time</th>
-                    <th scope="col" class="hidden w-12 px-3 py-3.5 text-left align-top 2xl:table-cell">Flags</th>
-                    <th scope="col" class="py-3.5 pr-4 pl-3 text-right sm:pr-6 lg:pr-8">Actions</th>
+                    <th scope="col" class="w-24 px-3 py-3.5 text-left align-top">
+                      {{ t('tables.qos.columns.priority') }}
+                    </th>
+                    <th scope="col" class="hidden w-72 px-3 py-3.5 text-left lg:table-cell">
+                      {{ t('tables.qos.columns.jobs') }}
+                    </th>
+                    <th scope="col" class="hidden w-72 px-3 py-3.5 text-left lg:table-cell">
+                      {{ t('tables.qos.columns.resources') }}
+                    </th>
+                    <th scope="col" class="w-12 px-3 py-3.5 text-left">
+                      {{ t('tables.qos.columns.time') }}
+                    </th>
+                    <th scope="col" class="hidden w-12 px-3 py-3.5 text-left align-top 2xl:table-cell">
+                      {{ t('tables.qos.columns.flags') }}
+                    </th>
+                    <th scope="col" class="py-3.5 pr-4 pl-3 text-right sm:pr-6 lg:pr-8">
+                      {{ t('tables.qos.columns.actions') }}
+                    </th>
                   </tr>
                 </thead>
                 <tbody
@@ -341,7 +374,7 @@ if (route.query.page_size) {
                           <button @click="openHelpModal(qos.name, limit.id, limit.value)" class="mr-1 -ml-5">
                             <QuestionMarkCircleIcon class="h-5 w-5 text-[var(--color-slurmweb-dark)]" />
                           </button>
-                          <dt class="visible">{{ limit.label }}:</dt>
+                          <dt class="visible">{{ t(limit.label) }}:</dt>
                           <dd class="visible ml-2">{{ renderClusterOptionalNumber(limit.value) }}</dd>
                         </div>
                       </dl>
@@ -356,7 +389,7 @@ if (route.query.page_size) {
                           <button @click="openHelpModal(qos.name, limit.id, limit.value)" class="mr-1 -ml-5 self-center">
                             <QuestionMarkCircleIcon class="h-5 w-5 text-[var(--color-slurmweb-dark)]" />
                           </button>
-                          <dt class="visible">{{ limit.label }}:</dt>
+                          <dt class="visible">{{ t(limit.label) }}:</dt>
                           <dd class="visible ml-2 font-mono text-xs">{{ renderClusterTRES(limit.value) }}</dd>
                         </div>
                       </dl>
@@ -388,7 +421,7 @@ if (route.query.page_size) {
                           class="ui-button-warning"
                           @click="openEditDialog(qos)"
                         >
-                          Edit
+                          {{ t('pages.qos.actions.edit') }}
                         </button>
                         <button
                           v-if="canDeleteQos"
@@ -396,13 +429,13 @@ if (route.query.page_size) {
                           class="ui-button-danger"
                           @click="openDeleteDialog(qos)"
                         >
-                          Delete
+                          {{ t('pages.qos.actions.delete') }}
                         </button>
                         <RouterLink
                           :to="{ name: 'jobs', params: { cluster: cluster }, query: { qos: qos.name } }"
                           class="ui-button-secondary"
                         >
-                          View jobs
+                          {{ t('pages.qos.actions.viewJobs') }}
                         </RouterLink>
                       </div>
                     </td>
@@ -425,7 +458,7 @@ if (route.query.page_size) {
               :page="page"
               :page-size="pageSize"
               :total="data?.length ?? 0"
-              item-label="qos policy"
+              :item-label="t('common.entities.qosPolicies')"
               @update:page="updatePage"
               @update:page-size="updatePageSize"
             />
@@ -435,35 +468,35 @@ if (route.query.page_size) {
 
       <ActionDialog
         :open="createOpen"
-        title="Create QOS"
-        description="Add a new quality-of-service policy for this cluster."
-        submit-label="Create QOS"
+        title="pages.qos.dialogs.create.title"
+        description="pages.qos.dialogs.create.description"
+        submit-label="pages.qos.dialogs.create.submit"
         :loading="operationBusy"
         :error="operationError"
         :initial-values="createQosInitialValues"
         :fields="[
-          { key: 'name', label: 'Name', required: true },
-          { key: 'description', label: 'Description', type: 'textarea' },
-          { key: 'priority', label: 'Priority', type: 'number' },
+          { key: 'name', label: 'pages.qos.dialogs.fields.name', required: true },
+          { key: 'description', label: 'pages.qos.dialogs.fields.description', type: 'textarea' },
+          { key: 'priority', label: 'pages.qos.dialogs.fields.priority', type: 'number' },
           {
             key: 'max_submit_jobs_per_user',
-            label: 'MaxSubmitJobsPerUser',
+            label: 'pages.qos.dialogs.fields.maxSubmitJobsPerUser',
             type: 'number',
             required: true,
-            hint: 'Current submitted jobs per user, including running and pending jobs.'
+            hint: 'pages.qos.dialogs.fields.maxSubmitJobsPerUserHint'
           },
           {
             key: 'max_jobs_per_user',
-            label: 'MaxJobsPerUser',
+            label: 'pages.qos.dialogs.fields.maxJobsPerUser',
             type: 'number',
             required: true,
-            hint: 'Maximum concurrently running jobs per user.'
+            hint: 'pages.qos.dialogs.fields.maxJobsPerUserHint'
           },
           {
             key: 'max_wall_duration_per_job',
-            label: 'MaxWallDurationPerJob',
+            label: 'pages.qos.dialogs.fields.maxWallDurationPerJob',
             required: true,
-            hint: 'Single-job maximum runtime as days-hh:mm:ss.'
+            hint: 'pages.qos.dialogs.fields.maxWallDurationPerJobHint'
           }
         ]"
         @close="createOpen = false"
@@ -472,9 +505,10 @@ if (route.query.page_size) {
 
       <ActionDialog
         :open="editOpen"
-        title="Edit QOS"
-        :description="selectedQos ? `Update ${selectedQos.name}.` : ''"
-        submit-label="Save changes"
+        title="pages.qos.dialogs.edit.title"
+        :description="selectedQos ? 'pages.qos.dialogs.edit.description' : undefined"
+        :description-params="selectedQos ? { name: selectedQos.name } : undefined"
+        submit-label="pages.qos.dialogs.edit.submit"
         :loading="operationBusy"
         :error="operationError"
         :initial-values="{
@@ -491,27 +525,27 @@ if (route.query.page_size) {
             createQosInitialValues.max_wall_duration_per_job
         }"
         :fields="[
-          { key: 'description', label: 'Description', type: 'textarea' },
-          { key: 'priority', label: 'Priority', type: 'number' },
+          { key: 'description', label: 'pages.qos.dialogs.fields.description', type: 'textarea' },
+          { key: 'priority', label: 'pages.qos.dialogs.fields.priority', type: 'number' },
           {
             key: 'max_submit_jobs_per_user',
-            label: 'MaxSubmitJobsPerUser',
+            label: 'pages.qos.dialogs.fields.maxSubmitJobsPerUser',
             type: 'number',
             required: true,
-            hint: 'Current submitted jobs per user, including running and pending jobs.'
+            hint: 'pages.qos.dialogs.fields.maxSubmitJobsPerUserHint'
           },
           {
             key: 'max_jobs_per_user',
-            label: 'MaxJobsPerUser',
+            label: 'pages.qos.dialogs.fields.maxJobsPerUser',
             type: 'number',
             required: true,
-            hint: 'Maximum concurrently running jobs per user.'
+            hint: 'pages.qos.dialogs.fields.maxJobsPerUserHint'
           },
           {
             key: 'max_wall_duration_per_job',
-            label: 'MaxWallDurationPerJob',
+            label: 'pages.qos.dialogs.fields.maxWallDurationPerJob',
             required: true,
-            hint: 'Single-job maximum runtime as days-hh:mm:ss.'
+            hint: 'pages.qos.dialogs.fields.maxWallDurationPerJobHint'
           }
         ]"
         @close="editOpen = false"
@@ -520,9 +554,10 @@ if (route.query.page_size) {
 
       <ActionDialog
         :open="deleteOpen"
-        title="Delete QOS"
-        :description="selectedQos ? `Delete QOS ${selectedQos.name}. This action is destructive.` : ''"
-        submit-label="Delete QOS"
+        title="pages.qos.dialogs.delete.title"
+        :description="selectedQos ? 'pages.qos.dialogs.delete.description' : undefined"
+        :description-params="selectedQos ? { name: selectedQos.name } : undefined"
+        submit-label="pages.qos.dialogs.delete.submit"
         :loading="operationBusy"
         :error="operationError"
         :fields="[]"

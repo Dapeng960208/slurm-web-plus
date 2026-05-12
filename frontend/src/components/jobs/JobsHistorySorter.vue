@@ -10,6 +10,7 @@
 import { Menu, MenuButton, MenuItem, MenuItems } from '@headlessui/vue'
 import { ChevronDownIcon, BarsArrowDownIcon, BarsArrowUpIcon } from '@heroicons/vue/20/solid'
 import type { JobHistorySortCriterion, JobHistorySortOrder } from '@/composables/GatewayAPI'
+import { useI18n } from 'vue-i18n'
 
 const props = defineProps<{
   sort: JobHistorySortCriterion
@@ -20,14 +21,15 @@ const emit = defineEmits<{
   (e: 'update:sort', value: JobHistorySortCriterion): void
   (e: 'update:order', value: JobHistorySortOrder): void
 }>()
+const { t } = useI18n()
 
-const sortOptions: Array<{ name: string; type: JobHistorySortCriterion }> = [
-  { name: 'Submit time', type: 'submit_time' },
-  { name: '#ID', type: 'id' },
-  { name: 'State', type: 'state' },
-  { name: 'User', type: 'user' },
-  { name: 'Priority', type: 'priority' },
-  { name: 'Resources', type: 'resources' }
+const sortOptions: Array<{ labelKey: string; type: JobHistorySortCriterion }> = [
+  { labelKey: 'common.labels.submitTime', type: 'submit_time' },
+  { labelKey: 'tables.jobs.columns.id', type: 'id' },
+  { labelKey: 'common.labels.state', type: 'state' },
+  { labelKey: 'common.labels.user', type: 'user' },
+  { labelKey: 'common.labels.priority', type: 'priority' },
+  { labelKey: 'common.labels.resources', type: 'resources' }
 ]
 
 function sortSelected(newCriteria: JobHistorySortCriterion) {
@@ -46,7 +48,7 @@ function triggerSortOrder() {
       class="relative inline-flex items-center rounded-l-full bg-white px-3 py-2 text-sm font-semibold text-[var(--color-brand-muted)] ring-1 ring-[rgba(80,105,127,0.16)] ring-inset hover:bg-[rgba(182,232,44,0.12)]"
       @click="triggerSortOrder()"
     >
-      <span class="sr-only">Order</span>
+      <span class="sr-only">{{ t('sort.order') }}</span>
       <BarsArrowDownIcon v-if="order === 'asc'" class="size-4" />
       <BarsArrowUpIcon v-else class="size-4" />
     </button>
@@ -54,7 +56,7 @@ function triggerSortOrder() {
       <MenuButton
         class="relative inline-flex items-center rounded-r-full bg-white px-4 py-2 text-sm font-semibold text-[var(--color-brand-ink-strong)] ring-1 ring-[rgba(80,105,127,0.16)] ring-inset hover:bg-[rgba(182,232,44,0.12)]"
       >
-        Sort
+        {{ t('sort.label') }}
         <ChevronDownIcon class="size-5" aria-hidden="true" />
       </MenuButton>
       <transition
@@ -68,7 +70,7 @@ function triggerSortOrder() {
         <MenuItems
           class="absolute left-0 z-10 mt-2 w-56 origin-top-right rounded-[22px] border border-white/80 bg-white/95 p-2 shadow-[var(--shadow-panel)] backdrop-blur-lg focus:outline-none"
         >
-          <MenuItem v-for="option in sortOptions" :key="option.name" v-slot="{ active }">
+          <MenuItem v-for="option in sortOptions" :key="option.type" v-slot="{ active }">
             <button
               type="button"
               :class="[
@@ -80,7 +82,7 @@ function triggerSortOrder() {
               ]"
               @click="sortSelected(option.type)"
             >
-              {{ option.name }}
+              {{ t(option.labelKey) }}
             </button>
           </MenuItem>
         </MenuItems>

@@ -10,6 +10,7 @@
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { MetricRange } from '@/composables/GatewayAPI'
+import { translate } from '@/i18n/translate'
 
 interface MetricWindowLocal {
   start: string
@@ -40,15 +41,15 @@ const props = withDefaults(
   {
     enableCustomWindow: false,
     showPresetButtons: true,
-    customButtonLabel: 'Custom',
-    resetLabel: 'Reset',
+    customButtonLabel: 'common.metricRanges.custom',
+    resetLabel: 'common.metricRanges.reset',
     showQuickWindows: true,
     quickWindowOptions: () => [
-      { key: '1d', label: '1 day', days: 1 },
-      { key: '3d', label: '3 days', days: 3 },
-      { key: '7d', label: '7 days', days: 7 },
-      { key: '15d', label: '15 days', days: 15 },
-      { key: '1m', label: '1 month', months: 1 }
+      { key: '1d', label: 'common.metricRanges.oneDay', days: 1 },
+      { key: '3d', label: 'common.metricRanges.threeDays', days: 3 },
+      { key: '7d', label: 'common.metricRanges.sevenDays', days: 7 },
+      { key: '15d', label: 'common.metricRanges.fifteenDays', days: 15 },
+      { key: '1m', label: 'common.metricRanges.oneMonth', months: 1 }
     ]
   }
 )
@@ -67,7 +68,7 @@ const windowError = ref<string | null>(null)
 const orderedRanges: MetricRange[] = ['week', 'day', 'hour']
 
 const customRangeLabel = computed(() => {
-  if (!props.startValue || !props.endValue) return props.customButtonLabel
+  if (!props.startValue || !props.endValue) return translate(props.customButtonLabel)
   return `${formatLocalDateTime(props.startValue)} - ${formatLocalDateTime(props.endValue)}`
 })
 
@@ -176,7 +177,7 @@ watch(
         ]"
         @click="range = candidate"
       >
-        {{ candidate }}
+        {{ t(`common.metricRanges.${candidate}`) }}
       </button>
     </span>
 
@@ -227,7 +228,7 @@ watch(
             :data-testid="`metric-range-quick-${option.key}`"
             @click="applyQuickWindow(option)"
           >
-            {{ option.label }}
+            {{ t(option.label) }}
           </button>
         </div>
 
@@ -262,7 +263,7 @@ watch(
           data-testid="metric-range-reset"
           @click="resetCustomWindow"
         >
-          {{ resetLabel }}
+          {{ translate(resetLabel) }}
         </button>
         <button
           type="button"

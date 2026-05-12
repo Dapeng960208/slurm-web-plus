@@ -1,5 +1,33 @@
 # 最新功能
 
+## 本轮：前端全站中英文切换已补齐到业务页面主体
+
+本轮继续收口前端国际化，把之前只覆盖导航和公共壳层的状态扩展到核心业务页面主体：
+
+- `vue-i18n`、locale store、`localStorage['locale']`、浏览器语言默认判定和 `document.documentElement.lang` 同步机制保持不变。
+- 登录页、右上 `UserMenu`、`Settings > General` 三个语言入口继续保留，切换后即时生效，不刷新页面。
+- 核心业务页面的页头、按钮、筛选、表格头、空态、弹窗、通知、前端状态提示和分析面板文案已补齐：
+  - `Dashboard`
+  - `Cluster Analysis`
+  - `Jobs` / `Jobs History` / `Job`
+  - `Resources` / `Node`
+  - `Accounts` / `Account`
+  - `User` / `User Analysis`
+  - `QOS`
+  - `Reservations`
+- 公共时间范围控件、作业历史详情、节点实时指标、用户分析图表和工具分析表格现在会随 locale 实时更新，不再出现“侧栏已切换但页面主体仍是英文”的情况。
+- 共享显示组件已统一按“翻译 key 或原始值”安全渲染，避免把后端原始值、实体名或状态码误送进 `t()` 触发 missing-key 告警。
+- 当前仍不翻译：
+  - 后端直接返回的原始错误消息
+  - 集群名、用户名、QOS 名、分区名、节点名等业务实体值
+  - 后端原始业务字段值
+
+本轮新增验证：
+
+- `npm --prefix frontend run type-check`
+- `cd frontend && npx vitest run`
+- `npm --prefix frontend run build`
+
 ## 本轮：已补本地 GitHub CI 拉取脚本
 
 本轮已为本机协作补两条 PowerShell 脚本，方便直接读取 GitHub Actions 返回的测试结果并继续修复：

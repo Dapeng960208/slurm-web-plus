@@ -10,6 +10,7 @@
 import { computed, onUnmounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import type { LocationQueryRaw } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import ClusterMainLayout from '@/components/ClusterMainLayout.vue'
 import ErrorAlert from '@/components/ErrorAlert.vue'
 import InfoAlert from '@/components/InfoAlert.vue'
@@ -41,6 +42,7 @@ const router = useRouter()
 const route = useRoute()
 const gateway = useGatewayAPI()
 const runtimeStore = useRuntimeStore()
+const { t, locale } = useI18n()
 
 const selectedRange = ref<MetricRange>('hour')
 const loading = ref(true)
@@ -78,8 +80,9 @@ const canViewHistory = computed(
 )
 const canViewResources = computed(() => runtimeStore.hasRoutePermission(cluster, 'resources', 'view'))
 
-const analysis = computed(() =>
-  analyzeCluster({
+const analysis = computed(() => {
+  locale.value
+  return analyzeCluster({
     stats: stats.value,
     jobs: canViewJobs.value ? jobs.value : [],
     nodes: canViewNodes.value ? nodes.value : [],
@@ -89,7 +92,7 @@ const analysis = computed(() =>
     gpuMetrics: gpuMetrics.value,
     historyJobs: historyJobs.value
   })
-)
+})
 
 const updatedAtLabel = computed(() => {
   if (!updatedAt.value) return null
@@ -102,9 +105,9 @@ const pingCards = computed(() =>
     badgeKeys: ['mode'],
     preferredOrder: ['hostname', 'mode', 'latency_ms', 'status'],
     labelMap: {
-      latency_ms: 'Latency (ms)'
+      latency_ms: t('analysis.labels.latencyMs')
     },
-    fallbackTitle: 'Controller'
+    fallbackTitle: t('pages.analysis.health.fallbackController')
   })
 )
 const diagFields = computed(() => {
@@ -126,13 +129,13 @@ const diagFields = computed(() => {
       'schedule_cycle_mean'
     ],
     labelMap: {
-      jobs_submitted: 'Jobs Submitted',
-      jobs_started: 'Jobs Started',
-      jobs_completed: 'Jobs Completed',
-      jobs_canceled: 'Jobs Canceled',
-      schedule_cycle_last: 'Schedule Cycle Last',
-      schedule_cycle_max: 'Schedule Cycle Max',
-      schedule_cycle_mean: 'Schedule Cycle Mean'
+      jobs_submitted: t('analysis.labels.jobsSubmitted'),
+      jobs_started: t('analysis.labels.jobsStarted'),
+      jobs_completed: t('analysis.labels.jobsCompleted'),
+      jobs_canceled: t('analysis.labels.jobsCanceled'),
+      schedule_cycle_last: t('analysis.labels.scheduleCycleLast'),
+      schedule_cycle_max: t('analysis.labels.scheduleCycleMax'),
+      schedule_cycle_mean: t('analysis.labels.scheduleCycleMean')
     }
   })
 })
@@ -140,32 +143,37 @@ const diagFields = computed(() => {
 const historicalCards = computed(() => {
   const busyCoresDetail =
     analysis.value.history.averageBusyCores != null && stats.value?.resources.cores
-      ? `${formatPercentValue(percent(analysis.value.history.averageBusyCores, stats.value.resources.cores), 0)}% average of declared CPU capacity`
-      : 'CPU history unavailable'
+      ? t('analysis.historyCards.busyCores.detail', {
+          percent: formatPercentValue(
+            percent(analysis.value.history.averageBusyCores, stats.value.resources.cores),
+            0
+          )
+        })
+      : t('analysis.historyCards.busyCores.unavailable')
 
   return [
     {
       id: 'peak-pending',
-      label: 'Peak pending',
-      value: renderNumber(analysis.value.history.peakPending, 'jobs'),
-      detail: 'Largest queued backlog in the selected telemetry range.'
+      label: t('analysis.historyCards.peakPending.label'),
+      value: renderNumber(analysis.value.history.peakPending, t('common.entities.jobs')),
+      detail: t('analysis.historyCards.peakPending.detail')
     },
     {
       id: 'avg-pending',
-      label: 'Average pending',
-      value: renderNumber(analysis.value.history.averagePending, 'jobs'),
-      detail: 'Average queue depth across the selected range.'
+      label: t('analysis.historyCards.averagePending.label'),
+      value: renderNumber(analysis.value.history.averagePending, t('common.entities.jobs')),
+      detail: t('analysis.historyCards.averagePending.detail')
     },
     {
       id: 'peak-running',
-      label: 'Peak running',
-      value: renderNumber(analysis.value.history.peakRunning, 'jobs'),
-      detail: 'Maximum concurrently running jobs observed in range.'
+      label: t('analysis.historyCards.peakRunning.label'),
+      value: renderNumber(analysis.value.history.peakRunning, t('common.entities.jobs')),
+      detail: t('analysis.historyCards.peakRunning.detail')
     },
     {
       id: 'busy-cores',
-      label: 'Peak busy cores',
-      value: renderNumber(analysis.value.history.peakBusyCores, 'cores'),
+      label: t('analysis.historyCards.busyCores.label'),
+      value: renderNumber(analysis.value.history.peakBusyCores, t('pages.dashboard.stats.cores')),
       detail: busyCoresDetail
     }
   ]
@@ -391,33 +399,37 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <ClusterMainLayout menu-entry="analysis" :cluster="cluster" :breadcrumb="[{ title: 'Analysis' }]">
+  <ClusterMainLayout
+    menu-entry="analysis"
+    :cluster="cluster"
+    :breadcrumb="[{ title: 'shell.mainMenu.analysis' }]"
+  >
     <div class="ui-page ui-page-wide ui-content-workspace">
       <PageHeader
-        kicker="Capacity Analysis"
-        title="Cluster Efficiency"
+        kicker="pages.analysis.kicker"
+        title="pages.analysis.title"
         :description="analysis.scoreSummary"
         :metric-value="loading ? undefined : `${analysis.score}/100`"
-        metric-label="operational score"
+        metric-label="pages.analysis.metricLabel"
       >
         <template #actions>
           <div class="flex flex-wrap gap-3">
             <RouterLink :to="{ name: 'dashboard', params: { cluster } }" class="ui-button-secondary">
-              Live dashboard
+              {{ t('pages.analysis.actions.liveDashboard') }}
             </RouterLink>
             <RouterLink
               v-if="canViewJobs"
               :to="{ name: 'jobs', params: { cluster } }"
               class="ui-button-primary"
             >
-              Inspect queue
+              {{ t('pages.analysis.actions.inspectQueue') }}
             </RouterLink>
             <RouterLink
               v-if="canViewResources"
               :to="{ name: 'resources', params: { cluster } }"
               class="ui-button-secondary"
             >
-              Open resources
+              {{ t('pages.analysis.actions.openResources') }}
             </RouterLink>
           </div>
         </template>
@@ -430,7 +442,7 @@ onUnmounted(() => {
           <div class="ui-panel ui-section">
             <div class="flex items-center gap-3 text-[var(--color-brand-muted)]">
               <LoadingSpinner :size="4" />
-              Building the cluster analysis workspace...
+              {{ t('pages.analysis.loading') }}
             </div>
           </div>
         </div>
@@ -438,14 +450,16 @@ onUnmounted(() => {
         <div v-else class="ui-section-stack pb-2">
           <div class="flex flex-wrap items-center justify-between gap-3">
             <div class="flex flex-wrap gap-2">
-              <span class="ui-chip">Status: {{ analysis.scoreLabel }}</span>
-              <span v-if="updatedAtLabel" class="ui-chip">Updated {{ updatedAtLabel }}</span>
-              <span v-if="refreshing" class="ui-chip">Refreshing</span>
+              <span class="ui-chip">{{ t('pages.analysis.status.prefix') }} {{ analysis.scoreLabel }}</span>
+              <span v-if="updatedAtLabel" class="ui-chip">
+                {{ t('pages.analysis.status.updated', { time: updatedAtLabel }) }}
+              </span>
+              <span v-if="refreshing" class="ui-chip">{{ t('pages.analysis.status.refreshing') }}</span>
             </div>
 
             <MetricRangeSelector
               :model-value="selectedRange"
-              aria-label="Select cluster analysis range"
+              :aria-label="t('pages.analysis.toolbar.selectRange')"
               @update:model-value="renderRange"
             />
           </div>
@@ -461,10 +475,8 @@ onUnmounted(() => {
           <div class="grid gap-6 xl:grid-cols-[minmax(0,1.18fr)_minmax(320px,0.82fr)]">
             <section class="ui-panel ui-section">
               <div class="mb-4">
-                <h2 class="ui-panel-title">Capacity Envelope</h2>
-                <p class="ui-panel-description mt-2">
-                  Current utilization and schedulable headroom across the cluster.
-                </p>
+                <h2 class="ui-panel-title">{{ t('pages.analysis.sections.capacityTitle') }}</h2>
+                <p class="ui-panel-description mt-2">{{ t('pages.analysis.sections.capacityDescription') }}</p>
               </div>
 
               <div class="space-y-4">
@@ -496,24 +508,22 @@ onUnmounted(() => {
 
             <section class="ui-panel ui-section">
               <div class="mb-4">
-                <h2 class="ui-panel-title">Queue Blockers</h2>
-                <p class="ui-panel-description mt-2">
-                  Why jobs are waiting, and whether the queue is blocked by capacity, policy or packing.
-                </p>
+                <h2 class="ui-panel-title">{{ t('pages.analysis.sections.blockersTitle') }}</h2>
+                <p class="ui-panel-description mt-2">{{ t('pages.analysis.sections.blockersDescription') }}</p>
               </div>
 
               <div class="space-y-3">
                 <div v-if="!canViewJobs" class="ui-panel-soft px-4 py-4 text-sm text-[var(--color-brand-muted)]">
-                  Job visibility is required to analyze queue blockers.
+                  {{ t('pages.analysis.blockers.noJobPermission') }}
                 </div>
                 <div v-else-if="jobsUnavailable" class="ui-panel-soft px-4 py-4 text-sm text-[var(--color-brand-muted)]">
-                  Job queue data is currently unavailable.
+                  {{ t('pages.analysis.blockers.jobsUnavailable') }}
                 </div>
                 <div
                   v-else-if="analysis.topReasons.length === 0"
                   class="ui-panel-soft px-4 py-4 text-sm text-[var(--color-brand-muted)]"
                 >
-                  No pending jobs are currently blocking the queue.
+                  {{ t('pages.analysis.blockers.none') }}
                 </div>
                 <div v-for="reason in analysis.topReasons" :key="reason.reason" class="ui-analysis-reason">
                   <div class="flex items-center justify-between gap-4">
@@ -522,7 +532,7 @@ onUnmounted(() => {
                         {{ reason.reason }}
                       </div>
                       <div class="mt-1 text-sm text-[var(--color-brand-muted)]">
-                        {{ reason.count }} pending job(s)
+                        {{ t('pages.analysis.blockers.pendingJobs', { count: reason.count }) }}
                       </div>
                     </div>
                     <PercentMetric
@@ -540,13 +550,17 @@ onUnmounted(() => {
                 </div>
 
                 <div class="ui-metric-surface px-4 py-4">
-                  <div class="ui-stat-label">Packing signal</div>
+                  <div class="ui-stat-label">{{ t('pages.analysis.blockers.packingSignal') }}</div>
                   <div class="mt-2 text-2xl font-bold text-[var(--color-brand-ink-strong)]">
                     {{ analysis.fragmentationJobs }}
                   </div>
                   <div class="mt-1.5 text-sm text-[var(--color-brand-muted)]">
-                    pending single-node job(s) appear blocked by fragmentation while
-                    {{ analysis.freeSchedulableCpu }} schedulable CPU(s) remain free.
+                    {{
+                      t('pages.analysis.blockers.packingDetail', {
+                        count: analysis.fragmentationJobs,
+                        cpu: analysis.freeSchedulableCpu
+                      })
+                    }}
                   </div>
                 </div>
               </div>
@@ -556,17 +570,15 @@ onUnmounted(() => {
           <div class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(360px,0.92fr)]">
             <section class="ui-panel ui-section">
               <div class="mb-4">
-                <h2 class="ui-panel-title">Partition Hotspots</h2>
-                <p class="ui-panel-description mt-2">
-                  Partition-level pressure helps decide whether to expand hardware, rebalance jobs or adjust QOS.
-                </p>
+                <h2 class="ui-panel-title">{{ t('pages.analysis.sections.partitionTitle') }}</h2>
+                <p class="ui-panel-description mt-2">{{ t('pages.analysis.sections.partitionDescription') }}</p>
               </div>
 
               <div v-if="!canViewJobs || !canViewNodes" class="ui-panel-soft px-4 py-4 text-sm text-[var(--color-brand-muted)]">
-                Both job and node visibility are required for partition pressure analysis.
+                {{ t('pages.analysis.partition.noPermission') }}
               </div>
               <div v-else-if="analysis.partitionPressure.length === 0" class="ui-panel-soft px-4 py-4 text-sm text-[var(--color-brand-muted)]">
-                No partition-level pressure is currently visible.
+                {{ t('pages.analysis.partition.none') }}
               </div>
               <div v-else class="space-y-3">
                 <div
@@ -580,15 +592,27 @@ onUnmounted(() => {
                         {{ partition.name }}
                       </div>
                       <div class="mt-1 text-sm text-[var(--color-brand-muted)]">
-                        {{ partition.pendingJobs }} pending, {{ partition.runningJobs }} active
+                        {{
+                          t('pages.analysis.partition.pendingActive', {
+                            pending: partition.pendingJobs,
+                            running: partition.runningJobs
+                          })
+                        }}
                       </div>
                     </div>
-                    <span class="ui-chip">CPU {{ partition.runningCpu }}/{{ partition.schedulableCpu || partition.totalCpu }}</span>
+                    <span class="ui-chip">
+                      {{
+                        t('pages.analysis.partition.cpuChip', {
+                          running: partition.runningCpu,
+                          total: partition.schedulableCpu || partition.totalCpu
+                        })
+                      }}
+                    </span>
                   </div>
                   <div class="mt-3 grid gap-2 text-sm text-[var(--color-brand-muted)] sm:grid-cols-3">
-                    <div>Pending CPU: {{ partition.pendingCpu }}</div>
-                    <div>Total CPU: {{ partition.totalCpu }}</div>
-                    <div>Schedulable CPU: {{ partition.schedulableCpu }}</div>
+                    <div>{{ t('pages.analysis.partition.pendingCpu', { value: partition.pendingCpu }) }}</div>
+                    <div>{{ t('pages.analysis.partition.totalCpu', { value: partition.totalCpu }) }}</div>
+                    <div>{{ t('pages.analysis.partition.schedulableCpu', { value: partition.schedulableCpu }) }}</div>
                   </div>
                 </div>
               </div>
@@ -596,17 +620,15 @@ onUnmounted(() => {
 
             <section class="ui-panel ui-section">
               <div class="mb-4">
-                <h2 class="ui-panel-title">Historical Pressure</h2>
-                <p class="ui-panel-description mt-2">
-                  Fast historical snapshots show whether capacity pressure is steady, bursty or policy-driven.
-                </p>
+                <h2 class="ui-panel-title">{{ t('pages.analysis.sections.historicalTitle') }}</h2>
+                <p class="ui-panel-description mt-2">{{ t('pages.analysis.sections.historicalDescription') }}</p>
               </div>
 
               <InfoAlert v-if="!metricsEnabled">
-                Metrics collection is disabled for this cluster. Live analysis remains available.
+                {{ t('pages.analysis.historical.metricsDisabled') }}
               </InfoAlert>
               <InfoAlert v-else-if="metricsUnavailable">
-                Historical metrics are temporarily unavailable.
+                {{ t('pages.analysis.historical.metricsUnavailable') }}
               </InfoAlert>
               <div v-else class="grid gap-3 sm:grid-cols-2">
                 <div v-for="card in historicalCards" :key="card.id" class="ui-metric-surface px-4 py-3">
@@ -622,35 +644,41 @@ onUnmounted(() => {
 
               <div class="mt-4 space-y-3">
                 <div class="ui-metric-surface px-4 py-3">
-                  <div class="ui-stat-label">Latest telemetry</div>
+                  <div class="ui-stat-label">{{ t('pages.analysis.historical.latestTelemetry') }}</div>
                   <div class="mt-2 text-lg font-semibold text-[var(--color-brand-ink-strong)]">
-                    {{ renderNumber(analysis.history.latestPending, 'pending') }} /
-                    {{ renderNumber(analysis.history.latestRunning, 'running') }}
+                    {{ renderNumber(analysis.history.latestPending, t('filters.states.pending')) }} /
+                    {{ renderNumber(analysis.history.latestRunning, t('filters.states.running')) }}
                   </div>
                   <div class="mt-1.5 text-sm text-[var(--color-brand-muted)]">
-                    Jobs at the most recent metric sample in the selected range.
+                    {{ t('pages.analysis.historical.latestTelemetryDetail') }}
                   </div>
                 </div>
 
                 <div class="ui-metric-surface px-4 py-3">
-                  <div class="ui-stat-label">Wait samples</div>
+                  <div class="ui-stat-label">{{ t('pages.analysis.historical.waitSamples') }}</div>
                   <div class="mt-2 text-lg font-semibold text-[var(--color-brand-ink-strong)]">
                     {{
                       analysis.waitStats.medianMinutes == null
                         ? '--'
-                        : `${analysis.waitStats.medianMinutes} min median`
+                        : t('pages.analysis.historical.waitMedian', {
+                            minutes: analysis.waitStats.medianMinutes
+                          })
                     }}
                   </div>
                   <div class="mt-1.5 text-sm text-[var(--color-brand-muted)]">
                     <template v-if="analysis.waitStats.samples > 0">
-                      p90 {{ analysis.waitStats.p90Minutes }} min from {{ analysis.waitStats.samples }}
-                      recent completed jobs.
+                      {{
+                        t('pages.analysis.historical.waitP90', {
+                          p90: analysis.waitStats.p90Minutes,
+                          samples: analysis.waitStats.samples
+                        })
+                      }}
                     </template>
                     <template v-else-if="waitSamplesUnavailable">
-                      Job history samples are unavailable for this cluster or time range.
+                      {{ t('pages.analysis.historical.waitUnavailable') }}
                     </template>
                     <template v-else>
-                      Historical wait samples are not enabled on this cluster.
+                      {{ t('pages.analysis.historical.waitDisabled') }}
                     </template>
                   </div>
                 </div>
@@ -660,10 +688,8 @@ onUnmounted(() => {
 
           <section class="ui-panel ui-section">
             <div class="mb-4">
-              <h2 class="ui-panel-title">Recommended Actions</h2>
-              <p class="ui-panel-description mt-2">
-                The list below is generated from live telemetry to help reduce queue time and increase job throughput.
-              </p>
+              <h2 class="ui-panel-title">{{ t('pages.analysis.sections.actionsTitle') }}</h2>
+              <p class="ui-panel-description mt-2">{{ t('pages.analysis.sections.actionsDescription') }}</p>
             </div>
 
             <div class="grid gap-4 xl:grid-cols-3">
@@ -672,7 +698,7 @@ onUnmounted(() => {
                 :key="recommendation.id"
                 class="ui-analysis-recommendation"
               >
-                <div class="ui-stat-label">{{ recommendation.tone }}</div>
+                <div class="ui-stat-label">{{ t(`pages.analysis.status.${recommendation.tone}`) }}</div>
                 <h3 class="mt-2 text-lg font-semibold text-[var(--color-brand-ink-strong)]">
                   {{ recommendation.title }}
                 </h3>
@@ -688,20 +714,20 @@ onUnmounted(() => {
 
           <section class="ui-panel ui-section">
             <div class="mb-4">
-              <h2 class="ui-panel-title">Controller Health</h2>
-              <p class="ui-panel-description mt-2">
-                Lightweight controller status checks from the Slurm `ping` and `diag` endpoints.
-              </p>
+              <h2 class="ui-panel-title">{{ t('pages.analysis.sections.healthTitle') }}</h2>
+              <p class="ui-panel-description mt-2">{{ t('pages.analysis.sections.healthDescription') }}</p>
             </div>
 
             <div class="grid gap-4 xl:grid-cols-2">
               <article class="ui-panel-soft px-4 py-4">
                 <div class="flex items-center justify-between gap-3">
-                  <div class="ui-stat-label">Ping</div>
-                  <span class="ui-chip">{{ pingUnavailable ? 'Unavailable' : 'Ready' }}</span>
+                  <div class="ui-stat-label">{{ t('pages.analysis.health.ping') }}</div>
+                  <span class="ui-chip">
+                    {{ pingUnavailable ? t('common.status.unavailable') : t('pages.analysis.status.ready') }}
+                  </span>
                 </div>
                 <InfoAlert v-if="pingUnavailable" class="mt-4">
-                  Ping data is currently unavailable for this cluster.
+                  {{ t('pages.analysis.health.pingUnavailable') }}
                 </InfoAlert>
                 <div v-else-if="pingCards.length" class="mt-4 grid gap-3">
                   <div
@@ -726,17 +752,19 @@ onUnmounted(() => {
                   </div>
                 </div>
                 <p v-else class="ui-panel-description mt-4">
-                  No controller ping fields are available in the current response.
+                  {{ t('pages.analysis.health.pingEmpty') }}
                 </p>
               </article>
 
               <article class="ui-panel-soft px-4 py-4">
                 <div class="flex items-center justify-between gap-3">
-                  <div class="ui-stat-label">Diag</div>
-                  <span class="ui-chip">{{ diagUnavailable ? 'Unavailable' : 'Ready' }}</span>
+                  <div class="ui-stat-label">{{ t('pages.analysis.health.diag') }}</div>
+                  <span class="ui-chip">
+                    {{ diagUnavailable ? t('common.status.unavailable') : t('pages.analysis.status.ready') }}
+                  </span>
                 </div>
                 <InfoAlert v-if="diagUnavailable" class="mt-4">
-                  Diagnostic data is currently unavailable for this cluster.
+                  {{ t('pages.analysis.health.diagUnavailable') }}
                 </InfoAlert>
                 <div v-else-if="diagFields.length" class="ui-detail-list mt-4">
                   <dl>
@@ -747,7 +775,7 @@ onUnmounted(() => {
                   </dl>
                 </div>
                 <p v-else class="ui-panel-description mt-4">
-                  No diagnostic summary fields are available in the current response.
+                  {{ t('pages.analysis.health.diagEmpty') }}
                 </p>
               </article>
             </div>

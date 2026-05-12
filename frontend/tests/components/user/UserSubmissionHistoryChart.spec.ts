@@ -2,9 +2,11 @@ import { describe, test, expect } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import { Chart } from 'chart.js/auto'
 import UserSubmissionHistoryChart from '@/components/user/UserSubmissionHistoryChart.vue'
+import { init_plugins } from '../../lib/common'
 
 describe('UserSubmissionHistoryChart.vue', () => {
   test('renders submissions and completions datasets from history values', async () => {
+    init_plugins()
     const wrapper = mount(UserSubmissionHistoryChart, {
       props: {
         history: {
@@ -40,6 +42,7 @@ describe('UserSubmissionHistoryChart.vue', () => {
   })
 
   test('clears datasets when history becomes null', async () => {
+    init_plugins()
     const wrapper = mount(UserSubmissionHistoryChart, {
       props: {
         history: {

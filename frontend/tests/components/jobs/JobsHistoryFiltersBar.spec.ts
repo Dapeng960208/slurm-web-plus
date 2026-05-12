@@ -1,9 +1,11 @@
 import { describe, expect, test } from 'vitest'
 import { mount } from '@vue/test-utils'
 import JobsHistoryFiltersBar from '@/components/jobs/JobsHistoryFiltersBar.vue'
+import { init_plugins } from '../../lib/common'
 
 describe('JobsHistoryFiltersBar.vue', () => {
   test('renders and removes keyword filter chips', async () => {
+    init_plugins()
     const filters = {
       keyword: 'sleep',
       user: '',

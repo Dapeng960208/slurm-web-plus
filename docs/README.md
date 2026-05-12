@@ -75,6 +75,10 @@
 
 本轮已落地的重点包括：
 
+- 前端中英文切换已从共享壳层扩展到核心业务页面主体，切换后不再出现“只有侧栏变化、页面内容仍是英文”的状态。
+- 业务页国际化当前覆盖 `Dashboard`、`Cluster Analysis`、`Jobs`、`Jobs History`、`Job`、`Resources`、`Node`、`Accounts`、`Account`、`User`、`User Analysis`、`QOS`、`Reservations` 以及相关公共分析面板和时间范围控件。
+- 国际化仍只作用于前端静态文案和前端自行生成的展示文案；后端原始错误文本和业务实体值不翻译。
+
 - GitHub Actions 已切到 `main` 分支自动测试，并补结构化 CI 结果 artifact 与手工 triage 入口。
 - AI 管理页新增所有用户会话审计；普通 AI 会话支持逻辑删除和消息复制。
 - AI 单作业查询已强化历史作业认知：实时 `job` 不足或作业完成后，可补查持久化 `jobs/history`，并识别 `used_memory_gb` 与 `used_cpu_cores_avg`。

@@ -5,6 +5,7 @@ import { useAuthStore } from '@/stores/auth'
 import JobsView from '@/views/JobsView.vue'
 import ActionDialog from '@/components/operations/ActionDialog.vue'
 import { init_plugins, getMockClusterDataPoller } from '../lib/common'
+import { i18n } from '@/plugins/i18n'
 import type { ClusterJob } from '@/composables/GatewayAPI'
 import ErrorAlert from '@/components/ErrorAlert.vue'
 import InfoAlert from '@/components/InfoAlert.vue'
@@ -106,14 +107,14 @@ describe('JobsView.vue', () => {
     const columns = table.findAll('thead th')
     expect(columns.length).toBe(9)
     expect(columns[0].text()).toBe('#ID')
-    expect(columns[1].text()).toBe('State')
-    expect(columns[2].text()).toBe('User (account)')
-    expect(columns[3].text()).toBe('Resources')
-    expect(columns[4].text()).toBe('Partition')
-    expect(columns[5].text()).toBe('QOS')
-    expect(columns[6].text()).toBe('Priority')
-    expect(columns[7].text()).toBe('Reason')
-    expect(columns[8].text()).toBe('Actions')
+    expect(columns[1].text()).toBe(i18n.global.t('tables.jobs.columns.state'))
+    expect(columns[2].text()).toBe(i18n.global.t('tables.jobs.columns.userAccount'))
+    expect(columns[3].text()).toBe(i18n.global.t('tables.jobs.columns.resources'))
+    expect(columns[4].text()).toBe(i18n.global.t('tables.jobs.columns.partition'))
+    expect(columns[5].text()).toBe(i18n.global.t('tables.jobs.columns.qos'))
+    expect(columns[6].text()).toBe(i18n.global.t('tables.jobs.columns.priority'))
+    expect(columns[7].text()).toBe(i18n.global.t('tables.jobs.columns.reason'))
+    expect(columns[8].text()).toBe(i18n.global.t('tables.jobs.columns.actions'))
     expect(table.findAll('tbody tr')).toHaveLength(2)
     expect(wrapper.text()).not.toContain('Batch cancel')
     expect(wrapper.text()).not.toContain('Bulk')
@@ -126,7 +127,9 @@ describe('JobsView.vue', () => {
         cluster: 'foo'
       }
     })
-    expect(wrapper.getComponent(ErrorAlert).text()).toBe('Unable to retrieve jobs from cluster foo')
+    expect(wrapper.getComponent(ErrorAlert).text()).toBe(
+      i18n.global.t('pages.jobs.unableToRetrieve', { cluster: 'foo' })
+    )
     expect(wrapper.find('main table').exists()).toBeFalsy()
   })
 
@@ -137,7 +140,9 @@ describe('JobsView.vue', () => {
         cluster: 'foo'
       }
     })
-    expect(wrapper.getComponent(InfoAlert).text()).toBe('No jobs found on cluster foo')
+    expect(wrapper.getComponent(InfoAlert).text()).toBe(
+      i18n.global.t('pages.jobs.noJobs', { cluster: 'foo' })
+    )
     expect(wrapper.find('main table').exists()).toBeFalsy()
   })
 
@@ -182,10 +187,10 @@ describe('JobsView.vue', () => {
 
     const rows = wrapper.findAll('tbody tr')
     expect(rows).toHaveLength(2)
-    expect(rows[0].text()).toContain('Edit')
-    expect(rows[0].text()).toContain('Cancel')
-    expect(rows[1].text()).not.toContain('Edit')
-    expect(rows[1].text()).not.toContain('Cancel')
+    expect(rows[0].text()).toContain(i18n.global.t('pages.jobs.actions.edit'))
+    expect(rows[0].text()).toContain(i18n.global.t('pages.jobs.actions.cancel'))
+    expect(rows[1].text()).not.toContain(i18n.global.t('pages.jobs.actions.edit'))
+    expect(rows[1].text()).not.toContain(i18n.global.t('pages.jobs.actions.cancel'))
     expect(wrapper.text()).not.toContain('Batch cancel')
   })
 
@@ -214,11 +219,14 @@ describe('JobsView.vue', () => {
       }
     })
 
-    await wrapper.findAll('tbody button').find((button) => button.text() === 'Edit')!.trigger('click')
+    await wrapper
+      .findAll('tbody button')
+      .find((button) => button.text() === i18n.global.t('pages.jobs.actions.edit'))!
+      .trigger('click')
     await flushPromises()
     wrapper
       .findAllComponents(ActionDialog)
-      .find((dialog) => dialog.props('title') === 'Edit Job')!
+      .find((dialog) => dialog.props('title') === 'pages.jobs.dialogs.edit.title')!
       .vm.$emit('submit', {
         partition: 'normal',
         qos: 'normal',

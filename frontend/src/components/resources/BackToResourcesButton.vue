@@ -10,11 +10,13 @@
 import { computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ChevronLeftIcon } from '@heroicons/vue/20/solid'
+import { useI18n } from 'vue-i18n'
 
 const { cluster } = defineProps<{ cluster: string }>()
 
 const router = useRouter()
 const route = useRoute()
+const { t } = useI18n()
 
 const returnRoute = computed(() => {
   const validRoutes = ['resources', 'resources-diagram-nodes', 'resources-diagram-cores']
@@ -34,6 +36,6 @@ function handleBackClick() {
     class="ui-button-secondary self-start"
   >
     <ChevronLeftIcon class="-ml-0.5 h-5 w-5" aria-hidden="true" />
-    Back to resources
+    {{ t('components.resourcesBack.toResources') }}
   </button>
 </template>

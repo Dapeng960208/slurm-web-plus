@@ -13,6 +13,7 @@ import jobsNode from '../assets/jobs-node.json'
 import { nextTick } from 'vue'
 import PanelSkeleton from '@/components/PanelSkeleton.vue'
 import ActionDialog from '@/components/operations/ActionDialog.vue'
+import { i18n } from '@/plugins/i18n'
 
 const mockNodeDataPoller = getMockClusterDataPoller<ClusterNode>()
 const mockJobsDataPoller = getMockClusterDataPoller<ClusterJob[]>()
@@ -119,7 +120,7 @@ describe('NodeView.vue', () => {
 
     const dayButton = wrapper
       .findAll('button[type="button"]')
-      .find((button) => button.text().trim() === 'day')
+      .find((button) => button.text().trim() === i18n.global.t('common.metricRanges.day'))
     if (!dayButton) {
       throw new Error('day button not found')
     }
@@ -129,7 +130,7 @@ describe('NodeView.vue', () => {
 
     const weekButton = wrapper
       .findAll('button[type="button"]')
-      .find((button) => button.text().trim() === 'week')
+      .find((button) => button.text().trim() === i18n.global.t('common.metricRanges.week'))
     if (!weekButton) {
       throw new Error('week button not found')
     }
@@ -368,7 +369,7 @@ describe('NodeView.vue', () => {
 
     const editDialog = wrapper
       .findAllComponents(ActionDialog)
-      .find((dialog) => dialog.props('title') === 'Edit Node')
+      .find((dialog) => dialog.props('title') === 'pages.node.dialogs.edit.title')
     if (!editDialog) {
       throw new Error('Edit node dialog not found')
     }
@@ -421,14 +422,14 @@ describe('NodeView.vue', () => {
 
     const editDialog = wrapper
       .findAllComponents(ActionDialog)
-      .find((dialog) => dialog.props('title') === 'Edit Node')
+      .find((dialog) => dialog.props('title') === 'pages.node.dialogs.edit.title')
     if (!editDialog) {
       throw new Error('Edit node dialog not found')
     }
 
     expect(editDialog.props('initialValues')).toMatchObject({ state: '' })
     const stateField = editDialog.props('fields').find((field) => field.key === 'state')
-    expect(stateField?.hint).toContain('Current node state: MIXED.')
+    expect(stateField?.hint).toContain(i18n.global.t('pages.node.dialogs.edit.fields.stateHint', { state: 'MIXED' }))
     expect(stateField?.options?.some((option) => option.value === 'MIXED')).toBe(false)
   })
 
@@ -470,14 +471,14 @@ describe('NodeView.vue', () => {
 
     const editDialog = wrapper
       .findAllComponents(ActionDialog)
-      .find((dialog) => dialog.props('title') === 'Edit Node')
+      .find((dialog) => dialog.props('title') === 'pages.node.dialogs.edit.title')
     if (!editDialog) {
       throw new Error('Edit node dialog not found')
     }
 
     expect(editDialog.props('initialValues')).toMatchObject({ state: 'DRAIN' })
     const stateField = editDialog.props('fields').find((field) => field.key === 'state')
-    expect(stateField?.hint).toContain('Current node state: DRAINED.')
+    expect(stateField?.hint).toContain(i18n.global.t('pages.node.dialogs.edit.fields.stateHint', { state: 'DRAINED' }))
     expect(stateField?.options?.some((option) => option.value === 'DRAINED')).toBe(false)
     expect(stateField?.options?.some((option) => option.value === 'DRAIN')).toBe(true)
   })
@@ -520,13 +521,13 @@ describe('NodeView.vue', () => {
 
     const editDialog = wrapper
       .findAllComponents(ActionDialog)
-      .find((dialog) => dialog.props('title') === 'Edit Node')
+      .find((dialog) => dialog.props('title') === 'pages.node.dialogs.edit.title')
     if (!editDialog) {
       throw new Error('Edit node dialog not found')
     }
 
     expect(editDialog.props('initialValues')).toMatchObject({ state: 'IDLE' })
     const stateField = editDialog.props('fields').find((field) => field.key === 'state')
-    expect(stateField?.hint).toContain('Current node state: IDLE.')
+    expect(stateField?.hint).toContain(i18n.global.t('pages.node.dialogs.edit.fields.stateHint', { state: 'IDLE' }))
   })
 })

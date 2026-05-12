@@ -301,7 +301,7 @@ describe('AccountView.vue', () => {
     await nextTick()
     wrapper
       .findAllComponents(ActionDialog)
-      .find((dialog) => dialog.props('title') === 'Add User Association')!
+      .find((dialog) => dialog.props('title') === 'pages.account.dialogs.addUserAssociation.title')!
       .vm.$emit('submit', {
         user: 'bob',
         qos: 'normal, study',
@@ -324,7 +324,7 @@ describe('AccountView.vue', () => {
     await nextTick()
     wrapper
       .findAllComponents(ActionDialog)
-      .find((dialog) => dialog.props('title') === 'Edit User QOS')!
+      .find((dialog) => dialog.props('title') === 'pages.account.dialogs.editUserQos.title')!
       .vm.$emit('submit', {
         qos: 'debug',
         default_qos: 'debug'
@@ -346,7 +346,7 @@ describe('AccountView.vue', () => {
     await nextTick()
     wrapper
       .findAllComponents(ActionDialog)
-      .find((dialog) => dialog.props('title') === 'Delete User Association')!
+      .find((dialog) => dialog.props('title') === 'pages.account.dialogs.deleteAssociation.title')!
       .vm.$emit('submit', {})
     await flushPromises()
 
@@ -399,7 +399,7 @@ describe('AccountView.vue', () => {
     await nextTick()
     wrapper
       .findAllComponents(ActionDialog)
-      .find((dialog) => dialog.props('title') === 'Add User Association')!
+      .find((dialog) => dialog.props('title') === 'pages.account.dialogs.addUserAssociation.title')!
       .vm.$emit('submit', {
         user: 'bob',
         qos: '',
@@ -458,7 +458,7 @@ describe('AccountView.vue', () => {
     await nextTick()
     wrapper
       .findAllComponents(ActionDialog)
-      .find((dialog) => dialog.props('title') === 'Edit Account')!
+      .find((dialog) => dialog.props('title') === 'pages.account.dialogs.edit.title')!
       .vm.$emit('submit', {
         description: 'Root account',
         organization: 'Platform Team',

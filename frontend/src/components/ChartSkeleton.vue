@@ -7,18 +7,22 @@
 -->
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
 withDefaults(
   defineProps<{
     label?: string
   }>(),
   {
-    label: 'Loading chart'
+    label: 'components.chartSkeleton.loadingChart'
   }
 )
+
+const { t } = useI18n()
 </script>
 
 <template>
-  <div class="ui-chart-skeleton" role="img" :aria-label="label">
+  <div class="ui-chart-skeleton" role="img" :aria-label="t(label)">
     <span class="ui-chart-skeleton-bar ui-chart-skeleton-bar-1"></span>
     <span class="ui-chart-skeleton-bar ui-chart-skeleton-bar-2"></span>
     <span class="ui-chart-skeleton-bar ui-chart-skeleton-bar-3"></span>

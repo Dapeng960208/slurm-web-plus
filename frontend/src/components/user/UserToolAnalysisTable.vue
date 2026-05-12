@@ -8,12 +8,14 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import type { UserToolActivityRecord } from '@/composables/GatewayAPI'
 
 const props = defineProps<{
   tools: UserToolActivityRecord[]
   totalCompletedJobs?: number
 }>()
+const { t } = useI18n()
 
 const sortedTools = computed(() =>
   [...props.tools].sort(
@@ -69,6 +71,10 @@ function jobsBarWidth(tool: UserToolActivityRecord): string {
   if (!maxJobs.value) return '0%'
   return `${(tool.jobs / maxJobs.value) * 100}%`
 }
+
+function jobsCountLabel(count: number): string {
+  return t('pages.user.analyticsPanels.table.jobsCount', { count })
+}
 </script>
 
 <template>
@@ -77,14 +83,26 @@ function jobsBarWidth(tool: UserToolActivityRecord): string {
       <table class="ui-table min-w-[1100px]">
         <thead>
           <tr>
-            <th scope="col" class="py-3.5 pr-3 pl-6 text-left">Tool</th>
-            <th scope="col" class="px-3 py-3.5 text-left">Workload</th>
-            <th scope="col" class="px-3 py-3.5 text-left">Avg Memory</th>
-            <th scope="col" class="px-3 py-3.5 text-left">Max Memory</th>
-            <th scope="col" class="px-3 py-3.5 text-left">Median Memory</th>
-            <th scope="col" class="px-3 py-3.5 text-left">Avg Runtime</th>
-            <th scope="col" class="px-3 py-3.5 text-left">Avg CPU</th>
-            <th scope="col" class="px-3 py-3.5 text-left">Jobs</th>
+            <th scope="col" class="py-3.5 pr-3 pl-6 text-left">{{ t('common.labels.tool') }}</th>
+            <th scope="col" class="px-3 py-3.5 text-left">
+              {{ t('pages.user.analyticsPanels.table.workload') }}
+            </th>
+            <th scope="col" class="px-3 py-3.5 text-left">
+              {{ t('pages.user.analyticsPanels.table.avgMemory') }}
+            </th>
+            <th scope="col" class="px-3 py-3.5 text-left">
+              {{ t('pages.user.analyticsPanels.table.maxMemory') }}
+            </th>
+            <th scope="col" class="px-3 py-3.5 text-left">
+              {{ t('pages.user.analyticsPanels.table.medianMemory') }}
+            </th>
+            <th scope="col" class="px-3 py-3.5 text-left">
+              {{ t('pages.user.analyticsPanels.table.avgRuntime') }}
+            </th>
+            <th scope="col" class="px-3 py-3.5 text-left">
+              {{ t('pages.user.analyticsPanels.table.avgCpu') }}
+            </th>
+            <th scope="col" class="px-3 py-3.5 text-left">{{ t('common.entities.jobs') }}</th>
           </tr>
         </thead>
         <tbody class="text-sm text-[var(--color-brand-muted)]">
@@ -111,7 +129,7 @@ function jobsBarWidth(tool: UserToolActivityRecord): string {
               <div class="min-w-[180px]">
                 <div class="flex items-center justify-between gap-3 text-xs font-semibold text-[var(--color-brand-ink-strong)]">
                   <span>{{ shareLabel(tool) }}</span>
-                  <span>{{ tool.jobs }} job{{ tool.jobs === 1 ? '' : 's' }}</span>
+                  <span>{{ jobsCountLabel(tool.jobs) }}</span>
                 </div>
                 <div class="mt-2 h-2.5 overflow-hidden rounded-full bg-[rgba(80,105,127,0.12)]">
                   <div

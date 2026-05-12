@@ -7,6 +7,7 @@
 -->
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import type { JobHistoryFilters } from '@/composables/GatewayAPI'
 import {
   Dialog,
@@ -41,6 +42,7 @@ const emit = defineEmits<{
   (e: 'search'): void
   (e: 'update:filters', filters: JobHistoryFilters): void
 }>()
+const { t } = useI18n()
 
 const state_options = [
   'RUNNING',
@@ -110,7 +112,7 @@ function toggleState(state: string) {
           >
             <div class="flex items-center justify-between px-4">
               <h2 class="text-lg font-medium text-gray-900 dark:text-gray-100">
-                Filters
+                {{ t('filters.title') }}
                 <span
                   class="text-slurmweb dark:text-slurmweb-light dark:bg-slurmweb-verydark ml-3 hidden rounded-full bg-indigo-100 px-2.5 py-0.5 text-xs font-medium md:inline-block"
                   >{{ props.total }}</span
@@ -121,7 +123,7 @@ function toggleState(state: string) {
                 class="-mr-2 flex h-10 w-10 items-center justify-center rounded-md p-2 text-gray-400"
                 @click="emit('close')"
               >
-                <span class="sr-only">Close menu</span>
+                <span class="sr-only">{{ t('filters.closeMenu') }}</span>
                 <XMarkIcon class="h-6 w-6" aria-hidden="true" />
               </button>
             </div>
@@ -141,7 +143,7 @@ function toggleState(state: string) {
                       <MagnifyingGlassIcon
                         class="-mt-1 mr-2 -ml-1 h-8 w-8 rounded-full bg-slate-600 p-2 text-white dark:bg-slate-500"
                       />
-                      <span class="font-medium text-gray-900 dark:text-gray-100">Keyword</span>
+                      <span class="font-medium text-gray-900 dark:text-gray-100">{{ t('filters.history.keyword') }}</span>
                     </span>
                     <ChevronDownIcon
                       :class="[dOpen ? '-rotate-180' : 'rotate-0', 'h-5 w-5 transform']"
@@ -152,7 +154,7 @@ function toggleState(state: string) {
                 <DisclosurePanel class="pt-4">
                   <input
                     :value="props.filters.keyword"
-                    placeholder="Search workdir / command"
+                    :placeholder="t('filters.history.keywordPlaceholder')"
                     class="w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-slurmweb dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
                     @input="updateTextFilter('keyword', $event)"
                   />
@@ -173,7 +175,7 @@ function toggleState(state: string) {
                       <BoltIcon
                         class="-mt-1 mr-2 -ml-1 h-8 w-8 rounded-full bg-gray-600 p-2 text-white dark:bg-gray-500"
                       />
-                      <span class="font-medium text-gray-900 dark:text-gray-100">State</span>
+                      <span class="font-medium text-gray-900 dark:text-gray-100">{{ t('common.labels.state') }}</span>
                     </span>
                     <ChevronDownIcon
                       :class="[dOpen ? '-rotate-180' : 'rotate-0', 'h-5 w-5 transform']"
@@ -220,7 +222,7 @@ function toggleState(state: string) {
                       <UserIcon
                         class="-mt-1 mr-2 -ml-1 h-8 w-8 rounded-full bg-emerald-500 p-2 text-white"
                       />
-                      <span class="font-medium text-gray-900 dark:text-gray-100">User</span>
+                      <span class="font-medium text-gray-900 dark:text-gray-100">{{ t('common.labels.user') }}</span>
                     </span>
                     <ChevronDownIcon
                       :class="[dOpen ? '-rotate-180' : 'rotate-0', 'h-5 w-5 transform']"
@@ -231,7 +233,7 @@ function toggleState(state: string) {
                 <DisclosurePanel class="pt-4">
                   <input
                     :value="props.filters.user"
-                    placeholder="Username"
+                    :placeholder="t('filters.history.userPlaceholder')"
                     class="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-1.5 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-slurmweb"
                     @input="updateTextFilter('user', $event)"
                   />
@@ -252,7 +254,7 @@ function toggleState(state: string) {
                       <UsersIcon
                         class="-mt-1 mr-2 -ml-1 h-8 w-8 rounded-full bg-yellow-500 p-2 text-white"
                       />
-                      <span class="font-medium text-gray-900 dark:text-gray-100">Account</span>
+                      <span class="font-medium text-gray-900 dark:text-gray-100">{{ t('common.labels.account') }}</span>
                     </span>
                     <ChevronDownIcon
                       :class="[dOpen ? '-rotate-180' : 'rotate-0', 'h-5 w-5 transform']"
@@ -263,7 +265,7 @@ function toggleState(state: string) {
                 <DisclosurePanel class="pt-4">
                   <input
                     :value="props.filters.account"
-                    placeholder="Account name"
+                    :placeholder="t('filters.history.accountPlaceholder')"
                     class="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-1.5 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-slurmweb"
                     @input="updateTextFilter('account', $event)"
                   />
@@ -284,7 +286,7 @@ function toggleState(state: string) {
                       <RectangleGroupIcon
                         class="-mt-1 mr-2 -ml-1 h-8 w-8 rounded-full bg-amber-700 p-2 text-white"
                       />
-                      <span class="font-medium text-gray-900 dark:text-gray-100">Partition</span>
+                      <span class="font-medium text-gray-900 dark:text-gray-100">{{ t('common.labels.partition') }}</span>
                     </span>
                     <ChevronDownIcon
                       :class="[dOpen ? '-rotate-180' : 'rotate-0', 'h-5 w-5 transform']"
@@ -295,7 +297,7 @@ function toggleState(state: string) {
                 <DisclosurePanel class="pt-4">
                   <input
                     :value="props.filters.partition"
-                    placeholder="Partition name"
+                    :placeholder="t('filters.history.partitionPlaceholder')"
                     class="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-1.5 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-slurmweb"
                     @input="updateTextFilter('partition', $event)"
                   />
@@ -316,7 +318,7 @@ function toggleState(state: string) {
                       <SwatchIcon
                         class="-mt-1 mr-2 -ml-1 h-8 w-8 rounded-full bg-purple-500 p-2 text-white"
                       />
-                      <span class="font-medium text-gray-900 dark:text-gray-100">QOS</span>
+                      <span class="font-medium text-gray-900 dark:text-gray-100">{{ t('common.labels.qos') }}</span>
                     </span>
                     <ChevronDownIcon
                       :class="[dOpen ? '-rotate-180' : 'rotate-0', 'h-5 w-5 transform']"
@@ -327,7 +329,7 @@ function toggleState(state: string) {
                 <DisclosurePanel class="pt-4">
                   <input
                     :value="props.filters.qos"
-                    placeholder="QOS name"
+                    :placeholder="t('filters.history.qosPlaceholder')"
                     class="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-1.5 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-slurmweb"
                     @input="updateTextFilter('qos', $event)"
                   />
@@ -348,7 +350,7 @@ function toggleState(state: string) {
                       <HashtagIcon
                         class="-mt-1 mr-2 -ml-1 h-8 w-8 rounded-full bg-sky-500 p-2 text-white"
                       />
-                      <span class="font-medium text-gray-900 dark:text-gray-100">Job ID</span>
+                      <span class="font-medium text-gray-900 dark:text-gray-100">{{ t('filters.history.jobId') }}</span>
                     </span>
                     <ChevronDownIcon
                       :class="[dOpen ? '-rotate-180' : 'rotate-0', 'h-5 w-5 transform']"
@@ -361,7 +363,7 @@ function toggleState(state: string) {
                     :value="props.filters.job_id ?? ''"
                     type="number"
                     min="1"
-                    placeholder="Job ID"
+                    :placeholder="t('filters.history.jobId')"
                     class="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-1.5 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-slurmweb"
                     @input="updateNumericFilter('job_id', $event)"
                   />
@@ -382,7 +384,7 @@ function toggleState(state: string) {
                       <CalendarIcon
                         class="-mt-1 mr-2 -ml-1 h-8 w-8 rounded-full bg-rose-500 p-2 text-white"
                       />
-                      <span class="font-medium text-gray-900 dark:text-gray-100">Time Range</span>
+                      <span class="font-medium text-gray-900 dark:text-gray-100">{{ t('filters.history.timeRange') }}</span>
                     </span>
                     <ChevronDownIcon
                       :class="[dOpen ? '-rotate-180' : 'rotate-0', 'h-5 w-5 transform']"
@@ -392,7 +394,7 @@ function toggleState(state: string) {
                 </h3>
                 <DisclosurePanel class="pt-4 space-y-3">
                   <div>
-                    <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1">From</label>
+                    <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1">{{ t('common.labels.from') }}</label>
                     <input
                       :value="props.filters.start"
                       type="datetime-local"
@@ -402,7 +404,7 @@ function toggleState(state: string) {
                     />
                   </div>
                   <div>
-                    <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1">To</label>
+                    <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1">{{ t('common.labels.to') }}</label>
                     <input
                       :value="props.filters.end"
                       type="datetime-local"
@@ -420,7 +422,7 @@ function toggleState(state: string) {
                   type="submit"
                   class="w-full bg-slurmweb dark:bg-slurmweb-verydark hover:bg-slurmweb-darker focus-visible:outline-slurmweb rounded-md px-3 py-2 text-sm font-semibold text-white shadow-xs focus-visible:outline-2 focus-visible:outline-offset-2"
                 >
-                  Apply Filters
+                  {{ t('filters.history.apply') }}
                 </button>
               </div>
             </form>

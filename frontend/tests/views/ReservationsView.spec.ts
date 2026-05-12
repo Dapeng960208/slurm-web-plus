@@ -5,6 +5,7 @@ import ErrorAlert from '@/components/ErrorAlert.vue'
 import InfoAlert from '@/components/InfoAlert.vue'
 import { init_plugins, getMockClusterDataPoller } from '../lib/common'
 import { useRuntimeStore } from '@/stores/runtime'
+import { i18n } from '@/plugins/i18n'
 import type { ClusterReservation } from '@/composables/GatewayAPI'
 import reservations from '../assets/reservations.json'
 
@@ -79,7 +80,7 @@ describe('ReservationsView.vue', () => {
       }
     })
     expect(wrapper.getComponent(ErrorAlert).text()).toBe(
-      'Unable to retrieve reservations from cluster foo'
+      i18n.global.t('pages.reservations.unableToRetrieve', { cluster: 'foo' })
     )
   })
   test('show info alert when no reservation defined', () => {
@@ -89,6 +90,8 @@ describe('ReservationsView.vue', () => {
         cluster: 'foo'
       }
     })
-    expect(wrapper.getComponent(InfoAlert).text()).toBe('No reservation defined on cluster foo')
+    expect(wrapper.getComponent(InfoAlert).text()).toBe(
+      i18n.global.t('pages.reservations.noReservations', { cluster: 'foo' })
+    )
   })
 })

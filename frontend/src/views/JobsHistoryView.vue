@@ -10,6 +10,7 @@
 import { computed, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import type { LocationQueryRaw } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { storeToRefs } from 'pinia'
 import { useGatewayAPI } from '@/composables/GatewayAPI'
 import type {
@@ -40,6 +41,7 @@ const props = defineProps<{ cluster: string }>()
 const gateway = useGatewayAPI()
 const router = useRouter()
 const route = useRoute()
+const { t } = useI18n()
 const runtimeStore = useRuntimeStore()
 const historyStore = runtimeStore.jobsHistory
 const { filters, page, pageSize, sort, order } = storeToRefs(historyStore)
@@ -155,7 +157,7 @@ watch(totalPages, (newLastPage) => {
   <ClusterMainLayout
     menu-entry="jobs-history"
     :cluster="cluster"
-    :breadcrumb="[{ title: 'Jobs History' }]"
+    :breadcrumb="[{ title: 'shell.mainMenu.jobsHistory' }]"
   >
     <div class="ui-page ui-page-wide ui-content-workspace">
       <JobsHistoryFiltersPanel
@@ -168,14 +170,16 @@ watch(totalPages, (newLastPage) => {
       />
 
       <PageHeader
-        title="Jobs History"
-        description="Historical job records with scheduler context, state transitions and searchable execution metadata."
+        title="pages.jobsHistory.title"
+        description="pages.jobsHistory.description"
         :metric-value="initialLoading || error ? undefined : total"
-        :metric-label="`record${total === 1 ? '' : 's'} found`"
+        :metric-label="
+          total === 1 ? 'pages.jobsHistory.metricLabel' : 'pages.jobsHistory.metricLabelPlural'
+        "
       />
 
       <section aria-labelledby="history-filter-heading" class="-mx-4 -my-2 sm:-mx-6 lg:-mx-8">
-        <h2 id="history-filter-heading" class="sr-only">Filters</h2>
+        <h2 id="history-filter-heading" class="sr-only">{{ t('pages.jobsHistory.headingFilters') }}</h2>
         <div class="pb-4">
           <div class="mx-auto flex items-center justify-between px-4 sm:px-6 lg:px-8">
             <JobsHistorySorter
@@ -186,7 +190,7 @@ watch(totalPages, (newLastPage) => {
             />
             <button type="button" class="ui-button-secondary" @click="filtersOpen = true">
               <PlusSmallIcon class="-ml-0.5 h-5 w-5" aria-hidden="true" />
-              Add filters
+              {{ t('pages.jobsHistory.addFilters') }}
             </button>
           </div>
         </div>
@@ -200,7 +204,7 @@ watch(totalPages, (newLastPage) => {
       <div class="ui-results-layout">
         <ErrorAlert v-if="error">{{ error }}</ErrorAlert>
         <InfoAlert v-else-if="!initialLoading && jobs.length === 0">
-          No job history records found on cluster <span class="font-medium">{{ cluster }}</span>
+          {{ t('pages.jobsHistory.noRecords', { cluster }) }}
         </InfoAlert>
         <div v-else class="ui-results-workspace">
           <div class="ui-table-shell ui-results-card">
@@ -210,16 +214,32 @@ watch(totalPages, (newLastPage) => {
               <thead>
                 <tr>
                   <th scope="col" class="w-12 py-3.5 pr-3 text-left sm:pl-6 lg:pl-8">#ID</th>
-                  <th scope="col" class="min-w-[11rem] px-3 py-3.5 text-left">Submit Time</th>
-                  <th scope="col" class="w-16 px-3 py-3.5 text-left">State</th>
-                  <th scope="col" class="px-3 py-3.5 text-left">User (account)</th>
-                  <th scope="col" class="hidden px-3 py-3.5 text-left sm:table-cell">Resources</th>
-                  <th scope="col" class="hidden px-3 py-3.5 text-left xl:table-cell">Partition</th>
-                  <th scope="col" class="hidden px-3 py-3.5 text-left xl:table-cell">QOS</th>
-                  <th scope="col" class="hidden px-3 py-3.5 text-center sm:table-cell">Priority</th>
-                  <th scope="col" class="hidden px-3 py-3.5 text-left 2xl:table-cell">Reason</th>
+                  <th scope="col" class="min-w-[11rem] px-3 py-3.5 text-left">
+                    {{ t('tables.jobs.columns.submitTime') }}
+                  </th>
+                  <th scope="col" class="w-16 px-3 py-3.5 text-left">
+                    {{ t('tables.jobs.columns.state') }}
+                  </th>
+                  <th scope="col" class="px-3 py-3.5 text-left">
+                    {{ t('tables.jobs.columns.userAccount') }}
+                  </th>
+                  <th scope="col" class="hidden px-3 py-3.5 text-left sm:table-cell">
+                    {{ t('tables.jobs.columns.resources') }}
+                  </th>
+                  <th scope="col" class="hidden px-3 py-3.5 text-left xl:table-cell">
+                    {{ t('tables.jobs.columns.partition') }}
+                  </th>
+                  <th scope="col" class="hidden px-3 py-3.5 text-left xl:table-cell">
+                    {{ t('tables.jobs.columns.qos') }}
+                  </th>
+                  <th scope="col" class="hidden px-3 py-3.5 text-center sm:table-cell">
+                    {{ t('tables.jobs.columns.priority') }}
+                  </th>
+                  <th scope="col" class="hidden px-3 py-3.5 text-left 2xl:table-cell">
+                    {{ t('tables.jobs.columns.reason') }}
+                  </th>
                   <th scope="col" class="py-3.5 pr-4 pl-3 text-right sm:pr-6 lg:pr-8">
-                    Actions
+                    {{ t('tables.jobs.columns.actions') }}
                   </th>
                 </tr>
               </thead>
@@ -269,14 +289,14 @@ watch(totalPages, (newLastPage) => {
                         class="ui-button-secondary"
                       >
                         <WindowIcon class="h-4 w-4" aria-hidden="true" />
-                        Live job
+                        {{ t('pages.jobsHistory.liveJob') }}
                       </RouterLink>
                       <RouterLink
                         :to="{ name: 'job-history', params: { cluster: cluster, id: job.id } }"
                         class="ui-button-secondary"
                       >
                         <WindowIcon class="h-4 w-4" aria-hidden="true" />
-                        History
+                        {{ t('pages.jobsHistory.history') }}
                       </RouterLink>
                     </div>
                   </td>
@@ -299,7 +319,7 @@ watch(totalPages, (newLastPage) => {
               :page="page"
               :page-size="pageSize"
               :total="total"
-              item-label="record"
+              :item-label="t('common.entities.record')"
               @update:page="updatePage"
               @update:page-size="updatePageSize"
             />

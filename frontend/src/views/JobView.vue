@@ -11,6 +11,7 @@ import { computed, ref, watch } from 'vue'
 import type { Component } from 'vue'
 import type { RouteLocationRaw } from 'vue-router'
 import { useRoute } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import ClusterMainLayout from '@/components/ClusterMainLayout.vue'
 import { useClusterDataPoller } from '@/composables/DataPoller'
 import { formatJobExitCode, jobRequestedGPU, jobAllocatedGPU } from '@/composables/GatewayAPI'
@@ -35,6 +36,7 @@ import { useAuthStore } from '@/stores/auth'
 const { cluster, id } = defineProps<{ cluster: string; id: number }>()
 
 const route = useRoute()
+const { t } = useI18n()
 const gateway = useGatewayAPI()
 const runtimeStore = useRuntimeStore()
 const authStore = useAuthStore()
@@ -159,39 +161,45 @@ const jobFieldsContent = computed((): JobFieldRow[] => {
   const account = data.value.association.account
 
   return [
-    compactField('user', 'User', data.value.user, {
-      name: 'user',
-      params: { cluster, user: data.value.user }
-    }),
-    compactField('group', 'Group', data.value.group),
+    compactField('group', 'pages.job.fields.group', data.value.group),
     compactField(
       'account',
-      'Account',
+      'pages.job.fields.account',
       account,
       account ? { name: 'account', params: { cluster, account } } : undefined
     ),
-    compactField('wckeys', 'Wckeys', data.value.wckey.wckey),
-    compactField('priority', 'Priority', data.value.priority.number),
-    compactField('nodes', 'Nodes', data.value.nodes),
-    compactField('partition', 'Partition', data.value.partition),
-    compactField('qos', 'QOS', data.value.qos),
-    compactField('exit-code', 'Exit Code', formatJobExitCode(data.value.exit_code)),
-    fullField('name', 'Name', JobFieldRaw, { field: data.value.name }),
-    fullField('comments', 'Comments', JobFieldComment, { comment: data.value.comment }),
-    fullField('submit-line', 'Submit line', JobFieldRaw, {
+    compactField('user', 'pages.job.fields.user', data.value.user, {
+      name: 'user',
+      params: { cluster, user: data.value.user }
+    }),
+    compactField('wckeys', 'pages.job.fields.wckeys', data.value.wckey.wckey),
+    compactField('priority', 'pages.job.fields.priority', data.value.priority.number),
+    compactField('nodes', 'pages.job.fields.nodes', data.value.nodes),
+    compactField('partition', 'pages.job.fields.partition', data.value.partition),
+    compactField('qos', 'pages.job.fields.qos', data.value.qos),
+    compactField(
+      'exit-code',
+      'pages.job.fields.exitCode',
+      formatJobExitCode(data.value.exit_code)
+    ),
+    fullField('name', 'pages.job.fields.name', JobFieldRaw, { field: data.value.name }),
+    fullField('comments', 'pages.job.fields.comments', JobFieldComment, {
+      comment: data.value.comment
+    }),
+    fullField('submit-line', 'pages.job.fields.submitLine', JobFieldRaw, {
       field: data.value.submit_line,
       monospace: true
     }),
-    fullField('script', 'Script', JobFieldRaw, { field: data.value.script }),
-    fullField('workdir', 'Working directory', JobFieldRaw, {
+    fullField('script', 'pages.job.fields.script', JobFieldRaw, { field: data.value.script }),
+    fullField('workdir', 'pages.job.fields.workingDirectory', JobFieldRaw, {
       field: data.value.working_directory,
       monospace: true
     }),
-    fullField('tres-requested', 'Requested', JobResources, {
+    fullField('tres-requested', 'pages.job.fields.requested', JobResources, {
       tres: data.value.tres.requested,
       gpu: jobRequestedGPU(data.value)
     }),
-    fullField('tres-allocated', 'Allocated', JobResources, {
+    fullField('tres-allocated', 'pages.job.fields.allocated', JobResources, {
       tres: data.value.tres.allocated,
       gpu: { count: jobAllocatedGPU(data.value), reliable: true }
     })
@@ -210,34 +218,46 @@ const summaryItems = computed(() => {
   return [
     {
       id: 'user',
-      label: 'User',
+      label: 'pages.job.summary.user',
       value: fmtField(data.value.user),
       to: { name: 'user', params: { cluster, user: data.value.user } }
     },
     {
       id: 'account',
-      label: 'Account',
+      label: 'pages.job.summary.account',
       value: fmtField(account),
       to: account ? { name: 'account', params: { cluster, account } } : undefined
     },
-    { id: 'partition', label: 'Partition', value: fmtField(data.value.partition) },
-    { id: 'nodes', label: 'Nodes', value: fmtField(data.value.nodes) },
+    { id: 'partition', label: 'pages.job.summary.partition', value: fmtField(data.value.partition) },
+    { id: 'nodes', label: 'pages.job.summary.nodes', value: fmtField(data.value.nodes) },
     {
       id: 'tres-requested',
-      label: 'Requested',
+      label: 'pages.job.summary.requested',
       value: `${data.value.tres.requested.length} TRES`,
-      subtle: requestedGpu.count >= 0 ? `${requestedGpu.count} GPU requested` : 'GPU request unavailable'
+      subtle:
+        requestedGpu.count >= 0
+          ? t('pages.job.summary.requestedSubtle', { count: requestedGpu.count })
+          : t('pages.job.summary.requestedUnavailable'),
+      translateSubtle: false
     },
     {
       id: 'tres-allocated',
-      label: 'Allocated',
+      label: 'pages.job.summary.allocated',
       value: `${data.value.tres.allocated.length} TRES`,
-      subtle: allocatedGpu >= 0 ? `${allocatedGpu} GPU allocated` : 'GPU allocation unavailable'
+      subtle:
+        allocatedGpu >= 0
+          ? t('pages.job.summary.allocatedSubtle', { count: allocatedGpu })
+          : t('pages.job.summary.allocatedUnavailable'),
+      translateSubtle: false
     },
-    { id: 'exit-code', label: 'Exit Code', value: formatJobExitCode(data.value.exit_code) },
+    {
+      id: 'exit-code',
+      label: 'pages.job.summary.exitCode',
+      value: formatJobExitCode(data.value.exit_code)
+    },
     {
       id: 'state-reason',
-      label: 'State Reason',
+      label: 'pages.job.summary.stateReason',
       value: data.value.state.reason && data.value.state.reason !== 'None' ? data.value.state.reason : '-'
     }
   ]
@@ -273,7 +293,7 @@ async function saveJobEdits(payload: Record<string, string>) {
           ? undefined
           : { set: true, infinite: false, number: memoryPerCpu }
     })
-    runtimeStore.reportInfo(`Job ${id} update requested.`)
+    runtimeStore.reportInfo(t('pages.job.notifications.updateRequested', { jobId: id }))
     editOpen.value = false
   } catch (error: unknown) {
     operationError.value = error instanceof Error ? error.message : String(error)
@@ -290,7 +310,7 @@ async function cancelJob(payload: Record<string, string>) {
       signal: payload.signal || undefined,
       reason: payload.reason || undefined
     })
-    runtimeStore.reportInfo(`Job ${id} cancel requested.`)
+    runtimeStore.reportInfo(t('pages.job.notifications.cancelRequested', { jobId: id }))
     cancelOpen.value = false
   } catch (error: unknown) {
     operationError.value = error instanceof Error ? error.message : String(error)
@@ -303,7 +323,7 @@ function parsePositiveInteger(value: string): number | null {
   if (!value.trim()) return null
   const parsed = Number(value)
   if (!Number.isInteger(parsed) || parsed <= 0) {
-    throw new Error('Memory per CPU must be a positive integer in MB.')
+    throw new Error(t('pages.jobs.dialogs.edit.errors.invalidMemoryPerCpu'))
   }
   return parsed
 }
@@ -346,7 +366,10 @@ watch(
   <ClusterMainLayout
     menu-entry="jobs"
     :cluster="cluster"
-    :breadcrumb="[{ title: 'Jobs', routeName: 'jobs' }, { title: `Job ${id}` }]"
+    :breadcrumb="[
+      { title: 'shell.mainMenu.jobs', routeName: 'jobs' },
+      { title: t('pages.job.title', { jobId: id }) }
+    ]"
   >
     <div class="ui-page ui-page-readable ui-content-workspace">
       <JobBackButton :cluster="cluster" />
@@ -354,9 +377,10 @@ watch(
       <div class="ui-scroll-region min-h-0 flex-1 pr-1">
         <div class="ui-section-stack pb-2">
         <PageHeader
-          kicker="Job Detail"
-          :title="`Job ${id}`"
-          description="Execution state, request metadata and allocated resources for the selected job."
+          kicker="pages.job.kicker"
+          title="pages.job.title"
+          :title-params="{ jobId: id }"
+          description="pages.job.description"
         >
           <template #actions>
             <div class="flex flex-wrap items-center justify-end gap-3">
@@ -369,10 +393,10 @@ watch(
                   {{ data.state.reason }}
                 </span>
                 <button v-if="canEdit" type="button" class="ui-button-warning" @click="editOpen = true">
-                  Edit
+                  {{ t('pages.job.actions.edit') }}
                 </button>
                 <button v-if="canCancel" type="button" class="ui-button-danger" @click="cancelOpen = true">
-                  Cancel
+                  {{ t('pages.job.actions.cancel') }}
                 </button>
               </template>
               <div
@@ -391,9 +415,9 @@ watch(
           <PanelSkeleton :rows="5" />
           <div class="ui-panel ui-section">
             <div class="mb-5">
-              <h2 class="ui-panel-title">Job Configuration</h2>
+              <h2 class="ui-panel-title">{{ t('pages.job.panels.configurationTitle') }}</h2>
               <p class="ui-panel-description mt-2">
-                Core identity, command context and requested versus allocated resources.
+                {{ t('pages.job.panels.configurationDescription') }}
               </p>
             </div>
             <DetailSkeletonList :rows="8" />
@@ -401,16 +425,15 @@ watch(
         </div>
 
         <ErrorAlert v-if="unable"
-          >Unable to retrieve job {{ id }} from cluster
-          <span class="font-medium">{{ cluster }}</span></ErrorAlert
+          >{{ t('pages.job.errors.unableToRetrieve', { jobId: id, cluster }) }}</ErrorAlert
         >
         <div v-else-if="data">
           <div class="grid gap-6 xl:grid-cols-[minmax(280px,0.68fr)_minmax(0,1.32fr)]">
             <div class="ui-panel ui-section">
               <div class="mb-5">
-                <h2 class="ui-panel-title">Execution Timeline</h2>
+                <h2 class="ui-panel-title">{{ t('pages.job.panels.executionTimelineTitle') }}</h2>
                 <p class="ui-panel-description mt-2">
-                  Submission, scheduling and runtime milestones for this job.
+                  {{ t('pages.job.panels.executionTimelineDescription') }}
                 </p>
               </div>
               <JobProgress :job="data" />
@@ -418,17 +441,17 @@ watch(
 
             <div class="ui-panel ui-section">
               <div class="mb-5">
-                <h2 class="ui-panel-title">Job Configuration</h2>
+                <h2 class="ui-panel-title">{{ t('pages.job.panels.configurationTitle') }}</h2>
                 <p class="ui-panel-description mt-2">
-                  Core identity, command context and requested versus allocated resources.
+                  {{ t('pages.job.panels.configurationDescription') }}
                 </p>
               </div>
               <section class="space-y-6">
                 <div>
                   <div class="mb-4">
-                    <h3 class="ui-panel-title">Detailed Resources & Commands</h3>
+                    <h3 class="ui-panel-title">{{ t('pages.job.panels.detailedTitle') }}</h3>
                     <p class="ui-panel-description mt-1">
-                      Longer fields stay expanded for readability and copy-friendly access.
+                      {{ t('pages.job.panels.detailedDescription') }}
                     </p>
                   </div>
                   <div class="ui-detail-list" data-testid="job-detail-list">
@@ -459,7 +482,7 @@ watch(
                               >
                                 <HashtagIcon class="h-3.5 w-3.5" aria-hidden="true" />
                               </span>
-                              <span>{{ field.label }}</span>
+                              <span>{{ t(field.label) }}</span>
                             </span>
                           </a>
                         </dt>
@@ -478,9 +501,10 @@ watch(
 
     <ActionDialog
       :open="editOpen"
-      title="Edit Job"
-      :description="`Update job ${id} on ${cluster}.`"
-      submit-label="Save changes"
+      title="pages.job.dialogs.edit.title"
+      description="pages.job.dialogs.edit.description"
+      :description-params="{ jobId: id, cluster }"
+      submit-label="pages.job.dialogs.edit.submit"
       :loading="operationBusy"
       :error="operationError"
       :initial-values="{
@@ -492,18 +516,18 @@ watch(
         comment: data?.comment?.administrator || data?.comment?.job || ''
       }"
       :fields="[
-        { key: 'partition', label: 'Partition' },
-        { key: 'qos', label: 'QOS' },
-        { key: 'priority', label: 'Priority', type: 'number' },
+        { key: 'partition', label: 'pages.jobs.dialogs.edit.fields.partition' },
+        { key: 'qos', label: 'pages.jobs.dialogs.edit.fields.qos' },
+        { key: 'priority', label: 'pages.jobs.dialogs.edit.fields.priority', type: 'number' },
         {
           key: 'memory_per_cpu_mb',
-          label: 'Memory per CPU (MB)',
+          label: 'pages.jobs.dialogs.edit.fields.memoryPerCpuMb',
           type: 'number',
-          hint: 'Optional',
-          tooltip: 'Submitted as Slurm REST memory_per_cpu.number when set.'
+          hint: 'pages.jobs.dialogs.edit.fields.memoryPerCpuHint',
+          tooltip: 'pages.jobs.dialogs.edit.fields.memoryPerCpuTooltip'
         },
-        { key: 'time_limit', label: 'Time limit' },
-        { key: 'comment', label: 'Comment', type: 'textarea' }
+        { key: 'time_limit', label: 'pages.jobs.dialogs.edit.fields.timeLimit' },
+        { key: 'comment', label: 'pages.jobs.dialogs.edit.fields.comment', type: 'textarea' }
       ]"
       @close="editOpen = false"
       @submit="saveJobEdits"
@@ -511,14 +535,15 @@ watch(
 
     <ActionDialog
       :open="cancelOpen"
-      title="Cancel Job"
-      :description="`Cancel job ${id}. This action is destructive.`"
-      submit-label="Cancel job"
+      title="pages.job.dialogs.cancel.title"
+      description="pages.job.dialogs.cancel.description"
+      :description-params="{ jobId: id }"
+      submit-label="pages.job.dialogs.cancel.submit"
       :loading="operationBusy"
       :error="operationError"
       :fields="[
-        { key: 'signal', label: 'Signal' },
-        { key: 'reason', label: 'Reason', type: 'textarea' }
+        { key: 'signal', label: 'pages.jobs.dialogs.cancel.fields.signal' },
+        { key: 'reason', label: 'pages.jobs.dialogs.cancel.fields.reason', type: 'textarea' }
       ]"
       @close="cancelOpen = false"
       @submit="cancelJob"

@@ -10,6 +10,7 @@
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import type { LocationQueryRaw } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import ClusterMainLayout from '@/components/ClusterMainLayout.vue'
 import { useClusterDataPoller } from '@/composables/DataPoller'
 import type { ClusterReservation } from '@/composables/GatewayAPI'
@@ -37,6 +38,7 @@ const route = useRoute()
 const router = useRouter()
 const gateway = useGatewayAPI()
 const runtimeStore = useRuntimeStore()
+const { t } = useI18n()
 
 const { data, unable, loaded, setCluster } = useClusterDataPoller<ClusterReservation[]>(
   cluster,
@@ -116,7 +118,9 @@ async function createReservation(payload: Record<string, string>) {
       users: parseCsvList(payload.users),
       accounts: parseCsvList(payload.accounts)
     })
-    runtimeStore.reportInfo(`Reservation ${payload.name || ''} creation requested.`)
+    runtimeStore.reportInfo(
+      t('pages.reservations.notifications.createRequested', { name: payload.name || '' })
+    )
     createOpen.value = false
   } catch (error: unknown) {
     operationError.value = error instanceof Error ? error.message : String(error)
@@ -137,7 +141,11 @@ async function updateReservation(payload: Record<string, string>) {
       users: parseCsvList(payload.users),
       accounts: parseCsvList(payload.accounts)
     })
-    runtimeStore.reportInfo(`Reservation ${selectedReservation.value.name} update requested.`)
+    runtimeStore.reportInfo(
+      t('pages.reservations.notifications.updateRequested', {
+        name: selectedReservation.value.name
+      })
+    )
     editOpen.value = false
   } catch (error: unknown) {
     operationError.value = error instanceof Error ? error.message : String(error)
@@ -152,7 +160,11 @@ async function deleteReservation() {
   operationError.value = null
   try {
     await gateway.delete_reservation(cluster, selectedReservation.value.name)
-    runtimeStore.reportInfo(`Reservation ${selectedReservation.value.name} deletion requested.`)
+    runtimeStore.reportInfo(
+      t('pages.reservations.notifications.deleteRequested', {
+        name: selectedReservation.value.name
+      })
+    )
     deleteOpen.value = false
   } catch (error: unknown) {
     operationError.value = error instanceof Error ? error.message : String(error)
@@ -184,13 +196,17 @@ if (route.query.page_size) {
 </script>
 
 <template>
-  <ClusterMainLayout menu-entry="reservations" :cluster="cluster" :breadcrumb="[{ title: 'Reservations' }]">
+  <ClusterMainLayout
+    menu-entry="reservations"
+    :cluster="cluster"
+    :breadcrumb="[{ title: 'shell.mainMenu.reservations' }]"
+  >
     <div class="ui-page ui-page-wide ui-content-workspace">
     <PageHeader
-      title="Reservations"
-      description="Advanced reservations, affected nodes and account or user access windows."
+      title="pages.reservations.title"
+      description="pages.reservations.description"
       :metric-value="loaded ? data?.length : undefined"
-      metric-label="reservations"
+      metric-label="pages.reservations.metricLabel"
     >
       <template #actions>
         <button
@@ -199,16 +215,15 @@ if (route.query.page_size) {
           class="ui-button-primary"
           @click="openCreateDialog"
         >
-          Create reservation
+          {{ t('pages.reservations.create') }}
         </button>
       </template>
     </PageHeader>
     <ErrorAlert v-if="unable"
-      >Unable to retrieve reservations from cluster
-      <span class="font-medium">{{ cluster }}</span></ErrorAlert
+      >{{ t('pages.reservations.unableToRetrieve', { cluster }) }}</ErrorAlert
     >
     <InfoAlert v-else-if="loaded && data?.length == 0"
-      >No reservation defined on cluster <span class="font-medium">{{ cluster }}</span></InfoAlert
+      >{{ t('pages.reservations.noReservations', { cluster }) }}</InfoAlert
     >
     <div v-else class="ui-results-layout">
       <div class="ui-results-workspace">
@@ -219,14 +234,26 @@ if (route.query.page_size) {
             <thead>
               <tr class="text-sm font-semibold text-gray-900 dark:text-gray-200">
                 <th scope="col" class="w-48 py-3.5 pr-3 text-left align-top sm:pl-6 lg:min-w-[150px] lg:pl-8">
-                  Name
+                  {{ t('tables.reservations.columns.name') }}
                 </th>
-                <th scope="col" class="w-72 px-3 py-3.5 text-left align-top">Nodes</th>
-                <th scope="col" class="w-72 px-3 py-3.5 text-left">Duration</th>
-                <th scope="col" class="w-12 px-3 py-3.5 text-left">Users</th>
-                <th scope="col" class="w-12 px-3 py-3.5 text-left">Accounts</th>
-                <th scope="col" class="hidden w-24 px-3 py-3.5 text-left align-top 2xl:table-cell">Flags</th>
-                <th scope="col" class="py-3.5 pr-4 pl-3 text-right sm:pr-6 lg:pr-8">Actions</th>
+                <th scope="col" class="w-72 px-3 py-3.5 text-left align-top">
+                  {{ t('tables.reservations.columns.nodes') }}
+                </th>
+                <th scope="col" class="w-72 px-3 py-3.5 text-left">
+                  {{ t('tables.reservations.columns.duration') }}
+                </th>
+                <th scope="col" class="w-12 px-3 py-3.5 text-left">
+                  {{ t('tables.reservations.columns.users') }}
+                </th>
+                <th scope="col" class="w-12 px-3 py-3.5 text-left">
+                  {{ t('tables.reservations.columns.accounts') }}
+                </th>
+                <th scope="col" class="hidden w-24 px-3 py-3.5 text-left align-top 2xl:table-cell">
+                  {{ t('tables.reservations.columns.flags') }}
+                </th>
+                <th scope="col" class="py-3.5 pr-4 pl-3 text-right sm:pr-6 lg:pr-8">
+                  {{ t('tables.reservations.columns.actions') }}
+                </th>
               </tr>
             </thead>
             <tbody v-if="loaded" class="divide-y divide-gray-200 text-[var(--color-brand-ink-strong)]">
@@ -275,7 +302,7 @@ if (route.query.page_size) {
                       class="ui-button-warning"
                       @click="openEditDialog(reservation)"
                     >
-                      Edit
+                      {{ t('pages.reservations.actions.edit') }}
                     </button>
                     <button
                       v-if="canDeleteReservation"
@@ -283,7 +310,7 @@ if (route.query.page_size) {
                       class="ui-button-danger"
                       @click="openDeleteDialog(reservation)"
                     >
-                      Delete
+                      {{ t('pages.reservations.actions.delete') }}
                     </button>
                   </div>
                 </td>
@@ -306,7 +333,7 @@ if (route.query.page_size) {
             :page="page"
             :page-size="pageSize"
             :total="data?.length ?? 0"
-            item-label="reservation"
+            :item-label="t('common.entities.reservations')"
             @update:page="updatePage"
             @update:page-size="updatePageSize"
           />
@@ -316,17 +343,22 @@ if (route.query.page_size) {
 
     <ActionDialog
       :open="createOpen"
-      title="Create Reservation"
-      description="Create a new reservation on this cluster."
-      submit-label="Create reservation"
+      title="pages.reservations.dialogs.create.title"
+      description="pages.reservations.dialogs.create.description"
+      submit-label="pages.reservations.dialogs.create.submit"
       :loading="operationBusy"
       :error="operationError"
       :fields="[
-        { key: 'name', label: 'Reservation name', required: true },
-        { key: 'node_list', label: 'Node list', required: true, type: 'textarea' },
-        { key: 'partition', label: 'Partition' },
-        { key: 'users', label: 'Users (comma separated)' },
-        { key: 'accounts', label: 'Accounts (comma separated)' }
+        { key: 'name', label: 'pages.reservations.dialogs.fields.name', required: true },
+        {
+          key: 'node_list',
+          label: 'pages.reservations.dialogs.fields.nodeList',
+          required: true,
+          type: 'textarea'
+        },
+        { key: 'partition', label: 'pages.reservations.dialogs.fields.partition' },
+        { key: 'users', label: 'pages.reservations.dialogs.fields.users' },
+        { key: 'accounts', label: 'pages.reservations.dialogs.fields.accounts' }
       ]"
       @close="createOpen = false"
       @submit="createReservation"
@@ -334,9 +366,10 @@ if (route.query.page_size) {
 
     <ActionDialog
       :open="editOpen"
-      title="Edit Reservation"
-      :description="selectedReservation ? `Update reservation ${selectedReservation.name}.` : ''"
-      submit-label="Save changes"
+      title="pages.reservations.dialogs.edit.title"
+      :description="selectedReservation ? 'pages.reservations.dialogs.edit.description' : undefined"
+      :description-params="selectedReservation ? { name: selectedReservation.name } : undefined"
+      submit-label="pages.reservations.dialogs.edit.submit"
       :loading="operationBusy"
       :error="operationError"
       :initial-values="{
@@ -346,10 +379,15 @@ if (route.query.page_size) {
         accounts: stringifyList(selectedReservation?.accounts)
       }"
       :fields="[
-        { key: 'node_list', label: 'Node list', required: true, type: 'textarea' },
-        { key: 'partition', label: 'Partition' },
-        { key: 'users', label: 'Users (comma separated)' },
-        { key: 'accounts', label: 'Accounts (comma separated)' }
+        {
+          key: 'node_list',
+          label: 'pages.reservations.dialogs.fields.nodeList',
+          required: true,
+          type: 'textarea'
+        },
+        { key: 'partition', label: 'pages.reservations.dialogs.fields.partition' },
+        { key: 'users', label: 'pages.reservations.dialogs.fields.users' },
+        { key: 'accounts', label: 'pages.reservations.dialogs.fields.accounts' }
       ]"
       @close="editOpen = false"
       @submit="updateReservation"
@@ -357,9 +395,10 @@ if (route.query.page_size) {
 
     <ActionDialog
       :open="deleteOpen"
-      title="Delete Reservation"
-      :description="selectedReservation ? `Delete reservation ${selectedReservation.name}. This action is destructive.` : ''"
-      submit-label="Delete reservation"
+      title="pages.reservations.dialogs.delete.title"
+      :description="selectedReservation ? 'pages.reservations.dialogs.delete.description' : undefined"
+      :description-params="selectedReservation ? { name: selectedReservation.name } : undefined"
+      submit-label="pages.reservations.dialogs.delete.submit"
       :loading="operationBusy"
       :error="operationError"
       :fields="[]"

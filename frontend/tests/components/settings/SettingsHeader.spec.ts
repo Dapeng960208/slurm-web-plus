@@ -10,14 +10,14 @@ describe('SettingsHeader.vue', () => {
         plugins: [i18n]
       },
       props: {
-        title: 'Test Title',
-        description: 'Test description'
+        title: 'settings.general.title',
+        description: 'settings.general.description'
       }
     })
     const heading = wrapper.get('h1')
-    expect(heading.text()).toBe('Test Title')
+    expect(heading.text()).toBe('General Settings')
 
     const description = wrapper.get('.ui-page-description')
-    expect(description.text()).toBe('Test description')
+    expect(description.text()).toBe('Configure general application preferences.')
   })
 })

@@ -7,6 +7,7 @@
 -->
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import type { JobHistoryFilters } from '@/composables/GatewayAPI'
 import {
   FunnelIcon,
@@ -25,6 +26,7 @@ const emit = defineEmits<{
   (e: 'search'): void
   (e: 'update:filters', filters: JobHistoryFilters): void
 }>()
+const { t } = useI18n()
 
 function removeFilter(key: keyof JobHistoryFilters) {
   const nextFilters: JobHistoryFilters = {
@@ -54,8 +56,20 @@ function activeFilters(): ActiveFilter[] {
   if (props.filters.partition) result.push({ key: 'partition', label: props.filters.partition, icon: RectangleGroupIcon })
   if (props.filters.qos) result.push({ key: 'qos', label: props.filters.qos, icon: SwatchIcon })
   if (props.filters.job_id) result.push({ key: 'job_id', label: String(props.filters.job_id), icon: HashtagIcon })
-  if (props.filters.start) result.push({ key: 'start', label: `from ${props.filters.start}`, icon: CalendarIcon })
-  if (props.filters.end) result.push({ key: 'end', label: `to ${props.filters.end}`, icon: CalendarIcon })
+  if (props.filters.start) {
+    result.push({
+      key: 'start',
+      label: t('filters.history.fromValue', { value: props.filters.start }),
+      icon: CalendarIcon
+    })
+  }
+  if (props.filters.end) {
+    result.push({
+      key: 'end',
+      label: t('filters.history.toValue', { value: props.filters.end }),
+      icon: CalendarIcon
+    })
+  }
   return result
 }
 </script>
@@ -65,7 +79,7 @@ function activeFilters(): ActiveFilter[] {
     <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
       <div class="flex items-center gap-2 text-sm font-semibold text-[var(--color-brand-ink-strong)]">
         <FunnelIcon class="h-4 w-4" />
-        Active filters
+        {{ t('filters.history.active') }}
       </div>
       <div class="flex flex-wrap items-center gap-2">
         <span
@@ -80,7 +94,7 @@ function activeFilters(): ActiveFilter[] {
             class="inline-flex h-5 w-5 items-center justify-center rounded-full bg-white/80 text-[var(--color-brand-muted)] transition hover:bg-white hover:text-[var(--color-brand-ink-strong)]"
             @click="removeFilter(filter.key)"
           >
-            <span class="sr-only">Remove filter {{ filter.key }}</span>
+            <span class="sr-only">{{ t('filters.remove', { group: filter.key, value: filter.label }) }}</span>
             <svg class="h-2.5 w-2.5" stroke="currentColor" fill="none" viewBox="0 0 8 8">
               <path stroke-linecap="round" stroke-width="1.5" d="M1 1l6 6m0-6L1 7" />
             </svg>

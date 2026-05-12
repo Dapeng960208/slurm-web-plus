@@ -18,6 +18,7 @@ import {
   type MetricResourceState,
   type MetricValue
 } from '@/composables/GatewayAPI'
+import { translate } from '@/i18n/translate'
 
 const activeJobStates = ['RUNNING', 'COMPLETING'] as const
 const pendingJobStates = ['PENDING'] as const
@@ -320,10 +321,10 @@ function computeFragmentationJobs(
 }
 
 function computeScoreLabel(score: number): string {
-  if (score >= 85) return 'Efficient'
-  if (score >= 70) return 'Stable'
-  if (score >= 55) return 'Pressured'
-  return 'Constrained'
+  if (score >= 85) return translate('pages.analysis.status.efficient')
+  if (score >= 70) return translate('pages.analysis.status.stable')
+  if (score >= 55) return translate('pages.analysis.status.pressured')
+  return translate('pages.analysis.status.constrained')
 }
 
 function computeScoreSummary(
@@ -332,19 +333,19 @@ function computeScoreSummary(
   unavailableNodes: number,
   fragmentationJobs: number
 ): string {
-  if (scoreLabel === 'Efficient') {
-    return 'Resources are well used and queue pressure is currently contained.'
+  if (scoreLabel === translate('pages.analysis.status.efficient')) {
+    return translate('analysis.scoreSummary.efficient')
   }
   if (unavailableNodes > 0) {
-    return 'Cluster throughput is being reduced by unavailable capacity that should be recovered first.'
+    return translate('analysis.scoreSummary.recoverCapacity')
   }
   if (fragmentationJobs > 0) {
-    return 'Idle capacity exists, but job shape and node packing are preventing fast starts.'
+    return translate('analysis.scoreSummary.fragmentation')
   }
   if (pendingJobs > 0) {
-    return 'Backlog is building faster than the scheduler can admit work.'
+    return translate('analysis.scoreSummary.backlog')
   }
-  return 'The cluster is operating steadily with limited queue friction.'
+  return translate('analysis.scoreSummary.steady')
 }
 
 function buildRecommendations(input: {
@@ -371,9 +372,12 @@ function buildRecommendations(input: {
   if (input.unavailableNodes > 0 && input.unavailableCpu > 0) {
     recommendations.push({
       id: 'recover-capacity',
-      title: 'Recover unavailable nodes before planning expansion',
-      summary: 'The fastest capacity gain comes from returning drained or down nodes to service.',
-      evidence: `${input.unavailableNodes} node(s) and ${input.unavailableCpu} CPU(s) are currently unavailable.`,
+      title: translate('analysis.recommendations.recoverCapacity.title'),
+      summary: translate('analysis.recommendations.recoverCapacity.summary'),
+      evidence: translate('analysis.recommendations.recoverCapacity.evidence', {
+        nodes: input.unavailableNodes,
+        cpu: input.unavailableCpu
+      }),
       tone: input.unavailableNodes > 1 ? 'danger' : 'warning'
     })
   }
@@ -381,10 +385,11 @@ function buildRecommendations(input: {
   if (input.fragmentationJobs > 0) {
     recommendations.push({
       id: 'reduce-fragmentation',
-      title: 'Mitigate CPU fragmentation for single-node jobs',
-      summary:
-        'Backfill smaller jobs, reduce oversized single-node requests or rebalance partitions to turn idle cores into admitted work.',
-      evidence: `${input.fragmentationJobs} pending job(s) can fit in cluster-wide free CPU but not on any single schedulable node.`,
+      title: translate('analysis.recommendations.fragmentation.title'),
+      summary: translate('analysis.recommendations.fragmentation.summary'),
+      evidence: translate('analysis.recommendations.fragmentation.evidence', {
+        count: input.fragmentationJobs
+      }),
       tone: 'warning'
     })
   }
@@ -396,10 +401,12 @@ function buildRecommendations(input: {
   ) {
     recommendations.push({
       id: 'expand-busy-partitions',
-      title: 'Expand or rebalance the busiest capacity pool',
-      summary:
-        'Resource-bound jobs dominate the queue while active capacity is already heavily occupied.',
-      evidence: `${Math.round(resourceReason.share * 100)}% of pending jobs are blocked on resources at ${Math.round(input.cpuUtilization ?? 0)}% CPU occupancy.`,
+      title: translate('analysis.recommendations.expandBusy.title'),
+      summary: translate('analysis.recommendations.expandBusy.summary'),
+      evidence: translate('analysis.recommendations.expandBusy.evidence', {
+        share: Math.round(resourceReason.share * 100),
+        cpu: Math.round(input.cpuUtilization ?? 0)
+      }),
       tone: 'danger'
     })
   }
@@ -411,10 +418,12 @@ function buildRecommendations(input: {
   ) {
     recommendations.push({
       id: 'review-priority-policy',
-      title: 'Review QOS and priority policy before adding hardware',
-      summary:
-        'Queue delay appears to be policy-bound rather than purely capacity-bound.',
-      evidence: `${Math.round(priorityReason.share * 100)}% of pending jobs are blocked by priority while CPU occupancy is ${Math.round(input.cpuUtilization ?? 0)}%.`,
+      title: translate('analysis.recommendations.priority.title'),
+      summary: translate('analysis.recommendations.priority.summary'),
+      evidence: translate('analysis.recommendations.priority.evidence', {
+        share: Math.round(priorityReason.share * 100),
+        cpu: Math.round(input.cpuUtilization ?? 0)
+      }),
       tone: 'neutral'
     })
   }
@@ -422,10 +431,12 @@ function buildRecommendations(input: {
   if (input.pendingGpu > 0 && (input.gpuUtilization ?? 0) >= 70) {
     recommendations.push({
       id: 'protect-gpu-throughput',
-      title: 'Protect GPU throughput with tighter GPU queue classes',
-      summary:
-        'GPU demand is building while accelerator capacity is already hot.',
-      evidence: `${input.pendingGpu} GPU(s) are requested by pending jobs and active GPU occupancy is ${Math.round(input.gpuUtilization ?? 0)}%.`,
+      title: translate('analysis.recommendations.gpu.title'),
+      summary: translate('analysis.recommendations.gpu.summary'),
+      evidence: translate('analysis.recommendations.gpu.evidence', {
+        gpu: input.pendingGpu,
+        occupancy: Math.round(input.gpuUtilization ?? 0)
+      }),
       tone: 'warning'
     })
   }
@@ -436,10 +447,12 @@ function buildRecommendations(input: {
   ) {
     recommendations.push({
       id: 'reduce-wait-time',
-      title: 'Reduce queue wait with shorter walltime classes and backfill',
-      summary:
-        'Observed wait samples show users are spending meaningful time in queue before admission.',
-      evidence: `Median sampled queue wait is ${input.waitStats.medianMinutes} min across ${input.waitStats.samples} completed jobs.`,
+      title: translate('analysis.recommendations.waitTime.title'),
+      summary: translate('analysis.recommendations.waitTime.summary'),
+      evidence: translate('analysis.recommendations.waitTime.evidence', {
+        minutes: input.waitStats.medianMinutes,
+        samples: input.waitStats.samples
+      }),
       tone: input.waitStats.medianMinutes >= 60 ? 'danger' : 'warning'
     })
   }
@@ -447,10 +460,13 @@ function buildRecommendations(input: {
   if (recommendations.length < 3) {
     recommendations.push({
       id: 'keep-balance',
-      title: 'Keep admission balanced across job sizes',
-      summary:
-        'Track partition pressure and promote smaller backfill windows to keep the cluster full without starving large jobs.',
-      evidence: `${pendingCount} pending job(s), ${runningCount} active job(s) and ${input.freeSchedulableCpu} schedulable free CPU(s) are in play right now.`,
+      title: translate('analysis.recommendations.balance.title'),
+      summary: translate('analysis.recommendations.balance.summary'),
+      evidence: translate('analysis.recommendations.balance.evidence', {
+        pending: pendingCount,
+        running: runningCount,
+        cpu: input.freeSchedulableCpu
+      }),
       tone: queueRatio > 1 ? 'warning' : 'success'
     })
   }
@@ -543,12 +559,15 @@ export function analyzeCluster(input: ClusterAnalysisInput): ClusterAnalysisResu
   const summaryCards: AnalysisSummaryCard[] = [
     {
       id: 'cpu-occupancy',
-      label: 'CPU occupancy',
+      label: translate('analysis.summary.cpuOccupancy.label'),
       value: cpuUtilization != null ? `${Math.round(cpuUtilization)}%` : '--',
       detail:
         totalCpu > 0
-          ? `${allocatedCpu || runningCpu} of ${totalCpu} CPU(s) are currently busy.`
-          : 'CPU occupancy is not available.',
+          ? translate('analysis.summary.cpuOccupancy.detail', {
+              busy: allocatedCpu || runningCpu,
+              total: totalCpu
+            })
+          : translate('analysis.summary.cpuOccupancy.unavailable'),
       tone:
         cpuUtilization == null
           ? 'neutral'
@@ -560,19 +579,25 @@ export function analyzeCluster(input: ClusterAnalysisInput): ClusterAnalysisResu
     },
     {
       id: 'queue-pressure',
-      label: 'Queue pressure',
-      value: pendingJobs.length ? `${round(queueRatio, 1)}x` : 'Low',
-      detail: `${pendingJobs.length} pending job(s) versus ${runningJobs.length} active job(s).`,
+      label: translate('analysis.summary.queuePressure.label'),
+      value: pendingJobs.length ? `${round(queueRatio, 1)}x` : translate('analysis.summary.queuePressure.low'),
+      detail: translate('analysis.summary.queuePressure.detail', {
+        pending: pendingJobs.length,
+        running: runningJobs.length
+      }),
       tone: pendingJobs.length === 0 ? 'success' : queueRatio > 2 ? 'danger' : queueRatio > 1 ? 'warning' : 'neutral'
     },
     {
       id: 'wait-sample',
-      label: 'Queue wait',
-      value: waitStats.medianMinutes != null ? `${waitStats.medianMinutes} min` : 'Proxy',
+      label: translate('analysis.summary.waitSample.label'),
+      value:
+        waitStats.medianMinutes != null
+          ? translate('analysis.summary.waitSample.value', { minutes: waitStats.medianMinutes })
+          : translate('analysis.summary.waitSample.proxy'),
       detail:
         waitStats.samples > 0
-          ? `Median wait from ${waitStats.samples} recent completed jobs.`
-          : 'Using live backlog as the queue delay proxy because history samples are unavailable.',
+          ? translate('analysis.summary.waitSample.detail', { samples: waitStats.samples })
+          : translate('analysis.summary.waitSample.fallback'),
       tone:
         waitStats.medianMinutes == null
           ? 'neutral'
@@ -584,12 +609,12 @@ export function analyzeCluster(input: ClusterAnalysisInput): ClusterAnalysisResu
     },
     {
       id: 'capacity-recovery',
-      label: 'Recovery potential',
+      label: translate('analysis.summary.recovery.label'),
       value: unavailableCpu > 0 ? `${unavailableCpu} CPU` : `${freeSchedulableCpu} CPU`,
       detail:
         unavailableCpu > 0
-          ? 'Recovering unavailable capacity will immediately increase admission throughput.'
-          : 'Schedulable free CPU currently available for backfill and smaller jobs.',
+          ? translate('analysis.summary.recovery.unavailable')
+          : translate('analysis.summary.recovery.available'),
       tone: unavailableCpu > 0 ? 'warning' : 'success'
     }
   ]
@@ -597,39 +622,51 @@ export function analyzeCluster(input: ClusterAnalysisInput): ClusterAnalysisResu
   const capacityMetrics: AnalysisCapacityMetric[] = [
     {
       id: 'cpu',
-      label: 'CPU busy',
+      label: translate('analysis.capacity.cpu.label'),
       value: cpuUtilization,
       detail:
         totalCpu > 0
-          ? `${allocatedCpu || runningCpu}/${totalCpu} CPU(s) allocated or requested by active jobs.`
-          : 'CPU totals are unavailable.'
+          ? translate('analysis.capacity.cpu.detail', {
+              busy: allocatedCpu || runningCpu,
+              total: totalCpu
+            })
+          : translate('analysis.capacity.cpu.unavailable')
     },
     {
       id: 'memory',
-      label: 'Memory committed',
+      label: translate('analysis.capacity.memory.label'),
       value: memoryUtilization,
       detail:
         memoryAllocated != null && totalMemory > 0
-          ? `${formatMemoryGb(memoryAllocated)} committed out of ${formatMemoryGb(totalMemory)}.`
-          : 'Memory commitment is unavailable in current telemetry.'
+          ? translate('analysis.capacity.memory.detail', {
+              committed: formatMemoryGb(memoryAllocated),
+              total: formatMemoryGb(totalMemory)
+            })
+          : translate('analysis.capacity.memory.unavailable')
     },
     {
       id: 'gpu',
-      label: 'GPU busy',
+      label: translate('analysis.capacity.gpu.label'),
       value: totalGpu > 0 ? gpuUtilization : null,
       detail:
         totalGpu > 0
-          ? `${runningGpu}/${totalGpu} GPU(s) are actively in use.`
-          : 'No GPU capacity is declared for this cluster.'
+          ? translate('analysis.capacity.gpu.detail', {
+              running: runningGpu,
+              total: totalGpu
+            })
+          : translate('analysis.capacity.gpu.unavailable')
     },
     {
       id: 'nodes',
-      label: 'Schedulable nodes',
+      label: translate('analysis.capacity.nodes.label'),
       value: schedulableNodeRatio,
       detail:
         totalNodes > 0
-          ? `${schedulableNodes}/${totalNodes} node(s) are currently schedulable.`
-          : 'Node inventory is unavailable.'
+          ? translate('analysis.capacity.nodes.detail', {
+              schedulable: schedulableNodes,
+              total: totalNodes
+            })
+          : translate('analysis.capacity.nodes.unavailable')
     }
   ]
 

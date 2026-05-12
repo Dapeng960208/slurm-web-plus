@@ -84,19 +84,24 @@
   - 登录页新增语言切换控件
   - 登录后 `UserMenu` 新增语言切换控件
   - `Settings > General` 新增显示语言设置项
-- 共享前端文案已完成第一阶段迁移：
+- 前端静态文案已扩展覆盖到核心业务页面主体：
   - 主导航、用户菜单、Settings tabs、Settings General / Errors
   - 登录页、匿名页、集群入口页、403、404、登出页
-  - 通知类型标签、分页文案、公共错误提示、公共操作弹窗、通用字段标签
+  - Dashboard、Cluster Analysis、Jobs、Jobs History、Job
+  - Resources、Node、Accounts、Account、User、User Analysis
+  - QOS、Reservations
+  - 公共时间范围控件、图表图例、摘要卡、副标题、空态、公共错误提示、公共操作弹窗、通用字段标签
   - 前端生成的认证错误、权限错误、服务端错误和普通错误通知
+- 国际化边界保持为“前端静态文案和前端生成消息”：
+  - 后端直接返回的原始错误消息不翻译
+  - 集群名、用户名、QOS 名、分区名、节点名等实体值不翻译
 - 本轮新增国际化专题文档：
   - `docs/features/i18n/requirements.md`
   - `docs/features/i18n/test-plan.md`
-- 本轮国际化定向验证已通过：
-  - `npm --prefix frontend run type-check`
-  - `cd frontend && npx vitest run tests/stores/locale.spec.ts tests/views/LoginView.spec.ts tests/components/MainMenu.spec.ts tests/components/UserMenu.spec.ts tests/components/settings/SettingsTabs.spec.ts tests/views/settings/SettingsMain.spec.ts tests/components/NotificationsPanel.spec.ts tests/components/PaginationControls.spec.ts`
 - 本轮国际化全量前端回归已通过：
+  - `npm --prefix frontend run type-check`
   - `cd frontend && npx vitest run`
+  - `npm --prefix frontend run build`
 
 - 开发错误库文档格式已收口：
   - `docs/tracking/error-log.md` 已从长篇复盘格式简化为仅保留 `时间`、`现象`、`解决办法`
@@ -488,7 +493,7 @@
 - 当前 Conversation Audit 搜索只过滤已加载摘要，不搜索完整消息正文；如需全文检索需要扩展审计接口
 - 当前 Conversation Audit 前端过滤只匹配已加载的 `username` 和 `title` 摘要列，不搜索完整消息正文；如需全文检索需要扩展审计接口
 - `cd frontend && npx vitest run` 当前仍会输出一批既有 Vue `inject() can only be used inside setup() or functional components.` 告警；全量前端测试已通过，但这类告警噪音仍值得后续单独清理
-- `cd frontend && npx vitest run` 当前仍会输出一批未完全迁移页面的 `vue-i18n` missing-key 告警；本轮全量前端测试已通过，但剩余业务视图文案仍需继续收口到翻译 key
+- 当前前端国际化仍有明确边界：服务端原始错误消息和业务实体值保持原样显示，不进入翻译层
 
 ## 5. 已同步文档
 

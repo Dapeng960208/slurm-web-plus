@@ -9,6 +9,7 @@
 <script setup lang="ts">
 import { useRuntimeStore } from '@/stores/runtime'
 import { useRuntimeConfiguration } from '@/plugins/runtimeConfiguration'
+import { useI18n } from 'vue-i18n'
 import PartitionFilterSelector from '@/components/filters/PartitionFilterSelector.vue'
 import UserFilterSelector from '@/components/jobs/UserFilterSelector.vue'
 import AccountFilterSelector from '@/components/jobs/AccountFilterSelector.vue'
@@ -37,12 +38,13 @@ const { cluster, nbJobs } = defineProps<{ cluster: string; nbJobs: number }>()
 
 const runtimeStore = useRuntimeStore()
 const runtimeConfiguration = useRuntimeConfiguration()
+const { t } = useI18n()
 
 const state_filters = [
-  { value: 'completed', label: 'Completed' },
-  { value: 'failed', label: 'Failed' },
-  { value: 'running', label: 'Running' },
-  { value: 'pending', label: 'Pending' }
+  { value: 'completed', labelKey: 'filters.states.completed' },
+  { value: 'failed', labelKey: 'filters.states.failed' },
+  { value: 'running', labelKey: 'filters.states.running' },
+  { value: 'pending', labelKey: 'filters.states.pending' }
 ]
 
 function canViewJobFilter(resource: 'jobs/filter-accounts' | 'jobs/filter-qos' | 'jobs/filter-partitions') {
@@ -82,7 +84,7 @@ function canViewJobFilter(resource: 'jobs/filter-accounts' | 'jobs/filter-qos' |
           >
             <div class="flex items-center justify-between px-4">
               <h2 class="text-lg font-medium text-gray-900 dark:text-gray-100">
-                Filters
+                {{ t('filters.title') }}
                 <span
                   class="text-slurmweb dark:text-slurmweb-light dark:bg-slurmweb-verydark ml-3 hidden rounded-full bg-indigo-100 px-2.5 py-0.5 text-xs font-medium md:inline-block"
                   >{{ nbJobs }}</span
@@ -93,7 +95,7 @@ function canViewJobFilter(resource: 'jobs/filter-accounts' | 'jobs/filter-qos' |
                 class="-mr-2 flex h-10 w-10 items-center justify-center rounded-md p-2 text-gray-400"
                 @click="runtimeStore.jobs.openFiltersPanel = false"
               >
-                <span class="sr-only">Close menu</span>
+                <span class="sr-only">{{ t('filters.closeMenu') }}</span>
                 <XMarkIcon class="h-6 w-6" aria-hidden="true" />
               </button>
             </div>
@@ -114,7 +116,7 @@ function canViewJobFilter(resource: 'jobs/filter-accounts' | 'jobs/filter-qos' |
                       <BoltIcon
                         class="-mt-1 mr-2 -ml-1 h-8 w-8 rounded-full bg-gray-600 p-2 text-white dark:bg-gray-500"
                       />
-                      <span class="font-medium text-gray-900 dark:text-gray-100">State</span>
+                      <span class="font-medium text-gray-900 dark:text-gray-100">{{ t('common.labels.state') }}</span>
                     </span>
                     <span class="ml-6 flex items-center">
                       <ChevronDownIcon
@@ -142,7 +144,7 @@ function canViewJobFilter(resource: 'jobs/filter-accounts' | 'jobs/filter-qos' |
                       <label
                         :for="`filter-mobile-${state.value}-${optionIdx}`"
                         class="ml-3 text-sm text-gray-500 dark:text-gray-300"
-                        >{{ state.label }}</label
+                        >{{ t(state.labelKey) }}</label
                       >
                     </div>
                   </div>
@@ -167,7 +169,7 @@ function canViewJobFilter(resource: 'jobs/filter-accounts' | 'jobs/filter-qos' |
                       <UserIcon
                         class="-mt-1 mr-2 -ml-1 h-8 w-8 rounded-full bg-emerald-500 p-2 text-white"
                       />
-                      <span class="font-medium text-gray-900 dark:text-gray-100">Users</span>
+                      <span class="font-medium text-gray-900 dark:text-gray-100">{{ t('common.labels.users') }}</span>
                     </span>
                     <span class="ml-6 flex items-center">
                       <ChevronDownIcon
@@ -196,7 +198,7 @@ function canViewJobFilter(resource: 'jobs/filter-accounts' | 'jobs/filter-qos' |
                       <UsersIcon
                         class="-mt-1 mr-2 -ml-1 h-8 w-8 rounded-full bg-yellow-500 p-2 text-white"
                       />
-                      <span class="font-medium text-gray-900 dark:text-gray-100">Accounts</span>
+                      <span class="font-medium text-gray-900 dark:text-gray-100">{{ t('common.labels.accounts') }}</span>
                     </span>
                     <span class="ml-6 flex items-center">
                       <ChevronDownIcon
@@ -225,7 +227,7 @@ function canViewJobFilter(resource: 'jobs/filter-accounts' | 'jobs/filter-qos' |
                       <SwatchIcon
                         class="-mt-1 mr-2 -ml-1 h-8 w-8 rounded-full bg-purple-500 p-2 text-white"
                       />
-                      <span class="font-medium text-gray-900 dark:text-gray-100">QOS</span>
+                      <span class="font-medium text-gray-900 dark:text-gray-100">{{ t('common.labels.qos') }}</span>
                     </span>
                     <span class="ml-6 flex items-center">
                       <ChevronDownIcon
@@ -254,7 +256,7 @@ function canViewJobFilter(resource: 'jobs/filter-accounts' | 'jobs/filter-qos' |
                       <RectangleGroupIcon
                         class="-mt-1 mr-2 -ml-1 h-8 w-8 rounded-full bg-amber-700 p-2 text-white"
                       />
-                      <span class="font-medium text-gray-900 dark:text-gray-100">Partitions</span>
+                      <span class="font-medium text-gray-900 dark:text-gray-100">{{ t('filters.partitions') }}</span>
                     </span>
                     <span class="ml-6 flex items-center">
                       <ChevronDownIcon

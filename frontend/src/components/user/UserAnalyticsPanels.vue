@@ -9,6 +9,7 @@
 <script setup lang="ts">
 import { computed, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { useGatewayAPI } from '@/composables/GatewayAPI'
 import type {
   DateTimeWindowQuery,
@@ -32,6 +33,7 @@ const { cluster, user, enabled } = defineProps<{
 const gateway = useGatewayAPI()
 const route = useRoute()
 const router = useRouter()
+const { t } = useI18n()
 const draftStart = ref('')
 const draftEnd = ref('')
 const appliedWindow = ref<DateTimeWindowQuery | null>(null)
@@ -47,7 +49,9 @@ let historyTimer: ReturnType<typeof setInterval> | null = null
 
 const userProfileStatusLabel = computed(() => {
   if (!userToolAnalysis.value?.profile) return null
-  return userToolAnalysis.value.profile.ldap_found ? 'LDAP profile available' : 'LDAP profile unavailable'
+  return userToolAnalysis.value.profile.ldap_found
+    ? t('pages.user.analyticsPanels.profile.ldapAvailable')
+    : t('pages.user.analyticsPanels.profile.ldapUnavailable')
 })
 
 const userMetricsGeneratedAtLabel = computed(() => {
@@ -85,7 +89,7 @@ const medianMemoryLabel = computed(() => {
 
 const averageCpuLabel = computed(() => {
   const value = userToolAnalysis.value?.totals.avg_cpu_cores
-  return value != null ? `${value.toFixed(1)} cores` : '--'
+  return value != null ? t('pages.user.analyticsPanels.units.cores', { value: value.toFixed(1) }) : '--'
 })
 
 const averageRuntimeLabel = computed(() => {
@@ -105,21 +109,25 @@ const shouldPoll = computed(() => {
 
 function formatDuration(value: number | null | undefined): string {
   if (value == null || Number.isNaN(value)) return '--'
-  if (value < 60) return `${Math.round(value)} sec`
-  if (value < 3600) return `${Math.round(value / 60)} min`
+  if (value < 60) return t('pages.user.analyticsPanels.units.seconds', { value: Math.round(value) })
+  if (value < 3600) {
+    return t('pages.user.analyticsPanels.units.minutes', { value: Math.round(value / 60) })
+  }
   const hours = Math.floor(value / 3600)
   const minutes = Math.round((value % 3600) / 60)
-  return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`
+  return minutes > 0
+    ? t('pages.user.analyticsPanels.units.hoursMinutes', { hours, minutes })
+    : t('pages.user.analyticsPanels.units.hoursOnly', { hours })
 }
 
 function formatGb(value: number | null | undefined): string {
   if (value == null || Number.isNaN(value)) return '--'
-  return `${value.toFixed(value >= 10 ? 1 : 2)} GB`
+  return t('pages.user.analyticsPanels.units.gb', { value: value.toFixed(value >= 10 ? 1 : 2) })
 }
 
 function formatHours(value: number | null | undefined): string {
   if (value == null || Number.isNaN(value)) return '--'
-  return `${value.toFixed(value >= 10 ? 1 : 2)} h`
+  return t('pages.user.analyticsPanels.units.hours', { value: value.toFixed(value >= 10 ? 1 : 2) })
 }
 
 function pad2(value: number): string {
@@ -249,11 +257,11 @@ function applyTimeWindow(window: { start: string; end: string }) {
   const startDate = parseDateTimeLocal(draftStart.value)
   const endDate = parseDateTimeLocal(draftEnd.value)
   if (!startDate || !endDate) {
-    timeWindowError.value = 'Start and end time must both be valid datetimes.'
+    timeWindowError.value = t('actionDialog.invalidDateRange')
     return
   }
   if (startDate >= endDate) {
-    timeWindowError.value = 'Start time must be earlier than end time.'
+    timeWindowError.value = t('actionDialog.invalidDateOrder')
     return
   }
   void router.replace({
@@ -332,14 +340,14 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <InfoAlert v-if="!enabled"> User analytics is not enabled for this cluster. </InfoAlert>
+  <InfoAlert v-if="!enabled">{{ t('pages.user.analyticsPanels.disabled') }}</InfoAlert>
 
   <div v-else class="ui-section-stack">
     <div class="user-analytics-toolbar">
       <div class="min-w-0">
-        <div class="ui-stat-label">Analysis Window</div>
+        <div class="ui-stat-label">{{ t('pages.user.analyticsPanels.window.title') }}</div>
         <div class="mt-2 text-sm font-medium text-[var(--color-brand-ink-strong)]">
-          One shared time window for activity, usage and completed tool analysis.
+          {{ t('pages.user.analyticsPanels.window.description') }}
         </div>
         <div
           v-if="userProfileStatusLabel || userMetricsGeneratedAtLabel"
@@ -355,21 +363,21 @@ onUnmounted(() => {
             v-if="userMetricsGeneratedAtLabel"
             class="user-analytics-meta-pill"
           >
-            Updated {{ userMetricsGeneratedAtLabel }}
+            {{ t('pages.user.analyticsPanels.window.updated', { value: userMetricsGeneratedAtLabel }) }}
           </span>
         </div>
       </div>
       <div class="user-analytics-window-control">
-        <div class="user-analytics-window-label">Time Range</div>
+        <div class="user-analytics-window-label">{{ t('common.labels.timeRange') }}</div>
         <MetricRangeSelector
           :model-value="'hour'"
-          aria-label="Select user analytics time range"
+          :aria-label="t('pages.user.analyticsPanels.window.ariaLabel')"
           enable-custom-window
           :show-preset-buttons="false"
           :start-value="draftStart"
           :end-value="draftEnd"
-          custom-button-label="Time range"
-          reset-label="Today"
+          custom-button-label="common.labels.timeRange"
+          reset-label="common.buttons.today"
           @apply-window="applyTimeWindow"
           @reset-window="resetTimeWindow"
         />
@@ -383,33 +391,35 @@ onUnmounted(() => {
 
     <div v-else-if="userMetricsReady" class="ui-stat-grid">
       <div class="ui-stat-card">
-        <div class="ui-stat-label">Submitted in Range</div>
+        <div class="ui-stat-label">{{ t('pages.user.analyticsPanels.cards.submitted.title') }}</div>
         <div class="ui-stat-value">{{ submittedJobsInRange }}</div>
-        <div class="ui-stat-subtle">Submission events captured in the selected window</div>
+        <div class="ui-stat-subtle">{{ t('pages.user.analyticsPanels.cards.submitted.detail') }}</div>
       </div>
       <div class="ui-stat-card">
-        <div class="ui-stat-label">Completed in Range</div>
+        <div class="ui-stat-label">{{ t('pages.user.analyticsPanels.cards.completed.title') }}</div>
         <div class="ui-stat-value">{{ completedJobsInRange }}</div>
-        <div class="ui-stat-subtle">Completed jobs captured in the selected window</div>
+        <div class="ui-stat-subtle">{{ t('pages.user.analyticsPanels.cards.completed.detail') }}</div>
       </div>
       <div class="ui-stat-card">
-        <div class="ui-stat-label">Active Tools</div>
+        <div class="ui-stat-label">{{ t('pages.user.analyticsPanels.cards.activeTools.title') }}</div>
         <div class="ui-stat-value">{{ userToolAnalysis?.totals.active_tools ?? 0 }}</div>
         <div class="ui-stat-subtle">
-          Top tool:
-          {{ userToolAnalysis?.totals.busiest_tool ?? '--' }}
+          {{
+            t('pages.user.analyticsPanels.cards.activeTools.detail', {
+              tool: userToolAnalysis?.totals.busiest_tool ?? '--'
+            })
+          }}
         </div>
       </div>
       <div class="ui-stat-card">
-        <div class="ui-stat-label">Average Runtime</div>
+        <div class="ui-stat-label">{{ t('pages.user.analyticsPanels.cards.avgRuntime.title') }}</div>
         <div class="ui-stat-value">{{ averageRuntimeLabel }}</div>
-        <div class="ui-stat-subtle">Across completed jobs captured in the selected window</div>
+        <div class="ui-stat-subtle">{{ t('pages.user.analyticsPanels.cards.avgRuntime.detail') }}</div>
       </div>
     </div>
 
     <InfoAlert v-else-if="userToolAnalysisUnavailable">
-      User tool analysis is not available for this cluster. LDAP and association details remain
-      available.
+      {{ t('pages.user.analyticsPanels.unavailable') }}
     </InfoAlert>
 
     <div
@@ -419,22 +429,22 @@ onUnmounted(() => {
       <div class="ui-panel ui-section min-w-0 user-analytics-activity-panel">
         <div class="mb-3 flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h2 class="ui-panel-title">Submission Activity</h2>
+            <h2 class="ui-panel-title">{{ t('pages.user.analyticsPanels.activity.title') }}</h2>
             <p class="ui-panel-description mt-2">
-              Submission and completion trends in the selected time range.
+              {{ t('pages.user.analyticsPanels.activity.description') }}
             </p>
           </div>
         </div>
 
         <ErrorAlert v-if="userMetricsHistoryUnavailable">
-          Unable to retrieve submission or completion history for this user.
+          {{ t('pages.user.analyticsPanels.activity.unable') }}
         </ErrorAlert>
         <div v-else-if="userMetricsHistoryLoading" class="text-[var(--color-brand-muted)]">
           <LoadingSpinner :size="4" />
-          Loading activity history...
+          {{ t('pages.user.analyticsPanels.activity.loading') }}
         </div>
         <p v-else-if="!userMetricsHistoryHasData" class="ui-panel-description">
-          No submission or completion history is available for this range.
+          {{ t('pages.user.analyticsPanels.activity.empty') }}
         </p>
         <div v-else class="user-analytics-chart-frame">
           <UserSubmissionHistoryChart :history="userMetricsHistory" />
@@ -443,50 +453,50 @@ onUnmounted(() => {
 
       <div class="ui-panel ui-section min-w-0 user-analytics-usage-panel">
         <div class="mb-3">
-          <h2 class="ui-panel-title">Usage Profile</h2>
+          <h2 class="ui-panel-title">{{ t('pages.user.analyticsPanels.usage.title') }}</h2>
           <p class="ui-panel-description mt-2">
-            Aggregate behaviour across completed jobs in the selected time range.
+            {{ t('pages.user.analyticsPanels.usage.description') }}
           </p>
         </div>
 
         <div class="user-analytics-usage-grid">
           <div class="ui-panel-soft user-analytics-metric-card px-4 py-3">
-            <div class="ui-stat-label">Average Memory</div>
+            <div class="ui-stat-label">{{ t('pages.user.analyticsPanels.usage.avgMemoryTitle') }}</div>
             <div class="mt-2 text-2xl font-bold text-[var(--color-brand-ink-strong)]">
               {{ averageMemoryLabel }}
             </div>
             <div class="mt-1.5 text-sm text-[var(--color-brand-muted)]">
-              Per completed job across recorded tools in the selected window
+              {{ t('pages.user.analyticsPanels.usage.avgMemoryDetail') }}
             </div>
           </div>
 
           <div class="ui-panel-soft user-analytics-metric-card px-4 py-3">
-            <div class="ui-stat-label">Max Memory</div>
+            <div class="ui-stat-label">{{ t('pages.user.analyticsPanels.usage.maxMemoryTitle') }}</div>
             <div class="mt-2 text-2xl font-bold text-[var(--color-brand-ink-strong)]">
               {{ maxMemoryLabel }}
             </div>
             <div class="mt-1.5 text-sm text-[var(--color-brand-muted)]">
-              Highest recorded completed-job memory across the selected window
+              {{ t('pages.user.analyticsPanels.usage.maxMemoryDetail') }}
             </div>
           </div>
 
           <div class="ui-panel-soft user-analytics-metric-card px-4 py-3">
-            <div class="ui-stat-label">Median Memory</div>
+            <div class="ui-stat-label">{{ t('pages.user.analyticsPanels.usage.medianMemoryTitle') }}</div>
             <div class="mt-2 text-2xl font-bold text-[var(--color-brand-ink-strong)]">
               {{ medianMemoryLabel }}
             </div>
             <div class="mt-1.5 text-sm text-[var(--color-brand-muted)]">
-              Typical completed-job memory across recorded tools in the selected window
+              {{ t('pages.user.analyticsPanels.usage.medianMemoryDetail') }}
             </div>
           </div>
 
           <div class="ui-panel-soft user-analytics-metric-card px-4 py-3">
-            <div class="ui-stat-label">Average CPU Cores</div>
+            <div class="ui-stat-label">{{ t('pages.user.analyticsPanels.usage.avgCpuTitle') }}</div>
             <div class="mt-2 text-2xl font-bold text-[var(--color-brand-ink-strong)]">
               {{ averageCpuLabel }}
             </div>
             <div class="mt-1.5 text-sm text-[var(--color-brand-muted)]">
-              Core allocation requested by this user's tool runs in the selected window
+              {{ t('pages.user.analyticsPanels.usage.avgCpuDetail') }}
             </div>
           </div>
         </div>
@@ -495,10 +505,9 @@ onUnmounted(() => {
 
     <div v-if="userMetricsReady">
       <div class="mb-3">
-        <h2 class="ui-panel-title">Completed Job Tool Analysis</h2>
+        <h2 class="ui-panel-title">{{ t('pages.user.analyticsPanels.table.title') }}</h2>
         <p class="ui-panel-description mt-2">
-          Tool-level analysis for completed jobs in the selected time range, combining completed
-          job volume with memory, CPU and runtime averages.
+          {{ t('pages.user.analyticsPanels.table.description') }}
         </p>
       </div>
 
@@ -506,7 +515,7 @@ onUnmounted(() => {
         v-if="(userToolAnalysis?.tool_breakdown ?? []).length === 0"
         class="ui-panel-soft px-4 py-5 text-sm text-[var(--color-brand-muted)]"
       >
-        No completed job tool activity has been recorded for this user yet.
+        {{ t('pages.user.analyticsPanels.table.empty') }}
       </p>
       <div v-else>
         <UserToolAnalysisTable
