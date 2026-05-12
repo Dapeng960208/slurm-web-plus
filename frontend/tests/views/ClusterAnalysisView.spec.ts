@@ -3,6 +3,7 @@ import { flushPromises, mount } from '@vue/test-utils'
 import ClusterAnalysisView from '@/views/ClusterAnalysisView.vue'
 import { init_plugins } from '../lib/common'
 import { useRuntimeStore } from '@/stores/runtime'
+import type { RouterMock } from 'vue-router-mock'
 
 const mockGatewayAPI = {
   stats: vi.fn(),
@@ -27,8 +28,10 @@ vi.mock('@/composables/GatewayAPI', async (importOriginal) => {
 })
 
 describe('ClusterAnalysisView.vue', () => {
+  let router: RouterMock
+
   beforeEach(() => {
-    init_plugins()
+    router = init_plugins()
     vi.clearAllMocks()
 
     useRuntimeStore().availableClusters = [
@@ -231,12 +234,18 @@ describe('ClusterAnalysisView.vue', () => {
   })
 
   test('renders cluster analysis workspace, recommendations, and controller health panels', async () => {
+    await router.push({ name: 'analysis', params: { cluster: 'foo' } })
     const wrapper = mount(ClusterAnalysisView, {
       props: { cluster: 'foo' },
       global: {
         stubs: {
           ClusterMainLayout: { template: '<div><slot /></div>' },
-          RouterLink: { template: '<a><slot /></a>' }
+          RouterLink: { template: '<a><slot /></a>' },
+          QueueWaitHistoryChart: {
+            props: ['series', 'aggregation'],
+            template:
+              '<div data-testid="queue-wait-chart">{{ aggregation }}|{{ JSON.stringify(series) }}</div>'
+          }
         }
       }
     })
@@ -252,10 +261,14 @@ describe('ClusterAnalysisView.vue', () => {
     expect(wrapper.text()).toContain('Ping')
     expect(wrapper.text()).toContain('Diag')
     expect(wrapper.text()).toContain('Average Queue Wait')
+    expect(wrapper.text()).toContain('grouped in minutes')
     expect(wrapper.text()).toContain('Node Hotspots')
     expect(wrapper.text()).toContain('Node cn1')
     expect(wrapper.text()).toContain('Jobs Submitted')
     expect(wrapper.text()).not.toContain('extra_field')
+    expect(wrapper.get('[data-testid="queue-wait-chart"]').text()).toContain(
+      'minute|[[1777021800000,10]]'
+    )
     expect(mockGatewayAPI.jobs_history).toHaveBeenCalledWith(
       'foo',
       expect.objectContaining({
@@ -274,6 +287,36 @@ describe('ClusterAnalysisView.vue', () => {
     )
     expect(wrapper.find('.ui-scroll-region').classes()).toEqual(
       expect.arrayContaining(['ui-scroll-region', 'min-h-0', 'flex-1', 'pr-1'])
+    )
+  })
+
+  test('defaults queue wait aggregation from the selected range and allows switching buckets', async () => {
+    await router.setQuery({ range: 'day' })
+    const wrapper = mount(ClusterAnalysisView, {
+      props: { cluster: 'foo' },
+      global: {
+        stubs: {
+          ClusterMainLayout: { template: '<div><slot /></div>' },
+          RouterLink: { template: '<a><slot /></a>' },
+          QueueWaitHistoryChart: {
+            props: ['series', 'aggregation'],
+            template:
+              '<div data-testid="queue-wait-chart">{{ aggregation }}|{{ JSON.stringify(series) }}</div>'
+          }
+        }
+      }
+    })
+
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="queue-wait-chart"]').text()).toContain(
+      `hour|[[${new Date('2026-04-24T09:00:00Z').getTime()},10]]`
+    )
+
+    await wrapper.get('[data-testid="queue-wait-aggregation-day"]').trigger('click')
+
+    expect(wrapper.get('[data-testid="queue-wait-chart"]').text()).toContain(
+      `day|[[${new Date('2026-04-24T00:00:00Z').getTime()},10]]`
     )
   })
 })

@@ -1410,7 +1410,15 @@ const zhCN = {
         metricsDisabled: '该集群未启用指标采集，但仍可使用实时分析。',
         metricsUnavailable: '历史指标暂时不可用。',
         avgQueueWait: '平均排队时间',
-        secondsUnit: '秒',
+        avgQueueWaitDetail: '按提交或可调度时间到启动时间的平均等待时长分组展示，单位为分钟。',
+        aggregationLabel: '聚合粒度',
+        aggregationAria: '排队时间聚合粒度 {value}',
+        aggregationOptions: {
+          minute: '分钟',
+          hour: '小时',
+          day: '天'
+        },
+        minutesUnit: '分钟',
         latestTelemetry: '最新遥测',
         latestTelemetryDetail: '所选时间范围内最近一次指标采样的作业情况。',
         waitSamples: '等待样本',

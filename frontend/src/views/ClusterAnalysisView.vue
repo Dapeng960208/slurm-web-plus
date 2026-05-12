@@ -22,6 +22,11 @@ import QueueWaitHistoryChart from '@/components/analysis/QueueWaitHistoryChart.v
 import { analyzeCluster } from '@/composables/ClusterAnalysis'
 import { formatPercentValue } from '@/composables/percentages'
 import {
+  buildQueueWaitSeries,
+  inferQueueWaitAggregation,
+  type QueueWaitAggregation
+} from '@/composables/queueWaitHistory'
+import {
   type AnalysisNodeHotspots,
   type DateTimeWindowQuery,
   isMetricRange,
@@ -50,6 +55,7 @@ const { t, locale } = useI18n()
 const selectedRange = ref<MetricRange>('hour')
 const customStart = ref('')
 const customEnd = ref('')
+const queueWaitAggregation = ref<QueueWaitAggregation>('minute')
 const loading = ref(true)
 const refreshing = ref(false)
 const error = ref<string | null>(null)
@@ -149,31 +155,35 @@ const diagFields = computed(() => {
   }).slice(0, 10)
 })
 
-const queueWaitSeries = computed(() => {
-  if (!historyJobs.value.length) return []
-  const buckets = new Map<number, { total: number; count: number }>()
-  for (const job of historyJobs.value) {
-    const start = job.start_time ? new Date(job.start_time).getTime() : NaN
-    const eligible = job.eligible_time ? new Date(job.eligible_time).getTime() : NaN
-    const submit = job.submit_time ? new Date(job.submit_time).getTime() : NaN
-    const baseline = Number.isFinite(eligible) ? eligible : submit
-    if (!Number.isFinite(start) || !Number.isFinite(baseline) || start < baseline) continue
-    const bucket = new Date(start)
-    if (selectedRange.value === 'hour') {
-      bucket.setUTCMinutes(0, 0, 0)
-    } else {
-      bucket.setUTCHours(0, 0, 0, 0)
-    }
-    const key = bucket.getTime()
-    const item = buckets.get(key) ?? { total: 0, count: 0 }
-    item.total += (start - baseline) / 1000
-    item.count += 1
-    buckets.set(key, item)
+const queueWaitAggregationOptions = computed<
+  Array<{ value: QueueWaitAggregation; label: string; ariaLabel: string }>
+>(() => [
+  {
+    value: 'minute',
+    label: t('pages.analysis.historical.aggregationOptions.minute'),
+    ariaLabel: t('pages.analysis.historical.aggregationAria', {
+      value: t('pages.analysis.historical.aggregationOptions.minute')
+    })
+  },
+  {
+    value: 'hour',
+    label: t('pages.analysis.historical.aggregationOptions.hour'),
+    ariaLabel: t('pages.analysis.historical.aggregationAria', {
+      value: t('pages.analysis.historical.aggregationOptions.hour')
+    })
+  },
+  {
+    value: 'day',
+    label: t('pages.analysis.historical.aggregationOptions.day'),
+    ariaLabel: t('pages.analysis.historical.aggregationAria', {
+      value: t('pages.analysis.historical.aggregationOptions.day')
+    })
   }
-  return [...buckets.entries()]
-    .sort((left, right) => left[0] - right[0])
-    .map(([timestamp, item]) => [timestamp, Math.round(item.total / item.count)] as MetricValue)
-})
+])
+
+const queueWaitSeries = computed<MetricValue[]>(() =>
+  buildQueueWaitSeries(historyJobs.value, queueWaitAggregation.value)
+)
 
 const historicalCards = computed(() => {
   const busyCoresDetail =
@@ -253,6 +263,10 @@ function resetCustomWindow() {
   customStart.value = ''
   customEnd.value = ''
   renderRange('hour')
+}
+
+function setQueueWaitAggregation(nextAggregation: QueueWaitAggregation) {
+  queueWaitAggregation.value = nextAggregation
 }
 
 function rangeStartISO(range: MetricRange): string {
@@ -471,6 +485,18 @@ watch(
       customStart.value = route.query.start
       customEnd.value = route.query.end
     }
+  },
+  { immediate: true }
+)
+
+watch(
+  () => `${selectedRange.value}/${customStart.value}/${customEnd.value}`,
+  () => {
+    queueWaitAggregation.value = inferQueueWaitAggregation({
+      range: selectedRange.value,
+      start: customStart.value,
+      end: customEnd.value
+    })
   },
   { immediate: true }
 )
@@ -743,9 +769,45 @@ onUnmounted(() => {
 
               <div class="mt-4 space-y-3">
                 <div class="ui-metric-surface px-4 py-3">
-                  <div class="ui-stat-label">{{ t('pages.analysis.historical.avgQueueWait') }}</div>
+                  <div class="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <div class="ui-stat-label">{{ t('pages.analysis.historical.avgQueueWait') }}</div>
+                      <div class="mt-1 text-sm text-[var(--color-brand-muted)]">
+                        {{ t('pages.analysis.historical.avgQueueWaitDetail') }}
+                      </div>
+                    </div>
+                    <div class="flex flex-col items-end gap-2">
+                      <div class="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-[var(--color-brand-muted)]">
+                        {{ t('pages.analysis.historical.aggregationLabel') }}
+                      </div>
+                      <span
+                        class="ui-segmented-control"
+                        :aria-label="t('pages.analysis.historical.aggregationLabel')"
+                      >
+                        <button
+                          v-for="option in queueWaitAggregationOptions"
+                          :key="option.value"
+                          type="button"
+                          class="ui-segmented-button"
+                          :class="{
+                            'ui-segmented-button-active':
+                              queueWaitAggregation === option.value
+                          }"
+                          :aria-label="option.ariaLabel"
+                          :aria-pressed="queueWaitAggregation === option.value"
+                          :data-testid="`queue-wait-aggregation-${option.value}`"
+                          @click="setQueueWaitAggregation(option.value)"
+                        >
+                          {{ option.label }}
+                        </button>
+                      </span>
+                    </div>
+                  </div>
                   <div v-if="queueWaitSeries.length" class="mt-3">
-                    <QueueWaitHistoryChart :series="queueWaitSeries" />
+                    <QueueWaitHistoryChart
+                      :series="queueWaitSeries"
+                      :aggregation="queueWaitAggregation"
+                    />
                   </div>
                   <div v-else class="mt-2 text-sm text-[var(--color-brand-muted)]">
                     {{ t('pages.analysis.historical.waitUnavailable') }}

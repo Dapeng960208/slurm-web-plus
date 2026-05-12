@@ -13,34 +13,64 @@ import type { Point } from 'chart.js'
 import 'chartjs-adapter-luxon'
 import { useI18n } from 'vue-i18n'
 import type { MetricValue } from '@/composables/GatewayAPI'
+import type { QueueWaitAggregation } from '@/composables/queueWaitHistory'
 
-const { series } = defineProps<{
+const { series, aggregation } = defineProps<{
   series: MetricValue[]
+  aggregation: QueueWaitAggregation
 }>()
 
 const { t, locale } = useI18n()
 const chartCanvas = useTemplateRef<HTMLCanvasElement>('chartCanvas')
 const label = computed(() => t('pages.analysis.historical.avgQueueWait'))
+const minutesUnit = computed(() => t('pages.analysis.historical.minutesUnit'))
 let chart: Chart<'line'> | null = null
 
 function toPoints(values: MetricValue[]): Point[] {
   return values.map(([x, y]) => ({ x, y }))
 }
 
+function formatMinutes(value: number): string {
+  if (value >= 100) return String(Math.round(value))
+  if (value >= 10) return value.toFixed(1)
+  return value.toFixed(1)
+}
+
 function updateChart() {
   if (!chart) return
+  const pointRadius = series.length === 1 ? 4 : 0
   chart.data.datasets = [
     {
       label: label.value,
       data: toPoints(series),
-      borderColor: '#50697f',
-      backgroundColor: 'rgba(80, 105, 127, 0.14)',
-      borderWidth: 2.4,
-      pointRadius: 0,
-      tension: 0.28,
+      borderColor: '#7bbf1f',
+      backgroundColor: 'rgba(123, 191, 31, 0.18)',
+      borderWidth: 2.8,
+      pointRadius,
+      pointHoverRadius: pointRadius === 0 ? 4 : 6,
+      pointBackgroundColor: '#7bbf1f',
+      pointBorderColor: '#f8fbf5',
+      pointBorderWidth: 2,
+      tension: 0.26,
       fill: true
     }
   ]
+  const xScale = chart.options.scales?.x
+  if (xScale && 'time' in xScale) {
+    xScale.time = {
+      ...xScale.time,
+      tooltipFormat: aggregation === 'day' ? 'yyyy-LL-dd' : 'yyyy-LL-dd HH:mm'
+    }
+  }
+  const yScale = chart.options.scales?.y
+  if (yScale && 'title' in yScale) {
+    yScale.title = {
+      ...yScale.title,
+      display: true,
+      text: minutesUnit.value,
+      color: '#6c7a80'
+    }
+  }
   chart.update()
 }
 
@@ -75,7 +105,7 @@ onMounted(() => {
           padding: 12,
           callbacks: {
             label: (context) =>
-              `${context.dataset.label}: ${Math.round(context.parsed.y)} ${t('pages.analysis.historical.secondsUnit')}`
+              `${context.dataset.label}: ${formatMinutes(context.parsed.y)} ${minutesUnit.value}`
           }
         }
       },
@@ -90,7 +120,7 @@ onMounted(() => {
             maxRotation: 0
           },
           time: {
-            tooltipFormat: 'yyyy-LL-dd HH:mm'
+            tooltipFormat: aggregation === 'day' ? 'yyyy-LL-dd' : 'yyyy-LL-dd HH:mm'
           }
         },
         y: {
@@ -100,7 +130,12 @@ onMounted(() => {
           },
           ticks: {
             color: '#6c7a80',
-            callback: (value) => `${value}`
+            callback: (value) => `${formatMinutes(Number(value))}`
+          },
+          title: {
+            display: true,
+            text: minutesUnit.value,
+            color: '#6c7a80'
           }
         }
       }
@@ -110,7 +145,7 @@ onMounted(() => {
 })
 
 watch(
-  () => series,
+  () => [series, aggregation],
   () => updateChart(),
   { deep: true }
 )

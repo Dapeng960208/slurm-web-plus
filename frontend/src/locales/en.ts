@@ -1487,7 +1487,16 @@ const en = {
           'Metrics collection is disabled for this cluster. Live analysis remains available.',
         metricsUnavailable: 'Historical metrics are temporarily unavailable.',
         avgQueueWait: 'Average Queue Wait',
-        secondsUnit: 'sec',
+        avgQueueWaitDetail:
+          'Average wait from submit or eligible time to start time, grouped in minutes.',
+        aggregationLabel: 'Aggregation',
+        aggregationAria: 'Queue wait aggregation {value}',
+        aggregationOptions: {
+          minute: 'Minute',
+          hour: 'Hour',
+          day: 'Day'
+        },
+        minutesUnit: 'min',
         latestTelemetry: 'Latest telemetry',
         latestTelemetryDetail: 'Jobs at the most recent metric sample in the selected range.',
         waitSamples: 'Wait samples',
