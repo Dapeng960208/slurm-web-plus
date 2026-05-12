@@ -1157,6 +1157,10 @@ class TestUserMetricsQueries(unittest.TestCase):
         self.cursor.fetchall.side_effect = [
             [(submission_bucket, 3)],
             [(completion_bucket, 2)],
+            [],
+            [],
+            [],
+            [],
         ]
 
         result = self.store.user_metrics_history(
@@ -1173,12 +1177,17 @@ class TestUserMetricsQueries(unittest.TestCase):
         )
         self.assertEqual(result["totals"]["submitted_jobs"], 3)
         self.assertEqual(result["totals"]["completed_jobs"], 2)
+        self.assertEqual(result["totals"]["running_jobs"], 0)
+        self.assertEqual(result["totals"]["pending_jobs"], 0)
+        self.assertEqual(result["totals"]["failed_jobs"], 0)
+        self.assertEqual(result["totals"]["cancelled_jobs"], 0)
         self.assertIn([submission_bucket_ms, 3], result["submissions"])
         self.assertIn([completion_bucket_ms, 2], result["completions"])
         submission_sql = self.cursor.execute.call_args_list[0].args[0]
         completion_sql = self.cursor.execute.call_args_list[1].args[0]
         self.assertIn("AT TIME ZONE 'UTC'", submission_sql)
         self.assertIn("AT TIME ZONE 'UTC'", completion_sql)
+        self.assertEqual(len(self.cursor.execute.call_args_list), 6)
 
     def test_completion_timeline_matches_terminal_states_case_insensitively(self):
         start_time = datetime(2026, 4, 24, 0, 0, tzinfo=timezone.utc)

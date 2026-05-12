@@ -21,6 +21,11 @@
 - 现象：虽然普通用户没有任何 `admin/*` 权限时不会通过 `admin-cache` 等子路由守卫，但直接访问 `/:cluster/admin` 会先命中默认重定向到 `analysis`，导致前端没有先返回 `forbidden`，形成后台入口越权跳转
 - 解决办法：把 `admin` 默认子路由改为带权限判断的 `redirect`；只有具备任一 `admin/*:view:*` 或 `*:*:*` 时才允许执行默认跳转，否则直接返回 `forbidden` 并携带 `admin/*:view:*` 缺权信息
 
+### 2026-05-12：用户分析历史新增状态曲线后，旧后端测试只准备两次查询结果
+- 时间：2026-05-12
+- 现象：在执行扩展后的本地回归 `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/apps/test_user_analytics_store.py ...` 时，`test_user_metrics_history_seven_day_window_matches_naive_utc_buckets` 因 `user_metrics_history()` 现在会额外查询 `running/pending/failed/cancelled` 四条状态时间线，而旧测试只给 `cursor.fetchall.side_effect` 提供“提交/完成”两次返回，最终在第三次读取时抛 `StopIteration`
+- 解决办法：把该测试夹具补齐为 6 次 `fetchall()` 返回，并同时断言新增状态总量为 `0`，避免后续再次把“能力扩展后的正常附加查询”误报成回归
+
 ### 2026-05-12：AI 直接输出 `job/cancel` 作为 tool name 时会被后端误判为不支持工具
 - 时间：2026-05-12
 - 现象：超级管理员在 AI 对话中执行取消作业时，模型直接输出 `job/cancel` 作为 tool name，`slurmweb.ai.tools.AIToolRegistry` 只接受 `query_agent_interface` / `mutate_agent_interface`，最终返回 `Unsupported tool job/cancel` 并在前端表现为接口 `500`
