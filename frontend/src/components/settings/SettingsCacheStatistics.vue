@@ -8,6 +8,7 @@
 
 <script setup lang="ts">
 import { computed, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import type { ClusterDescription, CacheStatistics } from '@/composables/GatewayAPI'
 import { useClusterDataPoller } from '@/composables/DataPoller'
 import useDoughnutChart from '@/composables/charts/Doughnut'
@@ -22,6 +23,7 @@ const { cluster } = defineProps<{ cluster: ClusterDescription }>()
 
 const gatewayAPI = useGatewayAPI()
 const runtimeStore = useRuntimeStore()
+const { t, locale } = useI18n()
 
 const { data, unable, loaded } = useClusterDataPoller<CacheStatistics>(
   cluster.name,
@@ -46,18 +48,24 @@ const totalRequests = computed(() => {
 
 const hasTraffic = computed(() => totalRequests.value > 0)
 
-const doughnutChart = useDoughnutChart(
-  'chartCanvas',
-  [
-    { name: 'hit', color: 'rgba(123, 191, 31, 0.78)' },
-    { name: 'miss', color: 'rgba(216, 75, 80, 0.72)' }
-  ],
-  doughnutChartData()
-)
+const doughnutChart = useDoughnutChart('chartCanvas', [], doughnutChartData())
+
+function currentChartLabels() {
+  return [
+    { name: t('settings.cache.statistics.chart.hit'), color: 'rgba(123, 191, 31, 0.78)' },
+    { name: t('settings.cache.statistics.chart.miss'), color: 'rgba(216, 75, 80, 0.72)' }
+  ]
+}
 
 watch(
   () => data.value,
   () => doughnutChart.updateData(doughnutChartData())
+)
+
+watch(
+  () => locale.value,
+  () => doughnutChart.setLabels(currentChartLabels()),
+  { immediate: true }
 )
 
 function hitValue(key: string): number {
@@ -87,10 +95,10 @@ function hitRateKey(key: string, value: number): number | null {
 </script>
 
 <template>
-  <ErrorAlert v-if="unable" class="mt-4">Unable to retrieve cache statistics.</ErrorAlert>
+  <ErrorAlert v-if="unable" class="mt-4">{{ t('settings.cache.statistics.error') }}</ErrorAlert>
   <div v-else-if="!loaded" class="mt-4 text-[var(--color-brand-muted)]">
     <LoadingSpinner :size="5" />
-    Loading statistics...
+    {{ t('settings.cache.statistics.loading') }}
   </div>
   <div
     v-else-if="data"
@@ -101,9 +109,9 @@ function hitRateKey(key: string, value: number): number | null {
   >
     <div class="ui-table-shell overflow-x-auto">
       <div class="border-b border-[rgba(80,105,127,0.08)] px-6 py-5">
-        <h3 class="ui-panel-title">Cache Statistics</h3>
+        <h3 class="ui-panel-title">{{ t('settings.cache.statistics.title') }}</h3>
         <p class="ui-panel-description mt-2">
-          Hit and miss ratios by key group, plus the total hit rate across the cluster cache.
+          {{ t('settings.cache.statistics.description') }}
         </p>
       </div>
 
@@ -111,11 +119,11 @@ function hitRateKey(key: string, value: number): number | null {
         <table class="ui-table min-w-full">
           <thead>
             <tr>
-              <th scope="col" class="py-3.5 pr-4 pl-6 text-left">Name</th>
-              <th scope="col" class="px-4 py-3.5 text-left">Hit</th>
-              <th scope="col" class="px-4 py-3.5 text-left">Miss</th>
-              <th scope="col" class="px-4 py-3.5 text-left">Total</th>
-              <th scope="col" class="py-3.5 pr-4 pl-4 text-left">Hit rate</th>
+              <th scope="col" class="py-3.5 pr-4 pl-6 text-left">{{ t('settings.cache.statistics.columns.name') }}</th>
+              <th scope="col" class="px-4 py-3.5 text-left">{{ t('settings.cache.statistics.columns.hit') }}</th>
+              <th scope="col" class="px-4 py-3.5 text-left">{{ t('settings.cache.statistics.columns.miss') }}</th>
+              <th scope="col" class="px-4 py-3.5 text-left">{{ t('settings.cache.statistics.columns.total') }}</th>
+              <th scope="col" class="py-3.5 pr-4 pl-4 text-left">{{ t('settings.cache.statistics.columns.hitRate') }}</th>
             </tr>
           </thead>
           <tbody class="text-sm text-[var(--color-brand-muted)]">
@@ -132,7 +140,7 @@ function hitRateKey(key: string, value: number): number | null {
             </tr>
             <tr>
               <td class="py-4 pr-4 pl-6 font-medium whitespace-nowrap text-[var(--color-brand-ink-strong)]">
-                Total
+                {{ t('settings.cache.statistics.total') }}
               </td>
               <td class="px-4 py-4 whitespace-nowrap">{{ data.hit.total }}</td>
               <td class="px-4 py-4 whitespace-nowrap">{{ data.miss.total }}</td>
@@ -154,20 +162,20 @@ function hitRateKey(key: string, value: number): number | null {
       >
         <button type="button" class="ui-button-secondary" @click="resetCache(cluster.name)">
           <ArrowPathIcon class="h-5 w-5" aria-hidden="true" />
-          Reset statistics
+          {{ t('settings.cache.statistics.reset') }}
         </button>
       </div>
     </div>
 
     <div class="ui-panel ui-section flex flex-col gap-6">
       <div>
-        <p class="ui-page-kicker">Cache Overview</p>
-        <h3 class="ui-panel-title">Traffic Snapshot</h3>
+        <p class="ui-page-kicker">{{ t('settings.cache.statistics.overviewKicker') }}</p>
+        <h3 class="ui-panel-title">{{ t('settings.cache.statistics.overviewTitle') }}</h3>
         <p class="ui-panel-description mt-2">
           {{
             hasTraffic
-              ? 'Quick totals and hit quality for the current cache activity window.'
-              : 'No cache requests have been recorded yet, so the chart stays hidden until traffic arrives.'
+              ? t('settings.cache.statistics.overviewDescription')
+              : t('settings.cache.statistics.overviewEmptyDescription')
           }}
         </p>
       </div>
@@ -175,7 +183,7 @@ function hitRateKey(key: string, value: number): number | null {
       <dl class="grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
         <div class="rounded-2xl border border-[rgba(80,105,127,0.12)] bg-white/75 px-4 py-3">
           <dt class="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--color-brand-muted)]">
-            Hit rate
+            {{ t('settings.cache.statistics.cards.hitRate') }}
           </dt>
           <dd class="mt-2">
             <PercentMetric :value="hitRateTotal()" :maximum-fraction-digits="2" />
@@ -183,7 +191,7 @@ function hitRateKey(key: string, value: number): number | null {
         </div>
         <div class="rounded-2xl border border-[rgba(80,105,127,0.12)] bg-white/75 px-4 py-3">
           <dt class="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--color-brand-muted)]">
-            Requests
+            {{ t('settings.cache.statistics.cards.requests') }}
           </dt>
           <dd class="mt-2 text-2xl font-semibold text-[var(--color-brand-ink-strong)]">
             {{ totalRequests }}
@@ -191,7 +199,7 @@ function hitRateKey(key: string, value: number): number | null {
         </div>
         <div class="rounded-2xl border border-[rgba(80,105,127,0.12)] bg-white/75 px-4 py-3">
           <dt class="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--color-brand-muted)]">
-            Key groups
+            {{ t('settings.cache.statistics.cards.keyGroups') }}
           </dt>
           <dd class="mt-2 text-2xl font-semibold text-[var(--color-brand-ink-strong)]">
             {{ cacheKeys.length }}
@@ -204,10 +212,10 @@ function hitRateKey(key: string, value: number): number | null {
         class="rounded-[24px] border border-dashed border-[rgba(80,105,127,0.18)] bg-[rgba(244,248,251,0.86)] px-5 py-6"
       >
         <p class="text-sm font-semibold text-[var(--color-brand-ink-strong)]">
-          Waiting for cache activity
+          {{ t('settings.cache.statistics.waitingTitle') }}
         </p>
         <p class="mt-2 text-sm text-[var(--color-brand-muted)]">
-          Once the cluster records cache hits or misses, the distribution chart will appear here.
+          {{ t('settings.cache.statistics.waitingDescription') }}
         </p>
       </div>
 

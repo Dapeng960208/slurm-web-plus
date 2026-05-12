@@ -20,7 +20,7 @@ const { t } = useI18n()
 
 <template>
   <div class="ui-section-stack">
-    <SettingsTabs entry="General" />
+    <SettingsTabs entry="general" />
     <div class="ui-panel ui-section">
       <SettingsHeader
         title="settings.general.title"

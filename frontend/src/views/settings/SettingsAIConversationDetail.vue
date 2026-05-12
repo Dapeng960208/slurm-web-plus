@@ -9,6 +9,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import type { AIConversation } from '@/composables/GatewayAPI'
 import { hasClusterAIAssistant, useGatewayAPI } from '@/composables/GatewayAPI'
 import { useRuntimeStore } from '@/stores/runtime'
@@ -20,6 +21,7 @@ import LoadingSpinner from '@/components/LoadingSpinner.vue'
 
 const gateway = useGatewayAPI()
 const runtimeStore = useRuntimeStore()
+const { t } = useI18n()
 
 const props = defineProps<{
   cluster: string
@@ -39,7 +41,7 @@ const canView = computed(
 )
 
 function formatTimestamp(value: string | null): string {
-  if (!value) return 'Never'
+  if (!value) return t('common.status.unavailable')
   return new Intl.DateTimeFormat(undefined, {
     dateStyle: 'medium',
     timeStyle: 'short'
@@ -49,7 +51,7 @@ function formatTimestamp(value: string | null): string {
 async function loadConversation() {
   if (!clusterName.value || !Number.isFinite(conversationId.value) || conversationId.value <= 0) {
     conversation.value = null
-    error.value = 'Conversation id is invalid.'
+    error.value = t('settings.aiDetail.alerts.invalidConversationId')
     return
   }
   loading.value = true
@@ -78,30 +80,30 @@ onMounted(async () => {
 
 <template>
   <div class="ui-section-stack">
-    <AdminTabs entry="AI" :cluster="clusterName" />
+    <AdminTabs entry="ai" :cluster="clusterName" />
 
     <div class="ui-panel ui-section">
       <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <AdminHeader
-          title="AI Conversation Detail"
-          description="Inspect one audited conversation with full message history and tool execution records."
+          title="settings.aiDetail.title"
+          description="settings.aiDetail.description"
         />
         <div class="flex flex-wrap gap-2">
           <RouterLink :to="{ name: 'admin-ai', params: { cluster: clusterName } }" class="ui-button-secondary">
-            Back to audit
+            {{ t('settings.aiDetail.actions.backToAudit') }}
           </RouterLink>
         </div>
       </div>
     </div>
 
     <InfoAlert v-if="!currentCluster">
-      No cluster context is available for this admin route.
+      {{ t('settings.aiDetail.alerts.noClusterContext') }}
     </InfoAlert>
     <InfoAlert v-else-if="!aiAvailable">
-      AI capability is not enabled for the current cluster.
+      {{ t('settings.aiDetail.alerts.unavailable') }}
     </InfoAlert>
     <InfoAlert v-else-if="!canView">
-      The current user does not have permission to view AI audit data on this cluster.
+      {{ t('settings.aiDetail.alerts.noPermission') }}
     </InfoAlert>
     <ErrorAlert v-else-if="error">
       {{ error }}
@@ -111,30 +113,32 @@ onMounted(async () => {
       <section class="ui-panel ui-section">
         <div v-if="loading" class="text-[var(--color-brand-muted)]">
           <LoadingSpinner :size="5" />
-          Loading conversation detail...
+          {{ t('settings.aiDetail.loading') }}
         </div>
 
         <InfoAlert v-else-if="!conversation">
-          Conversation detail is unavailable.
+          {{ t('settings.aiDetail.alerts.detailUnavailable') }}
         </InfoAlert>
 
         <template v-else>
           <div class="ui-summary-strip">
             <div class="ui-summary-item">
-              <p class="ui-summary-label">Title</p>
+              <p class="ui-summary-label">{{ t('settings.aiDetail.summary.title') }}</p>
               <p class="ui-summary-value">{{ conversation.title }}</p>
             </div>
             <div class="ui-summary-item">
-              <p class="ui-summary-label">User</p>
+              <p class="ui-summary-label">{{ t('settings.aiDetail.summary.user') }}</p>
               <p class="ui-summary-value">{{ conversation.username || '-' }}</p>
             </div>
             <div class="ui-summary-item">
-              <p class="ui-summary-label">Updated</p>
+              <p class="ui-summary-label">{{ t('settings.aiDetail.summary.updated') }}</p>
               <p class="ui-summary-value">{{ formatTimestamp(conversation.updated_at) }}</p>
             </div>
             <div class="ui-summary-item">
-              <p class="ui-summary-label">State</p>
-              <p class="ui-summary-value">{{ conversation.deleted_at ? 'Deleted' : 'Active' }}</p>
+              <p class="ui-summary-label">{{ t('settings.aiDetail.summary.state') }}</p>
+              <p class="ui-summary-value">
+                {{ conversation.deleted_at ? t('settings.aiDetail.summary.deleted') : t('settings.aiDetail.summary.active') }}
+              </p>
               <p v-if="conversation.deleted_at" class="ui-summary-subtle">
                 {{ formatTimestamp(conversation.deleted_at) }}
               </p>
@@ -142,9 +146,9 @@ onMounted(async () => {
           </div>
 
           <section class="mt-6">
-            <h2 class="ui-panel-title">Messages</h2>
+            <h2 class="ui-panel-title">{{ t('settings.aiDetail.messages.title') }}</h2>
             <p class="ui-panel-description mt-2">
-              Full conversation content is kept in chronological order and no longer competes with the main audit table.
+              {{ t('settings.aiDetail.messages.description') }}
             </p>
             <div class="mt-4 space-y-3">
               <article
@@ -164,24 +168,24 @@ onMounted(async () => {
           </section>
 
           <section class="mt-6">
-            <h2 class="ui-panel-title">Tool calls</h2>
+            <h2 class="ui-panel-title">{{ t('settings.aiDetail.toolCalls.title') }}</h2>
             <p class="ui-panel-description mt-2">
-              Tool execution is separated from messages so operators can scan failures and latency without reading the full chat transcript.
+              {{ t('settings.aiDetail.toolCalls.description') }}
             </p>
             <InfoAlert v-if="conversation.tool_calls.length === 0" class="mt-4">
-              No tool calls were recorded for this conversation.
+              {{ t('settings.aiDetail.toolCalls.empty') }}
             </InfoAlert>
             <div v-else class="mt-4 ui-table-shell overflow-x-auto">
               <table class="ui-table min-w-[960px]">
                 <thead>
                   <tr>
-                    <th scope="col" class="py-3.5 pr-3 pl-6 text-left">Tool</th>
-                    <th scope="col" class="px-3 py-3.5 text-left">Interface</th>
-                    <th scope="col" class="px-3 py-3.5 text-left">Status</th>
-                    <th scope="col" class="px-3 py-3.5 text-left">Code</th>
-                    <th scope="col" class="px-3 py-3.5 text-left">Duration</th>
-                    <th scope="col" class="px-3 py-3.5 text-left">Created</th>
-                    <th scope="col" class="px-3 py-3.5 text-left">Summary</th>
+                    <th scope="col" class="py-3.5 pr-3 pl-6 text-left">{{ t('settings.aiDetail.toolCalls.columns.tool') }}</th>
+                    <th scope="col" class="px-3 py-3.5 text-left">{{ t('settings.aiDetail.toolCalls.columns.interface') }}</th>
+                    <th scope="col" class="px-3 py-3.5 text-left">{{ t('settings.aiDetail.toolCalls.columns.status') }}</th>
+                    <th scope="col" class="px-3 py-3.5 text-left">{{ t('settings.aiDetail.toolCalls.columns.code') }}</th>
+                    <th scope="col" class="px-3 py-3.5 text-left">{{ t('settings.aiDetail.toolCalls.columns.duration') }}</th>
+                    <th scope="col" class="px-3 py-3.5 text-left">{{ t('settings.aiDetail.toolCalls.columns.created') }}</th>
+                    <th scope="col" class="px-3 py-3.5 text-left">{{ t('settings.aiDetail.toolCalls.columns.summary') }}</th>
                   </tr>
                 </thead>
                 <tbody class="text-sm text-[var(--color-brand-muted)]">
@@ -192,7 +196,7 @@ onMounted(async () => {
                     <td class="px-3 py-4 align-top">{{ toolCall.interface_key || '-' }}</td>
                     <td class="px-3 py-4 align-top">{{ toolCall.status }}</td>
                     <td class="px-3 py-4 align-top">{{ toolCall.status_code ?? '-' }}</td>
-                    <td class="px-3 py-4 align-top">{{ toolCall.duration_ms ?? 0 }} ms</td>
+                    <td class="px-3 py-4 align-top">{{ t('settings.aiDetail.toolCalls.durationMs', { value: toolCall.duration_ms ?? 0 }) }}</td>
                     <td class="px-3 py-4 align-top">{{ formatTimestamp(toolCall.created_at ?? null) }}</td>
                     <td class="px-3 py-4 align-top">
                       <p class="max-w-[20rem] whitespace-pre-wrap break-words">

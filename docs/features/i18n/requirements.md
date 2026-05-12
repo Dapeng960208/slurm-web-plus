@@ -25,6 +25,8 @@
 - Dashboard、Cluster Analysis、Jobs、Jobs History、Job
 - Resources、Node、Accounts、Account、User、User Analysis
 - QOS、Reservations、相关公共筛选器、时间范围控件和业务分析面板
+- AI 助手页、AI 管理页、AI 对话审计详情页
+- Cache、Users、Access Control 等 Admin 子页及其页面主体文案
 
 本轮不覆盖：
 
@@ -70,6 +72,7 @@
 - 后端直接返回的原始错误消息保持原样显示
 - 集群名、用户名、QOS 名、分区名、节点名等实体值保持原样显示
 - 后端原始业务字段值不做翻译；只有前端主动构造的映射 label 才进入 i18n
+- `Admin` 与 AI 相关页面中的表头、按钮、筛选、空态、前端提示、对话轨迹、工具标签、只读提示等也必须走前端翻译词典，不能继续依赖英文 fallback
 
 ## 8. 相关验证入口
 

@@ -19,7 +19,7 @@ const { t } = useI18n()
 
 <template>
   <div class="ui-section-stack">
-    <SettingsTabs entry="Errors" />
+    <SettingsTabs entry="errors" />
     <div class="ui-panel ui-section">
       <SettingsHeader
         title="settings.errors.title"

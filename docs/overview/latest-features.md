@@ -1,5 +1,21 @@
 # 最新功能
 
+## 本轮：AI 与 Admin 页面主体国际化已补齐
+
+本轮继续补齐前端全站中英文切换，重点收口此前仍大量保留英文直出的 AI 和 Admin 页面主体：
+
+- `AssistantView` 的历史区、工作区、提示词、对话轨迹、复制提示、token 提示、前端错误提示已接入中英文词典。
+- `Settings > AI` / `Admin > AI` 的模型配置、审计表格、弹窗字段、前端校验提示、按钮和筛选文案已接入中英文词典。
+- `Admin > AI Conversation Detail`、`Admin > Cache`、`Admin > Users`、`Admin > Access Control` 的页头、表头、空态、说明文案、只读提示和前端状态提示已补齐翻译。
+- `SettingsTabs` / `AdminTabs` 已改为稳定 id 驱动选中态，不再把英文显示值和组件状态耦合在一起。
+- `Cache` / `AI` 相关图表标签现在会随 locale 实时更新，不再只切换外围壳层。
+
+本轮新增验证：
+
+- `npm --prefix frontend run type-check`
+- `cd frontend && npx vitest run`
+- `npm --prefix frontend run build`
+
 ## 本轮：前端全站中英文切换已补齐到业务页面主体
 
 本轮继续收口前端国际化，把之前只覆盖导航和公共壳层的状态扩展到核心业务页面主体：

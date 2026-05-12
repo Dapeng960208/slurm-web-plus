@@ -4,6 +4,7 @@ import { RouterLinkStub } from '@vue/test-utils'
 import SettingsAIConversationDetailView from '@/views/settings/SettingsAIConversationDetail.vue'
 import { init_plugins } from '../../lib/common'
 import { useRuntimeStore } from '@/stores/runtime'
+import { i18n } from '@/plugins/i18n'
 
 const mockGatewayAPI = {
   ai_admin_conversation: vi.fn()
@@ -28,6 +29,7 @@ describe('views/settings/SettingsAIConversationDetail.vue', () => {
   beforeEach(() => {
     void init_plugins()
     vi.clearAllMocks()
+    i18n.global.locale.value = 'en'
   })
 
   function seedRuntime() {

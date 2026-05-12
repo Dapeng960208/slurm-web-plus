@@ -4,10 +4,12 @@ import SettingsCacheView from '@/views/settings/SettingsCache.vue'
 import { useRuntimeStore } from '@/stores/runtime'
 import { init_plugins } from '../../lib/common'
 import type { RouterMock } from 'vue-router-mock'
+import { i18n } from '@/plugins/i18n'
 
 describe('settings/SettingsCache.vue', () => {
   beforeEach(() => {
     void init_plugins()
+    i18n.global.locale.value = 'en'
   })
 
   async function primeAdminRoute(router: RouterMock) {
@@ -123,7 +125,7 @@ describe('settings/SettingsCache.vue', () => {
     const wrapper = renderView()
 
     expect(wrapper.text()).toContain('Cluster foo')
-    expect(wrapper.text()).toContain('Cache is disabled on this cluster.')
+    expect(wrapper.text()).toContain(i18n.global.t('settings.cache.alerts.disabled'))
     expect(wrapper.findAll('[data-testid="cache-statistics"]')).toHaveLength(0)
     expect(wrapper.findAll('[data-testid="cache-metrics"]')).toHaveLength(0)
     expect(wrapper.text()).not.toContain('Live cache metrics are unavailable')

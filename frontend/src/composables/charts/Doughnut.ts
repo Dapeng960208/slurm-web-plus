@@ -16,6 +16,7 @@ export default function useDoughnutChart(
   data: number[]
 ) {
   const chartCanvas = useTemplateRef<HTMLCanvasElement>(canvasRef)
+  let currentLabels = labels
 
   let chart: Chart | null = null
   const genericOptions: ChartOptions = {
@@ -36,14 +37,25 @@ export default function useDoughnutChart(
 
   function updateData(data: number[]) {
     if (!chart) return
+    chart.data.labels = currentLabels.map((label) => label.name)
     chart.data.datasets = [
       {
         data: data,
-        backgroundColor: labels.map((label) => label.color),
+        backgroundColor: currentLabels.map((label) => label.color),
         borderColor: borderColor,
         rotation: 180
       }
     ]
+    chart.update()
+  }
+
+  function setLabels(newLabels: { name: string; color: string }[]) {
+    currentLabels = newLabels
+    if (!chart) return
+    chart.data.labels = currentLabels.map((label) => label.name)
+    if (chart.data.datasets[0]) {
+      chart.data.datasets[0].backgroundColor = currentLabels.map((label) => label.color)
+    }
     chart.update()
   }
 
@@ -52,7 +64,7 @@ export default function useDoughnutChart(
       chart = new Chart(chartCanvas.value, {
         type: 'doughnut',
         data: {
-          labels: labels.map((label) => label.name),
+          labels: currentLabels.map((label) => label.name),
           datasets: []
         },
         options: genericOptions
@@ -61,5 +73,5 @@ export default function useDoughnutChart(
     }
   })
 
-  return { updateData }
+  return { updateData, setLabels }
 }

@@ -9,6 +9,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import type {
   AccessControlCatalog,
   AccessControlUserAssignment,
@@ -34,6 +35,7 @@ type PermissionScope = '*' | 'self'
 const gateway = useGatewayAPI()
 const runtimeStore = useRuntimeStore()
 const route = useRoute()
+const { t } = useI18n()
 
 const isAdminRoute = computed(() => String(route.name ?? '').startsWith('admin-'))
 const tabsComponent = computed(() => (isAdminRoute.value ? AdminTabs : SettingsTabs))
@@ -318,11 +320,11 @@ async function submitRole() {
   if (!currentClusterName.value) return
   const payload = rolePayload()
   if (!payload.name) {
-    rolesFormError.value = 'Role name is required.'
+    rolesFormError.value = t('settings.accessControl.roles.errors.roleNameRequired')
     return
   }
   if (!payload.permissions.length) {
-    rolesFormError.value = 'Select at least one permission rule.'
+    rolesFormError.value = t('settings.accessControl.roles.errors.permissionRequired')
     return
   }
   rolesSubmitting.value = true
@@ -427,31 +429,34 @@ onMounted(async () => {
 
 <template>
   <div class="ui-section-stack">
-    <component :is="tabsComponent" entry="Access Control" :cluster="currentClusterName" />
+    <component :is="tabsComponent" entry="access-control" :cluster="currentClusterName" />
     <div class="ui-panel ui-section">
       <component
         :is="headerComponent"
-        title="Access Control"
-        description="Manage database-backed custom roles, route permission rules and user role bindings for the current cluster."
+        title="settings.accessControl.title"
+        description="settings.accessControl.description"
       />
       <div
         v-if="settingsCluster"
         class="mt-6 flex flex-wrap items-center gap-3 rounded-[22px] border border-[rgba(80,105,127,0.1)] bg-[rgba(244,248,251,0.82)] px-5 py-4"
       >
-        <span class="ui-page-kicker !mb-0">Active Cluster</span>
+        <span class="ui-page-kicker !mb-0">{{ t('settings.accessControl.activeCluster') }}</span>
         <span class="ui-chip">{{ settingsCluster.name }}</span>
-        <span v-if="catalog" class="ui-chip">{{ totalCatalogResources }} resources</span>
+        <span v-if="catalog" class="ui-chip">{{ t('settings.accessControl.resourcesCount', { count: totalCatalogResources }) }}</span>
       </div>
     </div>
 
     <InfoAlert v-if="!settingsCluster">
-      No cluster context is available for access control management.
+      {{ t('settings.accessControl.alerts.noClusterContext') }}
     </InfoAlert>
     <InfoAlert v-else-if="!accessControlAvailable">
-      Access control is not enabled for the current cluster.
+      {{ t('settings.accessControl.alerts.unavailable') }}
     </InfoAlert>
     <InfoAlert v-else-if="!canView">
-      No permission to view access control data on this cluster.
+      {{ t('settings.accessControl.alerts.noPermission') }}
+    </InfoAlert>
+    <InfoAlert v-else-if="!canManage">
+      {{ t('settings.accessControl.alerts.readOnly', { permission: 'admin/access-control:edit:*' }) }}
     </InfoAlert>
 
     <template v-else>
@@ -463,14 +468,14 @@ onMounted(async () => {
         <section class="ui-panel ui-section">
           <div class="flex items-start justify-between gap-4">
             <div>
-              <p class="ui-page-kicker">Custom Roles</p>
-              <h2 class="ui-panel-title">Role Definitions</h2>
+              <p class="ui-page-kicker">{{ t('settings.accessControl.roles.kicker') }}</p>
+              <h2 class="ui-panel-title">{{ t('settings.accessControl.roles.title') }}</h2>
               <p class="ui-panel-description mt-2">
-                Edit exact route permissions with `resource:operation:scope` rules. Legacy actions are derived automatically for compatibility.
+                {{ t('settings.accessControl.roles.description') }}
               </p>
             </div>
             <button type="button" class="ui-button-secondary" @click="reloadAll">
-              Refresh
+              {{ t('common.buttons.refresh') }}
             </button>
           </div>
 
@@ -483,10 +488,10 @@ onMounted(async () => {
 
           <div v-if="rolesLoading || catalogLoading" class="mt-6 text-[var(--color-brand-muted)]">
             <LoadingSpinner :size="5" />
-            Loading access control data...
+            {{ t('settings.accessControl.roles.loading') }}
           </div>
           <InfoAlert v-else-if="roles.length === 0" class="mt-6">
-            No custom roles have been created yet. Seed roles are created automatically on first database-backed startup.
+            {{ t('settings.accessControl.roles.empty') }}
           </InfoAlert>
           <div v-else class="mt-6 space-y-3">
             <article
@@ -500,7 +505,7 @@ onMounted(async () => {
                     {{ role.name }}
                   </h3>
                   <p class="mt-1 text-sm text-[var(--color-brand-muted)]">
-                    {{ role.description || 'No description provided.' }}
+                    {{ role.description || t('settings.accessControl.roles.noDescription') }}
                   </p>
                 </div>
                 <div class="flex gap-2">
@@ -510,7 +515,7 @@ onMounted(async () => {
                     class="ui-button-warning"
                     @click="editRole(role)"
                   >
-                    Edit
+                    {{ t('common.buttons.edit') }}
                   </button>
                   <button
                     v-if="canDelete"
@@ -518,13 +523,13 @@ onMounted(async () => {
                     class="ui-button-danger"
                     @click="removeRole(role)"
                   >
-                    Delete
+                    {{ t('common.buttons.delete') }}
                   </button>
                 </div>
               </div>
 
               <div class="mt-4">
-                <p class="text-sm font-semibold text-[var(--color-brand-ink-strong)]">Permissions</p>
+                <p class="text-sm font-semibold text-[var(--color-brand-ink-strong)]">{{ t('settings.accessControl.roles.permissions') }}</p>
                 <div class="mt-2 flex flex-wrap gap-2">
                   <span
                     v-for="permission in role.permissions"
@@ -537,7 +542,7 @@ onMounted(async () => {
               </div>
 
               <div class="mt-4">
-                <p class="text-sm font-semibold text-[var(--color-brand-ink-strong)]">Compatibility Actions</p>
+                <p class="text-sm font-semibold text-[var(--color-brand-ink-strong)]">{{ t('settings.accessControl.roles.compatibilityActions') }}</p>
                 <div class="mt-2 flex flex-wrap gap-2">
                   <span
                     v-for="action in roleActions(role)"
@@ -547,7 +552,7 @@ onMounted(async () => {
                     {{ action }}
                   </span>
                   <span v-if="roleActions(role).length === 0" class="text-sm text-[var(--color-brand-muted)]">
-                    No legacy actions derived.
+                    {{ t('settings.accessControl.roles.noLegacyActions') }}
                   </span>
                 </div>
               </div>
@@ -559,9 +564,15 @@ onMounted(async () => {
           >
             <div class="flex items-start justify-between gap-3">
               <div>
-                <p class="ui-page-kicker">{{ roleForm.id === null ? 'Create Role' : 'Edit Role' }}</p>
+                <p class="ui-page-kicker">
+                  {{ roleForm.id === null ? t('settings.accessControl.roles.createKicker') : t('settings.accessControl.roles.editKicker') }}
+                </p>
                 <h3 class="text-base font-semibold text-[var(--color-brand-ink-strong)]">
-                  {{ roleForm.id === null ? 'Permission Matrix' : `Editing ${roleForm.name}` }}
+                  {{
+                    roleForm.id === null
+                      ? t('settings.accessControl.roles.createTitle')
+                      : t('settings.accessControl.roles.editTitle', { name: roleForm.name })
+                  }}
                 </h3>
               </div>
               <button
@@ -570,42 +581,41 @@ onMounted(async () => {
                 class="ui-button-secondary"
                 @click="resetRoleForm"
               >
-                Clear
+                {{ t('settings.accessControl.roles.clear') }}
               </button>
             </div>
 
             <InfoAlert v-if="!canManage" class="mt-4">
-              You can inspect roles on this cluster, but editing requires
-              <code>{{
-                isAdminRoute ? 'admin/access-control:edit:*' : 'settings/access-control:edit:*'
-              }}</code>.
+              {{ t('settings.accessControl.alerts.readOnly', {
+                permission: isAdminRoute ? 'admin/access-control:edit:*' : 'settings/access-control:edit:*'
+              }) }}
             </InfoAlert>
 
             <form class="mt-5 space-y-5" @submit.prevent="submitRole">
               <div class="grid gap-4 lg:grid-cols-2">
                 <div>
                   <label class="mb-2 block text-sm font-semibold text-[var(--color-brand-ink-strong)]">
-                    Role Name
+                    {{ t('settings.accessControl.roles.roleName') }}
                   </label>
                   <input
                     v-model="roleForm.name"
                     :disabled="!canManage || rolesSubmitting"
                     type="text"
                     class="block w-full rounded-[18px] border border-[rgba(80,105,127,0.16)] bg-white px-4 py-3 text-sm text-[var(--color-brand-ink-strong)] shadow-[var(--shadow-soft)] outline-hidden focus:border-[rgba(182,232,44,0.65)] focus:ring-4 focus:ring-[rgba(182,232,44,0.18)]"
-                    placeholder="ops-viewer"
+                    :placeholder="t('settings.accessControl.roles.roleNamePlaceholder')"
                   />
                 </div>
 
                 <div>
                   <label class="mb-2 block text-sm font-semibold text-[var(--color-brand-ink-strong)]">
-                    Description
+                    {{ t('settings.accessControl.roles.roleDescription') }}
                   </label>
                   <input
                     v-model="roleForm.description"
                     :disabled="!canManage || rolesSubmitting"
                     type="text"
                     class="block w-full rounded-[18px] border border-[rgba(80,105,127,0.16)] bg-white px-4 py-3 text-sm text-[var(--color-brand-ink-strong)] shadow-[var(--shadow-soft)] outline-hidden focus:border-[rgba(182,232,44,0.65)] focus:ring-4 focus:ring-[rgba(182,232,44,0.18)]"
-                    placeholder="Read-only access to cluster routes."
+                    :placeholder="t('settings.accessControl.roles.roleDescriptionPlaceholder')"
                   />
                 </div>
               </div>
@@ -613,12 +623,12 @@ onMounted(async () => {
               <div>
                 <div class="flex items-center justify-between gap-3">
                   <div>
-                    <p class="text-sm font-semibold text-[var(--color-brand-ink-strong)]">Resource Matrix</p>
+                    <p class="text-sm font-semibold text-[var(--color-brand-ink-strong)]">{{ t('settings.accessControl.roles.resourceMatrix') }}</p>
                     <p class="mt-1 text-sm text-[var(--color-brand-muted)]">
-                      Grant exact rules, wildcard resources such as `settings/*`, or global admin access with `*:*:*`.
+                      {{ t('settings.accessControl.roles.resourceMatrixDescription') }}
                     </p>
                   </div>
-                  <span class="ui-chip">{{ roleForm.permissions.length }} selected</span>
+                  <span class="ui-chip">{{ t('settings.accessControl.roles.selectedCount', { count: roleForm.permissions.length }) }}</span>
                 </div>
 
                 <div class="mt-4 space-y-4">
@@ -655,7 +665,7 @@ onMounted(async () => {
                               :key="`${resource.resource}-scope-${scope}`"
                               class="ui-chip"
                             >
-                              {{ scope === 'self' ? 'owner-aware' : 'cluster-wide' }}
+                              {{ scope === 'self' ? t('settings.accessControl.roles.ownerAware') : t('settings.accessControl.roles.clusterWide') }}
                             </label>
                           </div>
                         </div>
@@ -678,7 +688,17 @@ onMounted(async () => {
                                 class="h-4 w-4 rounded border-[rgba(80,105,127,0.24)] text-[var(--color-brand-deep)]"
                                 @change="togglePermission(resource.resource, operation, scope)"
                               />
-                              <span>{{ operation }} / {{ scope }}</span>
+                              <span>
+                                {{
+                                  t('settings.accessControl.roles.ruleLabel', {
+                                    operation,
+                                    scope:
+                                      scope === 'self'
+                                        ? t('settings.accessControl.roles.ownerAware')
+                                        : t('settings.accessControl.roles.clusterWide')
+                                  })
+                                }}
+                              </span>
                             </span>
                           </label>
                         </div>
@@ -689,7 +709,7 @@ onMounted(async () => {
               </div>
 
               <div class="rounded-[22px] border border-[rgba(80,105,127,0.1)] bg-white px-4 py-4">
-                <p class="text-sm font-semibold text-[var(--color-brand-ink-strong)]">Selected Rules</p>
+                <p class="text-sm font-semibold text-[var(--color-brand-ink-strong)]">{{ t('settings.accessControl.roles.selectedRules') }}</p>
                 <div class="mt-3 flex flex-wrap gap-2">
                   <span
                     v-for="permission in sortRules(roleForm.permissions)"
@@ -699,12 +719,10 @@ onMounted(async () => {
                     {{ permission }}
                   </span>
                   <span v-if="roleForm.permissions.length === 0" class="text-sm text-[var(--color-brand-muted)]">
-                    No rules selected.
+                    {{ t('settings.accessControl.roles.noRulesSelected') }}
                   </span>
                 </div>
-                <p class="mt-4 text-sm font-semibold text-[var(--color-brand-ink-strong)]">
-                  Derived legacy actions
-                </p>
+                <p class="mt-4 text-sm font-semibold text-[var(--color-brand-ink-strong)]">{{ t('settings.accessControl.roles.derivedActions') }}</p>
                 <div class="mt-3 flex flex-wrap gap-2">
                   <span
                     v-for="action in permissionsToActions(roleForm.permissions)"
@@ -717,7 +735,7 @@ onMounted(async () => {
                     v-if="permissionsToActions(roleForm.permissions).length === 0"
                     class="text-sm text-[var(--color-brand-muted)]"
                   >
-                    No compatibility actions derived.
+                    {{ t('settings.accessControl.roles.noDerivedActions') }}
                   </span>
                 </div>
               </div>
@@ -728,7 +746,7 @@ onMounted(async () => {
                   :class="roleForm.id === null ? 'ui-button-primary' : 'ui-button-warning'"
                   :disabled="!canManage || rolesSubmitting"
                 >
-                  {{ roleForm.id === null ? 'Create Role' : 'Save Role' }}
+                  {{ roleForm.id === null ? t('settings.accessControl.roles.createSubmit') : t('settings.accessControl.roles.saveSubmit') }}
                 </button>
                 <button
                   type="button"
@@ -736,7 +754,7 @@ onMounted(async () => {
                   :disabled="rolesSubmitting"
                   @click="resetRoleForm"
                 >
-                  Reset
+                  {{ t('settings.accessControl.roles.reset') }}
                 </button>
               </div>
             </form>
@@ -746,14 +764,14 @@ onMounted(async () => {
         <section class="ui-panel ui-section">
           <div class="flex items-start justify-between gap-4">
             <div>
-              <p class="ui-page-kicker">User Assignment</p>
-              <h2 class="ui-panel-title">User Role Bindings</h2>
+              <p class="ui-page-kicker">{{ t('settings.accessControl.users.kicker') }}</p>
+              <h2 class="ui-panel-title">{{ t('settings.accessControl.users.title') }}</h2>
               <p class="ui-panel-description mt-2">
-                Bind cached users to custom roles. Policy roles remain read-only and come from the active RBAC file.
+                {{ t('settings.accessControl.users.description') }}
               </p>
             </div>
             <button type="button" class="ui-button-secondary" @click="loadUsers">
-              Refresh
+              {{ t('common.buttons.refresh') }}
             </button>
           </div>
 
@@ -769,23 +787,23 @@ onMounted(async () => {
               v-model="userSearch"
               type="text"
               class="block w-full rounded-[18px] border border-[rgba(80,105,127,0.16)] bg-white px-4 py-3 text-sm text-[var(--color-brand-ink-strong)] shadow-[var(--shadow-soft)] outline-hidden focus:border-[rgba(182,232,44,0.65)] focus:ring-4 focus:ring-[rgba(182,232,44,0.18)]"
-              placeholder="Search username..."
+              :placeholder="t('settings.accessControl.users.searchPlaceholder')"
               @keyup.enter="searchUsers"
             />
             <button type="button" class="ui-button-primary" @click="searchUsers">
-              Search
+              {{ t('common.buttons.search') }}
             </button>
             <button type="button" class="ui-button-secondary" @click="resetUsersSearch">
-              Reset
+              {{ t('common.buttons.reset') }}
             </button>
           </div>
 
           <div v-if="usersLoading" class="mt-6 text-[var(--color-brand-muted)]">
             <LoadingSpinner :size="5" />
-            Loading users...
+            {{ t('settings.accessControl.users.loading') }}
           </div>
           <InfoAlert v-else-if="users.length === 0" class="mt-6">
-            No cached users match the current search.
+            {{ t('settings.accessControl.users.empty') }}
           </InfoAlert>
           <div v-else class="mt-6 grid gap-3">
             <button
@@ -806,11 +824,15 @@ onMounted(async () => {
                     {{ user.username }}
                   </p>
                   <p class="mt-1 text-sm text-[var(--color-brand-muted)]">
-                    {{ user.fullname || 'No full name cached.' }}
+                    {{ user.fullname || t('settings.accessControl.users.noFullNameCached') }}
                   </p>
                 </div>
                 <span class="ui-chip">
-                  {{ user.custom_roles.length }} custom role{{ user.custom_roles.length === 1 ? '' : 's' }}
+                  {{
+                    user.custom_roles.length === 1
+                      ? t('settings.accessControl.users.roleCount', { count: user.custom_roles.length })
+                      : t('settings.accessControl.users.roleCountPlural', { count: user.custom_roles.length })
+                  }}
                 </span>
               </div>
             </button>
@@ -823,10 +845,10 @@ onMounted(async () => {
               :disabled="usersPage <= 1"
               @click="changePage(-1)"
             >
-              Previous
+              {{ t('common.buttons.previous') }}
             </button>
             <span class="text-[var(--color-brand-muted)]">
-              Page {{ usersPage }} / {{ totalUserPages }}
+              {{ t('settings.accessControl.users.page', { page: usersPage, total: totalUserPages }) }}
             </span>
             <button
               type="button"
@@ -834,7 +856,7 @@ onMounted(async () => {
               :disabled="usersPage >= totalUserPages"
               @click="changePage(1)"
             >
-              Next
+              {{ t('common.buttons.next') }}
             </button>
           </div>
 
@@ -843,12 +865,16 @@ onMounted(async () => {
           >
             <div class="flex items-start justify-between gap-4">
               <div>
-                <p class="ui-page-kicker">Assignment Details</p>
+                <p class="ui-page-kicker">{{ t('settings.accessControl.users.assignmentKicker') }}</p>
                 <h3 class="text-base font-semibold text-[var(--color-brand-ink-strong)]">
-                  {{ selectedUsername || 'Select a user' }}
+                  {{
+                    selectedUsername
+                      ? t('settings.accessControl.users.assignmentTitle', { user: selectedUsername })
+                      : t('settings.accessControl.users.assignmentEmptyTitle')
+                  }}
                 </h3>
                 <p class="mt-2 text-sm text-[var(--color-brand-muted)]">
-                  Attach custom roles to this cached user. Effective route permissions are the union of policy and custom rules.
+                  {{ t('settings.accessControl.users.assignmentDescription') }}
                 </p>
               </div>
               <button
@@ -857,21 +883,21 @@ onMounted(async () => {
                 class="ui-button-secondary"
                 @click="loadSelectedUser"
               >
-                Refresh
+                {{ t('common.buttons.refresh') }}
               </button>
             </div>
 
             <div v-if="userAssignmentLoading" class="mt-5 text-[var(--color-brand-muted)]">
               <LoadingSpinner :size="5" />
-              Loading user assignment...
+              {{ t('settings.accessControl.users.loadingAssignment') }}
             </div>
             <InfoAlert v-else-if="!selectedUsername" class="mt-5">
-              Select a user to inspect and modify role bindings.
+              {{ t('settings.accessControl.users.selectUserNotice') }}
             </InfoAlert>
             <template v-else-if="selectedUserDetails">
               <div class="mt-5 grid gap-4 lg:grid-cols-3">
                 <section class="rounded-[22px] border border-[rgba(80,105,127,0.1)] bg-white px-4 py-4">
-                  <p class="text-sm font-semibold text-[var(--color-brand-ink-strong)]">Policy Roles</p>
+                  <p class="text-sm font-semibold text-[var(--color-brand-ink-strong)]">{{ t('settings.accessControl.users.policyRoles') }}</p>
                   <div class="mt-3 flex flex-wrap gap-2">
                     <span
                       v-for="role in [...selectedUserDetails.policy_roles].sort()"
@@ -881,12 +907,12 @@ onMounted(async () => {
                       {{ role }}
                     </span>
                     <span v-if="selectedUserDetails.policy_roles.length === 0" class="text-sm text-[var(--color-brand-muted)]">
-                      None
+                      {{ t('settings.accessControl.users.none') }}
                     </span>
                   </div>
                 </section>
                 <section class="rounded-[22px] border border-[rgba(80,105,127,0.1)] bg-white px-4 py-4">
-                  <p class="text-sm font-semibold text-[var(--color-brand-ink-strong)]">Custom Roles</p>
+                  <p class="text-sm font-semibold text-[var(--color-brand-ink-strong)]">{{ t('settings.accessControl.users.customRoles') }}</p>
                   <div class="mt-3 flex flex-wrap gap-2">
                     <span
                       v-for="roleName in [...selectedRoleNames].sort()"
@@ -896,12 +922,12 @@ onMounted(async () => {
                       {{ roleName }}
                     </span>
                     <span v-if="selectedRoleNames.length === 0" class="text-sm text-[var(--color-brand-muted)]">
-                      None
+                      {{ t('settings.accessControl.users.none') }}
                     </span>
                   </div>
                 </section>
                 <section class="rounded-[22px] border border-[rgba(80,105,127,0.1)] bg-white px-4 py-4">
-                  <p class="text-sm font-semibold text-[var(--color-brand-ink-strong)]">Merged Actions</p>
+                  <p class="text-sm font-semibold text-[var(--color-brand-ink-strong)]">{{ t('settings.accessControl.users.mergedActions') }}</p>
                   <div class="mt-3 flex flex-wrap gap-2">
                     <span
                       v-for="action in [...new Set([...selectedUserDetails.policy_actions, ...selectedUserDetails.custom_actions])].sort()"
@@ -917,16 +943,16 @@ onMounted(async () => {
                       "
                       class="text-sm text-[var(--color-brand-muted)]"
                     >
-                      None
+                      {{ t('settings.accessControl.users.none') }}
                     </span>
                   </div>
                 </section>
               </div>
 
               <div class="mt-5">
-                <p class="mb-3 text-sm font-semibold text-[var(--color-brand-ink-strong)]">Assigned Custom Roles</p>
+                <p class="mb-3 text-sm font-semibold text-[var(--color-brand-ink-strong)]">{{ t('settings.accessControl.users.assignedRoles') }}</p>
                 <div v-if="roles.length === 0" class="text-sm text-[var(--color-brand-muted)]">
-                  Create at least one role before assigning users.
+                  {{ t('settings.accessControl.users.createRoleFirst') }}
                 </div>
                 <div v-else class="grid gap-3">
                   <label
@@ -944,7 +970,7 @@ onMounted(async () => {
                     <div>
                       <p class="font-semibold text-[var(--color-brand-ink-strong)]">{{ role.name }}</p>
                       <p class="mt-1 text-sm text-[var(--color-brand-muted)]">
-                        {{ role.description || 'No description provided.' }}
+                        {{ role.description || t('settings.accessControl.users.noDescription') }}
                       </p>
                       <div class="mt-2 flex flex-wrap gap-2">
                         <span
@@ -967,7 +993,7 @@ onMounted(async () => {
                   :disabled="!canManage || userAssignmentSaving"
                   @click="saveUserRoles"
                 >
-                  Save Assignments
+                  {{ t('settings.accessControl.users.saveAssignments') }}
                 </button>
                 <button
                   type="button"
@@ -975,7 +1001,7 @@ onMounted(async () => {
                   :disabled="userAssignmentSaving"
                   @click="loadSelectedUser"
                 >
-                  Reset Selection
+                  {{ t('settings.accessControl.users.resetSelection') }}
                 </button>
               </div>
             </template>

@@ -9,6 +9,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import type { LocationQueryRaw } from 'vue-router'
 import type { CachedLdapUser, ClusterDescription } from '@/composables/GatewayAPI'
 import { useGatewayAPI } from '@/composables/GatewayAPI'
@@ -27,6 +28,7 @@ const runtimeStore = useRuntimeStore()
 const runtimeConfiguration = useRuntimeConfiguration()
 const route = useRoute()
 const router = useRouter()
+const { t } = useI18n()
 const pageSize = ref(DEFAULT_PAGE_SIZE)
 const isAdminRoute = computed(() => String(route.name ?? '').startsWith('admin-'))
 const tabsComponent = computed(() => (isAdminRoute.value ? AdminTabs : SettingsTabs))
@@ -141,15 +143,15 @@ onMounted(async () => {
   <div class="ui-section-stack">
     <component
       :is="tabsComponent"
-      entry="Users"
+      entry="users"
       :cluster="runtimeStore.currentCluster?.name ?? runtimeStore.availableClusters[0]?.name ?? ''"
     />
 
     <InfoAlert v-if="!runtimeConfiguration.authentication">
-      LDAP authentication is disabled, so cached directory users are unavailable.
+      {{ t('settings.ldapUsers.alerts.authDisabled') }}
     </InfoAlert>
     <InfoAlert v-else-if="!pageVisible">
-      No cluster has database support enabled for cached directory users.
+      {{ t('settings.ldapUsers.alerts.noClusterDatabase') }}
     </InfoAlert>
 
     <div v-else class="ui-section-stack">
@@ -159,10 +161,10 @@ onMounted(async () => {
             !runtimeStore.hasRoutePermission(cluster.name, usersPermissionResource, 'view')
           "
         >
-          No permission to view cached directory users on this cluster.
+          {{ t('settings.ldapUsers.alerts.noPermission') }}
         </InfoAlert>
         <InfoAlert v-else-if="!cluster.database">
-          Database support is disabled on this cluster.
+          {{ t('settings.ldapUsers.alerts.databaseDisabled') }}
         </InfoAlert>
         <div v-else class="space-y-4">
           <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
@@ -171,7 +173,7 @@ onMounted(async () => {
                 :for="`ldap-users-query-${cluster.name}`"
                 class="mb-2 block text-sm font-semibold text-[var(--color-brand-ink-strong)]"
               >
-                Search by username
+                {{ t('settings.ldapUsers.search.label') }}
               </label>
               <div class="flex flex-col gap-3 sm:flex-row">
                 <input
@@ -179,14 +181,14 @@ onMounted(async () => {
                   v-model="clusterQueries[cluster.name]"
                   type="text"
                   class="block w-full rounded-[18px] border border-[rgba(80,105,127,0.16)] bg-white px-4 py-3 text-sm text-[var(--color-brand-ink-strong)] shadow-[var(--shadow-soft)] outline-hidden focus:border-[rgba(182,232,44,0.65)] focus:ring-4 focus:ring-[rgba(182,232,44,0.18)]"
-                  placeholder="Search username..."
+                  :placeholder="t('settings.ldapUsers.search.placeholder')"
                   @keyup.enter="searchClusterUsers(cluster)"
                 />
                 <button type="button" class="ui-button-primary" @click="searchClusterUsers(cluster)">
-                  Search
+                  {{ t('common.buttons.search') }}
                 </button>
                 <button type="button" class="ui-button-secondary" @click="resetClusterUsers(cluster)">
-                  Reset
+                  {{ t('common.buttons.reset') }}
                 </button>
               </div>
             </div>
@@ -195,7 +197,11 @@ onMounted(async () => {
               v-if="!clusterLoading[cluster.name] && !clusterErrors[cluster.name]"
               class="text-sm text-[var(--color-brand-muted)]"
             >
-              {{ clusterTotals[cluster.name] ?? 0 }} user{{ (clusterTotals[cluster.name] ?? 0) === 1 ? '' : 's' }} found
+              {{
+                (clusterTotals[cluster.name] ?? 0) === 1
+                  ? t('settings.ldapUsers.resultsCount', { count: clusterTotals[cluster.name] ?? 0 })
+                  : t('settings.ldapUsers.resultsCountPlural', { count: clusterTotals[cluster.name] ?? 0 })
+              }}
             </div>
           </div>
 
@@ -204,13 +210,13 @@ onMounted(async () => {
             class="text-[var(--color-brand-muted)]"
           >
             <LoadingSpinner :size="5" />
-            Loading cached users...
+            {{ t('settings.ldapUsers.loading') }}
           </div>
           <ErrorAlert v-else-if="clusterErrors[cluster.name]">
             {{ clusterErrors[cluster.name] }}
           </ErrorAlert>
           <InfoAlert v-else-if="(clusterTotals[cluster.name] ?? 0) === 0">
-            No cached users found on this cluster.
+            {{ t('settings.ldapUsers.alerts.empty') }}
           </InfoAlert>
           <div v-else class="ui-table-shell ui-results-card">
             <div class="ui-table-scroll">
@@ -218,9 +224,9 @@ onMounted(async () => {
                 <table class="ui-table min-w-full">
                   <thead>
                     <tr>
-                      <th scope="col" class="py-3.5 pr-3 pl-6 text-left">Username</th>
-                      <th scope="col" class="px-3 py-3.5 text-left">Full name</th>
-                      <th scope="col" class="px-3 py-3.5 text-left">Shortcuts</th>
+                      <th scope="col" class="py-3.5 pr-3 pl-6 text-left">{{ t('settings.ldapUsers.columns.username') }}</th>
+                      <th scope="col" class="px-3 py-3.5 text-left">{{ t('settings.ldapUsers.columns.fullName') }}</th>
+                      <th scope="col" class="px-3 py-3.5 text-left">{{ t('settings.ldapUsers.columns.shortcuts') }}</th>
                     </tr>
                   </thead>
                   <tbody class="text-sm text-[var(--color-brand-muted)]">
@@ -235,7 +241,7 @@ onMounted(async () => {
                             :to="{ name: 'user', params: { cluster: cluster.name, user: user.username } }"
                             class="ui-button-secondary"
                           >
-                            View user
+                            {{ t('settings.ldapUsers.actions.viewUser') }}
                           </RouterLink>
                           <RouterLink
                             v-if="cluster.user_metrics"
@@ -246,14 +252,14 @@ onMounted(async () => {
                             }"
                             class="ui-button-secondary"
                           >
-                            Open analysis
+                            {{ t('settings.ldapUsers.actions.openAnalysis') }}
                           </RouterLink>
                           <RouterLink
                             v-if="runtimeStore.hasRoutePermission(cluster.name, 'jobs-history', 'view')"
                             :to="{ name: 'jobs-history', params: { cluster: cluster.name }, query: { user: user.username } }"
                             class="ui-button-secondary"
                           >
-                            View history jobs
+                            {{ t('settings.ldapUsers.actions.viewHistoryJobs') }}
                           </RouterLink>
                         </div>
                       </td>

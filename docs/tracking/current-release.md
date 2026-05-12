@@ -92,6 +92,8 @@
   - Dashboard、Cluster Analysis、Jobs、Jobs History、Job
   - Resources、Node、Accounts、Account、User、User Analysis
   - QOS、Reservations
+  - Assistant、Admin > AI、Admin > AI Conversation Detail
+  - Admin > Cache、Admin > Users、Admin > Access Control
   - 公共时间范围控件、图表图例、摘要卡、副标题、空态、公共错误提示、公共操作弹窗、通用字段标签
   - 前端生成的认证错误、权限错误、服务端错误和普通错误通知
 - 国际化边界保持为“前端静态文案和前端生成消息”：
@@ -104,6 +106,8 @@
   - `npm --prefix frontend run type-check`
   - `cd frontend && npx vitest run`
   - `npm --prefix frontend run build`
+- 本轮 AI / Admin 国际化补齐定向回归也已通过：
+  - `cd frontend && npx vitest run tests/views/AssistantView.spec.ts tests/views/settings/SettingsAI.spec.ts tests/views/settings/SettingsAIConversationDetail.spec.ts tests/views/settings/SettingsCache.spec.ts tests/views/settings/SettingsLdapCache.spec.ts tests/views/settings/SettingsAccessControl.spec.ts tests/components/settings/SettingsCacheStatistics.spec.ts tests/components/settings/SettingsCacheMetrics.spec.ts`
 - 国际化首轮推送后的远端 CI 回归缺口已收口：
   - `ClusterAnalysisView.vue` 与 `UserView.vue` 中用于建立 i18n 响应依赖的裸 `locale.value` 表达式已改掉，`Frontend ESLint` 不再因 `@typescript-eslint/no-unused-expressions` 失败
   - `SettingsLdapCache.vue` 已清理未使用导入，避免远端静态检查继续报 `no-unused-vars`

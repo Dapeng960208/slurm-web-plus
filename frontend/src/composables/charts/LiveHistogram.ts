@@ -58,77 +58,57 @@ export function useLiveHistogram<MetricKeyType extends string>(
     Chart.defaults.borderColor = '#333333'
   }
 
-  /* Update charts datasets when metrics values change. */
+  function buildDatasets() {
+    const metricData = metrics.data.value
+    if (!metricData) return []
+    return Object.entries(labels).flatMap(([label, properties]) => {
+      if (!properties.group.some((metric) => metric in metricData)) {
+        return []
+      }
+      const newData = metricData[properties.group[0]].map((value) => ({
+        x: value[0],
+        y: properties.invert ? -value[1] : value[1]
+      }))
+      if (properties.group.length > 1) {
+        properties.group.forEach((metric, index) => {
+          if (!index) return
+          metricData[metric].forEach((value) => {
+            const item = newData.find((_value) => _value.x == value[0])
+            if (item) item.y += value[1]
+          })
+        })
+      }
+      return [
+        {
+          label: label,
+          data: newData,
+          barPercentage: 1,
+          fill: 'stack' as const,
+          backgroundColor: properties.color
+        }
+      ]
+    })
+  }
+
+  function syncChart() {
+    if (!chart) return
+    if (!metrics.data.value) {
+      chart.data.datasets = []
+      chart.update()
+      return
+    }
+    chart.data.datasets = buildDatasets()
+    if (chart.options.scales && chart.options.scales.x) {
+      chart.options.scales.x.suggestedMin = suggestedMin()
+      ;(chart.options.scales.x as TimeScaleOptions).time.unit = timeframeUnit()
+    }
+    chart.update()
+  }
+
   watch(
     () => metrics.data.value,
     () => {
-      /* If chart is null, stop here. */
-      if (!chart) return
-
-      /* If poller data is undefined, just set an empty dataset and leave. */
-      if (!metrics.data.value) {
-        chart.data.datasets = []
-        return
-      }
-      const newSuggestedMin = suggestedMin()
-      for (const [label, properties] of Object.entries(labels)) {
-        /* If current state is not present in poller data keys, skip it. */
-        if (!properties.group.some((metric) => metrics.data.value && metric in metrics.data.value))
-          continue
-        /* Compute new data array with values of first metric in group */
-        const new_data = metrics.data.value[properties.group[0]].map((value) => ({
-          x: value[0],
-          y: properties.invert ? -value[1] : value[1]
-        }))
-        /* Sum values of all other metrics in the same group */
-        if (properties.group.length > 1) {
-          properties.group.forEach((metric, index) => {
-            // skip index 0 already in new_data
-            if (!index || !metrics.data.value) return
-            metrics.data.value[metric].forEach((value) => {
-              const item = new_data.find((_value) => _value.x == value[0])
-              if (item) item.y += value[1]
-            })
-          })
-        }
-        /* Search for existing dataset which has the current state as label */
-        const matching_datasets = chart.data.datasets.filter((dataset) => dataset.label == label)
-        if (!matching_datasets.length) {
-          /* If matching dataset has not been found, push a new dataset with all
-           * its parameters. */
-          chart.data.datasets.push({
-            label: label,
-            data: new_data,
-            barPercentage: 1,
-            fill: 'stack',
-            backgroundColor: properties.color
-          })
-          continue
-        } else {
-          /* First remove all values older than new suggested minimal timestamp. */
-          matching_datasets[0].data = matching_datasets[0].data.filter(
-            (value) => (value as Point).x > newSuggestedMin
-          )
-          /* If matching dataset has been found, get the timestamp of the last
-           * datapoint. */
-          const last_timestamp = (matching_datasets[0].data.slice(-1)[0] as Point).x
-          /* Iterate over new data to insert in the dataset only the datapoints
-           * with a timestamp after the timestamp of the last datapoint in
-           * current dataset, and count inserted values. */
-          new_data.forEach((item) => {
-            if (item.x > last_timestamp) {
-              matching_datasets[0].data.push(item)
-            }
-          })
-        }
-      }
-      /* Update suggested min and unit of x-axis. */
-      if (chart.options.scales && chart.options.scales.x) {
-        chart.options.scales.x.suggestedMin = newSuggestedMin
-        ;(chart.options.scales.x as TimeScaleOptions).time.unit = timeframeUnit()
-      }
-      /* Finally update the chart. */
-      chart.update()
+      syncChart()
     }
   )
 
@@ -276,7 +256,7 @@ export function useLiveHistogram<MetricKeyType extends string>(
     newLabels: Record<string, { group: MetricKeyType[]; color: string; invert?: boolean }>
   ) {
     labels = newLabels
-    clear()
+    syncChart()
   }
 
   onMounted(() => {

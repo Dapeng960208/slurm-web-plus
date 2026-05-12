@@ -4,6 +4,7 @@ import SettingsLdapCacheView from '@/views/settings/SettingsLdapCache.vue'
 import { init_plugins } from '../../lib/common'
 import { useRuntimeStore } from '@/stores/runtime'
 import type { RouterMock } from 'vue-router-mock'
+import { i18n } from '@/plugins/i18n'
 
 const mockGatewayAPI = {
   ldap_cache_users: vi.fn()
@@ -39,6 +40,7 @@ describe('settings/SettingsLdapCache.vue', () => {
   beforeEach(() => {
     void init_plugins()
     vi.clearAllMocks()
+    i18n.global.locale.value = 'en'
     mockGatewayAPI.ldap_cache_users.mockReset()
   })
 
@@ -94,10 +96,10 @@ describe('settings/SettingsLdapCache.vue', () => {
 
     await flushPromises()
 
-    expect(wrapper.text()).toContain('Users')
+    expect(wrapper.text()).toContain('users')
     expect(wrapper.text()).not.toContain('Cluster foo')
     expect(wrapper.text()).not.toContain('LDAP Cache')
-    expect(wrapper.text()).toContain('Search by username')
+    expect(wrapper.text()).toContain(i18n.global.t('settings.ldapUsers.search.label'))
     expect(wrapper.text()).toContain('alice')
     expect(wrapper.text()).toContain('Alice Doe')
     expect(wrapper.text()).toContain('bob')
@@ -156,7 +158,7 @@ describe('settings/SettingsLdapCache.vue', () => {
     expect(wrapper.text()).toContain('alice')
     expect(wrapper.text()).toContain('Alice Doe')
     expect(wrapper.text()).toContain('bob')
-    expect(wrapper.text()).toContain('2 users found')
+    expect(wrapper.text()).toContain(i18n.global.t('settings.ldapUsers.resultsCountPlural', { count: 2 }))
   })
 
   test('searches by username and resets to first page', async () => {
@@ -251,7 +253,9 @@ describe('settings/SettingsLdapCache.vue', () => {
       page_size: 20
     })
 
-    const resetButton = wrapper.findAll('button').find((button) => button.text().trim() === 'Reset')
+    const resetButton = wrapper
+      .findAll('button')
+      .find((button) => button.text().trim() === i18n.global.t('common.buttons.reset'))
     expect(resetButton).toBeDefined()
     await resetButton!.trigger('click')
     await flushPromises()
@@ -313,7 +317,7 @@ describe('settings/SettingsLdapCache.vue', () => {
     await inputs[0].setValue('ali')
     const searchButtons = wrapper
       .findAll('button')
-      .filter((button) => button.text().trim() === 'Search')
+      .filter((button) => button.text().trim() === i18n.global.t('common.buttons.search'))
     await searchButtons[0].trigger('click')
     await flushPromises()
 
@@ -363,7 +367,7 @@ describe('settings/SettingsLdapCache.vue', () => {
     await flushPromises()
 
     expect(wrapper.text()).toContain(
-      'No cluster has database support enabled for cached directory users.'
+      i18n.global.t('settings.ldapUsers.alerts.noClusterDatabase')
     )
     expect(mockGatewayAPI.ldap_cache_users).not.toHaveBeenCalled()
   })
@@ -396,7 +400,7 @@ describe('settings/SettingsLdapCache.vue', () => {
 
     await flushPromises()
 
-    expect(wrapper.text()).toContain('No permission to view cached directory users on this cluster.')
+    expect(wrapper.text()).toContain(i18n.global.t('settings.ldapUsers.alerts.noPermission'))
     expect(mockGatewayAPI.ldap_cache_users).not.toHaveBeenCalled()
   })
 
@@ -429,6 +433,6 @@ describe('settings/SettingsLdapCache.vue', () => {
 
     await flushPromises()
 
-    expect(wrapper.text()).toContain('No cached users found on this cluster.')
+    expect(wrapper.text()).toContain(i18n.global.t('settings.ldapUsers.alerts.empty'))
   })
 })

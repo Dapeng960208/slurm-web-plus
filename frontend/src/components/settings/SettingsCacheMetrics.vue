@@ -8,12 +8,14 @@
 
 <script setup lang="ts">
 import { computed, ref, useTemplateRef } from 'vue'
+import { useI18n } from 'vue-i18n'
 import type { ClusterDescription, MetricCacheResult } from '@/composables/GatewayAPI'
 import { useLiveHistogram } from '@/composables/charts/LiveHistogram'
 import ChartSkeleton from '@/components/ChartSkeleton.vue'
 import ErrorAlert from '@/components/ErrorAlert.vue'
 
 const { cluster } = defineProps<{ cluster: ClusterDescription }>()
+const { t } = useI18n()
 
 const range = ref<string>('hour')
 
@@ -55,8 +57,8 @@ const hasMetricSamples = computed(() => {
   <div class="ui-panel ui-section mt-6">
     <div class="mb-5 flex flex-wrap items-start justify-between gap-4">
       <div>
-        <h3 class="ui-panel-title">Cache Metrics</h3>
-        <p class="ui-panel-description mt-2">Live hit and miss activity across cache operations.</p>
+        <h3 class="ui-panel-title">{{ t('settings.cache.metrics.title') }}</h3>
+        <p class="ui-panel-description mt-2">{{ t('settings.cache.metrics.description') }}</p>
       </div>
       <div class="isolate inline-flex rounded-full shadow-[var(--shadow-soft)]">
         <button
@@ -70,7 +72,7 @@ const hasMetricSamples = computed(() => {
           ]"
           @click="setRange('week')"
         >
-          week
+          {{ t('common.metricRanges.week') }}
         </button>
         <button
           type="button"
@@ -83,7 +85,7 @@ const hasMetricSamples = computed(() => {
           ]"
           @click="setRange('day')"
         >
-          day
+          {{ t('common.metricRanges.day') }}
         </button>
         <button
           type="button"
@@ -96,13 +98,13 @@ const hasMetricSamples = computed(() => {
           ]"
           @click="setRange('hour')"
         >
-          hour
+          {{ t('common.metricRanges.hour') }}
         </button>
       </div>
     </div>
 
     <ErrorAlert v-if="chart.metrics.unable.value" class="mt-4">
-      Unable to retrieve cache metrics.
+      {{ t('settings.cache.metrics.error') }}
     </ErrorAlert>
     <div v-else class="ui-chart-shell">
       <ChartSkeleton v-show="!chart.metrics.loaded.value" />
@@ -112,10 +114,10 @@ const hasMetricSamples = computed(() => {
       >
         <div>
           <p class="text-sm font-semibold text-[var(--color-brand-ink-strong)]">
-            No live cache metric samples in this range
+            {{ t('settings.cache.metrics.emptyTitle') }}
           </p>
           <p class="mt-2 text-sm text-[var(--color-brand-muted)]">
-            Switch the time range or wait for cache traffic to generate hit and miss data points.
+            {{ t('settings.cache.metrics.emptyDescription') }}
           </p>
         </div>
       </div>

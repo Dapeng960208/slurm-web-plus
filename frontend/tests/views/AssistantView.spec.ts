@@ -3,6 +3,7 @@ import { flushPromises, mount } from '@vue/test-utils'
 import AssistantView from '@/views/AssistantView.vue'
 import { init_plugins } from '../lib/common'
 import { useRuntimeStore } from '@/stores/runtime'
+import { i18n } from '@/plugins/i18n'
 
 const mockGatewayAPI = {
   ai_configs: vi.fn(),
@@ -39,6 +40,7 @@ describe('views/AssistantView.vue', () => {
   beforeEach(() => {
     init_plugins()
     vi.clearAllMocks()
+    i18n.global.locale.value = 'en'
     useRuntimeStore().availableClusters = [
       {
         name: 'foo',
@@ -334,7 +336,7 @@ describe('views/AssistantView.vue', () => {
 
     await flushPromises()
     await wrapper
-      .get('textarea[placeholder="Ask about a job, node resources, partitions, or another read-only cluster question."]')
+      .get(`textarea[placeholder="${i18n.global.t('pages.assistant.composer.placeholder')}"]`)
       .setValue('Which node has the most free GPUs?')
     await wrapper.get('form').trigger('submit.prevent')
     await flushPromises()
@@ -396,7 +398,7 @@ describe('views/AssistantView.vue', () => {
     expect(wrapper.text()).toContain('Estimated tokens 0 / 10')
 
     await wrapper
-      .get('textarea[placeholder="Ask about a job, node resources, partitions, or another read-only cluster question."]')
+      .get(`textarea[placeholder="${i18n.global.t('pages.assistant.composer.placeholder')}"]`)
       .setValue('Explain the current job scheduling pressure across every partition with detailed evidence.')
     await flushPromises()
 

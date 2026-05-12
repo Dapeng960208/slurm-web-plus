@@ -24,8 +24,13 @@
 - 核心业务页面
   - `Dashboard`、`Cluster Analysis`、`Jobs`、`Jobs History`、`Job`
   - `Resources`、`Node`、`Accounts`、`Account`、`User`、`User Analysis`
-  - `QOS`、`Reservations`
+- `QOS`、`Reservations`
   - 每页至少验证页头标题/说明、1 组工具栏或筛选文案、1 组内容区文案或空态可随语言切换
+- `AI`、`Admin > AI`、`Admin > AI Conversation Detail`
+- `Admin > Cache`
+- `Admin > Users`
+- `Admin > Access Control`
+  - 至少验证页头、主要按钮/筛选、表头或空态、前端生成提示在两种语言下同步变化
 
 - Settings
   - `SettingsTabs` 在中英文下显示正确标签
@@ -44,6 +49,10 @@
 - `npm --prefix frontend run type-check`
 - `cd frontend && npx vitest run`
 - `npm --prefix frontend run build`
+
+本轮补齐 AI/Admin 页面主体后，已额外执行：
+
+- `cd frontend && npx vitest run tests/views/AssistantView.spec.ts tests/views/settings/SettingsAI.spec.ts tests/views/settings/SettingsAIConversationDetail.spec.ts tests/views/settings/SettingsCache.spec.ts tests/views/settings/SettingsLdapCache.spec.ts tests/views/settings/SettingsAccessControl.spec.ts tests/components/settings/SettingsCacheStatistics.spec.ts tests/components/settings/SettingsCacheMetrics.spec.ts`
 
 ## 4. 当前边界
 

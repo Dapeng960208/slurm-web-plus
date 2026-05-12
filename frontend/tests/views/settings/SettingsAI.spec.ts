@@ -6,6 +6,7 @@ import SettingsAIView from '@/views/settings/SettingsAI.vue'
 import { init_plugins } from '../../lib/common'
 import { useRuntimeStore } from '@/stores/runtime'
 import type { RouterMock } from 'vue-router-mock'
+import { i18n } from '@/plugins/i18n'
 
 const mockGatewayAPI = {
   ai_configs: vi.fn(),
@@ -86,6 +87,7 @@ describe('views/settings/SettingsAI.vue', () => {
   beforeEach(() => {
     void init_plugins()
     vi.clearAllMocks()
+    i18n.global.locale.value = 'en'
     mockGatewayAPI.ai_admin_conversations.mockResolvedValue([])
     mockGatewayAPI.ai_admin_conversation.mockResolvedValue({
       id: 21,
@@ -148,7 +150,7 @@ describe('views/settings/SettingsAI.vue', () => {
     expect(wrapper.text()).toContain('Qwen Prod')
     expect(wrapper.text()).toContain('***1234')
     expect(wrapper.text()).toContain('Default')
-    expect(wrapper.text()).toContain('Delete')
+    expect(wrapper.text()).toContain(i18n.global.t('common.buttons.delete'))
     expect(wrapper.find('[data-testid="ai-config-row"]').exists()).toBe(true)
   })
 
@@ -266,7 +268,7 @@ describe('views/settings/SettingsAI.vue', () => {
     })
 
     await flushPromises()
-    await getButtonByText(wrapper, 'Delete').trigger('click')
+    await getButtonByText(wrapper, i18n.global.t('common.buttons.delete')).trigger('click')
     await flushPromises()
 
     expect(mockGatewayAPI.delete_ai_config).toHaveBeenCalledWith('foo', 1)
@@ -295,7 +297,7 @@ describe('views/settings/SettingsAI.vue', () => {
     })
 
     await flushPromises()
-    await getButtonByText(wrapper, 'New model').trigger('click')
+    await getButtonByText(wrapper, i18n.global.t('settings.ai.actions.newModel')).trigger('click')
     await flushPromises()
 
     const textInputs = wrapper.findAll('input[type="text"]')
@@ -390,7 +392,7 @@ describe('views/settings/SettingsAI.vue', () => {
     await flushPromises()
 
     expect(wrapper.text()).toContain('Edit')
-    expect(wrapper.text()).toContain('Test connection')
-    expect(wrapper.text()).not.toContain('Delete')
+    expect(wrapper.text()).toContain(i18n.global.t('settings.ai.actions.testConnection'))
+    expect(wrapper.text()).not.toContain(i18n.global.t('common.buttons.delete'))
   })
 })

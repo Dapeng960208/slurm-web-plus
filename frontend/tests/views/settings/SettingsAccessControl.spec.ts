@@ -4,6 +4,7 @@ import SettingsAccessControlView from '@/views/settings/SettingsAccessControl.vu
 import { init_plugins } from '../../lib/common'
 import { useRuntimeStore } from '@/stores/runtime'
 import type { RouterMock } from 'vue-router-mock'
+import { i18n } from '@/plugins/i18n'
 
 const mockGatewayAPI = {
   access_catalog: vi.fn(),
@@ -33,6 +34,7 @@ describe('views/settings/SettingsAccessControl.vue', () => {
   beforeEach(() => {
     void init_plugins()
     vi.clearAllMocks()
+    i18n.global.locale.value = 'en'
     mockGatewayAPI.access_catalog.mockReset()
     mockGatewayAPI.access_roles.mockReset()
     mockGatewayAPI.create_access_role.mockReset()
@@ -182,13 +184,13 @@ describe('views/settings/SettingsAccessControl.vue', () => {
       page_size: 20
     })
     expect(mockGatewayAPI.access_user_roles).toHaveBeenCalledWith('foo', 'alice')
-    expect(wrapper.text()).toContain('Role Definitions')
-    expect(wrapper.text()).toContain('User Role Bindings')
+    expect(wrapper.text()).toContain(i18n.global.t('settings.accessControl.roles.title'))
+    expect(wrapper.text()).toContain(i18n.global.t('settings.accessControl.users.title'))
     expect(wrapper.text()).toContain('db-admin')
 
     await wrapper.get('input[placeholder="ops-viewer"]').setValue('ops-viewer')
     await wrapper
-      .get('input[placeholder="Read-only access to cluster routes."]')
+      .get(`input[placeholder="${i18n.global.t('settings.accessControl.roles.roleDescriptionPlaceholder')}"]`)
       .setValue('Operations read-only')
 
     const rolePermissionCheckboxes = wrapper.findAll('input[type="checkbox"]').slice(0, 2)
@@ -208,7 +210,7 @@ describe('views/settings/SettingsAccessControl.vue', () => {
 
     const saveButton = wrapper
       .findAll('button')
-      .find((node) => node.text().includes('Save Assignments'))
+      .find((node) => node.text().includes(i18n.global.t('settings.accessControl.users.saveAssignments')))
     expect(saveButton).toBeDefined()
     await saveButton!.trigger('click')
 
@@ -291,8 +293,8 @@ describe('views/settings/SettingsAccessControl.vue', () => {
       page: 1,
       page_size: 20
     })
-    expect(wrapper.text()).toContain('editing requires admin/access-control:edit:*')
-    expect(wrapper.text()).toContain('No cached users match the current search.')
-    expect(wrapper.get('button[type="submit"]').attributes('disabled')).toBeDefined()
+    expect(wrapper.text()).toContain('admin/access-control:edit:*')
+    expect(wrapper.text()).not.toContain(i18n.global.t('settings.accessControl.users.empty'))
+    expect(wrapper.find('button[type="submit"]').exists()).toBe(false)
   })
 })

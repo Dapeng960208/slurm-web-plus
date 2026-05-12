@@ -131,6 +131,8 @@ const zhCN = {
       cancel: '取消',
       apply: '应用',
       reset: '重置',
+      refresh: '刷新',
+      clear: '清空',
       goBack: '返回',
       signIn: '登录',
       signOut: '退出登录',
@@ -142,6 +144,11 @@ const zhCN = {
       open: '打开',
       search: '搜索',
       retry: '重试',
+      previous: '上一页',
+      next: '下一页',
+      send: '发送',
+      enable: '启用',
+      disable: '禁用',
       today: '今天'
     },
     notifications: {
@@ -411,6 +418,364 @@ const zhCN = {
       emptyRoles: '未声明角色。',
       emptyActions: '未声明动作。',
       emptyRules: '未声明路由规则。'
+    },
+    ai: {
+      title: 'AI',
+      description: '在同一工作区中管理集群 AI 模型、连通性校验以及管理员侧对话审计。',
+      actions: {
+        goToChat: '前往对话',
+        newModel: '新建模型',
+        edit: '编辑',
+        testConnection: '测试连接',
+        testing: '测试中...',
+        setDefault: '设为默认',
+        delete: '删除',
+        deleting: '删除中...',
+        keep: '保留',
+        replace: '替换',
+        clear: '清除',
+        createModel: '创建模型'
+      },
+      alerts: {
+        noClusterContext: '当前没有可用于 AI 设置的集群上下文。',
+        unavailable: '当前集群未启用 AI 能力。',
+        noPermission: '当前用户无权查看此集群的 AI 设置。',
+        readOnly: '当前用户可以查看 AI 设置，但无权在此集群上修改。'
+      },
+      configs: {
+        title: '模型配置',
+        description: '每一行定义一个集群模型目标，包含提供方路由、密钥状态和校验状态。',
+        loading: '正在加载模型配置...',
+        empty: '此集群暂时还没有模型配置。',
+        columns: {
+          displayName: '显示名称',
+          provider: '提供方',
+          model: '模型',
+          state: '状态',
+          default: '默认',
+          secret: '密钥',
+          validated: '已校验',
+          actions: '操作'
+        },
+        state: {
+          enabled: '已启用',
+          disabled: '已禁用',
+          default: '默认',
+          configured: '已配置',
+          notConfigured: '未配置'
+        },
+        actionTitles: {
+          create: '创建一个新的集群级 AI 模型配置。',
+          edit: '打开编辑器，更新提供方设置、路由、提示词和密钥。',
+          test: '使用当前模型配置执行一次在线连通性检查。',
+          setDefault: '将此模型设为新 AI 对话的默认目标。',
+          toggle: '启用或禁用此模型，而不删除已保存配置。',
+          delete: '删除此模型配置及其已保存密钥。'
+        }
+      },
+      audit: {
+        title: '对话审计',
+        description: '以表格方式查看集群级 AI 对话记录，并可打开详情页查看完整消息与工具历史。',
+        filters: {
+          username: '用户名',
+          usernamePlaceholder: '按用户名筛选',
+          title: '标题',
+          titlePlaceholder: '按对话标题筛选'
+        },
+        loading: '正在加载对话审计...',
+        empty: '此集群暂无 AI 对话记录。',
+        noMatch: '当前筛选条件下没有匹配的 AI 对话记录。',
+        state: {
+          deleted: '已删除',
+          active: '活动中'
+        },
+        openDetail: '打开详情',
+        columns: {
+          title: '标题',
+          user: '用户',
+          state: '状态',
+          updated: '更新时间',
+          details: '详情'
+        }
+      },
+      modal: {
+        kicker: '模型编辑器',
+        createTitle: '创建模型配置',
+        editTitle: '编辑模型配置',
+        description: '提供方密钥保存在数据库中，只会以脱敏摘要的形式返回到 UI。'
+      },
+      fields: {
+        configName: '配置名称',
+        displayName: '显示名称',
+        provider: '提供方',
+        model: '模型',
+        baseUrl: '基础 URL',
+        sortOrder: '排序权重',
+        deployment: '部署名',
+        apiVersion: 'API 版本',
+        requestTimeout: '请求超时',
+        temperature: '温度',
+        systemPrompt: '系统提示词',
+        extraOptions: '扩展选项',
+        apiKey: 'API Key',
+        enabled: '启用',
+        isDefault: '设为默认'
+      },
+      hints: {
+        configName: '用于标识该已保存模型条目的稳定标识符。',
+        configNameTooltip: '用于集群配置列表和审计记录内部识别。',
+        displayName: '终端用户选择模型时看到的友好名称。',
+        displayNameTooltip: '可以比提供方模型标识更易读。',
+        provider: '选择接收聊天请求的上游 AI 服务。',
+        providerTooltip: '提供方决定下面需要填写哪些连接参数。',
+        model: '提供方侧的模型标识、部署名或运行时标签。',
+        modelTooltip: '例如：gpt-4.1、claude-3-7-sonnet、qwen-max、llama3.1。',
+        baseUrl: '当提供方通过自定义端点提供服务时，可选覆盖默认地址。',
+        baseUrlTooltip: '留空则使用该提供方的默认 API 基础地址。',
+        sortOrder: '用于控制模型在 UI 中顺序的可选数值权重。',
+        sortOrderTooltip: '值越小越靠前；留空时回退为 0。',
+        deployment: 'Azure OpenAI 用于将请求路由到目标模型的部署名称。',
+        deploymentTooltip: 'Azure 请求时使用部署标识，而不是原始模型名。',
+        apiVersion: '附加到请求中的 Azure API 版本，用于兼容性控制。',
+        apiVersionTooltip: '请与部署启用的 Azure OpenAI API 版本保持一致。',
+        requestTimeout: '聊天或校验请求在被中止前的可选超时时间（秒）。',
+        requestTimeoutTooltip: '适用于较慢的提供方或本地私有网关。',
+        temperature: '可选采样控制项，用于调整生成的随机性与确定性。',
+        temperatureTooltip: '留空则由提供方或服务端默认值决定。',
+        secretDescription: '对当前模型保留、替换或清除已保存的密钥。',
+        replaceSecretTitle: '用新的 API key 替换当前已存储密钥。',
+        clearSecretTitle: '移除当前已存储密钥。未重新设置前后续请求会失败。',
+        apiKey: '安全存储的凭证，只会以脱敏形式回显到 UI。',
+        apiKeyTooltip: '对使用 bearer secret 认证的提供方是必填项。',
+        systemPrompt: '可选的指令前缀，会附加到该模型的每次新对话。',
+        systemPromptTooltip: '可用于约束语气、范围、安全策略或集群专属上下文。',
+        extraOptions: '用于填写提供方专有请求字段的可选 JSON 对象，适用于表单中没有单独控件的情况。',
+        extraOptionsTooltip: '例如 max_tokens、top_p、reasoning 选项或自定义 header。'
+      },
+      secret: {
+        title: '密钥'
+      },
+      placeholders: {
+        apiKey: '请输入 API 密钥',
+        extraOptions: '{ }'
+      },
+      submitTitles: {
+        create: '为该集群创建新的模型配置。',
+        edit: '将编辑后的模型配置保存到集群。'
+      },
+      feedback: {
+        created: '模型配置已创建。',
+        updated: '模型配置已更新。',
+        enabled: '{name} 已启用。',
+        disabled: '{name} 已禁用。',
+        defaultSet: '{name} 已设为默认模型。',
+        validated: '连接校验成功：{sample}',
+        deleted: '{name} 已删除。'
+      },
+      errors: {
+        requestTimeoutInteger: 'request_timeout 必须是整数',
+        integerField: '{field} 必须是整数',
+        temperatureNumeric: 'temperature 必须是数字',
+        extraOptionsObject: 'extra_options 必须是 JSON 对象',
+        apiKeyRequired: '创建非 Ollama 模型时必须提供 api_key',
+        apiKeyReplaceRequired: '替换当前密钥前，请先输入新的 api_key'
+      }
+    },
+    aiDetail: {
+      title: 'AI 对话详情',
+      description: '查看单条审计对话的完整消息历史和工具执行记录。',
+      actions: {
+        backToAudit: '返回审计列表'
+      },
+      alerts: {
+        noClusterContext: '当前管理路由没有可用的集群上下文。',
+        unavailable: '当前集群未启用 AI 能力。',
+        noPermission: '当前用户无权查看此集群的 AI 审计数据。',
+        invalidConversationId: '对话 ID 无效。',
+        detailUnavailable: '对话详情不可用。'
+      },
+      loading: '正在加载对话详情...',
+      summary: {
+        title: '标题',
+        user: '用户',
+        updated: '更新时间',
+        state: '状态',
+        deleted: '已删除',
+        active: '活动中'
+      },
+      messages: {
+        title: '消息',
+        description: '完整对话内容按时间顺序展示，不再和主审计表相互竞争视觉焦点。'
+      },
+      toolCalls: {
+        title: '工具调用',
+        description: '工具执行记录与消息分离，方便运维人员快速定位失败和时延，而无需通读整段对话。',
+        empty: '该对话没有记录任何工具调用。',
+        columns: {
+          tool: '工具',
+          interface: '接口',
+          status: '状态',
+          code: '代码',
+          duration: '耗时',
+          created: '创建时间',
+          summary: '摘要'
+        },
+        durationMs: '{value} 毫秒'
+      }
+    },
+    cache: {
+      title: '缓存服务',
+      description: '查看每个集群的缓存可用性、命中率和实时指标。',
+      clusterKicker: '集群缓存',
+      clusterTitle: '集群 {cluster}',
+      alerts: {
+        noPermission: '无权查看该集群的缓存信息。',
+        disabled: '该集群未启用缓存。'
+      },
+      metricsUnavailable: {
+        kicker: '指标不可用',
+        title: '实时缓存指标不可用',
+        description: '该集群提供了缓存统计，但没有启用指标采集，因此当前无法展示实时缓存时间线。'
+      },
+      statistics: {
+        title: '缓存统计',
+        description: '按 key 分组统计命中与未命中比例，并展示整个集群缓存的总命中率。',
+        error: '无法获取缓存统计。',
+        loading: '正在加载统计...',
+        reset: '重置统计',
+        columns: {
+          name: '名称',
+          hit: '命中',
+          miss: '未命中',
+          total: '总计',
+          hitRate: '命中率'
+        },
+        total: '总计',
+        overviewKicker: '缓存概览',
+        overviewTitle: '流量快照',
+        overviewDescription: '快速查看当前缓存活动窗口下的总请求量和命中质量。',
+        overviewEmptyDescription: '当前尚未记录到任何缓存请求，因此图表会在有流量之前保持隐藏。',
+        cards: {
+          hitRate: '命中率',
+          requests: '请求数',
+          keyGroups: 'Key 分组'
+        },
+        waitingTitle: '等待缓存活动',
+        waitingDescription: '当集群记录到命中或未命中后，这里会展示分布图表。',
+        chart: {
+          hit: '命中',
+          miss: '未命中'
+        }
+      },
+      metrics: {
+        title: '缓存指标',
+        description: '查看缓存操作中的实时命中与未命中活动。',
+        error: '无法获取缓存指标。',
+        emptyTitle: '当前时间范围内没有实时缓存指标样本',
+        emptyDescription: '请切换时间范围，或等待缓存流量产生新的命中与未命中数据点。'
+      }
+    },
+    ldapUsers: {
+      alerts: {
+        authDisabled: 'LDAP 认证已禁用，因此无法查看缓存目录用户。',
+        noClusterDatabase: '当前没有启用数据库支持的集群可用于查看缓存目录用户。',
+        noPermission: '无权查看该集群的缓存目录用户。',
+        databaseDisabled: '该集群未启用数据库支持。',
+        empty: '该集群未找到任何缓存用户。'
+      },
+      search: {
+        label: '按用户名搜索',
+        placeholder: '搜索用户名...'
+      },
+      loading: '正在加载缓存用户...',
+      resultsCount: '找到 {count} 个用户',
+      resultsCountPlural: '找到 {count} 个用户',
+      columns: {
+        username: '用户名',
+        fullName: '姓名',
+        shortcuts: '快捷入口'
+      },
+      actions: {
+        viewUser: '查看用户',
+        openAnalysis: '打开分析',
+        viewHistoryJobs: '查看历史作业'
+      }
+    },
+    accessControl: {
+      title: '访问控制',
+      description: '管理当前集群基于数据库的自定义角色、路由权限规则和用户角色绑定。',
+      activeCluster: '当前集群',
+      resourcesCount: '{count} 个资源',
+      alerts: {
+        noClusterContext: '当前没有可用于访问控制管理的集群上下文。',
+        unavailable: '当前集群未启用访问控制。',
+        noPermission: '无权查看该集群的访问控制数据。',
+        readOnly: '你可以查看该集群角色，但编辑需要 `{permission}` 权限。'
+      },
+      roles: {
+        kicker: '自定义角色',
+        title: '角色定义',
+        description: '通过 `resource:operation:scope` 规则精确控制路由权限。为兼容旧动作会自动推导 legacy actions。',
+        loading: '正在加载访问控制数据...',
+        empty: '当前还没有自定义角色。首次启用数据库后会自动初始化种子角色。',
+        noDescription: '未提供说明。',
+        permissions: '权限',
+        compatibilityActions: '兼容动作',
+        noLegacyActions: '没有推导出 legacy action。',
+        createKicker: '创建角色',
+        editKicker: '编辑角色',
+        createTitle: '权限矩阵',
+        editTitle: '正在编辑 {name}',
+        clear: '清除',
+        roleName: '角色名称',
+        roleNamePlaceholder: 'ops-viewer',
+        roleDescription: '说明',
+        roleDescriptionPlaceholder: '对集群路由提供只读访问。',
+        resourceMatrix: '资源矩阵',
+        resourceMatrixDescription: '可授予精确规则、`settings/*` 这类通配资源，或 `*:*:*` 形式的全局管理权限。',
+        selectedCount: '已选择 {count} 项',
+        ownerAware: '仅本人',
+        clusterWide: '全局',
+        ruleLabel: '{operation} / {scope}',
+        selectedRules: '已选择规则',
+        noRulesSelected: '尚未选择任何规则。',
+        derivedActions: '推导出的 legacy actions',
+        noDerivedActions: '没有推导出兼容动作。',
+        createSubmit: '创建角色',
+        saveSubmit: '保存角色',
+        reset: '重置',
+        errors: {
+          roleNameRequired: '角色名称不能为空。',
+          permissionRequired: '请至少选择一条权限规则。'
+        }
+      },
+      users: {
+        kicker: '用户分配',
+        title: '用户角色绑定',
+        description: '将缓存用户绑定到自定义角色。策略角色保持只读，来源于当前生效的 RBAC 文件。',
+        searchPlaceholder: '搜索用户名...',
+        loading: '正在加载用户...',
+        empty: '当前搜索条件下没有匹配的缓存用户。',
+        noFullNameCached: '没有缓存姓名。',
+        roleCount: '{count} 个自定义角色',
+        roleCountPlural: '{count} 个自定义角色',
+        page: '第 {page} 页 / 共 {total} 页',
+        assignmentKicker: '分配详情',
+        assignmentEmptyTitle: '选择一个用户',
+        assignmentTitle: '{user}',
+        assignmentDescription: '为该缓存用户附加自定义角色。最终生效的路由权限是策略规则与自定义规则的并集。',
+        loadingAssignment: '正在加载用户分配...',
+        selectUserNotice: '请选择一个用户以查看并修改角色绑定。',
+        policyRoles: '策略角色',
+        customRoles: '自定义角色',
+        mergedActions: '合并动作',
+        none: '无',
+        assignedRoles: '已分配的自定义角色',
+        createRoleFirst: '请先创建至少一个角色，再为用户分配。',
+        noDescription: '未提供说明。',
+        saveAssignments: '保存分配',
+        resetSelection: '重置选择'
+      }
     }
   },
   actionDialog: {
@@ -1321,6 +1686,86 @@ const zhCN = {
       notifications: {
         updateRequested: '已请求更新用户 {user}。',
         deleteRequested: '已请求删除用户 {user}。'
+      }
+    },
+    assistant: {
+      kicker: '集群副驾',
+      title: 'AI',
+      description: '使用集群助手进行多轮对话，并查看实时工具调用轨迹。',
+      actions: {
+        manageModels: '管理模型',
+        newChat: '新建对话',
+        reusePrompt: '复用问题'
+      },
+      alerts: {
+        unavailable: '该集群未开放 AI 能力。',
+        noPermission: '当前用户无权使用 AI 工作区。',
+        noEnabledModel: '该集群当前没有已启用模型。请先在 管理 > AI 中创建模型。'
+      },
+      history: {
+        kicker: '历史',
+        title: '对话',
+        loading: '正在加载对话...',
+        empty: '发送一个问题即可创建第一条对话。',
+        deleteTitle: '删除对话',
+        updated: '更新时间 {time}'
+      },
+      workspace: {
+        kicker: '工作区',
+        newConversation: '新的集群对话',
+        cluster: '集群 {cluster}',
+        loading: '正在加载 AI 工作区...'
+      },
+      ready: {
+        kicker: '就绪',
+        title: '询问此集群中的作业、节点、分区或指标',
+        description: '例如作业状态分析、空闲节点排序、集群资源摘要等主题。'
+      },
+      prompts: {
+        summarizeCluster: '总结集群',
+        bestNodeNow: '当前最佳节点',
+        analyzeJob: '分析作业 12345',
+        summarizeClusterPrompt: '总结当前集群负载和队列压力。',
+        bestNodeNowPrompt: '现在剩余资源最多的是哪个节点？',
+        analyzeJobPrompt: '解释作业 12345 当前状态及可能原因。'
+      },
+      messages: {
+        copied: '已复制',
+        copyMessage: '复制消息',
+        generating: '正在生成回复...',
+        user: '用户',
+        assistant: '助手'
+      },
+      composer: {
+        placeholder: '可以询问作业、节点资源、分区或其他只读型集群问题。',
+        estimatedTokens: '预计 tokens {current} / {limit}',
+        tokenExceededHint: '当前预计 token 数已超过限制。请缩短问题，或开启新对话。'
+      },
+      toolTrace: {
+        kicker: '工具调用',
+        title: '执行轨迹',
+        empty: '当前运行的工具事件会显示在这里。',
+        viewDetails: '查看详情',
+        hideDetails: '隐藏详情',
+        tool: '工具：{value}',
+        interface: '接口：{value}',
+        status: '状态：{value}',
+        duration: '耗时：{value}',
+        pending: '处理中',
+        http: 'HTTP {code}',
+        running: '运行中'
+      },
+      retry: {
+        kicker: '重试',
+        title: '上一次问题',
+        empty: '尚未发送任何问题。'
+      },
+      time: {
+        justNow: '刚刚'
+      },
+      errors: {
+        tokenExceeded: '预计 token 用量已超过当前限制（{current}/{limit}）。请缩短问题或开始新对话。',
+        noEnabledModel: '该集群当前没有可用的已启用模型。'
       }
     },
     jobHistoryDetail: {

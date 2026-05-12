@@ -57,7 +57,7 @@ function sortedValues(values: string[]) {
 
 <template>
   <div class="ui-section-stack">
-    <SettingsTabs entry="Account" />
+    <SettingsTabs entry="account" />
     <div class="ui-panel ui-section">
       <SettingsHeader
         title="settings.account.title"

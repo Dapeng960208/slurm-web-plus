@@ -143,6 +143,8 @@ const en = {
       cancel: 'Cancel',
       apply: 'Apply',
       reset: 'Reset',
+      refresh: 'Refresh',
+      clear: 'Clear',
       goBack: 'Go back',
       signIn: 'Sign in',
       signOut: 'Sign out',
@@ -154,6 +156,11 @@ const en = {
       open: 'Open',
       search: 'Search',
       retry: 'Retry',
+      previous: 'Previous',
+      next: 'Next',
+      send: 'Send',
+      enable: 'Enable',
+      disable: 'Disable',
       today: 'Today'
     },
     notifications: {
@@ -427,6 +434,396 @@ const en = {
       emptyRoles: 'No roles declared.',
       emptyActions: 'No actions declared.',
       emptyRules: 'No route rules declared.'
+    },
+    ai: {
+      title: 'AI',
+      description:
+        'Manage cluster AI models, connectivity checks and admin-side conversation audit from one workspace.',
+      actions: {
+        goToChat: 'Go to chat',
+        newModel: 'New model',
+        edit: 'Edit',
+        testConnection: 'Test connection',
+        testing: 'Testing...',
+        setDefault: 'Set default',
+        delete: 'Delete',
+        deleting: 'Deleting...',
+        keep: 'Keep',
+        replace: 'Replace',
+        clear: 'Clear',
+        createModel: 'Create model'
+      },
+      alerts: {
+        noClusterContext: 'No cluster context is available for AI settings.',
+        unavailable: 'AI capability is not enabled for the current cluster.',
+        noPermission: 'The current user does not have permission to view AI settings on this cluster.',
+        readOnly: 'The current user can inspect AI settings but cannot edit them on this cluster.'
+      },
+      configs: {
+        title: 'Model configurations',
+        description:
+          'Each row defines one cluster model target, including provider routing, secret state and validation status.',
+        loading: 'Loading model configs...',
+        empty: 'No model configs exist for this cluster yet.',
+        columns: {
+          displayName: 'Display name',
+          provider: 'Provider',
+          model: 'Model',
+          state: 'State',
+          default: 'Default',
+          secret: 'Secret',
+          validated: 'Validated',
+          actions: 'Actions'
+        },
+        state: {
+          enabled: 'Enabled',
+          disabled: 'Disabled',
+          default: 'Default',
+          configured: 'Configured',
+          notConfigured: 'Not configured'
+        },
+        actionTitles: {
+          create: 'Create a new cluster-scoped AI model configuration.',
+          edit: 'Open the editor to update provider settings, routing, prompts and secrets.',
+          test: 'Run a live connectivity check with the current model configuration.',
+          setDefault: 'Make this model the default target for new AI conversations.',
+          toggle: 'Enable or disable this model without deleting its saved configuration.',
+          delete: 'Delete this model configuration and remove its saved secret.'
+        }
+      },
+      audit: {
+        title: 'Conversation audit',
+        description:
+          'Review cluster-wide AI conversation records in table form, then open a dedicated detail page for full message and tool history.',
+        filters: {
+          username: 'Username',
+          usernamePlaceholder: 'Filter by username',
+          title: 'Title',
+          titlePlaceholder: 'Filter by conversation title'
+        },
+        loading: 'Loading conversation audit...',
+        empty: 'No AI conversation records exist for this cluster.',
+        noMatch: 'No AI conversation records match the current filters.',
+        state: {
+          deleted: 'Deleted',
+          active: 'Active'
+        },
+        openDetail: 'Open detail',
+        columns: {
+          title: 'Title',
+          user: 'User',
+          state: 'State',
+          updated: 'Updated',
+          details: 'Details'
+        }
+      },
+      modal: {
+        kicker: 'Model Editor',
+        createTitle: 'Create model config',
+        editTitle: 'Edit model config',
+        description:
+          'Provider secrets are stored in the database and only returned to the UI as masked summaries.'
+      },
+      fields: {
+        configName: 'Config name',
+        displayName: 'Display name',
+        provider: 'Provider',
+        model: 'Model',
+        baseUrl: 'Base URL',
+        sortOrder: 'Sort order',
+        deployment: 'Deployment',
+        apiVersion: 'API version',
+        requestTimeout: 'Request timeout',
+        temperature: 'Temperature',
+        systemPrompt: 'System prompt',
+        extraOptions: 'Extra options',
+        apiKey: 'API Key',
+        enabled: 'Enabled',
+        isDefault: 'is_default'
+      },
+      hints: {
+        configName: 'Stable identifier used to recognize this saved model entry.',
+        configNameTooltip: 'Used inside the cluster configuration list and audit trail.',
+        displayName: 'Friendly label shown to end users when they choose a model.',
+        displayNameTooltip: 'This can be more readable than the provider model identifier.',
+        provider: 'Select which upstream AI service receives chat requests.',
+        providerTooltip: 'Provider controls which connection options are required below.',
+        model: 'Provider-specific model identifier, deployment name or runtime tag.',
+        modelTooltip: 'Examples: gpt-4.1, claude-3-7-sonnet, qwen-max, llama3.1.',
+        baseUrl: 'Optional override when the provider is served from a custom endpoint.',
+        baseUrlTooltip: "Leave empty to use the provider's default API base URL.",
+        sortOrder: 'Optional numeric weight that controls how models are ordered in the UI.',
+        sortOrderTooltip: 'Lower values appear earlier in lists; empty falls back to 0.',
+        deployment:
+          'Azure OpenAI deployment name that routes requests to the target model.',
+        deploymentTooltip:
+          'Azure uses deployment identifiers rather than raw model names at request time.',
+        apiVersion: 'Azure API version appended to requests for compatibility.',
+        apiVersionTooltip:
+          'Match this to the Azure OpenAI API version enabled for your deployment.',
+        requestTimeout:
+          'Optional timeout in seconds before chat or validation requests are aborted.',
+        requestTimeoutTooltip: 'Useful for slower providers or on-premise gateways.',
+        temperature:
+          'Optional sampling control for generation creativity and determinism.',
+        temperatureTooltip: 'Leave empty to let the provider or server defaults decide.',
+        secretDescription:
+          'Keep the current secret, replace it, or clear it for the selected model.',
+        replaceSecretTitle: 'Replace the stored secret with a new API key.',
+        clearSecretTitle:
+          'Remove the stored secret. Future requests will fail until a new secret is set.',
+        apiKey:
+          'Credential stored securely and only returned to the UI as a masked value.',
+        apiKeyTooltip: 'Required for providers that authenticate with a bearer secret.',
+        systemPrompt:
+          'Optional instruction prefix applied to every new conversation for this model.',
+        systemPromptTooltip:
+          'Use this to enforce tone, scope, safety policy or cluster-specific context.',
+        extraOptions:
+          'Optional JSON object for provider-specific request fields that do not have a dedicated form control.',
+        extraOptionsTooltip:
+          'Examples include max_tokens, top_p, reasoning options or custom headers.'
+      },
+      secret: {
+        title: 'Secret'
+      },
+      placeholders: {
+        apiKey: 'Enter API key',
+        extraOptions: '{ }'
+      },
+      submitTitles: {
+        create: 'Create a new model configuration for this cluster.',
+        edit: 'Save the edited model configuration to the cluster.'
+      },
+      feedback: {
+        created: 'Model config created.',
+        updated: 'Model config updated.',
+        enabled: '{name} enabled.',
+        disabled: '{name} disabled.',
+        defaultSet: '{name} is now the default model.',
+        validated: 'Connection validated: {sample}',
+        deleted: '{name} deleted.'
+      },
+      errors: {
+        requestTimeoutInteger: 'request_timeout must be an integer',
+        integerField: '{field} must be an integer',
+        temperatureNumeric: 'temperature must be numeric',
+        extraOptionsObject: 'extra_options must be a JSON object',
+        apiKeyRequired: 'api_key is required when creating a non-Ollama model',
+        apiKeyReplaceRequired: 'Enter a new api_key before replacing the current secret'
+      }
+    },
+    aiDetail: {
+      title: 'AI Conversation Detail',
+      description:
+        'Inspect one audited conversation with full message history and tool execution records.',
+      actions: {
+        backToAudit: 'Back to audit'
+      },
+      alerts: {
+        noClusterContext: 'No cluster context is available for this admin route.',
+        unavailable: 'AI capability is not enabled for the current cluster.',
+        noPermission: 'The current user does not have permission to view AI audit data on this cluster.',
+        invalidConversationId: 'Conversation id is invalid.',
+        detailUnavailable: 'Conversation detail is unavailable.'
+      },
+      loading: 'Loading conversation detail...',
+      summary: {
+        title: 'Title',
+        user: 'User',
+        updated: 'Updated',
+        state: 'State',
+        deleted: 'Deleted',
+        active: 'Active'
+      },
+      messages: {
+        title: 'Messages',
+        description:
+          'Full conversation content is kept in chronological order and no longer competes with the main audit table.'
+      },
+      toolCalls: {
+        title: 'Tool calls',
+        description:
+          'Tool execution is separated from messages so operators can scan failures and latency without reading the full chat transcript.',
+        empty: 'No tool calls were recorded for this conversation.',
+        columns: {
+          tool: 'Tool',
+          interface: 'Interface',
+          status: 'Status',
+          code: 'Code',
+          duration: 'Duration',
+          created: 'Created',
+          summary: 'Summary'
+        },
+        durationMs: '{value} ms'
+      }
+    },
+    cache: {
+      title: 'Cache Service',
+      description: 'Cache availability, hit ratios and live metrics for each cluster.',
+      clusterKicker: 'Cluster Cache',
+      clusterTitle: 'Cluster {cluster}',
+      alerts: {
+        noPermission: 'No permission to get cache information on this cluster.',
+        disabled: 'Cache is disabled on this cluster.'
+      },
+      metricsUnavailable: {
+        kicker: 'Metrics Unavailable',
+        title: 'Live cache metrics are unavailable',
+        description:
+          'This cluster exposes cache statistics, but metrics collection is disabled, so there is no live cache timeline to display.'
+      },
+      statistics: {
+        title: 'Cache Statistics',
+        description:
+          'Hit and miss ratios by key group, plus the total hit rate across the cluster cache.',
+        error: 'Unable to retrieve cache statistics.',
+        loading: 'Loading statistics...',
+        reset: 'Reset statistics',
+        columns: {
+          name: 'Name',
+          hit: 'Hit',
+          miss: 'Miss',
+          total: 'Total',
+          hitRate: 'Hit rate'
+        },
+        total: 'Total',
+        overviewKicker: 'Cache Overview',
+        overviewTitle: 'Traffic Snapshot',
+        overviewDescription:
+          'Quick totals and hit quality for the current cache activity window.',
+        overviewEmptyDescription:
+          'No cache requests have been recorded yet, so the chart stays hidden until traffic arrives.',
+        cards: {
+          hitRate: 'Hit rate',
+          requests: 'Requests',
+          keyGroups: 'Key groups'
+        },
+        waitingTitle: 'Waiting for cache activity',
+        waitingDescription:
+          'Once the cluster records cache hits or misses, the distribution chart will appear here.',
+        chart: {
+          hit: 'Hit',
+          miss: 'Miss'
+        }
+      },
+      metrics: {
+        title: 'Cache Metrics',
+        description: 'Live hit and miss activity across cache operations.',
+        error: 'Unable to retrieve cache metrics.',
+        emptyTitle: 'No live cache metric samples in this range',
+        emptyDescription:
+          'Switch the time range or wait for cache traffic to generate hit and miss data points.'
+      }
+    },
+    ldapUsers: {
+      alerts: {
+        authDisabled: 'LDAP authentication is disabled, so cached directory users are unavailable.',
+        noClusterDatabase: 'No cluster has database support enabled for cached directory users.',
+        noPermission: 'No permission to view cached directory users on this cluster.',
+        databaseDisabled: 'Database support is disabled on this cluster.',
+        empty: 'No cached users found on this cluster.'
+      },
+      search: {
+        label: 'Search by username',
+        placeholder: 'Search username...'
+      },
+      loading: 'Loading cached users...',
+      resultsCount: '{count} user found',
+      resultsCountPlural: '{count} users found',
+      columns: {
+        username: 'Username',
+        fullName: 'Full name',
+        shortcuts: 'Shortcuts'
+      },
+      actions: {
+        viewUser: 'View user',
+        openAnalysis: 'Open analysis',
+        viewHistoryJobs: 'View history jobs'
+      }
+    },
+    accessControl: {
+      title: 'Access Control',
+      description:
+        'Manage database-backed custom roles, route permission rules and user role bindings for the current cluster.',
+      activeCluster: 'Active Cluster',
+      resourcesCount: '{count} resources',
+      alerts: {
+        noClusterContext: 'No cluster context is available for access control management.',
+        unavailable: 'Access control is not enabled for the current cluster.',
+        noPermission: 'No permission to view access control data on this cluster.',
+        readOnly:
+          'You can inspect roles on this cluster, but editing requires `{permission}`.'
+      },
+      roles: {
+        kicker: 'Custom Roles',
+        title: 'Role Definitions',
+        description:
+          'Edit exact route permissions with `resource:operation:scope` rules. Legacy actions are derived automatically for compatibility.',
+        loading: 'Loading access control data...',
+        empty:
+          'No custom roles have been created yet. Seed roles are created automatically on first database-backed startup.',
+        noDescription: 'No description provided.',
+        permissions: 'Permissions',
+        compatibilityActions: 'Compatibility Actions',
+        noLegacyActions: 'No legacy actions derived.',
+        createKicker: 'Create Role',
+        editKicker: 'Edit Role',
+        createTitle: 'Permission Matrix',
+        editTitle: 'Editing {name}',
+        clear: 'Clear',
+        roleName: 'Role Name',
+        roleNamePlaceholder: 'ops-viewer',
+        roleDescription: 'Description',
+        roleDescriptionPlaceholder: 'Read-only access to cluster routes.',
+        resourceMatrix: 'Resource Matrix',
+        resourceMatrixDescription:
+          'Grant exact rules, wildcard resources such as `settings/*`, or global admin access with `*:*:*`.',
+        selectedCount: '{count} selected',
+        ownerAware: 'owner-aware',
+        clusterWide: 'cluster-wide',
+        ruleLabel: '{operation} / {scope}',
+        selectedRules: 'Selected Rules',
+        noRulesSelected: 'No rules selected.',
+        derivedActions: 'Derived legacy actions',
+        noDerivedActions: 'No compatibility actions derived.',
+        createSubmit: 'Create Role',
+        saveSubmit: 'Save Role',
+        reset: 'Reset',
+        errors: {
+          roleNameRequired: 'Role name is required.',
+          permissionRequired: 'Select at least one permission rule.'
+        }
+      },
+      users: {
+        kicker: 'User Assignment',
+        title: 'User Role Bindings',
+        description:
+          'Bind cached users to custom roles. Policy roles remain read-only and come from the active RBAC file.',
+        searchPlaceholder: 'Search username...',
+        loading: 'Loading users...',
+        empty: 'No cached users match the current search.',
+        noFullNameCached: 'No full name cached.',
+        roleCount: '{count} custom role',
+        roleCountPlural: '{count} custom roles',
+        page: 'Page {page} / {total}',
+        assignmentKicker: 'Assignment Details',
+        assignmentEmptyTitle: 'Select a user',
+        assignmentTitle: '{user}',
+        assignmentDescription:
+          'Attach custom roles to this cached user. Effective route permissions are the union of policy and custom rules.',
+        loadingAssignment: 'Loading user assignment...',
+        selectUserNotice: 'Select a user to inspect and modify role bindings.',
+        policyRoles: 'Policy Roles',
+        customRoles: 'Custom Roles',
+        mergedActions: 'Merged Actions',
+        none: 'None',
+        assignedRoles: 'Assigned Custom Roles',
+        createRoleFirst: 'Create at least one role before assigning users.',
+        noDescription: 'No description provided.',
+        saveAssignments: 'Save Assignments',
+        resetSelection: 'Reset Selection'
+      }
     }
   },
   actionDialog: {
@@ -1379,6 +1776,90 @@ const en = {
       notifications: {
         updateRequested: 'User {user} update requested.',
         deleteRequested: 'User {user} deletion requested.'
+      }
+    },
+    assistant: {
+      kicker: 'Cluster Copilot',
+      title: 'AI',
+      description: 'Use the cluster assistant for multi-turn chat and live tool trace visibility.',
+      actions: {
+        manageModels: 'Manage models',
+        newChat: 'New chat',
+        reusePrompt: 'Reuse prompt'
+      },
+      alerts: {
+        unavailable: 'This cluster does not expose AI capability.',
+        noPermission: 'The current user does not have permission to use the AI workspace.',
+        noEnabledModel: 'No enabled model exists for this cluster yet. Create one in Admin > AI first.'
+      },
+      history: {
+        kicker: 'History',
+        title: 'Conversations',
+        loading: 'Loading conversations...',
+        empty: 'Start a prompt to create the first conversation.',
+        deleteTitle: 'Delete conversation',
+        updated: 'Updated {time}'
+      },
+      workspace: {
+        kicker: 'Workspace',
+        newConversation: 'New cluster conversation',
+        cluster: 'Cluster {cluster}',
+        loading: 'Loading AI workspace...'
+      },
+      ready: {
+        kicker: 'Ready',
+        title: 'Ask about jobs, nodes, partitions, or metrics in this cluster',
+        description:
+          'Example topics include job state analysis, idle node ranking, and cluster resource summaries.'
+      },
+      prompts: {
+        summarizeCluster: 'Summarize cluster',
+        bestNodeNow: 'Best node now',
+        analyzeJob: 'Analyze job 12345',
+        summarizeClusterPrompt: 'Summarize current cluster load and queue pressure.',
+        bestNodeNowPrompt: 'Which node has the most remaining resources right now?',
+        analyzeJobPrompt: 'Explain the current state of job 12345 and possible reasons.'
+      },
+      messages: {
+        copied: 'Copied',
+        copyMessage: 'Copy message',
+        generating: 'Generating response...',
+        user: 'User',
+        assistant: 'Assistant'
+      },
+      composer: {
+        placeholder:
+          'Ask about a job, node resources, partitions, or another read-only cluster question.',
+        estimatedTokens: 'Estimated tokens {current} / {limit}',
+        tokenExceededHint:
+          'Token estimate exceeds the current limit. Shorten the prompt or start a new chat.'
+      },
+      toolTrace: {
+        kicker: 'Tool Calls',
+        title: 'Execution trace',
+        empty: 'Tool events for the current run appear here.',
+        viewDetails: 'View details',
+        hideDetails: 'Hide details',
+        tool: 'Tool: {value}',
+        interface: 'Interface: {value}',
+        status: 'Status: {value}',
+        duration: 'Duration: {value}',
+        pending: 'pending',
+        http: 'HTTP {code}',
+        running: 'running'
+      },
+      retry: {
+        kicker: 'Retry',
+        title: 'Last prompt',
+        empty: 'No prompt sent yet.'
+      },
+      time: {
+        justNow: 'Just now'
+      },
+      errors: {
+        tokenExceeded:
+          'Estimated token usage exceeds the current limit ({current}/{limit}). Shorten the prompt or start a new chat.',
+        noEnabledModel: 'No enabled model is available for this cluster.'
       }
     },
     jobHistoryDetail: {

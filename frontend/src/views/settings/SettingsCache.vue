@@ -8,6 +8,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import SettingsTabs from '@/components/settings/SettingsTabs.vue'
 import SettingsHeader from '@/components/settings/SettingsHeader.vue'
 import { useRoute } from 'vue-router'
@@ -20,6 +21,7 @@ import AdminHeader from '@/components/admin/AdminHeader.vue'
 
 const runtimeStore = useRuntimeStore()
 const route = useRoute()
+const { t } = useI18n()
 const isAdminRoute = computed(() => String(route.name ?? '').startsWith('admin-'))
 const tabsComponent = computed(() => (isAdminRoute.value ? AdminTabs : SettingsTabs))
 const headerComponent = computed(() => (isAdminRoute.value ? AdminHeader : SettingsHeader))
@@ -29,14 +31,14 @@ const headerComponent = computed(() => (isAdminRoute.value ? AdminHeader : Setti
   <div class="ui-section-stack">
     <component
       :is="tabsComponent"
-      entry="Cache"
+      entry="cache"
       :cluster="runtimeStore.currentCluster?.name ?? runtimeStore.availableClusters[0]?.name ?? ''"
     />
     <div class="ui-panel ui-section">
       <component
         :is="headerComponent"
-        title="Cache Service"
-        description="Cache availability, hit ratios and live metrics for each cluster."
+        title="settings.cache.title"
+        description="settings.cache.description"
       />
     </div>
 
@@ -46,9 +48,9 @@ const headerComponent = computed(() => (isAdminRoute.value ? AdminHeader : Setti
       class="ui-panel ui-section"
     >
       <div class="mb-6">
-        <p class="ui-page-kicker">Cluster Cache</p>
+        <p class="ui-page-kicker">{{ t('settings.cache.clusterKicker') }}</p>
         <h3 class="text-2xl font-bold text-[var(--color-brand-ink-strong)]">
-          Cluster {{ cluster.name }}
+          {{ t('settings.cache.clusterTitle', { cluster: cluster.name }) }}
         </h3>
       </div>
 
@@ -61,9 +63,9 @@ const headerComponent = computed(() => (isAdminRoute.value ? AdminHeader : Setti
           )
         "
       >
-        No permission to get cache information on this cluster.
+        {{ t('settings.cache.alerts.noPermission') }}
       </InfoAlert>
-      <InfoAlert v-else-if="!cluster.cache">Cache is disabled on this cluster.</InfoAlert>
+      <InfoAlert v-else-if="!cluster.cache">{{ t('settings.cache.alerts.disabled') }}</InfoAlert>
       <template v-else>
         <div class="ui-section-stack">
           <SettingsCacheStatistics :cluster="cluster" />
@@ -72,11 +74,10 @@ const headerComponent = computed(() => (isAdminRoute.value ? AdminHeader : Setti
             v-else
             class="rounded-[28px] border border-[rgba(80,105,127,0.12)] bg-[rgba(244,248,251,0.86)] px-6 py-5"
           >
-            <p class="ui-page-kicker">Metrics Unavailable</p>
-            <h4 class="ui-panel-title">Live cache metrics are unavailable</h4>
+            <p class="ui-page-kicker">{{ t('settings.cache.metricsUnavailable.kicker') }}</p>
+            <h4 class="ui-panel-title">{{ t('settings.cache.metricsUnavailable.title') }}</h4>
             <p class="ui-panel-description mt-2">
-              This cluster exposes cache statistics, but metrics collection is disabled, so there
-              is no live cache timeline to display.
+              {{ t('settings.cache.metricsUnavailable.description') }}
             </p>
           </div>
         </div>

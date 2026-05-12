@@ -9,6 +9,7 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { ClipboardDocumentIcon, TrashIcon } from '@heroicons/vue/24/outline'
 import type {
   AIChatToolEvent,
@@ -50,6 +51,7 @@ const { cluster } = defineProps<{ cluster: string }>()
 
 const gateway = useGatewayAPI()
 const runtimeStore = useRuntimeStore()
+const { t } = useI18n()
 
 const configs = ref<AIModelConfig[]>([])
 const configsLoading = ref(false)
@@ -168,7 +170,7 @@ function readTokenLimit(config: AIModelConfig | null): number | null {
 }
 
 function formatTimestamp(value: string | null): string {
-  if (!value) return 'Just now'
+  if (!value) return t('pages.assistant.time.justNow')
   return new Intl.DateTimeFormat(undefined, {
     dateStyle: 'medium',
     timeStyle: 'short'
@@ -192,8 +194,9 @@ function toggleToolRun(tool: ToolRun) {
 }
 
 function toolStatusLabel(tool: ToolRun): string {
-  if (tool.status === 'running') return 'running'
-  if (typeof tool.status_code === 'number') return `HTTP ${tool.status_code}`
+  if (tool.status === 'running') return t('pages.assistant.toolTrace.running')
+  if (typeof tool.status_code === 'number')
+    return t('pages.assistant.toolTrace.http', { code: tool.status_code })
   return tool.status
 }
 
@@ -202,7 +205,9 @@ function toolHeadline(tool: ToolRun): string {
 }
 
 function toolDetailLabel(tool: ToolRun): string {
-  return isToolRunExpanded(tool) ? 'Hide details' : 'View details'
+  return isToolRunExpanded(tool)
+    ? t('pages.assistant.toolTrace.hideDetails')
+    : t('pages.assistant.toolTrace.viewDetails')
 }
 
 function formatJson(value: unknown): string {
@@ -406,14 +411,17 @@ async function deleteConversation(conversationId: number) {
 async function submitMessage() {
   const message = draft.value.trim()
   if (tokenLimitExceeded.value) {
-    sendError.value = `Estimated token usage exceeds the current limit (${estimatedTokenCount.value}/${tokenLimit.value}). Shorten the prompt or start a new chat.`
+    sendError.value = t('pages.assistant.errors.tokenExceeded', {
+      current: estimatedTokenCount.value,
+      limit: tokenLimit.value
+    })
     return
   }
   if (!canSend.value) return
 
   const sessionModelId = selectedModelId.value
   if (!sessionModelId) {
-    sendError.value = 'No enabled model is available for this cluster.'
+    sendError.value = t('pages.assistant.errors.noEnabledModel')
     return
   }
 
@@ -506,12 +514,16 @@ watch(
 </script>
 
 <template>
-  <ClusterMainLayout menu-entry="ai" :cluster="cluster" :breadcrumb="[{ title: 'AI' }]">
+  <ClusterMainLayout
+    menu-entry="ai"
+    :cluster="cluster"
+    :breadcrumb="[{ title: 'shell.mainMenu.ai' }]"
+  >
     <div class="ui-page ui-page-wide ui-content-workspace">
       <PageHeader
-        kicker="Cluster Copilot"
-        title="AI"
-        description="Use the cluster assistant for multi-turn chat and live tool trace visibility."
+        kicker="pages.assistant.kicker"
+        title="pages.assistant.title"
+        description="pages.assistant.description"
       >
         <template #actions>
           <RouterLink
@@ -519,19 +531,19 @@ watch(
             :to="{ name: 'admin-ai', params: { cluster } }"
             class="ui-button-secondary"
           >
-            Manage models
+            {{ t('pages.assistant.actions.manageModels') }}
           </RouterLink>
           <button type="button" class="ui-button-primary" :disabled="sending" @click="startNewConversation">
-            New chat
+            {{ t('pages.assistant.actions.newChat') }}
           </button>
         </template>
       </PageHeader>
 
       <InfoAlert v-if="!aiAvailable">
-        This cluster does not expose AI capability.
+        {{ t('pages.assistant.alerts.unavailable') }}
       </InfoAlert>
       <InfoAlert v-else-if="!canView">
-        The current user does not have permission to use the AI workspace.
+        {{ t('pages.assistant.alerts.noPermission') }}
       </InfoAlert>
       <ErrorAlert v-else-if="configsError">
         {{ configsError }}
@@ -545,11 +557,11 @@ watch(
           <aside class="ui-panel ui-section ui-panel-stack min-h-0 overflow-hidden">
             <div class="flex items-start justify-between gap-3">
               <div>
-                <p class="ui-page-kicker">History</p>
-                <h2 class="ui-panel-title">Conversations</h2>
+                <p class="ui-page-kicker">{{ t('pages.assistant.history.kicker') }}</p>
+                <h2 class="ui-panel-title">{{ t('pages.assistant.history.title') }}</h2>
               </div>
               <button type="button" class="ui-button-secondary" :disabled="conversationsLoading" @click="loadConversations()">
-                Refresh
+                {{ t('common.buttons.refresh') }}
               </button>
             </div>
 
@@ -559,11 +571,11 @@ watch(
 
             <div v-if="conversationsLoading" class="text-[var(--color-brand-muted)]">
               <LoadingSpinner :size="5" />
-              Loading conversations...
+              {{ t('pages.assistant.history.loading') }}
             </div>
 
             <InfoAlert v-else-if="conversations.length === 0">
-              Start a prompt to create the first conversation.
+              {{ t('pages.assistant.history.empty') }}
             </InfoAlert>
 
             <div v-else class="ui-scroll-region space-y-3 pr-1">
@@ -587,14 +599,14 @@ watch(
                     type="button"
                     class="rounded-full p-2 text-[var(--color-brand-muted)] transition hover:bg-white hover:text-red-600"
                     :disabled="deletingConversationId === conversation.id"
-                    title="Delete conversation"
+                    :title="t('pages.assistant.history.deleteTitle')"
                     @click="deleteConversation(conversation.id)"
                   >
                     <TrashIcon class="h-4 w-4" aria-hidden="true" />
                   </button>
                 </div>
                 <p class="mt-3 text-xs text-[var(--color-brand-muted)]">
-                  Updated {{ formatTimestamp(conversation.updated_at) }}
+                  {{ t('pages.assistant.history.updated', { time: formatTimestamp(conversation.updated_at) }) }}
                 </p>
               </article>
             </div>
@@ -603,13 +615,13 @@ watch(
           <section class="ui-panel ui-section ui-panel-stack min-w-0 min-h-0 overflow-hidden">
             <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div>
-                <p class="ui-page-kicker">Workspace</p>
+                <p class="ui-page-kicker">{{ t('pages.assistant.workspace.kicker') }}</p>
                 <h2 class="ui-panel-title">
-                  {{ selectedConversation?.title || 'New cluster conversation' }}
+                  {{ selectedConversation?.title || t('pages.assistant.workspace.newConversation') }}
                 </h2>
               </div>
               <div class="flex flex-wrap gap-2">
-                <span class="ui-chip">Cluster {{ cluster }}</span>
+                <span class="ui-chip">{{ t('pages.assistant.workspace.cluster', { cluster }) }}</span>
               </div>
             </div>
 
@@ -620,7 +632,7 @@ watch(
               {{ sendError }}
             </ErrorAlert>
             <InfoAlert v-if="enabledModels.length === 0">
-              No enabled model exists for this cluster yet. Create one in Admin > AI first.
+              {{ t('pages.assistant.alerts.noEnabledModel') }}
             </InfoAlert>
 
             <div class="grid min-h-0 flex-1 gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
@@ -632,28 +644,40 @@ watch(
                 >
                   <div v-if="selectedConversationLoading || configsLoading" class="text-[var(--color-brand-muted)]">
                     <LoadingSpinner :size="5" />
-                    Loading AI workspace...
+                    {{ t('pages.assistant.workspace.loading') }}
                   </div>
 
                   <div v-else-if="renderedMessages.length === 0" class="flex h-full flex-col gap-6">
                     <div class="rounded-[24px] border border-[rgba(80,105,127,0.12)] bg-white/80 px-5 py-5">
-                      <p class="ui-page-kicker">Ready</p>
+                      <p class="ui-page-kicker">{{ t('pages.assistant.ready.kicker') }}</p>
                       <h3 class="text-base font-semibold text-[var(--color-brand-ink-strong)]">
-                        Ask about jobs, nodes, partitions, or metrics in this cluster
+                        {{ t('pages.assistant.ready.title') }}
                       </h3>
                       <p class="mt-3 text-sm leading-6 text-[var(--color-brand-muted)]">
-                        Example topics include job state analysis, idle node ranking, and cluster resource summaries.
+                        {{ t('pages.assistant.ready.description') }}
                       </p>
                     </div>
                     <div class="mt-auto flex flex-wrap gap-2">
-                      <button type="button" class="ui-button-ghost" @click="draft = 'Summarize current cluster load and queue pressure.'">
-                        Summarize cluster
+                      <button
+                        type="button"
+                        class="ui-button-ghost"
+                        @click="draft = t('pages.assistant.prompts.summarizeClusterPrompt')"
+                      >
+                        {{ t('pages.assistant.prompts.summarizeCluster') }}
                       </button>
-                      <button type="button" class="ui-button-ghost" @click="draft = 'Which node has the most remaining resources right now?'">
-                        Best node now
+                      <button
+                        type="button"
+                        class="ui-button-ghost"
+                        @click="draft = t('pages.assistant.prompts.bestNodeNowPrompt')"
+                      >
+                        {{ t('pages.assistant.prompts.bestNodeNow') }}
                       </button>
-                      <button type="button" class="ui-button-ghost" @click="draft = 'Explain the current state of job 12345 and possible reasons.'">
-                        Analyze job 12345
+                      <button
+                        type="button"
+                        class="ui-button-ghost"
+                        @click="draft = t('pages.assistant.prompts.analyzeJobPrompt')"
+                      >
+                        {{ t('pages.assistant.prompts.analyzeJob') }}
                       </button>
                     </div>
                   </div>
@@ -674,13 +698,23 @@ watch(
                         "
                       >
                         <div class="flex items-center justify-between gap-3 text-xs font-semibold tracking-[0.12em] uppercase">
-                          <span>{{ message.role }}</span>
+                          <span>
+                            {{
+                              message.role === 'user'
+                                ? t('pages.assistant.messages.user')
+                                : t('pages.assistant.messages.assistant')
+                            }}
+                          </span>
                           <div class="flex items-center gap-2">
                             <span class="opacity-70">{{ formatTimestamp(message.created_at) }}</span>
                             <button
                               type="button"
                               class="rounded-full p-1.5 opacity-70 transition hover:bg-black/5 hover:opacity-100"
-                              :title="copiedMessageId === message.id ? 'Copied' : 'Copy message'"
+                              :title="
+                                copiedMessageId === message.id
+                                  ? t('pages.assistant.messages.copied')
+                                  : t('pages.assistant.messages.copyMessage')
+                              "
                               @click="copyMessage(message)"
                             >
                               <ClipboardDocumentIcon class="h-4 w-4" aria-hidden="true" />
@@ -691,7 +725,7 @@ watch(
                           v-if="message.id === '__pending-assistant__' && !message.content"
                           class="mt-3 animate-pulse text-sm text-[var(--color-brand-muted)]"
                         >
-                          Generating response...
+                          {{ t('pages.assistant.messages.generating') }}
                         </p>
                         <MarkdownMessage
                           v-else
@@ -710,7 +744,7 @@ watch(
                     rows="4"
                     :disabled="!canView || enabledModels.length === 0 || sending"
                     class="block w-full rounded-[28px] border border-[rgba(80,105,127,0.16)] bg-white px-5 py-4 text-sm leading-6 text-[var(--color-brand-ink-strong)] shadow-[var(--shadow-soft)] outline-hidden focus:border-[rgba(182,232,44,0.65)] focus:ring-4 focus:ring-[rgba(182,232,44,0.18)]"
-                    placeholder="Ask about a job, node resources, partitions, or another read-only cluster question."
+                    :placeholder="t('pages.assistant.composer.placeholder')"
                   />
                   <div class="flex flex-wrap items-center justify-between gap-3">
                     <div class="text-sm text-[var(--color-brand-muted)]">
@@ -718,18 +752,18 @@ watch(
                         class="font-semibold"
                         :class="tokenLimitExceeded ? 'text-red-600' : 'text-[var(--color-brand-ink-strong)]'"
                       >
-                        Estimated tokens {{ estimatedTokenCount }} / {{ tokenLimit }}
+                        {{ t('pages.assistant.composer.estimatedTokens', { current: estimatedTokenCount, limit: tokenLimit }) }}
                       </span>
                       <p v-if="tokenLimitExceeded" class="mt-1 text-red-600">
-                        Token estimate exceeds the current limit. Shorten the prompt or start a new chat.
+                        {{ t('pages.assistant.composer.tokenExceededHint') }}
                       </p>
                     </div>
                     <div class="flex flex-wrap gap-2">
                       <button type="button" class="ui-button-secondary" :disabled="sending" @click="draft = ''">
-                        Clear
+                        {{ t('common.buttons.clear') }}
                       </button>
                       <button type="submit" class="ui-button-primary" :disabled="!canSend">
-                        Send
+                        {{ t('common.buttons.send') }}
                       </button>
                     </div>
                   </div>
@@ -738,12 +772,12 @@ watch(
 
               <aside class="ui-scroll-region min-h-0 space-y-4 pr-1">
                 <div class="ui-panel-soft px-4 py-4">
-                  <p class="ui-page-kicker">Tool Calls</p>
+                  <p class="ui-page-kicker">{{ t('pages.assistant.toolTrace.kicker') }}</p>
                   <h3 class="text-base font-semibold text-[var(--color-brand-ink-strong)]">
-                    Execution trace
+                    {{ t('pages.assistant.toolTrace.title') }}
                   </h3>
                   <div v-if="displayToolRuns.length === 0" class="mt-3 text-sm text-[var(--color-brand-muted)]">
-                    Tool events for the current run appear here.
+                    {{ t('pages.assistant.toolTrace.empty') }}
                   </div>
                   <div v-else class="mt-4 space-y-3">
                     <div
@@ -770,19 +804,29 @@ watch(
                       </button>
                       <div v-if="isToolRunExpanded(tool)" class="mt-3 space-y-2">
                         <p class="text-xs text-[var(--color-brand-muted)]">
-                          Tool: {{ tool.tool_name }}
+                          {{ t('pages.assistant.toolTrace.tool', { value: tool.tool_name }) }}
                         </p>
                         <p v-if="tool.interface_key" class="text-xs text-[var(--color-brand-muted)]">
-                          Interface: {{ tool.interface_key }}
+                          {{ t('pages.assistant.toolTrace.interface', { value: tool.interface_key }) }}
                         </p>
                         <p class="text-xs text-[var(--color-brand-muted)]">
-                          Status: {{ toolStatusLabel(tool) }}
+                          {{ t('pages.assistant.toolTrace.status', { value: toolStatusLabel(tool) }) }}
                         </p>
                         <p class="text-xs text-[var(--color-brand-muted)]">
-                          Duration: {{ tool.status === 'running' ? 'pending' : `${tool.duration_ms ?? 0} ms` }}
+                          {{
+                            t('pages.assistant.toolTrace.duration', {
+                              value:
+                                tool.status === 'running'
+                                  ? t('pages.assistant.toolTrace.pending')
+                                  : `${tool.duration_ms ?? 0} ms`
+                            })
+                          }}
                         </p>
                         <p class="text-xs text-[var(--color-brand-muted)]">
                           {{ formatTimestamp(tool.created_at) }}
+                        </p>
+                        <p class="text-xs text-[var(--color-brand-muted)]">
+                          {{ t('pages.assistant.toolTrace.tool', { value: tool.tool_name }) }}
                         </p>
                         <pre class="max-h-48 overflow-auto whitespace-pre-wrap break-words rounded-[14px] bg-[rgba(32,42,53,0.04)] px-3 py-2 font-mono text-xs leading-5 text-[var(--color-brand-muted)]">{{ formatJson(tool.arguments) }}</pre>
                         <p v-if="tool.result_summary" class="break-words text-sm leading-6 text-[var(--color-brand-muted)]">
@@ -797,12 +841,12 @@ watch(
                 </div>
 
                 <div class="ui-panel-soft px-4 py-4">
-                  <p class="ui-page-kicker">Retry</p>
+                  <p class="ui-page-kicker">{{ t('pages.assistant.retry.kicker') }}</p>
                   <h3 class="text-base font-semibold text-[var(--color-brand-ink-strong)]">
-                    Last prompt
+                    {{ t('pages.assistant.retry.title') }}
                   </h3>
                   <p class="mt-3 text-sm text-[var(--color-brand-muted)]">
-                    {{ lastSubmittedPrompt || 'No prompt sent yet.' }}
+                    {{ lastSubmittedPrompt || t('pages.assistant.retry.empty') }}
                   </p>
                   <button
                     type="button"
@@ -810,7 +854,7 @@ watch(
                     :disabled="!lastSubmittedPrompt || sending"
                     @click="retryLastPrompt"
                   >
-                    Reuse prompt
+                    {{ t('pages.assistant.actions.reusePrompt') }}
                   </button>
                 </div>
               </aside>

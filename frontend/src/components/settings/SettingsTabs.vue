@@ -16,9 +16,9 @@ const { t } = useI18n()
 
 const tabs = computed(() => {
   return [
-    { name: 'General', labelKey: 'shell.settings.general', href: 'settings' },
-    { name: 'Errors', labelKey: 'shell.settings.errors', href: 'settings-errors' },
-    { name: 'Account', labelKey: 'shell.settings.account', href: 'settings-account' }
+    { id: 'general', labelKey: 'shell.settings.general', href: 'settings' },
+    { id: 'errors', labelKey: 'shell.settings.errors', href: 'settings-errors' },
+    { id: 'account', labelKey: 'shell.settings.account', href: 'settings-account' }
   ]
 })
 </script>
@@ -37,15 +37,15 @@ const tabs = computed(() => {
         <nav class="flex flex-wrap gap-2">
           <RouterLink
             v-for="tab in tabs"
-            :key="tab.name"
+            :key="tab.id"
             :to="{ name: tab.href }"
             :class="[
-              entry == tab.name
+              entry == tab.id
                 ? 'bg-[linear-gradient(135deg,rgba(182,232,44,0.95),rgba(152,201,31,0.95))] text-[var(--color-brand-deep)]'
                 : 'bg-[rgba(239,244,246,0.7)] text-[var(--color-brand-muted)] hover:bg-white hover:text-[var(--color-brand-ink-strong)]',
               'rounded-full px-4 py-2.5 text-sm font-medium whitespace-nowrap transition'
             ]"
-            :aria-current="entry == tab.name ? 'page' : undefined"
+            :aria-current="entry == tab.id ? 'page' : undefined"
             >{{ t(tab.labelKey) }}</RouterLink
           >
         </nav>
