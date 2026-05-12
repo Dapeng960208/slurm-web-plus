@@ -101,6 +101,7 @@
 - 开启 `-DownloadArtifacts` 时会下载对应 GitHub Actions artifact
 - 开启 `-ShowFailedLog` 时会生成 `failed.log`
 - `watch-github-ci.ps1` 会轮询到目标 workflow 完成后自动调用抓取脚本
+- `watch-github-ci.ps1` 在 completed run 上应继续把 `-RunId` 与 `-OutputRoot` 正确转发给 `fetch-github-ci-result.ps1`，不应再出现 `Conclusion` 参数校验错误
 - `continue-from-github-ci.ps1` 会在 run 目录内生成 `codex-autofix-prompt.md`
 - 显式追加 `-RunCodex` 时，脚本会调用本机 `codex exec`，并把最终消息写到 `codex-last-message.txt`
 - `push-and-watch-github-ci.ps1` 会按当前 `HEAD` commit 追踪对应 run；生产使用时默认执行 `push`，验证时可用 `-SkipPush` 复用已存在的远端 run

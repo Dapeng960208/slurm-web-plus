@@ -46,6 +46,9 @@
   - 可按当前 `HEAD` 提交推送到 GitHub
   - 自动等待对应 commit 的 GitHub Actions run 完成
   - 完成后直接接到 `continue-from-github-ci.ps1`
+- 发布后又补了一条脚本级修复：
+  - `scripts/watch-github-ci.ps1` 在 workflow 完成后，改为用命名参数 hashtable 调 `fetch-github-ci-result.ps1`
+  - 修复了 `-OutputRoot` 被误绑到 `-Conclusion`，导致 completed run 无法继续导出结果的问题
 
 当前约束：
 

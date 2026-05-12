@@ -31,6 +31,11 @@
 - 现象：GitHub Actions 中 `Frontend Static Analysis` 的 `Frontend ESLint` 失败，`ClusterAnalysisView.vue` 和 `UserView.vue` 用 `locale.value` 作为无副作用表达式建立响应依赖，被 `@typescript-eslint/no-unused-expressions` 拦截；同一提交的 `Backend Tests` 中，`slurmweb/tests/views/test_agent_metrics_collector.py` 仍按旧行为只 mock `nodes/jobs`，但当前 `SlurmWebMetricsCollector` 已无条件追加分区级指标请求，导致 `/metrics` 视图测试在 CI 中耗尽 mocked slurmrestd 响应并抛 `RuntimeError: generator raised StopIteration`
 - 解决办法：前端把 `ClusterAnalysisView` 的 locale 依赖改为显式传参给 `analyzeCluster()`，移除 `UserView` 中多余的 `locale` 访问，并清理 `SettingsLdapCache.vue` 的未使用导入；后端保持 collector 当前分区指标实现不变，只把 `test_agent_metrics_collector.py` 调整为显式 mock `self.app.slurmrestd.partitions = []`，让该视图层测试继续只验证 `/metrics` 端点基础行为，分区级指标细节仍由 `slurmweb/tests/metrics/test_collector.py` 覆盖
 
+### 2026-05-12：`watch-github-ci.ps1` 用字符串数组转发参数时会把 `-OutputRoot` 误绑到 `-Conclusion`
+- 时间：2026-05-12
+- 现象：执行 `scripts/watch-github-ci.ps1` 轮询到 workflow 完成后，二次调用 `fetch-github-ci-result.ps1` 会报 `Cannot validate argument on parameter 'Conclusion'. The argument ".ci-results/github" does not belong to the set ...`，导致本地 `github-ci-autofix` 流程在抓取最终结果前中断
+- 解决办法：把 `watch-github-ci.ps1` 的二次调用从字符串数组 splat 改为命名参数 hashtable splat，确保 `RunId`、`OutputRoot`、`DownloadArtifacts`、`ShowFailedLog` 按参数名稳定绑定
+
 ### 2026-05-12：CI 修复提交本地完成但推送 GitHub 时遇到 443 连接失败
 - 时间：2026-05-12
 - 现象：执行 `powershell -ExecutionPolicy Bypass -File scripts/push-and-watch-github-ci.ps1 -Workflow "Frontend Tests"` 时，`git push origin main` 失败，报错 `Failed to connect to github.com port 443 after 21095 ms: Could not connect to server`；最新本地提交 `1f2c7c9` 未触发新的远端 GitHub Actions

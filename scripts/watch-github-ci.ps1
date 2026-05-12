@@ -25,15 +25,15 @@ while ((Get-Date) -lt $deadline) {
     }
 
     if ($run.status -eq "completed") {
-        $arguments = @(
-            "-RunId", [string]$run.run_id,
-            "-OutputRoot", $OutputRoot
-        )
+        $arguments = @{
+            RunId = [string]$run.run_id
+            OutputRoot = $OutputRoot
+        }
         if ($DownloadArtifacts) {
-            $arguments += "-DownloadArtifacts"
+            $arguments.DownloadArtifacts = $true
         }
         if ($ShowFailedLog) {
-            $arguments += "-ShowFailedLog"
+            $arguments.ShowFailedLog = $true
         }
 
         & $fetchScript @arguments

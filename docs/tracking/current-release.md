@@ -43,6 +43,7 @@
   - 新增 `scripts/watch-github-ci.ps1`，可按 workflow 轮询 run 完成后自动抓取结果
   - 新增 `scripts/continue-from-github-ci.ps1`，可基于 GitHub artifact 自动生成 `codex` 修复提示词，并在显式开关下调用本机 `codex exec`
   - 新增 `scripts/push-and-watch-github-ci.ps1`，可按当前 `HEAD` 提交推送并自动追踪对应 GitHub Actions run，再接管到本地修复流程
+  - `scripts/watch-github-ci.ps1` 已修复 completed 状态下对 `fetch-github-ci-result.ps1` 的参数转发错误；`OutputRoot` 不再误绑定到 `Conclusion`
   - `docs/features/ci/*`、`docs/overview/*` 与 `docs/README.md` 已同步补用法与边界说明
   - `AGENTS.md` 与 `docs/standards/ai-development-standard.md` 已新增仓库级执行规则：后续凡是查询远端 GitHub Actions 结果、下载 CI 失败日志/产物、从某次 run 继续修复或推送后等待 workflow 完成时，AI 必须优先使用这套 `github-ci-autofix` 流程和仓库 `scripts/*github-ci*.ps1`
 
@@ -640,6 +641,7 @@
 - `powershell -ExecutionPolicy Bypass -File scripts/fetch-github-ci-result.ps1 -Workflow "Frontend Tests" -Conclusion success`
 - `powershell -ExecutionPolicy Bypass -File scripts/continue-from-github-ci.ps1 -Workflow "Backend Tests"`
 - `powershell -ExecutionPolicy Bypass -File scripts/push-and-watch-github-ci.ps1 -Workflow "Backend Tests" -SkipPush`
+- `powershell -ExecutionPolicy Bypass -File scripts/watch-github-ci.ps1 -Workflow "Frontend Tests" -Branch main -TimeoutMinutes 1 -OutputRoot ".ci-results/github" -DownloadArtifacts:$false -ShowFailedLog:$false`
 
 待同步：
 
