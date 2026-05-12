@@ -158,6 +158,66 @@ describe('views/AssistantView.vue', () => {
     expect(wrapper.text()).toContain('Tool: query_agent_interface')
   })
 
+  test('ordinary users do not request admin AI configs before loading conversations', async () => {
+    useRuntimeStore().availableClusters = [
+      {
+        name: 'foo',
+        permissions: { roles: [], actions: [], rules: ['ai:view:*'] },
+        capabilities: {
+          ai: {
+            enabled: true,
+            streaming: true,
+            persistence: true,
+            available_models_count: 1,
+            default_model_id: 9
+          }
+        },
+        racksdb: true,
+        infrastructure: 'foo',
+        metrics: true,
+        cache: true
+      }
+    ]
+    mockGatewayAPI.ai_conversations.mockResolvedValue([
+      {
+        id: 9,
+        title: 'Queue pressure',
+        created_at: '2026-04-24T10:00:00Z',
+        updated_at: '2026-04-24T10:05:00Z',
+        last_message: 'GPU partition is saturated.',
+        model_config_id: 9
+      }
+    ])
+    mockGatewayAPI.ai_conversation.mockResolvedValue({
+      id: 9,
+      title: 'Queue pressure',
+      created_at: '2026-04-24T10:00:00Z',
+      updated_at: '2026-04-24T10:05:00Z',
+      model_config_id: 9,
+      tool_calls: [],
+      messages: [
+        {
+          id: 100,
+          role: 'user',
+          content: 'How busy is the GPU queue?',
+          created_at: '2026-04-24T10:00:00Z',
+          model_config_id: 9,
+          metadata: {}
+        }
+      ]
+    })
+
+    const wrapper = mountAssistantView()
+
+    await flushPromises()
+
+    expect(mockGatewayAPI.ai_configs).not.toHaveBeenCalled()
+    expect(mockGatewayAPI.ai_conversations).toHaveBeenCalledWith('foo')
+    expect(mockGatewayAPI.ai_conversation).toHaveBeenCalledWith('foo', 9)
+    expect(wrapper.text()).toContain('Queue pressure')
+    expect(wrapper.text()).not.toContain('Request failed with status code 403')
+  })
+
   test('renders markdown safely for user and assistant messages', async () => {
     mockGatewayAPI.ai_configs.mockResolvedValue([
       {

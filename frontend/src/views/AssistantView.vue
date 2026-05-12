@@ -84,6 +84,7 @@ const clusterDetails = computed<ClusterDescription | undefined>(() =>
 )
 const aiAvailable = computed(() => hasClusterAIAssistant(clusterDetails.value))
 const canView = computed(() => runtimeStore.hasRoutePermission(cluster, 'ai', 'view'))
+const canInspectModels = computed(() => runtimeStore.hasRoutePermission(cluster, 'admin/ai', 'view'))
 const canManage = computed(
   () => runtimeStore.hasRoutePermission(cluster, 'admin/ai', 'edit')
 )
@@ -99,6 +100,10 @@ const enabledModels = computed(() =>
 const selectedModelConfig = computed(
   () => enabledModels.value.find((config) => config.id === selectedModelId.value) ?? enabledModels.value[0] ?? null
 )
+const hasUsableModel = computed(() => {
+  if (enabledModels.value.length > 0) return true
+  return clusterDetails.value?.ai?.default_model_id != null
+})
 const renderedMessages = computed<AIConversationMessage[]>(() => {
   const messages = [...(selectedConversation.value?.messages ?? [])]
   if (pendingUserMessage.value) {
@@ -143,7 +148,7 @@ const tokenLimitExceeded = computed(() => estimatedTokenCount.value > tokenLimit
 const canSend = computed(
   () =>
     canView.value &&
-    enabledModels.value.length > 0 &&
+    hasUsableModel.value &&
     draft.value.trim().length > 0 &&
     !sending.value &&
     !tokenLimitExceeded.value
@@ -258,6 +263,10 @@ function startNewConversation() {
 }
 
 function ensureSelectedModel() {
+  if (!canInspectModels.value) {
+    selectedModelId.value = null
+    return
+  }
   const preferred =
     selectedConversation.value?.model_config_id ??
     clusterDetails.value?.ai?.default_model_id ??
@@ -271,9 +280,10 @@ function ensureSelectedModel() {
 }
 
 async function loadConfigs() {
-  if (!aiAvailable.value || !canView.value) {
+  if (!aiAvailable.value || !canView.value || !canInspectModels.value) {
     configs.value = []
-    selectedModelId.value = null
+    configsError.value = null
+    ensureSelectedModel()
     return
   }
   configsLoading.value = true
@@ -297,6 +307,7 @@ async function loadConversation(conversationId: number) {
     selectedConversationId.value = conversation.id
     selectedConversation.value = conversation
     if (
+      canInspectModels.value &&
       conversation.model_config_id &&
       enabledModels.value.some((config) => config.id === conversation.model_config_id)
     ) {
@@ -419,8 +430,12 @@ async function submitMessage() {
   }
   if (!canSend.value) return
 
-  const sessionModelId = selectedModelId.value
-  if (!sessionModelId) {
+  const sessionModelId =
+    selectedModelId.value ??
+    selectedConversation.value?.model_config_id ??
+    clusterDetails.value?.ai?.default_model_id ??
+    null
+  if (!sessionModelId && canInspectModels.value) {
     sendError.value = t('pages.assistant.errors.noEnabledModel')
     return
   }
@@ -438,7 +453,7 @@ async function submitMessage() {
     {
       message,
       conversation_id: selectedConversationId.value,
-      model_config_id: sessionModelId
+      model_config_id: sessionModelId ?? undefined
     },
     {
       onConversation(event) {
@@ -545,9 +560,9 @@ watch(
       <InfoAlert v-else-if="!canView">
         {{ t('pages.assistant.alerts.noPermission') }}
       </InfoAlert>
-      <ErrorAlert v-else-if="configsError">
-        {{ configsError }}
-      </ErrorAlert>
+            <ErrorAlert v-else-if="configsError">
+              {{ configsError }}
+            </ErrorAlert>
 
       <template v-else>
         <div
@@ -631,7 +646,7 @@ watch(
             <ErrorAlert v-if="sendError">
               {{ sendError }}
             </ErrorAlert>
-            <InfoAlert v-if="enabledModels.length === 0">
+            <InfoAlert v-if="!hasUsableModel">
               {{ t('pages.assistant.alerts.noEnabledModel') }}
             </InfoAlert>
 
@@ -742,7 +757,7 @@ watch(
                   <textarea
                     v-model="draft"
                     rows="4"
-                    :disabled="!canView || enabledModels.length === 0 || sending"
+                    :disabled="!canView || !hasUsableModel || sending"
                     class="block w-full rounded-[28px] border border-[rgba(80,105,127,0.16)] bg-white px-5 py-4 text-sm leading-6 text-[var(--color-brand-ink-strong)] shadow-[var(--shadow-soft)] outline-hidden focus:border-[rgba(182,232,44,0.65)] focus:ring-4 focus:ring-[rgba(182,232,44,0.18)]"
                     :placeholder="t('pages.assistant.composer.placeholder')"
                   />

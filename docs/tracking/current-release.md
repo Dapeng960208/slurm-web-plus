@@ -38,6 +38,7 @@
 - 用户分析页新增运行/排队/失败/取消状态统计与曲线数据，移除冗余分析标题
 - 资源页新增 `Rack` 列与分区详情跳转，补 `/:cluster/partitions/:partition` 分区详情页
 - 修复 AI 取消作业兼容性：当模型直接输出 `job/cancel` 作为 tool name 时，后端会兼容映射到同名写接口，不再返回 `Unsupported tool`
+- 修复普通用户 AI 页面初始化权限口径：仅具备 `ai:view:*` 的用户不再首屏请求 `admin/ai:view:*` 才能访问的 `ai/configs`
 
 ## 2. 已完成项
 
@@ -647,6 +648,7 @@
 - `cd frontend && pnpm vitest run tests/views/UserAnalysisView.spec.ts tests/views/ClusterAnalysisView.spec.ts tests/views/resources/ResourcesView.spec.ts tests/views/PartitionView.spec.ts tests/composables/GatewayAPI.spec.ts`
 - `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/metrics/test_db.py slurmweb/tests/views/test_agent_metrics_requests.py slurmweb/tests/views/test_agent_operations.py slurmweb/tests/views/test_gateway.py`
 - `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/apps/test_ai_service.py`
+- `cd frontend && npx vitest run tests/views/AssistantView.spec.ts`
 - `gh auth status`
 - `gh repo view --json name,owner,defaultBranchRef,url`
 - `gh run list --limit 5 --json databaseId,workflowName,status,conclusion,headBranch,displayTitle,createdAt,url`

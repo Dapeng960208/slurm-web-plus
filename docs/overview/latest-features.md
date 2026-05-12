@@ -12,6 +12,19 @@
 
 - `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/apps/test_ai_service.py`
 
+## 本轮：普通用户 AI 页面不再错误请求管理员模型配置接口
+
+本轮修复了普通用户进入 `AI` 页面时的一条权限口径错误：
+
+- 普通用户具备 `ai:view:*` 时，允许进入 `/:cluster/ai` 并使用 AI 对话。
+- 之前页面初始化会先请求 `ai/configs`，而该接口要求 `admin/ai:view:*`，因此普通用户首屏会先收到 `403`。
+- 现在普通 AI 页只读取 `ai:view:*` 可访问的会话与流式接口，不再把管理员模型配置接口作为首屏前置依赖。
+- 默认模型选择继续通过 cluster `capabilities.ai.default_model_id` 与当前会话 `model_config_id` 兜底；管理员仍可额外读取配置列表。
+
+本轮新增验证：
+
+- `cd frontend && npx vitest run tests/views/AssistantView.spec.ts`
+
 ## 本轮：集群分析、用户分析、资源与分区页面补齐分析视图增强
 
 本轮围绕 `Cluster Analysis`、`User Analysis`、`Resources` 和新的分区详情页补了一组前端与接口增强，并同步补齐中英文文案：

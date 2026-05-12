@@ -75,6 +75,10 @@ npm --prefix frontend run test:unit
 
 - 无 `ai:view:*`：不能对话、不能读取会话
 - 无 `admin/ai:view:*`：不能读取模型配置列表
+- 仅有 `ai:view:*` 的普通用户打开 `/:cluster/ai` 时：
+  - 可以读取自己的会话列表和详情
+  - 不会额外请求 `ai/configs`
+  - 页面不应因为 `ai/configs` 的 `403` 初始化失败
 - 无 `admin/ai:edit:*` / `admin/ai:delete:*`：不能创建、更新、删除 configs，也不能 validate
 - 有 `ai:view:*` 但无底层权限时不能通过 AI 绕过：
   - 无 `jobs:view:*|self`：不能通过 AI 读不允许访问的 live jobs

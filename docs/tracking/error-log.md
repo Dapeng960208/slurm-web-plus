@@ -16,6 +16,11 @@
 - 现象：超级管理员在 AI 对话中执行取消作业时，模型直接输出 `job/cancel` 作为 tool name，`slurmweb.ai.tools.AIToolRegistry` 只接受 `query_agent_interface` / `mutate_agent_interface`，最终返回 `Unsupported tool job/cancel` 并在前端表现为接口 `500`
 - 解决办法：AI 工具层增加“直接接口名”兼容分发；当 tool name 命中已注册 Agent interface 时，按接口读写属性自动映射到 `dynamic-query` 或 `dynamic-mutate`，并继续复用原有权限与 owner-aware 校验
 
+### 2026-05-12：普通用户 AI 页面首屏错误请求 `ai/configs` 会直接冒出 403
+- 时间：2026-05-12
+- 现象：普通用户虽然具备 `ai:view:*` 且允许进入 `/:cluster/ai`，但 `AssistantView` 初始化时仍先请求 `ai/configs`；该接口要求 `admin/ai:view:*`，导致页面首屏直接显示 `Request failed with status code 403`
+- 解决办法：普通 AI 页不再把管理员模型配置接口作为初始化前置依赖；仅当用户具备 `admin/ai:view:*` 时才读取 `ai/configs`，普通用户改为依赖 `capabilities.ai.default_model_id` 和会话自身 `model_config_id` 兜底
+
 ### 2026-04-24：示例标题（用一句话概括）
 - 时间：2026-04-24
 - 现象：
