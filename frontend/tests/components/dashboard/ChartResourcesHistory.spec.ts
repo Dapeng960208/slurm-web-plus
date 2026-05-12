@@ -85,6 +85,7 @@ describe('ChartJobsHistogram.vue', () => {
     expect(mockClusterDataPoller.setCallback).toHaveBeenCalledWith('metrics_cores')
     expect(router.push).toHaveBeenCalledWith({
       name: 'dashboard',
+      params: {},
       query: {
         resources: 'cores'
       }
@@ -94,6 +95,7 @@ describe('ChartJobsHistogram.vue', () => {
     expect(mockClusterDataPoller.setCallback).toHaveBeenCalledWith('metrics_memory')
     expect(router.push).toHaveBeenCalledWith({
       name: 'dashboard',
+      params: {},
       query: {
         resources: 'memory'
       }
@@ -103,6 +105,7 @@ describe('ChartJobsHistogram.vue', () => {
     expect(mockClusterDataPoller.setCallback).toHaveBeenCalledWith('metrics_gpus')
     expect(router.push).toHaveBeenCalledWith({
       name: 'dashboard',
+      params: {},
       query: {
         resources: 'gpus'
       }
@@ -112,6 +115,7 @@ describe('ChartJobsHistogram.vue', () => {
     expect(mockClusterDataPoller.setCallback).toHaveBeenCalledWith('metrics_nodes')
     expect(router.push).toHaveBeenCalledWith({
       name: 'dashboard',
+      params: {},
       query: {}
     })
   })
@@ -154,6 +158,27 @@ describe('ChartJobsHistogram.vue', () => {
     expect(mockClusterDataPoller.setParam).toHaveBeenLastCalledWith({
       range: 'day',
       partition: 'gpu'
+    })
+  })
+
+  test('uses the provided route target name instead of forcing dashboard navigation', async () => {
+    router.setParams({ cluster: 'foo', partition: 'normal' })
+    mount(ChartResourcesHistogram, {
+      props: {
+        cluster: 'foo',
+        routeTargetName: 'partition'
+      }
+    })
+
+    useRuntimeStore().dashboard.chartResourcesType = 'cores'
+    await flushPromises()
+
+    expect(router.push).toHaveBeenCalledWith({
+      name: 'partition',
+      params: { cluster: 'foo', partition: 'normal' },
+      query: {
+        resources: 'cores'
+      }
     })
   })
 

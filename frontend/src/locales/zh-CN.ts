@@ -122,7 +122,8 @@ const zhCN = {
   },
   common: {
     navigation: {
-      back: '返回'
+      back: '返回',
+      openPartition: '打开分区 {partition}'
     },
     locale: {
       en: 'English',
@@ -1108,6 +1109,12 @@ const zhCN = {
       description: '查看所选分区的拓扑、节点覆盖范围和核心容量。',
       detailTitle: '分区详情',
       detailDescription: '查看该分区的节点集合定义以及当前工作区可见的容量情况。',
+      metrics: {
+        kicker: '实时指标',
+        title: '分区实时曲线',
+        description: '复用 dashboard 曲线，按分区 {partition} 查看资源和作业走势。',
+        selectRange: '选择分区指标时间范围'
+      },
       nodeSets: '节点集合',
       nodeSetsDescription: '节点集合表达式用于说明该分区由哪些主机提供容量。',
       nodeSetsEmpty: '该分区当前没有可展示的节点集合表达式。',

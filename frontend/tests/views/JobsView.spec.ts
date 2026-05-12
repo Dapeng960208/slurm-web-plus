@@ -116,6 +116,11 @@ describe('JobsView.vue', () => {
     expect(columns[7].text()).toBe(i18n.global.t('tables.jobs.columns.reason'))
     expect(columns[8].text()).toBe(i18n.global.t('tables.jobs.columns.actions'))
     expect(table.findAll('tbody tr')).toHaveLength(2)
+    const partitionLinks = wrapper.findAllComponents({ name: 'RouterLink' }).filter((link) =>
+      JSON.stringify(link.props('to')) ===
+      JSON.stringify({ name: 'partition', params: { cluster: 'foo', partition: 'normal' } })
+    )
+    expect(partitionLinks.length).toBeGreaterThan(0)
     expect(wrapper.text()).not.toContain('Batch cancel')
     expect(wrapper.text()).not.toContain('Bulk')
   })

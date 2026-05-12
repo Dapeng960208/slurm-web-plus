@@ -28,7 +28,7 @@ defineProps<{
         <RouterLink
           v-if="item.to && item.value !== '-'"
           :to="item.to"
-          class="text-[var(--color-brand-blue)] transition hover:text-[var(--color-brand-ink-strong)]"
+          class="ui-partition-link-chip"
         >
           {{ item.value }}
         </RouterLink>

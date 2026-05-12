@@ -97,6 +97,10 @@ describe('JobsHistoryView.vue', () => {
     expect(wrapper.text()).toContain('Reason')
     const links = wrapper.findAllComponents({ name: 'RouterLink' })
     expect(links.some((link) => JSON.stringify(link.props('to')) === JSON.stringify({
+      name: 'partition',
+      params: { cluster: 'foo', partition: 'normal' }
+    }))).toBe(true)
+    expect(links.some((link) => JSON.stringify(link.props('to')) === JSON.stringify({
       name: 'job',
       params: { cluster: 'foo', id: 1234 }
     }))).toBe(true)

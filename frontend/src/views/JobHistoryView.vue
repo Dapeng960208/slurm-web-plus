@@ -25,6 +25,7 @@ import PanelSkeleton from '@/components/PanelSkeleton.vue'
 import { HashtagIcon } from '@heroicons/vue/24/outline'
 import { CheckIcon } from '@heroicons/vue/20/solid'
 import DetailSummaryStrip from '@/components/details/DetailSummaryStrip.vue'
+import PartitionLinkChip from '@/components/PartitionLinkChip.vue'
 import { translate } from '@/i18n/translate'
 
 const props = defineProps<{ cluster: string; id: number }>()
@@ -333,6 +334,13 @@ const fields = (record: JobHistoryRecord): HistoryFieldRow[] => [
 ]
 
 const timeline = computed(() => (job.value ? timelineSteps(job.value) : []))
+const compactFields = computed((): HistoryTextField[] =>
+  job.value
+    ? fields(job.value).filter(
+        (field): field is HistoryTextField => field.layout === 'compact' && field.kind === 'text'
+      )
+    : []
+)
 const fullFields = computed(() =>
   job.value ? fields(job.value).filter((field) => field.layout === 'full') : []
 )
@@ -343,7 +351,14 @@ const summaryItems = computed(() => {
     { id: 'job-id', label: 'pages.jobHistoryDetail.summary.jobId', value: String(job.value.job_id) },
     { id: 'user', label: 'pages.jobHistoryDetail.summary.user', value: fmt(job.value.user_name) },
     { id: 'account', label: 'pages.jobHistoryDetail.summary.account', value: fmt(job.value.account) },
-    { id: 'partition', label: 'pages.jobHistoryDetail.summary.partition', value: fmt(job.value.partition) },
+    {
+      id: 'partition',
+      label: 'pages.jobHistoryDetail.summary.partition',
+      value: fmt(job.value.partition),
+      to: job.value.partition
+        ? { name: 'partition', params: { cluster: props.cluster, partition: job.value.partition } }
+        : undefined
+    },
     { id: 'nodes', label: 'pages.jobHistoryDetail.summary.nodes', value: fmt(job.value.nodes) },
     {
       id: 'max-memory',
@@ -527,6 +542,32 @@ watch(
                     {{ t('pages.jobHistoryDetail.detailedDescription') }}
                   </p>
                 </div>
+                <div class="ui-detail-compact-grid" data-testid="job-history-detail-compact-grid">
+                  <div
+                    v-for="field in compactFields"
+                    :key="field.id"
+                    class="ui-detail-compact-card"
+                  >
+                    <div class="ui-detail-compact-label">{{ translate(field.label) }}</div>
+                    <div class="ui-detail-compact-value">
+                      <PartitionLinkChip
+                        v-if="field.id === 'partition' && field.value !== '-'"
+                        :cluster="cluster"
+                        :partition="field.value"
+                      />
+                      <RouterLink
+                        v-else-if="field.id === 'user' && field.value !== '-'"
+                        :to="{ name: 'user', params: { cluster, user: field.value } }"
+                        class="ui-user-link"
+                      >
+                        {{ field.value }}
+                      </RouterLink>
+                      <template v-else>
+                        {{ field.value }}
+                      </template>
+                    </div>
+                  </div>
+                </div>
                 <div class="ui-detail-list" data-testid="job-history-detail-list">
                   <dl>
                     <div
@@ -583,6 +624,12 @@ watch(
                         >
                           {{ field.value }}
                         </RouterLink>
+                      </dd>
+                      <dd
+                        v-else-if="field.id === 'partition' && field.value !== '-'"
+                        class="mt-1 sm:col-span-2 sm:mt-0"
+                      >
+                        <PartitionLinkChip :cluster="cluster" :partition="field.value" />
                       </dd>
                       <dd
                         v-else

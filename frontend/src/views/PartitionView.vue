@@ -13,9 +13,12 @@ import { useI18n } from 'vue-i18n'
 import ClusterMainLayout from '@/components/ClusterMainLayout.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import InfoAlert from '@/components/InfoAlert.vue'
+import MetricRangeSelector from '@/components/MetricRangeSelector.vue'
+import DashboardCharts from '@/components/dashboard/DashboardCharts.vue'
 import { useClusterDataGetter } from '@/composables/DataGetter'
 import { getMBHumanUnit, getNodeGPU } from '@/composables/GatewayAPI'
 import type { ClusterNode, ClusterPartition } from '@/composables/GatewayAPI'
+import { useRuntimeStore } from '@/stores/runtime'
 
 const { cluster, partition } = defineProps<{
   cluster: string
@@ -23,6 +26,7 @@ const { cluster, partition } = defineProps<{
 }>()
 
 const { t } = useI18n()
+const runtimeStore = useRuntimeStore()
 const { data: partitions } = useClusterDataGetter<ClusterPartition[]>(cluster, 'partitions')
 const { data: nodes } = useClusterDataGetter<ClusterNode[]>(cluster, 'nodes')
 
@@ -68,6 +72,34 @@ const partitionChips = computed(() =>
     .map((item) => item.trim())
     .filter(Boolean)
 )
+
+const partitionMetricsQuery = computed(() => {
+  if (runtimeStore.dashboard.start && runtimeStore.dashboard.end) {
+    return {
+      start: runtimeStore.dashboard.start,
+      end: runtimeStore.dashboard.end,
+      partition
+    }
+  }
+  return {
+    range: runtimeStore.dashboard.range,
+    partition
+  }
+})
+
+function setRange(range: 'hour' | 'day' | 'week') {
+  runtimeStore.dashboard.range = range
+  runtimeStore.dashboard.clearWindow()
+}
+
+function applyMetricsWindow(window: { start: string; end: string }) {
+  runtimeStore.dashboard.setWindow(window)
+}
+
+function resetMetricsWindow() {
+  runtimeStore.dashboard.clearWindow()
+  runtimeStore.dashboard.range = 'hour'
+}
 </script>
 
 <template>
@@ -190,6 +222,36 @@ const partitionChips = computed(() =>
                 </p>
               </section>
             </div>
+
+            <section class="ui-panel ui-section" data-testid="partition-dashboard-charts">
+              <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+                <div class="min-w-0">
+                  <p class="ui-page-kicker">{{ t('pages.partition.metrics.kicker') }}</p>
+                  <h2 class="ui-panel-title">{{ t('pages.partition.metrics.title') }}</h2>
+                  <p class="ui-panel-description mt-2">
+                    {{ t('pages.partition.metrics.description', { partition }) }}
+                  </p>
+                </div>
+                <MetricRangeSelector
+                  :model-value="runtimeStore.dashboard.range"
+                  :aria-label="t('pages.partition.metrics.selectRange')"
+                  enable-custom-window
+                  :start-value="runtimeStore.dashboard.start"
+                  :end-value="runtimeStore.dashboard.end"
+                  custom-button-label="common.labels.timeRange"
+                  reset-label="common.metricRanges.lastHour"
+                  @update:model-value="setRange"
+                  @apply-window="applyMetricsWindow"
+                  @reset-window="resetMetricsWindow"
+                />
+              </div>
+              <DashboardCharts
+                class="mt-6"
+                :cluster="cluster"
+                :metrics-query="partitionMetricsQuery"
+                route-target-name="partition"
+              />
+            </section>
           </template>
         </div>
       </div>

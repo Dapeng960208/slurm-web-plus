@@ -27,6 +27,7 @@ import ErrorAlert from '@/components/ErrorAlert.vue'
 const props = defineProps<{
   cluster: string
   metricsQuery?: DashboardMetricsQuery
+  routeTargetName?: string
 }>()
 
 const router = useRouter()
@@ -127,7 +128,11 @@ function currentMetricsQuery() {
 
 function setResourceType(resourceType: ChartResourcesType) {
   runtimeStore.dashboard.chartResourcesType = resourceType
-  router.push({ name: 'dashboard', query: runtimeStore.dashboard.query() as LocationQueryRaw })
+  router.push({
+    name: props.routeTargetName ?? 'dashboard',
+    params: route.params,
+    query: runtimeStore.dashboard.query() as LocationQueryRaw
+  })
 }
 
 /* Clear chart datasets and set new poller callback when dashboard range is
@@ -135,7 +140,11 @@ function setResourceType(resourceType: ChartResourcesType) {
 watch(
   () => runtimeStore.dashboard.chartResourcesType,
   () => {
-    router.push({ name: 'dashboard', query: runtimeStore.dashboard.query() as LocationQueryRaw })
+    router.push({
+      name: props.routeTargetName ?? 'dashboard',
+      params: route.params,
+      query: runtimeStore.dashboard.query() as LocationQueryRaw
+    })
     liveChart.setLabels(resourcesLabels())
     liveChart.setCallback(resourcesTypeCallback())
   }

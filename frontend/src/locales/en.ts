@@ -134,7 +134,8 @@ const en = {
   },
   common: {
     navigation: {
-      back: 'Back'
+      back: 'Back',
+      openPartition: 'Open partition {partition}'
     },
     locale: {
       en: 'English',
@@ -1167,6 +1168,13 @@ const en = {
       detailTitle: 'Partition Details',
       detailDescription:
         'Review the partition node set definition and the currently visible capacity in this workspace.',
+      metrics: {
+        kicker: 'Realtime Metrics',
+        title: 'Partition live metrics',
+        description:
+          'Reuse the dashboard curves for partition {partition} to compare resources and job movement in context.',
+        selectRange: 'Select partition metrics time range'
+      },
       nodeSets: 'Node sets',
       nodeSetsDescription: 'Node set expressions define which hosts contribute capacity to this partition.',
       nodeSetsEmpty: 'No node set expression is currently available for this partition.',

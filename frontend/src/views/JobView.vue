@@ -30,6 +30,7 @@ import JobFieldComment from '@/components/job/JobFieldComment.vue'
 import JobResources from '@/components/job/JobResources.vue'
 import DetailSummaryStrip from '@/components/details/DetailSummaryStrip.vue'
 import ActionDialog from '@/components/operations/ActionDialog.vue'
+import PartitionLinkChip from '@/components/PartitionLinkChip.vue'
 import { useRuntimeStore } from '@/stores/runtime'
 import { useAuthStore } from '@/stores/auth'
 
@@ -175,7 +176,14 @@ const jobFieldsContent = computed((): JobFieldRow[] => {
     compactField('wckeys', 'pages.job.fields.wckeys', data.value.wckey.wckey),
     compactField('priority', 'pages.job.fields.priority', data.value.priority.number),
     compactField('nodes', 'pages.job.fields.nodes', data.value.nodes),
-    compactField('partition', 'pages.job.fields.partition', data.value.partition),
+    compactField(
+      'partition',
+      'pages.job.fields.partition',
+      data.value.partition,
+      data.value.partition
+        ? { name: 'partition', params: { cluster, partition: data.value.partition } }
+        : undefined
+    ),
     compactField('qos', 'pages.job.fields.qos', data.value.qos),
     compactField(
       'exit-code',
@@ -210,6 +218,10 @@ const fullFields = computed((): JobComponentField[] =>
   jobFieldsContent.value.filter((field): field is JobComponentField => field.layout === 'full')
 )
 
+const compactFields = computed((): JobCompactField[] =>
+  jobFieldsContent.value.filter((field): field is JobCompactField => field.layout === 'compact')
+)
+
 const summaryItems = computed(() => {
   if (!data.value) return []
   const account = data.value.association.account
@@ -228,7 +240,14 @@ const summaryItems = computed(() => {
       value: fmtField(account),
       to: account ? { name: 'account', params: { cluster, account } } : undefined
     },
-    { id: 'partition', label: 'pages.job.summary.partition', value: fmtField(data.value.partition) },
+    {
+      id: 'partition',
+      label: 'pages.job.summary.partition',
+      value: fmtField(data.value.partition),
+      to: data.value.partition
+        ? { name: 'partition', params: { cluster, partition: data.value.partition } }
+        : undefined
+    },
     { id: 'nodes', label: 'pages.job.summary.nodes', value: fmtField(data.value.nodes) },
     {
       id: 'tres-requested',
@@ -454,6 +473,32 @@ watch(
                       {{ t('pages.job.panels.detailedDescription') }}
                     </p>
                   </div>
+                  <div class="ui-detail-compact-grid" data-testid="job-detail-compact-grid">
+                    <div
+                      v-for="field in compactFields"
+                      :key="field.id"
+                      class="ui-detail-compact-card"
+                    >
+                      <div class="ui-detail-compact-label">{{ t(field.label) }}</div>
+                      <div class="ui-detail-compact-value">
+                        <PartitionLinkChip
+                          v-if="field.id === 'partition' && field.value !== '-'"
+                          :cluster="cluster"
+                          :partition="field.value"
+                        />
+                        <RouterLink
+                          v-else-if="field.to && field.value !== '-'"
+                          :to="field.to"
+                          class="ui-inline-link"
+                        >
+                          {{ field.value }}
+                        </RouterLink>
+                        <template v-else>
+                          {{ field.value }}
+                        </template>
+                      </div>
+                    </div>
+                  </div>
                   <div class="ui-detail-list" data-testid="job-detail-list">
                     <dl>
                       <div
@@ -486,7 +531,13 @@ watch(
                             </span>
                           </a>
                         </dt>
-                        <component :is="field.component" v-bind="field.props" />
+                        <dd
+                          v-if="field.id === 'partition' && data?.partition"
+                          class="mt-1 sm:col-span-2 sm:mt-0"
+                        >
+                          <PartitionLinkChip :cluster="cluster" :partition="data.partition" />
+                        </dd>
+                        <component v-else :is="field.component" v-bind="field.props" />
                       </div>
                     </dl>
                   </div>

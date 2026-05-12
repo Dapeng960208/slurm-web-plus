@@ -1,6 +1,7 @@
 import { describe, test, expect, beforeEach, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { ref } from 'vue'
+import { useRuntimeStore } from '@/stores/runtime'
 import PartitionView from '@/views/PartitionView.vue'
 import { init_plugins } from '../lib/common'
 
@@ -48,6 +49,8 @@ vi.mock('@/composables/DataGetter', () => ({
 describe('PartitionView.vue', () => {
   beforeEach(() => {
     init_plugins()
+    useRuntimeStore().dashboard.reset()
+    useRuntimeStore().dashboard.range = 'day'
   })
 
   test('renders partition summary and node set chips', () => {
@@ -59,7 +62,12 @@ describe('PartitionView.vue', () => {
       global: {
         stubs: {
           ClusterMainLayout: { template: '<div><slot /></div>' },
-          RouterLink: { template: '<a><slot /></a>' }
+          RouterLink: { template: '<a><slot /></a>' },
+          DashboardCharts: {
+            props: ['cluster', 'metricsQuery', 'routeTargetName'],
+            template:
+              '<div data-testid="partition-dashboard-props">{{ cluster }}|{{ routeTargetName }}|{{ JSON.stringify(metricsQuery) }}</div>'
+          }
         }
       }
     })
@@ -71,6 +79,13 @@ describe('PartitionView.vue', () => {
     expect(wrapper.text()).toContain('GPU')
     expect(wrapper.text()).toContain('cn[1-4]')
     expect(wrapper.text()).toContain('gpu[1-2]')
+    expect(wrapper.get('[data-testid="partition-dashboard-charts"]').text()).toContain(
+      'Partition live metrics'
+    )
+    expect(wrapper.get('[data-testid="partition-dashboard-props"]').text()).toContain('foo|partition|')
+    expect(wrapper.get('[data-testid="partition-dashboard-props"]').text()).toContain(
+      JSON.stringify({ range: 'day', partition: 'normal' })
+    )
   })
 
   test('renders not found state when partition is missing', () => {

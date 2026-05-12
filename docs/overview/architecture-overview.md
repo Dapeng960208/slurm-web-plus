@@ -179,7 +179,9 @@ Vue 页面
   - Agent 读取当前节点列表后调用 `node_metrics_db.cluster_node_hotspots(...)`
 - `GET /:cluster/partitions/:partition`
   - 前端复用现有 `partitions` 与 `nodes` 数据源
-  - 当前只展示现有接口可稳定提供的分区核心信息，不伪造未暴露字段
+  - 当前展示现有接口可稳定提供的分区核心信息，并复用 dashboard 曲线组件显示该分区的实时资源与作业趋势
+  - 图表 query 继续沿用 dashboard `range / start / end` 机制，但固定附带当前 `partition`
+  - 作业与历史作业页面中的 `partition` 字段统一跳转到该详情页
 
 资源页 `Rack` 列当前采用保守的节点命名分组展示，仅用于同页快速辨识，不宣称等价于完整 RacksDB 物理机架标签。
 

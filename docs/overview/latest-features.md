@@ -14,6 +14,18 @@
 - `cd frontend && npx vitest run tests/composables/queueWaitHistory.spec.ts tests/views/ClusterAnalysisView.spec.ts`
 - `npm --prefix frontend run type-check`
 
+## 本轮：分区详情页已补实时曲线，作业相关分区字段统一为可点击入口
+
+本轮继续把分区详情链路补齐到完整工作流：
+
+- `/:cluster/partitions/:partition` 现在除核心摘要外，还复用 dashboard 的实时资源与作业曲线，并固定按当前分区过滤。
+- 分区详情页沿用 dashboard 的时间范围状态，但图表切换资源类型时会继续停留在当前分区详情页，不再错误跳回 `dashboard`。
+- `Job`、`Job History`、`Jobs`、`Jobs History` 中的分区字段已统一改成芯片式可点击入口，直接跳转分区详情页。
+
+本轮新增验证：
+
+- `cd frontend && npx vitest run tests/views/PartitionView.spec.ts tests/views/JobView.spec.ts tests/views/JobHistoryView.spec.ts tests/views/JobsView.spec.ts tests/views/JobsHistoryView.spec.ts tests/components/dashboard/ChartResourcesHistory.spec.ts tests/components/dashboard/DashboardCharts.spec.ts`
+
 ## 本轮：Dashboard 分区统计、Admin 门禁与 AI 管理页样式已继续收口
 
 本轮继续修正一组已经在真实页面上暴露出的前端问题：

@@ -82,6 +82,7 @@ describe('JobView.vue', () => {
     const details = wrapper.get('[data-testid="job-detail-list"]')
     const links = summary.findAllComponents({ name: 'RouterLink' })
     const userLink = links[0]
+    const partitionLink = links[1]
 
     expect(summary.text()).toContain(i18n.global.t('pages.job.summary.user'))
     expect(userLink.props('to')).toEqual({
@@ -90,9 +91,12 @@ describe('JobView.vue', () => {
     })
     expect(summary.text()).toContain(i18n.global.t('pages.job.summary.account'))
     expect(summary.text()).toContain('-')
-    expect(links).toHaveLength(1)
+    expect(links).toHaveLength(2)
     expect(summary.text()).toContain(i18n.global.t('pages.job.summary.partition'))
-    expect(summary.text()).toContain(jobRunning.partition)
+    expect(partitionLink.props('to')).toEqual({
+      name: 'partition',
+      params: { cluster: 'foo', partition: jobRunning.partition }
+    })
     expect(summary.text()).toContain(i18n.global.t('pages.job.summary.nodes'))
     expect(summary.text()).toContain(jobRunning.nodes)
     expect(summary.text()).toContain(i18n.global.t('pages.job.summary.exitCode'))
@@ -101,6 +105,18 @@ describe('JobView.vue', () => {
     expect(summary.text()).toContain(i18n.global.t('pages.job.summary.allocated'))
 
     expect(details.text()).toContain(i18n.global.t('pages.job.fields.workingDirectory'))
+    const detailCompactGrid = wrapper.get('[data-testid="job-detail-compact-grid"]')
+    const detailPartitionLinks = detailCompactGrid
+      .findAllComponents({ name: 'RouterLink' })
+      .filter((link) =>
+        JSON.stringify(link.props('to')) ===
+        JSON.stringify({
+          name: 'partition',
+          params: { cluster: 'foo', partition: jobRunning.partition }
+        })
+      )
+    expect(detailCompactGrid.text()).toContain(i18n.global.t('pages.job.fields.partition'))
+    expect(detailPartitionLinks).toHaveLength(1)
     expect(wrapper.get('#workdir').text()).toContain(jobRunning.working_directory)
     expect(details.text()).toContain(i18n.global.t('pages.job.fields.requested'))
     expect(details.text()).toContain(i18n.global.t('pages.job.fields.allocated'))

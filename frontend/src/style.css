@@ -879,6 +879,46 @@
     line-height: 1;
   }
 
+  .ui-partition-link-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    border-radius: 999px;
+    border: 1px solid rgba(182, 232, 44, 0.34);
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(232, 247, 184, 0.72)),
+      linear-gradient(135deg, rgba(182, 232, 44, 0.18), transparent);
+    color: var(--color-brand-blue);
+    padding: 0.34rem 0.72rem;
+    font-size: 0.82rem;
+    font-weight: 700;
+    line-height: 1.2;
+    box-shadow: var(--shadow-soft);
+    transition:
+      border-color 180ms ease,
+      color 180ms ease,
+      box-shadow 180ms ease,
+      transform 180ms ease;
+  }
+
+  .ui-partition-link-chip:hover,
+  .ui-partition-link-chip:focus-visible {
+    transform: translateY(-1px);
+    border-color: rgba(152, 201, 31, 0.44);
+    color: var(--color-brand-ink-strong);
+    box-shadow:
+      0 16px 28px rgba(182, 232, 44, 0.18),
+      0 6px 14px rgba(80, 105, 127, 0.08);
+    outline: none;
+  }
+
+  .ui-partition-link-chip:focus-visible {
+    box-shadow:
+      0 0 0 4px rgba(182, 232, 44, 0.2),
+      0 16px 28px rgba(182, 232, 44, 0.18),
+      0 6px 14px rgba(80, 105, 127, 0.08);
+  }
+
   .ui-form-label {
     display: flex;
     flex-wrap: wrap;

@@ -80,7 +80,14 @@ describe('JobHistoryView.vue', () => {
         name: 'job',
         params: { cluster: 'foo', id: 1234 }
       }))
+    const partitionSummaryLink = wrapper
+      .findAllComponents({ name: 'RouterLink' })
+      .find((link) => JSON.stringify(link.props('to')) === JSON.stringify({
+        name: 'partition',
+        params: { cluster: 'foo', partition: 'normal' }
+      }))
     expect(liveLink).toBeDefined()
+    expect(partitionSummaryLink).toBeDefined()
     expect(wrapper.text()).toContain('0 nodes, 0 CPUs')
     expect(wrapper.text()).toContain('Exit Code')
     expect(wrapper.get('[data-testid="detail-summary-strip"]').text()).toContain('SUCCESS (0)')
@@ -88,6 +95,14 @@ describe('JobHistoryView.vue', () => {
     expect(wrapper.get('[data-testid="detail-summary-strip"]').text()).toContain('-')
     expect(wrapper.get('[data-testid="detail-summary-strip"]').text()).toContain('Job ID')
     expect(wrapper.get('[data-testid="detail-summary-strip"]').text()).toContain('Exit Code')
+    const detailCompactLinks = wrapper
+      .get('[data-testid="job-history-detail-compact-grid"]')
+      .findAllComponents({ name: 'RouterLink' })
+      .filter((link) => JSON.stringify(link.props('to')) === JSON.stringify({
+        name: 'partition',
+        params: { cluster: 'foo', partition: 'normal' }
+      }))
+    expect(detailCompactLinks).toHaveLength(1)
     expect(wrapper.get('[data-testid="job-history-detail-list"]').text()).toContain('Resources')
     expect(wrapper.get('[data-testid="job-history-detail-list"]').text()).toContain('Command')
     expect(wrapper.text()).not.toContain('Submit Time')

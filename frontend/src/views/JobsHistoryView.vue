@@ -35,6 +35,7 @@ import { WindowIcon } from '@heroicons/vue/24/outline'
 import { PlusSmallIcon } from '@heroicons/vue/24/outline'
 import PaginationControls from '@/components/PaginationControls.vue'
 import { lastPage, type PageSizeOption } from '@/composables/Pagination'
+import PartitionLinkChip from '@/components/PartitionLinkChip.vue'
 
 const props = defineProps<{ cluster: string }>()
 
@@ -269,7 +270,7 @@ watch(totalPages, (newLastPage) => {
                     <JobHistoryResources :job="job" />
                   </td>
                   <td class="hidden px-3 py-3 whitespace-nowrap xl:table-cell">
-                    {{ job.partition ?? '-' }}
+                    <PartitionLinkChip :cluster="cluster" :partition="job.partition" />
                   </td>
                   <td class="hidden px-3 py-3 whitespace-nowrap xl:table-cell">
                     {{ job.qos ?? '-' }}

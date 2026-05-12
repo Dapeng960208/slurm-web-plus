@@ -29,6 +29,7 @@ import PageHeader from '@/components/PageHeader.vue'
 import TableSkeletonRows from '@/components/TableSkeletonRows.vue'
 import PaginationControls from '@/components/PaginationControls.vue'
 import ActionDialog from '@/components/operations/ActionDialog.vue'
+import PartitionLinkChip from '@/components/PartitionLinkChip.vue'
 import { lastPage, parsePageSize, parsePositivePage, type PageSizeOption } from '@/composables/Pagination'
 import { useAuthStore } from '@/stores/auth'
 
@@ -430,7 +431,7 @@ onMounted(async () => {
                     <JobResources :job="job" />
                   </td>
                   <td class="hidden px-3 py-3 whitespace-nowrap xl:table-cell">
-                    {{ job.partition }}
+                    <PartitionLinkChip :cluster="cluster" :partition="job.partition" />
                   </td>
                   <td class="hidden px-3 py-3 whitespace-nowrap xl:table-cell">
                     {{ job.qos }}

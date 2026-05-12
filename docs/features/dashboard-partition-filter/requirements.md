@@ -11,6 +11,8 @@
 - 让 `GET /v<agent-version>/stats` 支持 `partition` query。
 - 让 `GET /v<agent-version>/metrics/<metric>` 支持 `partition` query 透传。
 - 让 Gateway 保持 query 原样透传，不为 `partition` 增加特判逻辑。
+- 让前端分区详情页复用同一套 dashboard 指标 query，并固定携带当前分区名。
+- 让作业与历史作业页面中的分区字段统一作为分区详情入口。
 - 通过测试把接口契约固定下来，避免后续回归。
 
 ## 2. 功能范围
@@ -42,6 +44,20 @@
   - `GET /api/agents/<cluster>/metrics/<metric>`
 - Gateway 不新增 query 重写逻辑。
 - 只要求继续把原始 query string 原样拼到 Agent URL。
+
+### 2.4 分区详情与分区入口
+
+- 路由：`/:cluster/partitions/:partition`
+- 分区详情页除核心摘要外，还需复用 dashboard 的实时资源与作业曲线：
+  - 时间范围继续复用 dashboard 现有 `range / start / end`
+  - query 固定带当前 `partition`
+  - 图表切换资源类型时，仍需停留在当前分区详情路由，不得跳回 `dashboard`
+- 以下页面中的 `partition` 展示统一改为可点击入口，跳转到 `/:cluster/partitions/:partition`：
+  - `/:cluster/job/:id`
+  - `/:cluster/jobs`
+  - `/:cluster/jobs-history`
+  - `/:cluster/jobs-history/:id`
+- 分区入口统一使用芯片式可点击样式，避免和普通文本字段混淆。
 
 ## 3. 启用条件
 
