@@ -113,6 +113,10 @@
     - `npm --prefix frontend run build`
     - `.venv\Scripts\python.exe -m pytest slurmweb/tests/views/test_agent_metrics_collector.py -q`
     - `.venv\Scripts\python.exe -m pytest slurmweb/tests/metrics/test_collector.py -q`
+  - 针对上述 CI 修复又追加了本地提交 `1f2c7c9`（`fix(ci): align i18n and metrics test coverage`）
+  - 该提交当前状态为“已本地提交，待 push”：
+    - 推送命令 `git push origin main` / `scripts/push-and-watch-github-ci.ps1` 因 `github.com:443` 连接失败未完成
+    - 因此最新修复尚未触发新的远端 GitHub Actions，需在网络恢复后重新推送确认
 
 - 开发错误库文档格式已收口：
   - `docs/tracking/error-log.md` 已从长篇复盘格式简化为仅保留 `时间`、`现象`、`解决办法`
