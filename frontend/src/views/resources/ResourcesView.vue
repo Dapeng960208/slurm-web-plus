@@ -72,6 +72,14 @@ const clusterSupportsRacksdb = computed(() => {
   return Boolean(runtimeStore.getCluster(cluster)?.racksdb)
 })
 
+function resolveRackLabel(nodeName: string): string {
+  const match = /^([a-z]+)(\d+)/i.exec(nodeName)
+  if (match) {
+    return `${match[1].toUpperCase()}-${match[2]}`
+  }
+  return '--'
+}
+
 const foldedNodes: Ref<FoldedClusterNode[]> = computed(() => {
   let previousNode: FoldedClusterNode | undefined = undefined
   let similarNodes: string[] = []
@@ -219,26 +227,28 @@ watch(totalPages, (newLastPage) => {
         "
       >
         <template #actions>
-          <button
-            v-if="clusterSupportsRacksdb"
-            type="button"
-            class="ui-button-secondary"
-            @click="
-              runtimeStore.resources.showRackDiagram = !runtimeStore.resources.showRackDiagram
-            "
-          >
-            <EyeSlashIcon
-              v-if="runtimeStore.resources.showRackDiagram"
-              class="h-4 w-4"
-              aria-hidden="true"
-            />
-            <EyeIcon v-else class="h-4 w-4" aria-hidden="true" />
-            {{
-              runtimeStore.resources.showRackDiagram
-                ? t('pages.resources.actions.hideRackDiagram')
-                : t('pages.resources.actions.showRackDiagram')
-            }}
-          </button>
+          <div class="flex flex-wrap items-center gap-3">
+            <button
+              v-if="clusterSupportsRacksdb"
+              type="button"
+              class="ui-button-secondary"
+              @click="
+                runtimeStore.resources.showRackDiagram = !runtimeStore.resources.showRackDiagram
+              "
+            >
+              <EyeSlashIcon
+                v-if="runtimeStore.resources.showRackDiagram"
+                class="h-4 w-4"
+                aria-hidden="true"
+              />
+              <EyeIcon v-else class="h-4 w-4" aria-hidden="true" />
+              {{
+                runtimeStore.resources.showRackDiagram
+                  ? t('pages.resources.actions.hideRackDiagram')
+                  : t('pages.resources.actions.showRackDiagram')
+              }}
+            </button>
+          </div>
         </template>
       </PageHeader>
 
@@ -278,6 +288,9 @@ watch(totalPages, (newLastPage) => {
                   </th>
                   <th scope="col" class="px-3 py-3.5 text-left">
                     {{ t('tables.resources.columns.gpu') }}
+                  </th>
+                  <th scope="col" class="px-3 py-3.5 text-left">
+                    {{ t('pages.resources.rack') }}
                   </th>
                   <th scope="col" class="px-3 py-3.5 text-left">
                     {{ t('tables.resources.columns.partitions') }}
@@ -353,13 +366,17 @@ watch(totalPages, (newLastPage) => {
                       <NodeGPU :node="node" />
                     </td>
                     <td class="px-3 py-3 whitespace-nowrap">
-                      <span
+                      {{ resolveRackLabel(node.name) }}
+                    </td>
+                    <td class="px-3 py-3 whitespace-nowrap">
+                      <RouterLink
                         v-for="partition in node.partitions"
                         :key="partition"
-                        class="ui-chip mr-1"
+                        :to="{ name: 'partition', params: { cluster, partition } }"
+                        class="ui-chip mr-1 inline-flex"
                       >
                         {{ partition }}
-                      </span>
+                      </RouterLink>
                     </td>
                   </tr>
                   <template v-if="node.number > 1">
@@ -372,7 +389,7 @@ watch(totalPages, (newLastPage) => {
                       leave-to-class="-translate-y-6 opacity-0"
                     >
                       <tr v-show="foldedNodesShow[node.name]">
-                        <td colspan="8" class="z-0 bg-[rgba(239,244,246,0.92)]">
+                        <td colspan="9" class="z-0 bg-[rgba(239,244,246,0.92)]">
                           <ul
                             role="list"
                             class="m-4 grid grid-cols-1 gap-5 sm:grid-cols-2 sm:gap-4 md:grid-cols-4 xl:grid-cols-8 2xl:grid-cols-16"
@@ -408,7 +425,7 @@ watch(totalPages, (newLastPage) => {
               </tbody>
               <TableSkeletonRows
                 v-else
-                :columns="8"
+                :columns="9"
                 :rows="8"
                 first-cell-class="sm:pl-6 lg:pl-8"
                 cell-class="px-3"

@@ -33,6 +33,22 @@
   - `Top Tools`
 - 首次进入无 query 时仍默认回填当天 `00:00` 到当前时间。
 - 刷新页面后保留已应用的起止时间。
+- 用户分析摘要卡显示运行、排队、失败、取消状态样本。
+
+### 2.2.1 集群分析时间窗与热点
+
+- 集群分析页面使用同一套时间范围按钮与弹框。
+- 默认进入页面时，节点热点会自动按最近 3 天窗口请求。
+- 应用自定义窗口后：
+  - `metrics/jobs`
+  - `metrics/cores`
+  - `metrics/memory`
+  - `metrics/gpus`
+  - `jobs/history`
+  - `analysis/node-hotspots`
+  都应跟随新的 `start` / `end`。
+- 页面展示平均排队时长曲线，单位为秒。
+- `diag` 面板最多显示 10 条核心字段。
 
 ### 2.3 AI 对话页展示
 
@@ -127,6 +143,13 @@ cd frontend
 npx vitest run tests/components/MetricRangeSelector.spec.ts tests/views/AssistantView.spec.ts tests/views/settings/SettingsAI.spec.ts tests/views/NodeView.spec.ts tests/views/UserAnalysisView.spec.ts tests/components/user/UserToolAnalysisChart.spec.ts tests/composables/GatewayAPI.spec.ts
 ```
 
+本轮集群分析、资源和分区详情定向验证：
+
+```powershell
+cd frontend
+pnpm vitest run tests/views/UserAnalysisView.spec.ts tests/views/ClusterAnalysisView.spec.ts tests/views/resources/ResourcesView.spec.ts tests/views/PartitionView.spec.ts tests/composables/GatewayAPI.spec.ts
+```
+
 本次 AI 配置、审计搜索与 token 估算定向验证：
 
 ```powershell
@@ -144,6 +167,12 @@ npm --prefix frontend run type-check
 
 ```powershell
 .venv\Scripts\python.exe -m pytest -q slurmweb/tests/apps/test_ai_service.py slurmweb/tests/apps/test_user_analytics_store.py slurmweb/tests/views/test_agent_ai.py slurmweb/tests/views/test_gateway_ai.py slurmweb/tests/views/test_agent_metrics_requests.py slurmweb/tests/slurmrestd/test_slurmrestd_write_operations.py slurmweb/tests/test_cache.py
+```
+
+本轮补充的 analysis / metrics 定向验证：
+
+```powershell
+.venv\Scripts\python.exe -m pytest -q slurmweb/tests/metrics/test_db.py slurmweb/tests/views/test_agent_metrics_requests.py slurmweb/tests/views/test_agent_operations.py slurmweb/tests/views/test_gateway.py
 ```
 
 ## 6. 手工验收场景

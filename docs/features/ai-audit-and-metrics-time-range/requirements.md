@@ -23,6 +23,18 @@
   - 弹框内置 `1 day`、`3 days`、`7 days`、`15 days`、`1 month` 快捷窗口。
   - 应用后刷新 `Submission Activity`、`Usage Profile`、`Tool Analysis` 与 `Top Tools`。
 
+### 2.1.1 集群分析页时间窗与热点
+
+- `/:cluster/analysis` 现在也使用同一套时间范围按钮和弹框。
+- 集群分析的 metrics/history 请求支持：
+  - `range=hour|day|week`
+  - `start` / `end`
+- 分析页新增节点热点概览接口：
+  - `GET /api/agents/<cluster>/analysis/node-hotspots?start=<iso>&end=<iso>`
+- 节点热点默认展示最近 3 天窗口；当用户显式选择自定义窗口时，热点查询跟随该窗口。
+- `diag` 面板只展示 10 条核心字段，其他统计字段不再直接铺满分析页。
+- 分析页新增平均排队时长曲线，单位为秒，数据来自历史已完成作业的 `eligible_time/submit_time -> start_time` 差值聚合。
+
 ### 2.2 AI 对话页面精简
 
 - 普通 `/:cluster/ai` 对话页顶部不再展示模型、stream 等运行配置。
@@ -119,6 +131,9 @@
   - `GET /api/agents/<cluster>/node/<node>/metrics/history`
   - 支持 `range=hour|day|week`
   - 支持 `start` / `end` ISO 8601 自定义窗口
+- 集群分析节点热点接口：
+  - `GET /api/agents/<cluster>/analysis/node-hotspots`
+  - 要求显式 `start` / `end`
 
 ## 5. 权限要求
 

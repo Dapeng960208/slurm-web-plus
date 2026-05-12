@@ -14,7 +14,8 @@ const mockGatewayAPI = {
   metrics_gpus: vi.fn(),
   jobs_history: vi.fn(),
   analysis_ping: vi.fn(),
-  analysis_diag: vi.fn()
+  analysis_diag: vi.fn(),
+  analysis_node_hotspots: vi.fn()
 }
 
 vi.mock('@/composables/GatewayAPI', async (importOriginal) => {
@@ -196,7 +197,36 @@ describe('ClusterAnalysisView.vue', () => {
       pings: [{ hostname: 'slurmctld', mode: 'primary', latency_ms: 12 }]
     })
     mockGatewayAPI.analysis_diag.mockResolvedValue({
-      statistics: { jobs_submitted: 10, schedule_cycle_max: 2.4 }
+      statistics: {
+        jobs_submitted: 10,
+        jobs_started: 9,
+        jobs_completed: 8,
+        jobs_canceled: 1,
+        schedule_cycle_last: 1,
+        schedule_cycle_max: 2.4,
+        schedule_cycle_mean: 1.4,
+        bf_backfilled_jobs: 7,
+        bf_last_backfilled_jobs: 2,
+        bf_queue_len: 5,
+        extra_field: 999
+      }
+    })
+    mockGatewayAPI.analysis_node_hotspots.mockResolvedValue({
+      window: {
+        start: '2026-04-21T00:00:00Z',
+        end: '2026-04-24T00:00:00Z'
+      },
+      threshold: 80,
+      events: [
+        {
+          node: 'cn1',
+          metric: 'cpu',
+          start: '2026-04-23T09:00:00Z',
+          end: '2026-04-23T09:20:00Z',
+          duration_seconds: 1200,
+          peak_usage: 93
+        }
+      ]
     })
   })
 
@@ -221,7 +251,11 @@ describe('ClusterAnalysisView.vue', () => {
     expect(wrapper.text()).toContain('Controller Health')
     expect(wrapper.text()).toContain('Ping')
     expect(wrapper.text()).toContain('Diag')
+    expect(wrapper.text()).toContain('Average Queue Wait')
+    expect(wrapper.text()).toContain('Node Hotspots')
+    expect(wrapper.text()).toContain('Node cn1')
     expect(wrapper.text()).toContain('Jobs Submitted')
+    expect(wrapper.text()).not.toContain('extra_field')
     expect(mockGatewayAPI.jobs_history).toHaveBeenCalledWith(
       'foo',
       expect.objectContaining({
@@ -231,6 +265,13 @@ describe('ClusterAnalysisView.vue', () => {
     )
     expect(mockGatewayAPI.analysis_ping).toHaveBeenCalledWith('foo')
     expect(mockGatewayAPI.analysis_diag).toHaveBeenCalledWith('foo')
+    expect(mockGatewayAPI.analysis_node_hotspots).toHaveBeenCalledWith(
+      'foo',
+      expect.objectContaining({
+        start: expect.stringMatching(/T/),
+        end: expect.stringMatching(/T/)
+      })
+    )
     expect(wrapper.find('.ui-scroll-region').classes()).toEqual(
       expect.arrayContaining(['ui-scroll-region', 'min-h-0', 'flex-1', 'pr-1'])
     )

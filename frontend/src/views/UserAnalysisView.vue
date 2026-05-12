@@ -12,7 +12,6 @@ import { RouterLink, useRouter } from 'vue-router'
 import { ChevronLeftIcon } from '@heroicons/vue/20/solid'
 import { useI18n } from 'vue-i18n'
 import ClusterMainLayout from '@/components/ClusterMainLayout.vue'
-import PageHeader from '@/components/PageHeader.vue'
 import { useRuntimeStore } from '@/stores/runtime'
 import UserAnalyticsPanels from '@/components/user/UserAnalyticsPanels.vue'
 
@@ -56,28 +55,20 @@ const userMetricsEnabled = computed(
 
       <div class="ui-scroll-region min-h-0 flex-1 pr-1">
         <div class="ui-section-stack pb-2">
-          <PageHeader
-            kicker="pages.user.analytics.kicker"
-            :title="user"
-            description="pages.user.analytics.description"
-          >
-            <template #actions>
-              <div class="flex flex-wrap gap-3">
-                <RouterLink
-                  :to="{ name: 'user', params: { cluster, user } }"
-                  class="ui-button-secondary"
-                >
-                  {{ t('pages.user.analytics.userDetail') }}
-                </RouterLink>
-                <RouterLink
-                  :to="{ name: 'jobs', params: { cluster }, query: { users: user } }"
-                  class="ui-button-primary"
-                >
-                  {{ t('pages.user.actions.viewJobs') }}
-                </RouterLink>
-              </div>
-            </template>
-          </PageHeader>
+          <div class="flex flex-wrap justify-end gap-3">
+            <RouterLink
+              :to="{ name: 'user', params: { cluster, user } }"
+              class="ui-button-secondary"
+            >
+              {{ t('pages.user.analytics.userDetail') }}
+            </RouterLink>
+            <RouterLink
+              :to="{ name: 'jobs', params: { cluster }, query: { users: user } }"
+              class="ui-button-primary"
+            >
+              {{ t('pages.user.actions.viewJobs') }}
+            </RouterLink>
+          </div>
 
           <UserAnalyticsPanels :cluster="cluster" :user="user" :enabled="userMetricsEnabled" />
         </div>

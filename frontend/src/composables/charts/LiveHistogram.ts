@@ -14,6 +14,7 @@ import { useClusterDataPoller } from '@/composables/DataPoller'
 import type { ClusterDataPoller } from '@/composables/DataPoller'
 import type { ClusterDataPollerParam } from '@/composables/DataPoller'
 import type { MetricValue } from '@/composables/GatewayAPI'
+import type { DashboardMetricsQuery } from '@/composables/GatewayAPI'
 import { Chart } from 'chart.js/auto'
 import type { ChartOptions, TimeScaleOptions, TimeUnit, Point } from 'chart.js'
 import 'chartjs-adapter-luxon'
@@ -24,7 +25,7 @@ type HistogramValueFormatter = (value: number) => string | undefined
 export interface DashboardLiveChart<MetricKeyType extends string> {
   metrics: ClusterDataPoller<Record<MetricKeyType, MetricValue[]>>
   setCluster: (cluster: string) => void
-  setRange: (range: string, query?: DashboardPartitionQuery) => void
+  setRange: (range: string, query?: DashboardPartitionQuery | DashboardMetricsQuery) => void
   setCallback: (callback: GatewayAnyClusterApiKey) => void
   setLabels: (
     labels: Record<string, { group: MetricKeyType[]; color: string; invert?: boolean }>
@@ -221,8 +222,15 @@ export function useLiveHistogram<MetricKeyType extends string>(
 
   function buildMetricsQuery(
     metricsRange: string,
-    query?: DashboardPartitionQuery
+    query?: DashboardPartitionQuery | DashboardMetricsQuery
   ): ClusterDataPollerParam {
+    if (query && 'start' in query && 'end' in query) {
+      return {
+        start: query.start,
+        end: query.end,
+        ...(query.partition ? { partition: query.partition } : {})
+      }
+    }
     if (!query?.partition) {
       return metricsRange
     }
@@ -239,7 +247,7 @@ export function useLiveHistogram<MetricKeyType extends string>(
 
   /* Clear chart datasets and set new poller param when dashboard range is
    * modified. */
-  function setRange(newRange: string, query?: DashboardPartitionQuery) {
+  function setRange(newRange: string, query?: DashboardPartitionQuery | DashboardMetricsQuery) {
     range = newRange
     filterQuery = query
     clear()

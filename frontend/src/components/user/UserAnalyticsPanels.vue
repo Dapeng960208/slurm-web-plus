@@ -72,6 +72,36 @@ const submittedJobsInRange = computed(() => userMetricsHistory.value?.totals?.su
 
 const completedJobsInRange = computed(() => userMetricsHistory.value?.totals?.completed_jobs ?? 0)
 
+const otherJobsSummary = computed(() => {
+  const totals = userMetricsHistory.value?.totals
+  return [
+    {
+      key: 'running',
+      label: t('pages.user.analyticsPanels.cards.running.title'),
+      value: totals?.running_jobs ?? 0,
+      detail: t('pages.user.analyticsPanels.cards.running.detail')
+    },
+    {
+      key: 'pending',
+      label: t('pages.user.analyticsPanels.cards.pending.title'),
+      value: totals?.pending_jobs ?? 0,
+      detail: t('pages.user.analyticsPanels.cards.pending.detail')
+    },
+    {
+      key: 'failed',
+      label: t('pages.user.analyticsPanels.cards.failed.title'),
+      value: totals?.failed_jobs ?? 0,
+      detail: t('pages.user.analyticsPanels.cards.failed.detail')
+    },
+    {
+      key: 'cancelled',
+      label: t('pages.user.analyticsPanels.cards.cancelled.title'),
+      value: totals?.cancelled_jobs ?? 0,
+      detail: t('pages.user.analyticsPanels.cards.cancelled.detail')
+    }
+  ]
+})
+
 const averageMemoryLabel = computed(() => {
   const value = userToolAnalysis.value?.totals.avg_memory_gb
   return value != null ? formatGb(value) : '--'
@@ -415,6 +445,15 @@ onUnmounted(() => {
         <div class="ui-stat-label">{{ t('pages.user.analyticsPanels.cards.avgRuntime.title') }}</div>
         <div class="ui-stat-value">{{ averageRuntimeLabel }}</div>
         <div class="ui-stat-subtle">{{ t('pages.user.analyticsPanels.cards.avgRuntime.detail') }}</div>
+      </div>
+      <div
+        v-for="item in otherJobsSummary"
+        :key="item.key"
+        class="ui-stat-card"
+      >
+        <div class="ui-stat-label">{{ item.label }}</div>
+        <div class="ui-stat-value">{{ item.value }}</div>
+        <div class="ui-stat-subtle">{{ item.detail }}</div>
       </div>
     </div>
 

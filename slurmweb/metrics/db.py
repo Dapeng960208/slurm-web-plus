@@ -6,7 +6,8 @@
 
 import typing as t
 import collections
-from datetime import datetime, timedelta
+import re
+from datetime import datetime, timedelta, timezone
 import asyncio
 import logging
 
@@ -129,12 +130,28 @@ class SlurmwebMetricsDB:
         self.base_uri = base_uri
         self.job = job
 
-    def request(self, metric, last, partition=None):
+    def request(
+        self,
+        metric,
+        last,
+        partition=None,
+        start_time: t.Optional[datetime] = None,
+        end_time: t.Optional[datetime] = None,
+    ):
         params = self.METRICS_QUERY_PARAMS[metric]
         if metric not in self.PARTITION_SUPPORTED_METRICS:
             partition = None
         return self._merge_results(
-            asyncio_run(self._requests(metric, params, last, partition))
+            asyncio_run(
+                self._requests(
+                    metric,
+                    params,
+                    last,
+                    partition,
+                    start_time=start_time,
+                    end_time=end_time,
+                )
+            )
         )
 
     def _merge_results(self, results):
@@ -143,17 +160,55 @@ class SlurmwebMetricsDB:
             merge.update(result)
         return merge
 
-    async def _requests(self, metric, params, last, partition):
+    async def _requests(
+        self,
+        metric,
+        params,
+        last,
+        partition,
+        start_time: t.Optional[datetime] = None,
+        end_time: t.Optional[datetime] = None,
+    ):
         """Return the list of available clusters with permissions. Clusters on which
         request to get permissions failed are filtered out."""
         return await asyncio.gather(
             *[
                 self._request(
-                    metric, *self._query(metric, id, params, last, partition), partition
+                    metric,
+                    *self._query(
+                        metric,
+                        id,
+                        params,
+                        last,
+                        partition,
+                        start_time=start_time,
+                        end_time=end_time,
+                    ),
+                    partition,
                 )
                 for id in params.ids
             ]
         )
+
+    def _resolve_resolution(
+        self,
+        params: SlurmwebMetricQuery,
+        last: str,
+        start_time: t.Optional[datetime] = None,
+        end_time: t.Optional[datetime] = None,
+    ) -> SlurmWebRangeResolution:
+        if start_time is not None and end_time is not None:
+            duration = end_time - start_time
+            if duration <= timedelta(hours=2):
+                return params.resolution.hour
+            if duration <= timedelta(days=7):
+                return params.resolution.day
+            return params.resolution.week
+
+        try:
+            return getattr(params.resolution, last)
+        except AttributeError as err:
+            raise SlurmwebMetricsDBError(f"Unsupported metric range {last}") from err
 
     def _empty_result(self, metric):
         if metric == "memory":
@@ -235,11 +290,22 @@ class SlurmwebMetricsDB:
                 f"Unexpected result on metrics query {query}"
             ) from err
 
-    def _query(self, metric, id, params, last, partition=None):
-        try:
-            resolution = getattr(params.resolution, last)
-        except AttributeError as err:
-            raise SlurmwebMetricsDBError(f"Unsupported metric range {last}") from err
+    def _query(
+        self,
+        metric,
+        id,
+        params,
+        last,
+        partition=None,
+        start_time: t.Optional[datetime] = None,
+        end_time: t.Optional[datetime] = None,
+    ):
+        resolution = self._resolve_resolution(
+            params,
+            last,
+            start_time=start_time,
+            end_time=end_time,
+        )
         range = None
 
         def _rounded_timetstamp(timestamp):
@@ -250,6 +316,12 @@ class SlurmwebMetricsDB:
             labels.append(f"partition='{'' if partition is None else partition}'")
         filter = "{" + ",".join(labels) + "}"
         if params.agg:
+            if start_time is not None and end_time is not None:
+                start = _rounded_timetstamp(start_time.timestamp())
+                end = _rounded_timetstamp(end_time.timestamp())
+                query_range = f"&start={start}&end={end}&step={resolution.step}"
+                promql = f"{params.agg}({id.name}{filter}[{resolution.step}])"
+                return id, params, (f"query_range?query={promql}{query_range}")
             range = f"[{resolution.range}:{resolution.step}]"
             _promql = f"{params.agg}({id.name}{filter}[{resolution.step}]){range}"
         else:
@@ -261,6 +333,11 @@ class SlurmwebMetricsDB:
                 start = end - timedelta(days=1)
             elif last == "week":
                 start = end - timedelta(days=7)
+            else:
+                raise SlurmwebMetricsDBError(f"Unsupported metric range {last}")
+            if start_time is not None and end_time is not None:
+                start = start_time
+                end = end_time
             range = (
                 f"&start={_rounded_timetstamp(start.timestamp())}&"
                 f"end={_rounded_timetstamp(end.timestamp())}&step={resolution.step}"
@@ -269,6 +346,13 @@ class SlurmwebMetricsDB:
                 f"{id.name}{filter}-{id.name}{filter} offset {resolution.step} {range}"
             )
         return id, params, (f"{params.endpoint}?query={_promql}")
+
+    def _duration_resolution(self, duration: timedelta) -> SlurmWebRangeResolution:
+        if duration <= timedelta(hours=2):
+            return self.RANGE_RESOLUTIONS["30s"].hour
+        if duration <= timedelta(days=7):
+            return self.RANGE_RESOLUTIONS["30s"].day
+        return self.RANGE_RESOLUTIONS["30s"].week
 
     def node_instant_metrics(self, node_name: str, hostname_label: str = "hostname"):
         """
@@ -395,12 +479,7 @@ class SlurmwebMetricsDB:
             start = start_time
             end = end_time
             duration = end - start
-            if duration <= timedelta(hours=2):
-                resolution = self.RANGE_RESOLUTIONS["30s"].hour
-            elif duration <= timedelta(days=2):
-                resolution = self.RANGE_RESOLUTIONS["30s"].day
-            else:
-                resolution = self.RANGE_RESOLUTIONS["30s"].week
+            resolution = self._duration_resolution(duration)
         else:
             try:
                 resolution = getattr(self.RANGE_RESOLUTIONS["30s"], last)
@@ -472,3 +551,140 @@ class SlurmwebMetricsDB:
             return results
 
         return asyncio_run(_fetch_all())
+
+    def cluster_node_hotspots(
+        self,
+        node_names: t.Sequence[str],
+        hostname_label: str = "hostname",
+        start_time: t.Optional[datetime] = None,
+        end_time: t.Optional[datetime] = None,
+        threshold: float = 80.0,
+        limit: int = 10,
+    ) -> t.Dict[str, t.Any]:
+        if start_time is None or end_time is None:
+            end_time = datetime.now(tz=timezone.utc)
+            start_time = end_time - timedelta(days=3)
+        if start_time >= end_time:
+            raise SlurmwebMetricsDBError("start must be earlier than end")
+
+        duration = end_time - start_time
+        resolution = self._duration_resolution(duration)
+        start_ts = int(start_time.timestamp() - start_time.timestamp() % resolution.rounding)
+        end_ts = int(end_time.timestamp() - end_time.timestamp() % resolution.rounding)
+        if not node_names:
+            return {
+                "window": {
+                    "start": start_time.isoformat(),
+                    "end": end_time.isoformat(),
+                },
+                "threshold": threshold,
+                "events": [],
+            }
+
+        matcher = "|".join(re.escape(node_name) for node_name in sorted(set(node_names)))
+        node_filter = f'{hostname_label}=~"^(?:{matcher})$"'
+        queries = {
+            "cpu": (
+                f'100 - (avg by ({hostname_label}) '
+                f'(rate(node_cpu_seconds_total{{mode="idle",{node_filter}}}[1m])) * 100)'
+            ),
+            "memory": (
+                f"100 * (1 - (node_memory_MemAvailable_bytes{{{node_filter}}} / "
+                f"node_memory_MemTotal_bytes{{{node_filter}}}))"
+            ),
+        }
+
+        async def _fetch():
+            results = {}
+            async with aiohttp.ClientSession() as session:
+                for metric_key, promql in queries.items():
+                    url = (
+                        f"{self.base_uri.geturl()}{self.REQUEST_BASE_PATH}query_range"
+                        f"?query={promql}&start={start_ts}&end={end_ts}&step={resolution.step}"
+                    )
+                    logger.debug("Cluster node hotspot metrics request: %s", url)
+                    try:
+                        async with session.get(url) as response:
+                            if response.status != 200:
+                                raise SlurmwebMetricsDBError(
+                                    "Unexpected response status "
+                                    f"{response.status} for metrics database request {url}"
+                                )
+                            json_data = await response.json()
+                    except aiohttp.ClientConnectionError as err:
+                        raise SlurmwebMetricsDBError(
+                            f"Metrics database connection error: {str(err)}"
+                        ) from err
+
+                    series = {}
+                    for item in json_data.get("data", {}).get("result", []):
+                        node_name = item.get("metric", {}).get(hostname_label)
+                        if not node_name:
+                            continue
+                        series[node_name] = [
+                            [int(timestamp * 1000), round(float(value), 2)]
+                            for timestamp, value in item.get("values", [])
+                        ]
+                    results[metric_key] = series
+            return results
+
+        def _extract_events(metric_name: str, series_by_node: t.Dict[str, t.List[t.List[t.Any]]]):
+            events = []
+            for node_name, values in series_by_node.items():
+                event_start = None
+                event_end = None
+                peak = threshold
+                previous_ts = None
+                for index, (timestamp_ms, value) in enumerate(values):
+                    ts = datetime.fromtimestamp(timestamp_ms / 1000, tz=timezone.utc)
+                    is_hot = value >= threshold
+                    if is_hot and event_start is None:
+                        event_start = ts
+                        peak = value
+                    if is_hot:
+                        peak = max(peak, value)
+                        event_end = ts
+                    if (not is_hot or index == len(values) - 1) and event_start is not None:
+                        if event_end is None:
+                            event_end = previous_ts or ts
+                        next_ts = ts if not is_hot else ts
+                        duration_seconds = max(
+                            int((event_end - event_start).total_seconds()) + resolution.rounding,
+                            resolution.rounding,
+                        )
+                        events.append(
+                            {
+                                "node": node_name,
+                                "metric": metric_name,
+                                "start": event_start.isoformat(),
+                                "end": event_end.isoformat(),
+                                "duration_seconds": duration_seconds,
+                                "peak_usage": round(peak, 1),
+                            }
+                        )
+                        event_start = None
+                        event_end = None
+                        peak = threshold
+                    previous_ts = ts
+            return events
+
+        metrics = asyncio_run(_fetch())
+        events = []
+        for metric_name, series_by_node in metrics.items():
+            events.extend(_extract_events(metric_name, series_by_node))
+        events.sort(
+            key=lambda item: (
+                item["start"],
+                item["duration_seconds"],
+                item["peak_usage"],
+            ),
+            reverse=True,
+        )
+        return {
+            "window": {
+                "start": start_time.isoformat(),
+                "end": end_time.isoformat(),
+            },
+            "threshold": threshold,
+            "events": events[: max(limit, 0)],
+        }

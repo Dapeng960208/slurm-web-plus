@@ -228,6 +228,10 @@ class SlurmwebAppGateway(SlurmwebWebApp, RFLTokenizedWebApp):
             "/api/agents/<cluster>/user/<username>/tools/analysis",
             views.user_tools_analysis,
         ),
+        SlurmwebAppRoute(
+            "/api/agents/<cluster>/analysis/node-hotspots",
+            views.analysis_node_hotspots,
+        ),
         SlurmwebAppRoute("/api/agents/<cluster>/jobs", views.jobs),
         SlurmwebAppRoute("/api/agents/<cluster>/job/<int:job>", views.job),
         SlurmwebAppRoute(

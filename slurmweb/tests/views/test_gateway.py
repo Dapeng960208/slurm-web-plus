@@ -593,6 +593,31 @@ class TestGatewayViews(TestGatewayBase):
         self.assertEqual(response.json, {"ok": True})
         self.assertEqual(mock_proxy_agent.call_args.args[:2], ("foo", "analysis/ping"))
 
+    @mock.patch("slurmweb.views.gateway.aiohttp.ClientSession.get")
+    def test_analysis_node_hotspots_forwards_window_to_agent(self, mock_get):
+        foo = fake_slurmweb_agent("foo")
+        self.app_set_agents({"foo": foo})
+        _, mock_get.return_value = mock_agent_aio_response(
+            content={
+                "window": {
+                    "start": "2026-04-21T00:00:00Z",
+                    "end": "2026-04-24T00:00:00Z",
+                },
+                "threshold": 80,
+                "events": [],
+            }
+        )
+
+        response = self.client.get(
+            "/api/agents/foo/analysis/node-hotspots?start=2026-04-21T00:00:00Z&end=2026-04-24T00:00:00Z"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        mock_get.assert_called_once_with(
+            f"http://foo/v{foo.version}/analysis/node-hotspots?start=2026-04-21T00:00:00Z&end=2026-04-24T00:00:00Z",
+            headers=mock.ANY,
+        )
+
     def test_admin_system_query_removed(self):
         self.app_set_agents({"foo": fake_slurmweb_agent("foo")})
 

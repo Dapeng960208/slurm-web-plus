@@ -18,9 +18,12 @@ import LoadingSpinner from '@/components/LoadingSpinner.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import PercentMetric from '@/components/PercentMetric.vue'
 import MetricRangeSelector from '@/components/MetricRangeSelector.vue'
+import QueueWaitHistoryChart from '@/components/analysis/QueueWaitHistoryChart.vue'
 import { analyzeCluster } from '@/composables/ClusterAnalysis'
 import { formatPercentValue } from '@/composables/percentages'
 import {
+  type AnalysisNodeHotspots,
+  type DateTimeWindowQuery,
   isMetricRange,
   type ClusterJob,
   type ClusterNode,
@@ -45,6 +48,8 @@ const runtimeStore = useRuntimeStore()
 const { t, locale } = useI18n()
 
 const selectedRange = ref<MetricRange>('hour')
+const customStart = ref('')
+const customEnd = ref('')
 const loading = ref(true)
 const refreshing = ref(false)
 const error = ref<string | null>(null)
@@ -60,6 +65,7 @@ const gpuMetrics = ref<Partial<Record<MetricResourceState, MetricValue[]>> | nul
 const historyJobs = ref<JobHistoryRecord[]>([])
 const pingDetails = ref<unknown>(null)
 const diagDetails = ref<unknown>(null)
+const nodeHotspots = ref<AnalysisNodeHotspots | null>(null)
 
 const jobsUnavailable = ref(false)
 const nodesUnavailable = ref(false)
@@ -126,7 +132,10 @@ const diagFields = computed(() => {
       'jobs_canceled',
       'schedule_cycle_last',
       'schedule_cycle_max',
-      'schedule_cycle_mean'
+      'schedule_cycle_mean',
+      'bf_backfilled_jobs',
+      'bf_last_backfilled_jobs',
+      'bf_queue_len'
     ],
     labelMap: {
       jobs_submitted: t('analysis.labels.jobsSubmitted'),
@@ -137,7 +146,33 @@ const diagFields = computed(() => {
       schedule_cycle_max: t('analysis.labels.scheduleCycleMax'),
       schedule_cycle_mean: t('analysis.labels.scheduleCycleMean')
     }
-  })
+  }).slice(0, 10)
+})
+
+const queueWaitSeries = computed(() => {
+  if (!historyJobs.value.length) return []
+  const buckets = new Map<number, { total: number; count: number }>()
+  for (const job of historyJobs.value) {
+    const start = job.start_time ? new Date(job.start_time).getTime() : NaN
+    const eligible = job.eligible_time ? new Date(job.eligible_time).getTime() : NaN
+    const submit = job.submit_time ? new Date(job.submit_time).getTime() : NaN
+    const baseline = Number.isFinite(eligible) ? eligible : submit
+    if (!Number.isFinite(start) || !Number.isFinite(baseline) || start < baseline) continue
+    const bucket = new Date(start)
+    if (selectedRange.value === 'hour') {
+      bucket.setUTCMinutes(0, 0, 0)
+    } else {
+      bucket.setUTCHours(0, 0, 0, 0)
+    }
+    const key = bucket.getTime()
+    const item = buckets.get(key) ?? { total: 0, count: 0 }
+    item.total += (start - baseline) / 1000
+    item.count += 1
+    buckets.set(key, item)
+  }
+  return [...buckets.entries()]
+    .sort((left, right) => left[0] - right[0])
+    .map(([timestamp, item]) => [timestamp, Math.round(item.total / item.count)] as MetricValue)
 })
 
 const historicalCards = computed(() => {
@@ -192,11 +227,32 @@ function renderNumber(value: number | null, suffix = ''): string {
 
 function renderRange(range: MetricRange) {
   selectedRange.value = range
+  customStart.value = ''
+  customEnd.value = ''
   router.push({
     name: 'analysis',
     params: { cluster },
     query: { range } as LocationQueryRaw
   })
+}
+
+function applyCustomWindow(window: DateTimeWindowQuery) {
+  customStart.value = window.start
+  customEnd.value = window.end
+  router.push({
+    name: 'analysis',
+    params: { cluster },
+    query: {
+      start: window.start,
+      end: window.end
+    } as LocationQueryRaw
+  })
+}
+
+function resetCustomWindow() {
+  customStart.value = ''
+  customEnd.value = ''
+  renderRange('hour')
 }
 
 function rangeStartISO(range: MetricRange): string {
@@ -207,6 +263,23 @@ function rangeStartISO(range: MetricRange): string {
     week: 7 * 24 * 60 * 60 * 1000
   }[range]
   return new Date(now - duration).toISOString()
+}
+
+function historyWindowQuery(): DateTimeWindowQuery | null {
+  if (!customStart.value || !customEnd.value) return null
+  return {
+    start: new Date(customStart.value).toISOString(),
+    end: new Date(customEnd.value).toISOString()
+  }
+}
+
+function hotspotWindowQuery(): DateTimeWindowQuery {
+  const customWindow = historyWindowQuery()
+  if (customWindow) return customWindow
+  return {
+    start: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
+    end: new Date().toISOString()
+  }
 }
 
 async function loadAnalysis() {
@@ -263,24 +336,24 @@ async function loadAnalysis() {
     const metricsTasks: Promise<unknown>[] = []
     if (canViewJobs.value) {
       metricsTasks.push(
-        gateway.metrics_jobs(cluster, selectedRange.value).then((payload) => {
+        gateway.metrics_jobs(cluster, historyWindowQuery() ?? selectedRange.value).then((payload) => {
           jobsMetrics.value = payload
         })
       )
     }
     if (canViewNodes.value) {
       metricsTasks.push(
-        gateway.metrics_cores(cluster, selectedRange.value).then((payload) => {
+        gateway.metrics_cores(cluster, historyWindowQuery() ?? selectedRange.value).then((payload) => {
           coreMetrics.value = payload
         })
       )
       metricsTasks.push(
-        gateway.metrics_memory(cluster, selectedRange.value).then((payload) => {
+        gateway.metrics_memory(cluster, historyWindowQuery() ?? selectedRange.value).then((payload) => {
           memoryMetrics.value = payload
         })
       )
       metricsTasks.push(
-        gateway.metrics_gpus(cluster, selectedRange.value).then((payload) => {
+        gateway.metrics_gpus(cluster, historyWindowQuery() ?? selectedRange.value).then((payload) => {
           gpuMetrics.value = payload
         })
       )
@@ -313,7 +386,9 @@ async function loadAnalysis() {
           order: 'desc',
           page: 1,
           page_size: 200,
-          start: rangeStartISO(selectedRange.value)
+          ...(historyWindowQuery()
+            ? historyWindowQuery()!
+            : { start: rangeStartISO(selectedRange.value) })
         })
         .then((payload) => {
           historyJobs.value = payload.jobs
@@ -351,6 +426,17 @@ async function loadAnalysis() {
       })
   )
 
+  tasks.push(
+    gateway
+      .analysis_node_hotspots(cluster, hotspotWindowQuery())
+      .then((payload) => {
+        nodeHotspots.value = payload
+      })
+      .catch(() => {
+        nodeHotspots.value = null
+      })
+  )
+
   await Promise.all(tasks)
   updatedAt.value = new Date().toISOString()
   loading.value = false
@@ -376,15 +462,21 @@ watch(
   () => {
     if (route.query.range && isMetricRange(route.query.range)) {
       selectedRange.value = route.query.range
+      customStart.value = ''
+      customEnd.value = ''
     } else {
       selectedRange.value = 'hour'
+    }
+    if (typeof route.query.start === 'string' && typeof route.query.end === 'string') {
+      customStart.value = route.query.start
+      customEnd.value = route.query.end
     }
   },
   { immediate: true }
 )
 
 watch(
-  () => `${cluster}/${selectedRange.value}`,
+  () => `${cluster}/${selectedRange.value}/${customStart.value}/${customEnd.value}`,
   () => {
     loading.value = true
     void loadAnalysis()
@@ -460,7 +552,14 @@ onUnmounted(() => {
             <MetricRangeSelector
               :model-value="selectedRange"
               :aria-label="t('pages.analysis.toolbar.selectRange')"
+              enable-custom-window
+              :start-value="customStart"
+              :end-value="customEnd"
+              custom-button-label="common.labels.timeRange"
+              reset-label="common.metricRanges.lastHour"
               @update:model-value="renderRange"
+              @apply-window="applyCustomWindow"
+              @reset-window="resetCustomWindow"
             />
           </div>
 
@@ -644,6 +743,16 @@ onUnmounted(() => {
 
               <div class="mt-4 space-y-3">
                 <div class="ui-metric-surface px-4 py-3">
+                  <div class="ui-stat-label">{{ t('pages.analysis.historical.avgQueueWait') }}</div>
+                  <div v-if="queueWaitSeries.length" class="mt-3">
+                    <QueueWaitHistoryChart :series="queueWaitSeries" />
+                  </div>
+                  <div v-else class="mt-2 text-sm text-[var(--color-brand-muted)]">
+                    {{ t('pages.analysis.historical.waitUnavailable') }}
+                  </div>
+                </div>
+
+                <div class="ui-metric-surface px-4 py-3">
                   <div class="ui-stat-label">{{ t('pages.analysis.historical.latestTelemetry') }}</div>
                   <div class="mt-2 text-lg font-semibold text-[var(--color-brand-ink-strong)]">
                     {{ renderNumber(analysis.history.latestPending, t('filters.states.pending')) }} /
@@ -685,6 +794,44 @@ onUnmounted(() => {
               </div>
             </section>
           </div>
+
+          <section class="ui-panel ui-section">
+            <div class="mb-4">
+              <h2 class="ui-panel-title">{{ t('pages.analysis.sections.nodeHotspotsTitle') }}</h2>
+              <p class="ui-panel-description mt-2">{{ t('pages.analysis.sections.nodeHotspotsDescription') }}</p>
+            </div>
+
+            <div v-if="!(nodeHotspots?.events?.length)" class="ui-panel-soft px-4 py-4 text-sm text-[var(--color-brand-muted)]">
+              {{ t('pages.analysis.nodeHotspots.empty') }}
+            </div>
+            <div v-else class="space-y-3">
+              <div
+                v-for="event in nodeHotspots.events"
+                :key="`${event.node}-${event.metric}-${event.start}`"
+                class="ui-metric-surface px-4 py-4"
+              >
+                <div class="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <div class="font-semibold text-[var(--color-brand-ink-strong)]">
+                      {{ t('pages.analysis.nodeHotspots.summary', { node: event.node }) }}
+                    </div>
+                    <div class="mt-1 text-sm text-[var(--color-brand-muted)]">
+                      {{
+                        t('pages.analysis.nodeHotspots.detail', {
+                          time: new Date(event.start).toLocaleString(),
+                          metric: event.metric === 'cpu' ? t('common.labels.cpu') : t('common.labels.memory'),
+                          usage: `${Math.round(event.peak_usage)}%`
+                        })
+                      }}
+                    </div>
+                  </div>
+                  <span class="ui-chip">
+                    {{ t('pages.analysis.nodeHotspots.duration', { seconds: event.duration_seconds }) }}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </section>
 
           <section class="ui-panel ui-section">
             <div class="mb-4">

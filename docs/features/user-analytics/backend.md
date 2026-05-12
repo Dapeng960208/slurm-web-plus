@@ -123,10 +123,22 @@
 - `totals`
   - `submitted_jobs`
   - `completed_jobs`
+  - `running_jobs`
+  - `pending_jobs`
+  - `failed_jobs`
+  - `cancelled_jobs`
 - `submissions`
   - 按所选时间范围聚合的提交作业数序列
 - `completions`
   - 按所选时间范围聚合的完成作业数序列
+- `running_jobs`
+  - 运行中、完成中、挂起作业序列
+- `pending_jobs`
+  - 排队作业序列
+- `failed_jobs`
+  - 失败、超时、节点失败、启动失败、deadline、OOM 作业序列
+- `cancelled_jobs`
+  - 取消和抢占作业序列
 
 `metrics/history` 同时支持两种时间输入：
 
@@ -195,6 +207,11 @@
 - 用户分析页实时曲线同时展示：
   - 提交作业数
   - 完成作业数
+- 用户分析摘要卡还会展示：
+  - 运行样本数
+  - 排队样本数
+  - 失败样本数
+  - 取消样本数
 - 用户名由页面标题承载，分析面板内部不再重复展示独立用户名卡片。
 - LDAP 姓名、组和更新时间压缩展示在时间范围栏的轻量上下文标签中。
 - 用户分析页顶部统一使用共享时间窗按钮：

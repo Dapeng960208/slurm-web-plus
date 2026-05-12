@@ -7,6 +7,7 @@
 import unittest
 from unittest import mock
 import urllib
+from datetime import datetime
 
 import aiohttp
 
@@ -41,6 +42,22 @@ class TestSlurmwebMetricsDB(unittest.TestCase):
         self.db.request("nodes", "hour", partition="gpu")
         request_url = mock_get.call_args.args[0]
         self.assertIn("partition='gpu'", request_url)
+
+    @mock.patch("slurmweb.metrics.db.aiohttp.ClientSession.get")
+    def test_request_with_custom_window(self, mock_get):
+        _, mock_get.return_value = mock_prometheus_response("jobs-hour")
+        self.db.request(
+            "jobs",
+            "hour",
+            partition="gpu",
+            start_time=datetime.fromisoformat("2026-04-24T00:00:00+00:00"),
+            end_time=datetime.fromisoformat("2026-04-24T12:00:00+00:00"),
+        )
+        request_url = mock_get.call_args.args[0]
+        self.assertIn("query_range?query=", request_url)
+        self.assertIn("partition='gpu'", request_url)
+        self.assertIn("&start=", request_url)
+        self.assertIn("&end=", request_url)
 
     @mock.patch("slurmweb.metrics.db.aiohttp.ClientSession.get")
     def test_request_users(self, mock_get):

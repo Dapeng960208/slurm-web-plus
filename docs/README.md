@@ -46,6 +46,9 @@
   - [测试计划](./features/management-center/test-plan.md)
 - 用户分析
   - [后端与页面契约](./features/user-analytics/backend.md)
+- 集群分析与时间窗
+  - [需求说明](./features/ai-audit-and-metrics-time-range/requirements.md)
+  - [测试计划](./features/ai-audit-and-metrics-time-range/test-plan.md)
 - Users
   - [验证说明](./features/ldap-cache/verification.md)
 

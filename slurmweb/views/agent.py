@@ -483,6 +483,33 @@ def analysis_ping():
 def analysis_diag():
     return jsonify({"statistics": current_app.slurmrestd.diag()})
 
+
+@permission_required(("analysis", "view", "*"), legacy_action="view-stats")
+def analysis_node_hotspots():
+    if current_app.node_metrics_db is None:
+        error = "Node metrics is disabled"
+        logger.warning(error)
+        abort(501, error)
+    try:
+        start_time, end_time = _parse_metrics_window_query_args()
+        if start_time is None or end_time is None:
+            raise ValueError("start and end must both be provided")
+        nodes = slurmrest("nodes")
+        node_names = [node.get("name") for node in nodes if isinstance(node, dict) and node.get("name")]
+        result = current_app.node_metrics_db.cluster_node_hotspots(
+            node_names,
+            current_app.settings.node_metrics.node_hostname_label,
+            start_time=start_time,
+            end_time=end_time,
+        )
+        return jsonify(result)
+    except ValueError as err:
+        logger.warning("Invalid node hotspot query: %s", err)
+        abort(400, str(err))
+    except SlurmwebMetricsDBError as err:
+        logger.warning("Unable to query node hotspots: %s", err)
+        abort(500, str(err))
+
 @handle_slurmrestd_errors
 def slurmrest(method: str, *args: Tuple[Any, ...]):
     return getattr(current_app.slurmrestd, method)(*args)
@@ -917,6 +944,7 @@ def metrics(metric):
     try:
         metric_range = request.args.get("range", "hour")
         partition = request.args.get("partition")
+        start_time, end_time = _parse_metrics_window_query_args()
         metrics_request = current_app.metrics_db.request
         request_signature = inspect.signature(metrics_request)
         supports_partition = False
@@ -925,9 +953,13 @@ def metrics(metric):
                 parameter.kind == inspect.Parameter.VAR_KEYWORD
                 for parameter in request_signature.parameters.values()
             )
+        kwargs = {}
+        if start_time is not None and end_time is not None:
+            kwargs["start_time"] = start_time
+            kwargs["end_time"] = end_time
         if partition is not None and supports_partition:
-            return jsonify(metrics_request(metric, metric_range, partition=partition))
-        return jsonify(metrics_request(metric, metric_range))
+            kwargs["partition"] = partition
+        return jsonify(metrics_request(metric, metric_range, **kwargs))
     except SlurmwebMetricsDBError as err:
         logger.warning(str(err))
         abort(500, str(err))

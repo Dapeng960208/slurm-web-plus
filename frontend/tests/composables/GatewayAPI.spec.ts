@@ -342,11 +342,29 @@ describe('gateway data APIs', () => {
       .mockResolvedValueOnce(stats)
       .mockResolvedValueOnce({ idle: [] })
       .mockResolvedValueOnce({ running: [] })
+      .mockResolvedValueOnce({ running: [] })
+      .mockResolvedValueOnce({
+        window: {
+          start: '2026-04-21T00:00:00Z',
+          end: '2026-04-24T00:00:00Z'
+        },
+        threshold: 80,
+        events: []
+      })
 
     const gateway = useGatewayAPI()
     await gateway.stats('cluster', { partition: 'gpu' })
     await gateway.metrics_nodes('cluster', { range: 'day', partition: 'gpu' })
     await gateway.metrics_jobs('cluster', 'hour')
+    await gateway.metrics_jobs('cluster', {
+      start: '2026-04-24T00:00:00Z',
+      end: '2026-04-24T12:00:00Z',
+      partition: 'gpu'
+    })
+    await gateway.analysis_node_hotspots('cluster', {
+      start: '2026-04-21T00:00:00Z',
+      end: '2026-04-24T00:00:00Z'
+    })
 
     expect(mockRestAPI.get).toHaveBeenNthCalledWith(1, '/agents/cluster/stats?partition=gpu')
     expect(mockRestAPI.get).toHaveBeenNthCalledWith(
@@ -354,6 +372,14 @@ describe('gateway data APIs', () => {
       '/agents/cluster/metrics/nodes?range=day&partition=gpu'
     )
     expect(mockRestAPI.get).toHaveBeenNthCalledWith(3, '/agents/cluster/metrics/jobs?range=hour')
+    expect(mockRestAPI.get).toHaveBeenNthCalledWith(
+      4,
+      '/agents/cluster/metrics/jobs?start=2026-04-24T00%3A00%3A00Z&end=2026-04-24T12%3A00%3A00Z&partition=gpu'
+    )
+    expect(mockRestAPI.get).toHaveBeenNthCalledWith(
+      5,
+      '/agents/cluster/analysis/node-hotspots?start=2026-04-21T00%3A00%3A00Z&end=2026-04-24T00%3A00%3A00Z'
+    )
   })
 
   test('uses the corrected write routes for jobs and nodes', async () => {

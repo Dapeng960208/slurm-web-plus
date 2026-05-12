@@ -534,20 +534,6 @@ async function removeUser() {
           </section>
 
           <section v-else-if="section === 'analytics'" class="ui-panel ui-section" id="analysis">
-            <div class="mb-5 flex flex-wrap items-start justify-between gap-4">
-              <div>
-                <p class="ui-page-kicker">{{ t('pages.user.analytics.kicker') }}</p>
-                <h2 class="ui-panel-title">{{ t('pages.user.analytics.title') }}</h2>
-                <p class="ui-panel-description mt-2">
-                  {{ t('pages.user.analytics.description') }}
-                </p>
-              </div>
-              <span class="ui-chip">
-                <UsersIcon class="h-4 w-4" aria-hidden="true" />
-                {{ viewedUser }}
-              </span>
-            </div>
-
             <UserAnalyticsPanels :cluster="cluster" :user="viewedUser" :enabled="sections.analytics" />
           </section>
         </template>

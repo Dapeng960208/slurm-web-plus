@@ -121,6 +121,9 @@ const zhCN = {
     }
   },
   common: {
+    navigation: {
+      back: '返回'
+    },
     locale: {
       en: 'English',
       zhCN: '简体中文',
@@ -206,6 +209,7 @@ const zhCN = {
       duration: '持续时间',
       users: '用户',
       accounts: '账户',
+      partitions: '分区',
       name: '名称',
       description: '说明',
       organization: '组织',
@@ -1090,6 +1094,7 @@ const zhCN = {
       description: '查看整个集群中的节点当前状态、分配压力和分区可见性。',
       metricLabel: '个节点',
       metricLabelPlural: '个节点',
+      rack: '机架',
       actions: {
         showRackDiagram: '显示机架图',
         hideRackDiagram: '隐藏机架图',
@@ -1097,6 +1102,24 @@ const zhCN = {
       },
       errors: {
         unableToRetrieve: '无法从集群 {cluster} 获取节点'
+      }
+    },
+    partition: {
+      description: '查看所选分区的拓扑、节点覆盖范围和核心容量。',
+      detailTitle: '分区详情',
+      detailDescription: '查看该分区的节点集合定义以及当前工作区可见的容量情况。',
+      nodeSets: '节点集合',
+      nodeSetsDescription: '节点集合表达式用于说明该分区由哪些主机提供容量。',
+      nodeSetsEmpty: '该分区当前没有可展示的节点集合表达式。',
+      notFound: '当前集群中不存在分区 {partition}。',
+      summary: {
+        nodes: '节点数',
+        allocatedNodes: '已分配节点',
+        idleNodes: '空闲节点',
+        totalCpu: '总 CPU',
+        allocatedCpu: '已分配 CPU',
+        totalMemory: '总内存',
+        gpu: 'GPU'
       }
     },
     node: {
@@ -1358,6 +1381,8 @@ const zhCN = {
         partitionDescription: '分区级压力有助于判断是扩容、重平衡作业还是调整 QOS。',
         historicalTitle: '历史压力',
         historicalDescription: '快速历史快照可帮助判断容量压力是持续、突发还是策略驱动。',
+        nodeHotspotsTitle: '节点热点',
+        nodeHotspotsDescription: '展示所选分析时间窗内 CPU 或内存持续超过 80% 的节点。',
         actionsTitle: '建议动作',
         actionsDescription: '下面的建议基于实时遥测生成，用于降低排队时间并提升作业吞吐。',
         healthTitle: '控制器健康',
@@ -1384,6 +1409,8 @@ const zhCN = {
       historical: {
         metricsDisabled: '该集群未启用指标采集，但仍可使用实时分析。',
         metricsUnavailable: '历史指标暂时不可用。',
+        avgQueueWait: '平均排队时间',
+        secondsUnit: '秒',
         latestTelemetry: '最新遥测',
         latestTelemetryDetail: '所选时间范围内最近一次指标采样的作业情况。',
         waitSamples: '等待样本',
@@ -1400,6 +1427,12 @@ const zhCN = {
         diagUnavailable: '当前无法获取该集群的诊断数据。',
         diagEmpty: '当前响应中没有可用的诊断摘要字段。',
         fallbackController: '控制器'
+      },
+      nodeHotspots: {
+        empty: '当前时间窗内没有节点 CPU 或内存热点事件超过 80% 阈值。',
+        summary: '节点 {node}',
+        detail: '{time} {metric} 利用率达到 {usage}。',
+        duration: '{seconds} 秒'
       }
     },
     reservations: {
@@ -1598,6 +1631,22 @@ const zhCN = {
           avgRuntime: {
             title: '平均运行时长',
             detail: '基于所选时间窗口内捕获的已完成作业'
+          },
+          running: {
+            title: '运行中样本',
+            detail: '所选时间窗口内观察到的运行中或收尾作业样本'
+          },
+          pending: {
+            title: '排队中样本',
+            detail: '所选时间窗口内观察到的待调度作业样本'
+          },
+          failed: {
+            title: '失败样本',
+            detail: '所选时间窗口内观察到的失败或超时作业样本'
+          },
+          cancelled: {
+            title: '取消样本',
+            detail: '所选时间窗口内观察到的取消或抢占作业样本'
           }
         },
         activity: {
@@ -1634,6 +1683,10 @@ const zhCN = {
         chart: {
           submissions: '提交数',
           completions: '完成数',
+          running: '运行中',
+          pending: '排队中',
+          failed: '失败',
+          cancelled: '取消',
           jobsUnit: '个作业'
         },
         units: {

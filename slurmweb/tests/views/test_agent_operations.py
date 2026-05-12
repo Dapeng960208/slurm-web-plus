@@ -44,6 +44,52 @@ class TestAgentOperations(TestAgentBase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json["statistics"]["parts_packed"], 1)
 
+    def test_analysis_node_hotspots(self):
+        self.setup_client(node_metrics=True)
+        self.app.settings.node_metrics.node_hostname_label = "instance"
+        self.app.slurmrestd.nodes = mock.Mock(
+            return_value=[{"name": "cn1"}, {"name": "cn2"}]
+        )
+        self.app.node_metrics_db.cluster_node_hotspots = mock.Mock(
+            return_value={
+                "window": {
+                    "start": "2026-04-21T00:00:00+00:00",
+                    "end": "2026-04-24T00:00:00+00:00",
+                },
+                "threshold": 80,
+                "events": [
+                    {
+                        "node": "cn1",
+                        "metric": "cpu",
+                        "start": "2026-04-23T09:00:00+00:00",
+                        "end": "2026-04-23T09:20:00+00:00",
+                        "duration_seconds": 1200,
+                        "peak_usage": 93,
+                    }
+                ],
+            }
+        )
+
+        response = self.client.get(
+            f"/v{get_version()}/analysis/node-hotspots?start=2026-04-21T00:00:00Z&end=2026-04-24T00:00:00Z"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json["events"][0]["node"], "cn1")
+        args, _ = self.app.node_metrics_db.cluster_node_hotspots.call_args
+        self.assertEqual(args[1], "instance")
+
+    def test_analysis_node_hotspots_requires_window(self):
+        self.setup_client(node_metrics=True)
+
+        response = self.client.get(f"/v{get_version()}/analysis/node-hotspots")
+
+        self.assertEqual(response.status_code, 400)
+        if response.json is not None:
+            self.assertEqual(response.json["description"], "start and end must both be provided")
+        else:
+            self.assertIn("start and end must both be provided", response.text)
+
     def test_admin_system_route_removed(self):
         self.setup_client()
 

@@ -1,5 +1,31 @@
 # 最新功能
 
+## 本轮：集群分析、用户分析、资源与分区页面补齐分析视图增强
+
+本轮围绕 `Cluster Analysis`、`User Analysis`、`Resources` 和新的分区详情页补了一组前端与接口增强，并同步补齐中英文文案：
+
+- `Cluster Analysis`
+  - 新增平均排队时长曲线，单位为秒。
+  - 新增节点热点概览，默认展示近 3 天内 CPU 或内存利用率超过 80% 的节点事件，包括节点名、开始时间、指标类型、峰值利用率和持续时间。
+  - `diag` 面板只保留 10 条核心统计字段，避免非核心噪音继续占据分析页。
+  - 时间范围控件支持与用户分析一致的自定义起止时间和快捷窗口，请求链路已扩展到 `start/end`。
+- `User Analysis`
+  - 提交/完成趋势之外，新增运行中、排队中、失败、取消状态的统计与历史序列数据返回。
+  - 删除分析区冗余标题，只保留必要操作和分析面板。
+- `Resources`
+  - 节点列表新增 `Rack` 列。
+  - 资源页头部按钮已整理到同一行。
+  - 分区标签可直接跳转分区详情页。
+- `Partition`
+  - 新增 `/:cluster/partitions/:partition` 页面。
+  - 展示节点数、已分配节点、空闲节点、CPU、内存、GPU 与节点集合表达式等核心信息。
+
+本轮新增验证：
+
+- `npm --prefix frontend run type-check`
+- `cd frontend && pnpm vitest run tests/views/UserAnalysisView.spec.ts tests/views/ClusterAnalysisView.spec.ts tests/views/resources/ResourcesView.spec.ts tests/views/PartitionView.spec.ts tests/composables/GatewayAPI.spec.ts`
+- `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/metrics/test_db.py slurmweb/tests/views/test_agent_metrics_requests.py slurmweb/tests/views/test_agent_operations.py slurmweb/tests/views/test_gateway.py`
+
 ## 本轮：AI 与 Admin 页面主体国际化已补齐
 
 本轮继续补齐前端全站中英文切换，重点收口此前仍大量保留英文直出的 AI 和 Admin 页面主体：

@@ -23,6 +23,10 @@ const chartCanvas = useTemplateRef<HTMLCanvasElement>('chartCanvas')
 let chart: Chart<'line'> | null = null
 const submissionsLabel = computed(() => t('pages.user.analyticsPanels.chart.submissions'))
 const completionsLabel = computed(() => t('pages.user.analyticsPanels.chart.completions'))
+const runningLabel = computed(() => t('pages.user.analyticsPanels.chart.running'))
+const pendingLabel = computed(() => t('pages.user.analyticsPanels.chart.pending'))
+const failedLabel = computed(() => t('pages.user.analyticsPanels.chart.failed'))
+const cancelledLabel = computed(() => t('pages.user.analyticsPanels.chart.cancelled'))
 const jobsUnit = computed(() => t('pages.user.analyticsPanels.chart.jobsUnit'))
 
 function toPoints(series: Array<[number, number]>): Point[] {
@@ -56,6 +60,46 @@ function updateChart() {
       borderWidth: 2.2,
       pointRadius: 0,
       tension: 0.24,
+      fill: false
+    },
+    {
+      label: runningLabel.value,
+      data: toPoints(history.running_jobs ?? []),
+      borderColor: '#7bbf1f',
+      backgroundColor: 'rgba(123, 191, 31, 0.08)',
+      borderWidth: 2,
+      pointRadius: 0,
+      tension: 0.22,
+      fill: false
+    },
+    {
+      label: pendingLabel.value,
+      data: toPoints(history.pending_jobs ?? []),
+      borderColor: '#d4a03f',
+      backgroundColor: 'rgba(212, 160, 63, 0.08)',
+      borderWidth: 2,
+      pointRadius: 0,
+      tension: 0.22,
+      fill: false
+    },
+    {
+      label: failedLabel.value,
+      data: toPoints(history.failed_jobs ?? []),
+      borderColor: '#d84b50',
+      backgroundColor: 'rgba(216, 75, 80, 0.08)',
+      borderWidth: 2,
+      pointRadius: 0,
+      tension: 0.22,
+      fill: false
+    },
+    {
+      label: cancelledLabel.value,
+      data: toPoints(history.cancelled_jobs ?? []),
+      borderColor: '#8a6fb5',
+      backgroundColor: 'rgba(138, 111, 181, 0.08)',
+      borderWidth: 2,
+      pointRadius: 0,
+      tension: 0.22,
       fill: false
     }
   ]

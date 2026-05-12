@@ -34,6 +34,9 @@
 - 统一 Dashboard 头部摘要、筛选工具栏与统计卡片的布局和 surface 样式，修复按钮错位、筛选区不对齐和卡片背景不一致
 - 压缩用户详情分析区头部与双栏布局，强化时间窗控件可见性并减少 `Submission Activity` 周边空白
 - 收口 `/:cluster/admin/ai`：模型配置改为表格、审计记录改为表格、统一搜索框样式，并将审计详情迁移到独立详情页
+- 集群分析页新增近 3 天节点热点概览、平均排队时长曲线，并把 `diag` 面板收口到 10 条核心字段
+- 用户分析页新增运行/排队/失败/取消状态统计与曲线数据，移除冗余分析标题
+- 资源页新增 `Rack` 列与分区详情跳转，补 `/:cluster/partitions/:partition` 分区详情页
 
 ## 2. 已完成项
 
@@ -510,6 +513,7 @@
 - 当前用户分析的真实集群时间窗仍需结合数据库时区与旧快照字段完整性复验；代码已对缺失 `submit_time` 与小写终态做兼容
 - 根目录 `.venv\Scripts\python.exe -m pytest -q` 仍会在收集阶段被 `slurmweb4.2/` 参考测试树和缺失的可选依赖 `racksdb` 阻断；当前可作为主线验收结论的是 `.venv\Scripts\python.exe -m pytest -q slurmweb/tests`
 - 当前 `tool_mapping_file` demo 只提供常见工具归类示例，不会默认启用；生产环境仍需按实际集群命名规则调整
+- 资源页 `Rack` 列当前采用基于节点命名的保守展示，只用于快速辨识当前列表，不等价于完整 RacksDB 物理机架标签
 - 当前 AI token 计数为前端估算，不等同于 provider 真实 usage 或计费 token；若后续需要精确计量，需要扩展后端 provider 返回与持久化结构
 - 当前 Conversation Audit 搜索只过滤已加载摘要，不搜索完整消息正文；如需全文检索需要扩展审计接口
 - 当前 Conversation Audit 前端过滤只匹配已加载的 `username` 和 `title` 摘要列，不搜索完整消息正文；如需全文检索需要扩展审计接口
@@ -543,6 +547,7 @@
 - `docs/features/user-analytics/backend.md`
 - `docs/features/ai-audit-and-metrics-time-range/requirements.md`
 - `docs/features/ai-audit-and-metrics-time-range/test-plan.md`
+- `docs/README.md`
 - `docs/features/dashboard-partition-filter/requirements.md`
 - `docs/features/dashboard-partition-filter/test-plan.md`
 - `docs/features/dashboard-partition-filter/backend.md`
@@ -638,6 +643,8 @@
 - `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/views/test_agent.py slurmweb/tests/views/test_agent_metrics_requests.py slurmweb/tests/views/test_gateway.py`
 - `npm --prefix frontend run type-check`
 - `cd frontend && npx vitest run`
+- `cd frontend && pnpm vitest run tests/views/UserAnalysisView.spec.ts tests/views/ClusterAnalysisView.spec.ts tests/views/resources/ResourcesView.spec.ts tests/views/PartitionView.spec.ts tests/composables/GatewayAPI.spec.ts`
+- `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/metrics/test_db.py slurmweb/tests/views/test_agent_metrics_requests.py slurmweb/tests/views/test_agent_operations.py slurmweb/tests/views/test_gateway.py`
 - `gh auth status`
 - `gh repo view --json name,owner,defaultBranchRef,url`
 - `gh run list --limit 5 --json databaseId,workflowName,status,conclusion,headBranch,displayTitle,createdAt,url`

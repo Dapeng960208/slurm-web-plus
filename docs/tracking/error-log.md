@@ -16,6 +16,16 @@
 - 现象：
 - 解决办法：
 
+### 2026-05-12：集群分析页自定义时间窗只改路由但不会立即刷新分析数据
+- 时间：2026-05-12
+- 现象：`ClusterAnalysisView.vue` 已把 `start/end` 写入 query，但刷新逻辑只监听 `selectedRange`，导致手动应用自定义时间窗后 metrics、历史作业和热点数据不会立刻重拉
+- 解决办法：把分析页数据刷新 watch key 扩展到 `cluster + selectedRange + customStart + customEnd`，确保自定义窗口变化后立即触发统一刷新
+
+### 2026-05-12：节点热点接口缺少时间窗时仍继续访问 slurmrestd 节点列表
+- 时间：2026-05-12
+- 现象：`/analysis/node-hotspots` 在缺少 `start/end` 时，本应直接返回 `400`，但因为未先拦截空窗口，测试环境继续进入 `slurmrestd.nodes()`，在 Windows 下触发 `socket.AF_UNIX` 相关异常栈
+- 解决办法：在 `analysis_node_hotspots()` 中显式要求 `start` 和 `end` 同时存在，缺失时先抛 `ValueError("start and end must both be provided")` 并返回 `400`
+
 ### 2026-05-08：Dashboard 视图测试直接用 `wrapper.text()` 断言 `RouterLink` 文本会误报失败
 - 时间：2026-05-08
 - 现象：页面真实实现仍存在跳转按钮，但 `tests/views/DashboardView.spec.ts` 使用 `wrapper.text()` 或直接查 `RouterLinkStub` 时断言失败；同组 dashboard 测试其余用例全部通过，失败集中在头部 actions 区域文案检查

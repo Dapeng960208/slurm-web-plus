@@ -211,9 +211,20 @@ class TestAgentMetricsRequest(TestAgentBase):
                 "start": "2026-04-24T00:00:00+00:00",
                 "end": "2026-04-24T01:00:00+00:00",
             },
-            "totals": {"submitted_jobs": 2, "completed_jobs": 1},
+            "totals": {
+                "submitted_jobs": 2,
+                "completed_jobs": 1,
+                "running_jobs": 1,
+                "pending_jobs": 2,
+                "failed_jobs": 3,
+                "cancelled_jobs": 4,
+            },
             "submissions": [[1713956400000, 2]],
             "completions": [[1713956400000, 1]],
+            "running_jobs": [[1713956400000, 1]],
+            "pending_jobs": [[1713956400000, 2]],
+            "failed_jobs": [[1713956400000, 3]],
+            "cancelled_jobs": [[1713956400000, 4]],
         }
 
         response = self.client.get(
@@ -228,9 +239,20 @@ class TestAgentMetricsRequest(TestAgentBase):
                     "start": "2026-04-24T00:00:00+00:00",
                     "end": "2026-04-24T01:00:00+00:00",
                 },
-                "totals": {"submitted_jobs": 2, "completed_jobs": 1},
+                "totals": {
+                    "submitted_jobs": 2,
+                    "completed_jobs": 1,
+                    "running_jobs": 1,
+                    "pending_jobs": 2,
+                    "failed_jobs": 3,
+                    "cancelled_jobs": 4,
+                },
                 "submissions": [[1713956400000, 2]],
                 "completions": [[1713956400000, 1]],
+                "running_jobs": [[1713956400000, 1]],
+                "pending_jobs": [[1713956400000, 2]],
+                "failed_jobs": [[1713956400000, 3]],
+                "cancelled_jobs": [[1713956400000, 4]],
             },
         )
         self.app.user_metrics_store.user_metrics_history.assert_called_once_with(
@@ -239,6 +261,21 @@ class TestAgentMetricsRequest(TestAgentBase):
             start_time=None,
             end_time=None,
         )
+
+    def test_request_metrics_jobs_with_custom_window(self):
+        self._enable_custom_rules("jobs:view:*")
+        self.app.metrics_db.request = mock.Mock(
+            return_value={"running": [[1713956400000, 1.0]]}
+        )
+
+        response = self.client.get(
+            f"/v{get_version()}/metrics/jobs?start=2026-04-24T00:00:00Z&end=2026-04-24T12:00:00Z"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        _, kwargs = self.app.metrics_db.request.call_args
+        self.assertEqual(kwargs["start_time"].isoformat(), "2026-04-24T00:00:00+00:00")
+        self.assertEqual(kwargs["end_time"].isoformat(), "2026-04-24T12:00:00+00:00")
 
     def test_request_user_tools_analysis(self):
         self.app.user_metrics_enabled = True

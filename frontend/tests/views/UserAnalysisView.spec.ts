@@ -77,10 +77,18 @@ describe('UserAnalysisView.vue', () => {
       },
       totals: {
         submitted_jobs: 17,
-        completed_jobs: 12
+        completed_jobs: 12,
+        running_jobs: 2,
+        pending_jobs: 1,
+        failed_jobs: 3,
+        cancelled_jobs: 4
       },
       submissions: [[1745488800000, 2]],
-      completions: [[1745488800000, 1]]
+      completions: [[1745488800000, 1]],
+      running_jobs: [[1745488800000, 2]],
+      pending_jobs: [[1745488800000, 1]],
+      failed_jobs: [[1745488800000, 3]],
+      cancelled_jobs: [[1745488800000, 4]]
     })
   })
 
@@ -103,11 +111,14 @@ describe('UserAnalysisView.vue', () => {
 
     await flushPromises()
 
-    expect(wrapper.text()).toContain('User Analysis')
     expect(wrapper.text()).toContain('Submission Activity')
     expect(wrapper.text()).toContain('Completed Job Tool Analysis')
     expect(wrapper.text()).toContain('Avg Memory')
     expect(wrapper.text()).toContain('Avg CPU')
+    expect(wrapper.text()).toContain('Running Samples')
+    expect(wrapper.text()).toContain('Pending Samples')
+    expect(wrapper.text()).toContain('Failed Samples')
+    expect(wrapper.text()).toContain('Cancelled Samples')
     expect(wrapper.text()).toContain('bwa')
     expect(wrapper.text()).not.toContain('Top Tools')
     expect(wrapper.text()).not.toContain('Memory and Volume')

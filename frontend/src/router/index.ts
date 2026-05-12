@@ -34,6 +34,7 @@ const JobView = () => import('@/views/JobView.vue')
 const JobsHistoryView = () => import('@/views/JobsHistoryView.vue')
 const JobHistoryView = () => import('@/views/JobHistoryView.vue')
 const ResourcesView = () => import('@/views/resources/ResourcesView.vue')
+const PartitionView = () => import('@/views/PartitionView.vue')
 const ResourcesDiagramNodesView = () => import('@/views/resources/ResourcesDiagramNodesView.vue')
 const ResourcesDiagramCoresView = () => import('@/views/resources/ResourcesDiagramCoresView.vue')
 const NodeView = () => import('@/views/NodeView.vue')
@@ -275,6 +276,12 @@ const router = createRouter({
           props: true
         },
         {
+          path: 'partitions/:partition',
+          name: 'partition',
+          component: PartitionView,
+          props: true
+        },
+        {
           path: 'resources/diagram/nodes',
           name: 'resources-diagram-nodes',
           component: ResourcesDiagramNodesView,
@@ -403,6 +410,7 @@ function clusterRoutePermission(
     case 'job-history':
       return { resource: 'jobs-history', operation: 'view' }
     case 'resources':
+    case 'partition':
     case 'resources-diagram-nodes':
     case 'resources-diagram-cores':
     case 'node':

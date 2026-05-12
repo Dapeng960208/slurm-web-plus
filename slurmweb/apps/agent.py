@@ -45,6 +45,9 @@ class SlurmwebAppAgent(SlurmwebWebApp, RFLTokenizedRBACWebApp):
         SlurmwebAppRoute(f"/v{get_version()}/stats", views.stats),
         SlurmwebAppRoute(f"/v{get_version()}/analysis/ping", views.analysis_ping),
         SlurmwebAppRoute(f"/v{get_version()}/analysis/diag", views.analysis_diag),
+        SlurmwebAppRoute(
+            f"/v{get_version()}/analysis/node-hotspots", views.analysis_node_hotspots
+        ),
         SlurmwebAppRoute(f"/v{get_version()}/jobs", views.jobs),
         SlurmwebAppRoute(f"/v{get_version()}/job/<int:job>", views.job),
         SlurmwebAppRoute(

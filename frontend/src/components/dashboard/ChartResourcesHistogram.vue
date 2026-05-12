@@ -113,7 +113,7 @@ const liveChart = useLiveHistogram<ChartResourceMetricState>(
   chartCanvas,
   resourcesLabels(),
   runtimeStore.dashboard.range,
-  runtimeStore.dashboard.partition ? { partition: runtimeStore.dashboard.partition } : undefined,
+  runtimeStore.dashboard.metricsQuery(),
   formatResourceValue
 )
 
@@ -134,20 +134,16 @@ watch(
 )
 
 watch(
-  () => runtimeStore.dashboard.range,
+  () => [runtimeStore.dashboard.range, runtimeStore.dashboard.start, runtimeStore.dashboard.end],
   () => {
-    liveChart.setRange(runtimeStore.dashboard.range, {
-      partition: runtimeStore.dashboard.partition || undefined
-    })
+    liveChart.setRange(runtimeStore.dashboard.range, runtimeStore.dashboard.metricsQuery())
   }
 )
 
 watch(
   () => runtimeStore.dashboard.partition,
   () => {
-    liveChart.setRange(runtimeStore.dashboard.range, {
-      partition: runtimeStore.dashboard.partition || undefined
-    })
+    liveChart.setRange(runtimeStore.dashboard.range, runtimeStore.dashboard.metricsQuery())
   }
 )
 

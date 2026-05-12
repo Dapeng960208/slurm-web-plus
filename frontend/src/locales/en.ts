@@ -133,6 +133,9 @@ const en = {
     }
   },
   common: {
+    navigation: {
+      back: 'Back'
+    },
     locale: {
       en: 'English',
       zhCN: 'Simplified Chinese',
@@ -218,6 +221,7 @@ const en = {
       duration: 'Duration',
       users: 'Users',
       accounts: 'Accounts',
+      partitions: 'Partitions',
       name: 'Name',
       description: 'Description',
       organization: 'Organization',
@@ -1148,6 +1152,7 @@ const en = {
         'Current node state, allocation pressure and partition visibility across the cluster.',
       metricLabel: 'node found',
       metricLabelPlural: 'nodes found',
+      rack: 'Rack',
       actions: {
         showRackDiagram: 'Show Rack Diagram',
         hideRackDiagram: 'Hide Rack Diagram',
@@ -1155,6 +1160,25 @@ const en = {
       },
       errors: {
         unableToRetrieve: 'Unable to retrieve nodes from cluster {cluster}'
+      }
+    },
+    partition: {
+      description: 'Partition topology, node coverage and core capacity for the selected partition.',
+      detailTitle: 'Partition Details',
+      detailDescription:
+        'Review the partition node set definition and the currently visible capacity in this workspace.',
+      nodeSets: 'Node sets',
+      nodeSetsDescription: 'Node set expressions define which hosts contribute capacity to this partition.',
+      nodeSetsEmpty: 'No node set expression is currently available for this partition.',
+      notFound: 'Partition {partition} is not available on this cluster.',
+      summary: {
+        nodes: 'Nodes',
+        allocatedNodes: 'Allocated Nodes',
+        idleNodes: 'Idle Nodes',
+        totalCpu: 'Total CPU',
+        allocatedCpu: 'Allocated CPU',
+        totalMemory: 'Total Memory',
+        gpu: 'GPU'
       }
     },
     node: {
@@ -1429,6 +1453,9 @@ const en = {
         historicalTitle: 'Historical Pressure',
         historicalDescription:
           'Fast historical snapshots show whether capacity pressure is steady, bursty or policy-driven.',
+        nodeHotspotsTitle: 'Node Hotspots',
+        nodeHotspotsDescription:
+          'Nodes that sustained CPU or memory usage above 80% within the selected analysis window.',
         actionsTitle: 'Recommended Actions',
         actionsDescription:
           'The list below is generated from live telemetry to help reduce queue time and increase job throughput.',
@@ -1459,6 +1486,8 @@ const en = {
         metricsDisabled:
           'Metrics collection is disabled for this cluster. Live analysis remains available.',
         metricsUnavailable: 'Historical metrics are temporarily unavailable.',
+        avgQueueWait: 'Average Queue Wait',
+        secondsUnit: 'sec',
         latestTelemetry: 'Latest telemetry',
         latestTelemetryDetail: 'Jobs at the most recent metric sample in the selected range.',
         waitSamples: 'Wait samples',
@@ -1475,6 +1504,12 @@ const en = {
         diagUnavailable: 'Diagnostic data is currently unavailable for this cluster.',
         diagEmpty: 'No diagnostic summary fields are available in the current response.',
         fallbackController: 'Controller'
+      },
+      nodeHotspots: {
+        empty: 'No node CPU or memory hotspot events crossed the 80% threshold in this window.',
+        summary: 'Node {node}',
+        detail: '{time} {metric} usage reached {usage}.',
+        duration: '{seconds} sec'
       }
     },
     reservations: {
@@ -1687,6 +1722,22 @@ const en = {
           avgRuntime: {
             title: 'Average Runtime',
             detail: 'Across completed jobs captured in the selected window'
+          },
+          running: {
+            title: 'Running Samples',
+            detail: 'Running or completing job samples observed in the selected window'
+          },
+          pending: {
+            title: 'Pending Samples',
+            detail: 'Queued job samples observed in the selected window'
+          },
+          failed: {
+            title: 'Failed Samples',
+            detail: 'Failed or timed-out job samples observed in the selected window'
+          },
+          cancelled: {
+            title: 'Cancelled Samples',
+            detail: 'Cancelled or preempted job samples observed in the selected window'
           }
         },
         activity: {
@@ -1724,6 +1775,10 @@ const en = {
         chart: {
           submissions: 'Submissions',
           completions: 'Completions',
+          running: 'Running',
+          pending: 'Pending',
+          failed: 'Failed',
+          cancelled: 'Cancelled',
           jobsUnit: 'jobs'
         },
         units: {

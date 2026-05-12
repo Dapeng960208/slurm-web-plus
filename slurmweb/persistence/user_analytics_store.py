@@ -31,6 +31,13 @@ _SUMMARY_RANGE_WINDOWS = {
     "week": timedelta(days=7),
 }
 
+_USER_HISTORY_STATE_GROUPS = {
+    "running_jobs": ["RUNNING", "COMPLETING", "SUSPENDED"],
+    "pending_jobs": ["PENDING"],
+    "failed_jobs": ["FAILED", "TIMEOUT", "NODE_FAIL", "BOOT_FAIL", "DEADLINE", "OUT_OF_MEMORY"],
+    "cancelled_jobs": ["CANCELLED", "PREEMPTED"],
+}
+
 
 def _now_utc():
     return datetime.now(tz=timezone.utc)
@@ -724,6 +731,66 @@ class UserAnalyticsStore:
             cursor += resolution
         return {"completions": series}
 
+    def state_timeline(
+        self,
+        username,
+        states,
+        series_key,
+        range_name=None,
+        start_time=None,
+        end_time=None,
+    ):
+        start_time, end_time, bucket_name, resolution = (
+            self._resolve_history_window_and_bucket(
+                range_name=range_name,
+                start_time=start_time,
+                end_time=end_time,
+            )
+        )
+        state_params = [f"%{state}%" for state in states]
+        where_states = " OR ".join(["UPPER(js.job_state) LIKE %s"] * len(states))
+
+        conn = self._get_conn()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT bucket, COUNT(*)::int AS job_count
+                    FROM (
+                        SELECT DISTINCT ON (js.job_id, js.submit_time)
+                            date_trunc(%s, COALESCE(js.last_seen, js.start_time, js.submit_time) AT TIME ZONE 'UTC') AS bucket,
+                            js.job_id,
+                            js.submit_time
+                        FROM job_snapshots js
+                        INNER JOIN users u ON u.id = js.user_id
+                        WHERE u.username = %s
+                          AND COALESCE(js.last_seen, js.start_time, js.submit_time) >= %s
+                          AND COALESCE(js.last_seen, js.start_time, js.submit_time) <= %s
+                          AND (
+                    """
+                    + where_states
+                    + """
+                          )
+                        ORDER BY js.job_id, js.submit_time, js.last_seen DESC
+                    ) state_jobs
+                    GROUP BY bucket
+                    ORDER BY bucket ASC
+                    """,
+                    [bucket_name, username, start_time, end_time] + state_params,
+                )
+                rows = cur.fetchall()
+        finally:
+            self._release_conn(conn)
+
+        values = {_bucket_epoch_ms(bucket_time): count for bucket_time, count in rows}
+        cursor = self._align_bucket(start_time, resolution)
+        series = []
+        while cursor <= end_time:
+            bucket_ms = _bucket_epoch_ms(cursor)
+            series.append([bucket_ms, values.get(bucket_ms, 0)])
+            cursor += resolution
+        return {series_key: series}
+
     def user_metrics_history(self, username, range_name=None, start_time=None, end_time=None):
         start_time, end_time, _, _ = self._resolve_history_window_and_bucket(
             range_name=range_name,
@@ -742,6 +809,17 @@ class UserAnalyticsStore:
             start_time=start_time,
             end_time=end_time,
         )["completions"]
+        state_timelines = {
+            key: self.state_timeline(
+                username,
+                states,
+                key,
+                range_name=range_name,
+                start_time=start_time,
+                end_time=end_time,
+            )[key]
+            for key, states in _USER_HISTORY_STATE_GROUPS.items()
+        }
         return {
             "window": {
                 "start": start_time.isoformat(),
@@ -750,9 +828,14 @@ class UserAnalyticsStore:
             "totals": {
                 "submitted_jobs": sum(count for _, count in submissions),
                 "completed_jobs": sum(count for _, count in completions),
+                **{
+                    key: sum(count for _, count in values)
+                    for key, values in state_timelines.items()
+                },
             },
             "submissions": submissions,
             "completions": completions,
+            **state_timelines,
         }
 
     def latest_submission_count(self, username, window_seconds=60):

@@ -72,6 +72,18 @@ function syncQuery() {
 
 function setRange(range: MetricRange) {
   runtimeStore.dashboard.range = range
+  runtimeStore.dashboard.clearWindow()
+  syncQuery()
+}
+
+function applyMetricsWindow(window: { start: string; end: string }) {
+  runtimeStore.dashboard.setWindow(window)
+  syncQuery()
+}
+
+function resetMetricsWindow() {
+  runtimeStore.dashboard.clearWindow()
+  runtimeStore.dashboard.range = 'hour'
   syncQuery()
 }
 
@@ -234,7 +246,14 @@ watch(
                   <MetricRangeSelector
                     :model-value="runtimeStore.dashboard.range"
                     :aria-label="t('pages.dashboard.toolbar.selectMetricsRange')"
+                    enable-custom-window
+                    :start-value="runtimeStore.dashboard.start"
+                    :end-value="runtimeStore.dashboard.end"
+                    custom-button-label="common.labels.timeRange"
+                    reset-label="common.metricRanges.lastHour"
                     @update:model-value="setRange"
+                    @apply-window="applyMetricsWindow"
+                    @reset-window="resetMetricsWindow"
                   />
                 </div>
               </div>

@@ -1400,9 +1400,17 @@ export interface UserMetricsHistory {
   totals?: {
     submitted_jobs: number
     completed_jobs: number
+    running_jobs?: number
+    pending_jobs?: number
+    failed_jobs?: number
+    cancelled_jobs?: number
   }
   submissions: MetricValue[]
   completions: MetricValue[]
+  running_jobs?: MetricValue[]
+  pending_jobs?: MetricValue[]
+  failed_jobs?: MetricValue[]
+  cancelled_jobs?: MetricValue[]
 }
 
 export interface UserToolActivityRecord {
@@ -1467,9 +1475,13 @@ export interface DateTimeWindowQuery {
 export interface DashboardPartitionQuery {
   partition?: string
 }
-export interface DashboardMetricsQuery extends DashboardPartitionQuery {
-  range: string
-}
+export type DashboardMetricsQuery = DashboardPartitionQuery &
+  (
+    | {
+        range: string
+      }
+    | DateTimeWindowQuery
+  )
 export type MetricResourceState =
   | 'idle'
   | 'mixed'
@@ -1496,6 +1508,24 @@ export type MetricJobState =
   | 'out_of_memory'
   | 'unknown'
 export type MetricCacheResult = 'hit' | 'miss'
+
+export interface AnalysisNodeHotspotEvent {
+  node: string
+  metric: 'cpu' | 'memory'
+  start: string
+  end: string
+  duration_seconds: number
+  peak_usage: number
+}
+
+export interface AnalysisNodeHotspots {
+  window: {
+    start: string
+    end: string
+  }
+  threshold: number
+  events: AnalysisNodeHotspotEvent[]
+}
 
 export function isMetricRange(range: unknown): range is MetricRange {
   return typeof range === 'string' && MetricRanges.includes(range as MetricRange)
@@ -1643,7 +1673,12 @@ function buildDashboardMetricsQueryString(query: string | DashboardMetricsQuery)
   if (typeof query === 'string') {
     params.append('range', query)
   } else {
-    params.append('range', query.range)
+    if ('range' in query) {
+      params.append('range', query.range)
+    } else {
+      params.append('start', query.start)
+      params.append('end', query.end)
+    }
     if (query.partition) {
       params.append('partition', query.partition)
     }
@@ -1720,6 +1755,15 @@ export function useGatewayAPI() {
 
   async function analysis_diag(cluster: string): Promise<unknown> {
     return await restAPI.get<unknown>(`/agents/${cluster}/analysis/diag`)
+  }
+
+  async function analysis_node_hotspots(
+    cluster: string,
+    query: DateTimeWindowQuery
+  ): Promise<AnalysisNodeHotspots> {
+    return await restAPI.get<AnalysisNodeHotspots>(
+      `/agents/${cluster}/analysis/node-hotspots?start=${encodeURIComponent(query.start)}&end=${encodeURIComponent(query.end)}`
+    )
   }
 
   async function stats(cluster: string, query?: DashboardPartitionQuery): Promise<ClusterStats> {
@@ -2394,6 +2438,7 @@ export function useGatewayAPI() {
     ping,
     analysis_ping,
     analysis_diag,
+    analysis_node_hotspots,
     stats,
     jobs,
     job,

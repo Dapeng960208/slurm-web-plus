@@ -173,7 +173,7 @@ describe('ResourcesView.vue', () => {
     expect(addFiltersButton.classes()).toContain('ui-button-secondary')
   })
 
-  test('omits row management buttons while node links still open details', () => {
+  test('omits row management buttons while node and partition links still open details', () => {
     mockClusterDataPoller.data.value = [nodes[0] as ClusterNode]
 
     const wrapper = mount(ResourcesView, {
@@ -183,7 +183,9 @@ describe('ResourcesView.vue', () => {
 
     expect(wrapper.text()).not.toContain('Manage')
     expect(wrapper.text()).not.toContain('Delete')
+    expect(wrapper.text()).toContain('Rack')
     expect(wrapper.find('th:last-child').text()).toBe('Partitions')
+    expect(wrapper.text()).toContain('CN-1')
 
     const nodeLink = wrapper
       .findAllComponents({ name: 'RouterLink' })
@@ -195,6 +197,17 @@ describe('ResourcesView.vue', () => {
       name: 'node',
       params: { cluster: 'foo', nodeName: (nodes[0] as ClusterNode).name },
       query: { returnTo: 'resources' }
+    })
+
+    const partitionLink = wrapper
+      .findAllComponents({ name: 'RouterLink' })
+      .find((link) => link.props('to')?.name === 'partition')
+    if (!partitionLink) {
+      throw new Error('Partition detail link not found')
+    }
+    expect(partitionLink.props('to')).toEqual({
+      name: 'partition',
+      params: { cluster: 'foo', partition: 'normal' }
     })
   })
 })
