@@ -241,6 +241,11 @@ describe('ClusterAnalysisView.vue', () => {
         stubs: {
           ClusterMainLayout: { template: '<div><slot /></div>' },
           RouterLink: { template: '<a><slot /></a>' },
+          PartitionLinkChip: {
+            props: ['cluster', 'partition'],
+            template:
+              '<a data-testid="analysis-partition-link" :data-cluster="cluster" :data-partition="partition">{{ partition }}</a>'
+          },
           QueueWaitHistoryChart: {
             props: ['series', 'aggregation'],
             template:
@@ -257,6 +262,10 @@ describe('ClusterAnalysisView.vue', () => {
     expect(wrapper.text()).toContain('Open resources')
     expect(wrapper.text()).toContain('Recommended Actions')
     expect(wrapper.text()).toContain('Keep admission balanced across job sizes')
+    const partitionLink = wrapper.get('[data-testid="analysis-partition-link"]')
+    expect(partitionLink.text()).toBe('normal')
+    expect(partitionLink.attributes('data-cluster')).toBe('foo')
+    expect(partitionLink.attributes('data-partition')).toBe('normal')
     expect(wrapper.text()).toContain('Controller Health')
     expect(wrapper.text()).toContain('Ping')
     expect(wrapper.text()).toContain('Diag')
@@ -298,6 +307,11 @@ describe('ClusterAnalysisView.vue', () => {
         stubs: {
           ClusterMainLayout: { template: '<div><slot /></div>' },
           RouterLink: { template: '<a><slot /></a>' },
+          PartitionLinkChip: {
+            props: ['cluster', 'partition'],
+            template:
+              '<a data-testid="analysis-partition-link" :data-cluster="cluster" :data-partition="partition">{{ partition }}</a>'
+          },
           QueueWaitHistoryChart: {
             props: ['series', 'aggregation'],
             template:

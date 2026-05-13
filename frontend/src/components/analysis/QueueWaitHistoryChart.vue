@@ -9,10 +9,17 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, useTemplateRef, watch } from 'vue'
 import { Chart } from 'chart.js/auto'
-import type { Point } from 'chart.js'
+import type { ChartDataset, Point } from 'chart.js'
 import 'chartjs-adapter-luxon'
 import { useI18n } from 'vue-i18n'
 import type { MetricValue } from '@/composables/GatewayAPI'
+import {
+  QUEUE_WAIT_BASELINE_SECONDS,
+  QUEUE_WAIT_DANGER_SECONDS,
+  QUEUE_WAIT_WARNING_SECONDS,
+  queueWaitColorForSeconds,
+  queueWaitGradientStop
+} from '@/composables/queueWaitColors'
 import type { QueueWaitAggregation } from '@/composables/queueWaitHistory'
 
 const { series, aggregation } = defineProps<{
@@ -34,24 +41,77 @@ function formatSeconds(value: number): string {
   return String(Math.round(value))
 }
 
+function resolveContextValue(context: { parsed?: { y?: number }; raw?: unknown }): number {
+  if (typeof context.parsed?.y === 'number') return context.parsed.y
+  if (Array.isArray(context.raw) && typeof context.raw[1] === 'number') return context.raw[1]
+  if (
+    context.raw &&
+    typeof context.raw === 'object' &&
+    'y' in context.raw &&
+    typeof (context.raw as { y?: unknown }).y === 'number'
+  ) {
+    return (context.raw as { y: number }).y
+  }
+  return 0
+}
+
+function createAreaGradient(chart: Chart<'line'>): CanvasGradient | string {
+  const { chartArea, ctx, scales } = chart
+  if (!chartArea) return queueWaitColorForSeconds(QUEUE_WAIT_BASELINE_SECONDS, 0.18)
+
+  const maxSeconds = Math.max(
+    QUEUE_WAIT_DANGER_SECONDS,
+    Number(scales?.y?.max) || 0,
+    ...series.map(([, value]) => value)
+  )
+  const gradient = ctx.createLinearGradient(0, chartArea.bottom, 0, chartArea.top)
+
+  gradient.addColorStop(0, queueWaitColorForSeconds(QUEUE_WAIT_BASELINE_SECONDS, 0.12))
+  gradient.addColorStop(
+    queueWaitGradientStop(QUEUE_WAIT_BASELINE_SECONDS, maxSeconds),
+    queueWaitColorForSeconds(QUEUE_WAIT_BASELINE_SECONDS, 0.16)
+  )
+  gradient.addColorStop(
+    queueWaitGradientStop(QUEUE_WAIT_WARNING_SECONDS, maxSeconds),
+    queueWaitColorForSeconds(QUEUE_WAIT_WARNING_SECONDS, 0.2)
+  )
+  gradient.addColorStop(
+    queueWaitGradientStop(QUEUE_WAIT_DANGER_SECONDS, maxSeconds),
+    queueWaitColorForSeconds(QUEUE_WAIT_DANGER_SECONDS, 0.24)
+  )
+  gradient.addColorStop(1, queueWaitColorForSeconds(QUEUE_WAIT_DANGER_SECONDS, 0.28))
+
+  return gradient
+}
+
 function updateChart() {
   if (!chart) return
   const pointRadius = series.length === 1 ? 4 : 0
-  chart.data.datasets = [
-    {
-      label: label.value,
-      data: toPoints(series),
-      borderColor: '#50697f',
-      backgroundColor: 'rgba(80, 105, 127, 0.18)',
-      borderWidth: 2.8,
-      pointRadius,
-      pointHoverRadius: pointRadius === 0 ? 4 : 6,
-      pointBackgroundColor: '#b6e82c',
-      pointBorderColor: '#f8fbf5',
-      pointBorderWidth: 2,
-      tension: 0.26,
-      fill: true
+  const dataset: ChartDataset<'line', Point[]> = {
+    label: label.value,
+    data: toPoints(series),
+    borderColor: queueWaitColorForSeconds(QUEUE_WAIT_BASELINE_SECONDS),
+    backgroundColor: () => createAreaGradient(chart!),
+    borderWidth: 2.8,
+    pointRadius,
+    pointHoverRadius: pointRadius === 0 ? 4 : 6,
+    pointBackgroundColor: (context) =>
+      queueWaitColorForSeconds(resolveContextValue(context as { parsed?: { y?: number }; raw?: unknown })),
+    pointBorderColor: '#f8fbf5',
+    pointBorderWidth: 2,
+    tension: 0.26,
+    fill: true,
+    segment: {
+      borderColor: (context) => {
+        const start = context.p0.parsed.y
+        const end = context.p1.parsed.y
+        return queueWaitColorForSeconds((start + end) / 2)
+      }
     }
+  }
+
+  chart.data.datasets = [
+    dataset
   ]
   const xScale = chart.options.scales?.x
   if (xScale && 'time' in xScale) {

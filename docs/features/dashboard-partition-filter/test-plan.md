@@ -69,6 +69,7 @@
 - `JobHistoryView` 的 summary strip 中 `partition` 可点击跳转到分区详情页。
 - `JobsView` 列表中的 `partition` 列渲染为分区详情入口。
 - `JobsHistoryView` 列表中的 `partition` 列渲染为分区详情入口。
+- `ClusterAnalysisView` 的 `Partition Hotspots` 分区名称渲染为分区详情入口。
 
 ## 5. 自动化命令
 

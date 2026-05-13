@@ -16,6 +16,7 @@ import ErrorAlert from '@/components/ErrorAlert.vue'
 import InfoAlert from '@/components/InfoAlert.vue'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
 import PageHeader from '@/components/PageHeader.vue'
+import PartitionLinkChip from '@/components/PartitionLinkChip.vue'
 import PercentMetric from '@/components/PercentMetric.vue'
 import MetricRangeSelector from '@/components/MetricRangeSelector.vue'
 import QueueWaitHistoryChart from '@/components/analysis/QueueWaitHistoryChart.vue'
@@ -713,9 +714,11 @@ onUnmounted(() => {
                 >
                   <div class="flex flex-wrap items-center justify-between gap-3">
                     <div>
-                      <div class="font-semibold text-[var(--color-brand-ink-strong)]">
-                        {{ partition.name }}
-                      </div>
+                      <PartitionLinkChip
+                        :cluster="cluster"
+                        :partition="partition.name"
+                        data-testid="analysis-partition-link"
+                      />
                       <div class="mt-1 text-sm text-[var(--color-brand-muted)]">
                         {{
                           t('pages.analysis.partition.pendingActive', {
