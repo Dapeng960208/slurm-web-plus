@@ -32,11 +32,11 @@ const en = {
       },
       waitSample: {
         label: 'Queue wait',
-        value: '{minutes} min',
+        value: '{seconds} sec',
         proxy: 'Proxy',
         detail: 'Median wait from {samples} recent completed jobs.',
         fallback:
-          'Using live backlog as the queue delay proxy because history samples are unavailable.'
+          'Using live backlog as the queue delay proxy because recent completed jobs are unavailable.'
       },
       recovery: {
         label: 'Recovery potential',
@@ -101,8 +101,8 @@ const en = {
       waitTime: {
         title: 'Reduce queue wait with shorter walltime classes and backfill',
         summary:
-          'Observed wait samples show users are spending meaningful time in queue before admission.',
-        evidence: 'Median sampled queue wait is {minutes} min across {samples} completed jobs.'
+          'Observed completed-job wait history shows users are spending meaningful time in queue before admission.',
+        evidence: 'Median queue wait is {seconds} sec across {samples} completed jobs.'
       },
       balance: {
         title: 'Keep admission balanced across job sizes',
@@ -1496,7 +1496,7 @@ const en = {
         metricsUnavailable: 'Historical metrics are temporarily unavailable.',
         avgQueueWait: 'Average Queue Wait',
         avgQueueWaitDetail:
-          'Average wait from submit or eligible time to start time, grouped in minutes.',
+          'Average wait from submit time to start time, grouped by the selected bucket and shown in seconds.',
         aggregationLabel: 'Aggregation',
         aggregationAria: 'Queue wait aggregation {value}',
         aggregationOptions: {
@@ -1504,14 +1504,14 @@ const en = {
           hour: 'Hour',
           day: 'Day'
         },
-        minutesUnit: 'min',
+        secondsUnit: 'sec',
         latestTelemetry: 'Latest telemetry',
         latestTelemetryDetail: 'Jobs at the most recent metric sample in the selected range.',
-        waitSamples: 'Wait samples',
-        waitMedian: '{minutes} min median',
-        waitP90: 'p90 {p90} min from {samples} recent completed jobs.',
-        waitUnavailable: 'Job history samples are unavailable for this cluster or time range.',
-        waitDisabled: 'Historical wait samples are not enabled on this cluster.'
+        waitSamples: 'Completed jobs',
+        waitMedian: '{seconds} sec median',
+        waitP90: 'p90 {p90} sec from {samples} recent completed jobs.',
+        waitUnavailable: 'Completed job history is unavailable for this cluster or time range.',
+        waitDisabled: 'Completed job history is not enabled on this cluster.'
       },
       health: {
         ping: 'Ping',
@@ -1741,20 +1741,20 @@ const en = {
             detail: 'Across completed jobs captured in the selected window'
           },
           running: {
-            title: 'Running Samples',
-            detail: 'Running or completing job samples observed in the selected window'
+            title: 'Running Jobs',
+            detail: 'Running or completing jobs observed in the selected window'
           },
           pending: {
-            title: 'Pending Samples',
-            detail: 'Queued job samples observed in the selected window'
+            title: 'Pending Jobs',
+            detail: 'Queued jobs observed in the selected window'
           },
           failed: {
-            title: 'Failed Samples',
-            detail: 'Failed or timed-out job samples observed in the selected window'
+            title: 'Failed Jobs',
+            detail: 'Failed or timed-out jobs observed in the selected window'
           },
           cancelled: {
-            title: 'Cancelled Samples',
-            detail: 'Cancelled or preempted job samples observed in the selected window'
+            title: 'Cancelled Jobs',
+            detail: 'Cancelled or preempted jobs observed in the selected window'
           }
         },
         activity: {

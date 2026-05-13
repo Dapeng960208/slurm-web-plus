@@ -66,9 +66,9 @@ export interface AnalysisPartitionPressure {
 
 export interface AnalysisWaitStats {
   samples: number
-  medianMinutes: number | null
-  p90Minutes: number | null
-  averageMinutes: number | null
+  medianSeconds: number | null
+  p90Seconds: number | null
+  averageSeconds: number | null
 }
 
 export interface ClusterAnalysisResult {
@@ -274,13 +274,11 @@ function computeWaitStats(historyJobs: JobHistoryRecord[] | null | undefined): A
   const waits = (historyJobs ?? [])
     .map((job) => {
       const start = job.start_time ? new Date(job.start_time).getTime() : NaN
-      const eligible = job.eligible_time ? new Date(job.eligible_time).getTime() : NaN
       const submit = job.submit_time ? new Date(job.submit_time).getTime() : NaN
-      const baseline = Number.isFinite(eligible) ? eligible : submit
-      if (!Number.isFinite(start) || !Number.isFinite(baseline) || start < baseline) {
+      if (!Number.isFinite(start) || !Number.isFinite(submit) || start < submit) {
         return null
       }
-      return (start - baseline) / 60000
+      return (start - submit) / 1000
     })
     .filter((value): value is number => value != null)
     .sort((left, right) => left - right)
@@ -288,9 +286,9 @@ function computeWaitStats(historyJobs: JobHistoryRecord[] | null | undefined): A
   if (!waits.length) {
     return {
       samples: 0,
-      medianMinutes: null,
-      p90Minutes: null,
-      averageMinutes: null
+      medianSeconds: null,
+      p90Seconds: null,
+      averageSeconds: null
     }
   }
 
@@ -299,12 +297,9 @@ function computeWaitStats(historyJobs: JobHistoryRecord[] | null | undefined): A
 
   return {
     samples: waits.length,
-    medianMinutes: round(waits[medianIndex], 1),
-    p90Minutes: round(waits[p90Index], 1),
-    averageMinutes: round(
-      waits.reduce((total, value) => total + value, 0) / waits.length,
-      1
-    )
+    medianSeconds: round(waits[medianIndex], 0),
+    p90Seconds: round(waits[p90Index], 0),
+    averageSeconds: round(waits.reduce((total, value) => total + value, 0) / waits.length, 0)
   }
 }
 
@@ -442,19 +437,16 @@ function buildRecommendations(input: {
     })
   }
 
-  if (
-    input.waitStats.medianMinutes != null &&
-    input.waitStats.medianMinutes >= 15
-  ) {
+  if (input.waitStats.medianSeconds != null && input.waitStats.medianSeconds >= 15 * 60) {
     recommendations.push({
       id: 'reduce-wait-time',
       title: translate('analysis.recommendations.waitTime.title'),
       summary: translate('analysis.recommendations.waitTime.summary'),
       evidence: translate('analysis.recommendations.waitTime.evidence', {
-        minutes: input.waitStats.medianMinutes,
+        seconds: input.waitStats.medianSeconds,
         samples: input.waitStats.samples
       }),
-      tone: input.waitStats.medianMinutes >= 60 ? 'danger' : 'warning'
+      tone: input.waitStats.medianSeconds >= 60 * 60 ? 'danger' : 'warning'
     })
   }
 
@@ -544,9 +536,9 @@ export function analyzeCluster(input: ClusterAnalysisInput): ClusterAnalysisResu
     else if (schedulableNodeRatio < 85) score -= 9
   }
   if (fragmentationJobs > 0) score -= Math.min(12, fragmentationJobs * 3)
-  if (waitStats.medianMinutes != null) {
-    if (waitStats.medianMinutes >= 60) score -= 16
-    else if (waitStats.medianMinutes >= 20) score -= 8
+  if (waitStats.medianSeconds != null) {
+    if (waitStats.medianSeconds >= 60 * 60) score -= 16
+    else if (waitStats.medianSeconds >= 20 * 60) score -= 8
   }
   score = clamp(Math.round(score), 25, 97)
   const scoreLabel = computeScoreLabel(score)
@@ -592,19 +584,19 @@ export function analyzeCluster(input: ClusterAnalysisInput): ClusterAnalysisResu
       id: 'wait-sample',
       label: translate('analysis.summary.waitSample.label'),
       value:
-        waitStats.medianMinutes != null
-          ? translate('analysis.summary.waitSample.value', { minutes: waitStats.medianMinutes })
+        waitStats.medianSeconds != null
+          ? translate('analysis.summary.waitSample.value', { seconds: waitStats.medianSeconds })
           : translate('analysis.summary.waitSample.proxy'),
       detail:
         waitStats.samples > 0
           ? translate('analysis.summary.waitSample.detail', { samples: waitStats.samples })
           : translate('analysis.summary.waitSample.fallback'),
       tone:
-        waitStats.medianMinutes == null
+        waitStats.medianSeconds == null
           ? 'neutral'
-          : waitStats.medianMinutes >= 60
+          : waitStats.medianSeconds >= 60 * 60
             ? 'danger'
-            : waitStats.medianMinutes >= 20
+            : waitStats.medianSeconds >= 20 * 60
               ? 'warning'
               : 'success'
     },

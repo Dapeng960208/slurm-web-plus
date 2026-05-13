@@ -33,28 +33,23 @@ export function buildQueueWaitSeries(
 ): MetricValue[] {
   if (!historyJobs.length) return []
 
-  const buckets = new Map<number, { totalMinutes: number; count: number }>()
+  const buckets = new Map<number, { totalSeconds: number; count: number }>()
 
   for (const job of historyJobs) {
     const start = parseTimestamp(job.start_time)
-    const eligible = parseTimestamp(job.eligible_time)
     const submit = parseTimestamp(job.submit_time)
-    const baseline = Number.isFinite(eligible) ? eligible : submit
-    if (!Number.isFinite(start) || !Number.isFinite(baseline) || start < baseline) continue
+    if (!Number.isFinite(start) || !Number.isFinite(submit) || start < submit) continue
 
     const bucketKey = bucketTimestamp(start, aggregation)
-    const bucket = buckets.get(bucketKey) ?? { totalMinutes: 0, count: 0 }
-    bucket.totalMinutes += (start - baseline) / 60000
+    const bucket = buckets.get(bucketKey) ?? { totalSeconds: 0, count: 0 }
+    bucket.totalSeconds += (start - submit) / 1000
     bucket.count += 1
     buckets.set(bucketKey, bucket)
   }
 
   return [...buckets.entries()]
     .sort((left, right) => left[0] - right[0])
-    .map(([timestamp, bucket]) => [
-      timestamp,
-      Math.round((bucket.totalMinutes / bucket.count) * 10) / 10
-    ])
+    .map(([timestamp, bucket]) => [timestamp, Math.round(bucket.totalSeconds / bucket.count)])
 }
 
 function resolveCustomWindowDuration(start?: string, end?: string): number | null {

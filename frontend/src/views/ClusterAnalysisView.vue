@@ -829,10 +829,10 @@ onUnmounted(() => {
                   <div class="ui-stat-label">{{ t('pages.analysis.historical.waitSamples') }}</div>
                   <div class="mt-2 text-lg font-semibold text-[var(--color-brand-ink-strong)]">
                     {{
-                      analysis.waitStats.medianMinutes == null
+                      analysis.waitStats.medianSeconds == null
                         ? '--'
                         : t('pages.analysis.historical.waitMedian', {
-                            minutes: analysis.waitStats.medianMinutes
+                            seconds: analysis.waitStats.medianSeconds
                           })
                     }}
                   </div>
@@ -840,7 +840,7 @@ onUnmounted(() => {
                     <template v-if="analysis.waitStats.samples > 0">
                       {{
                         t('pages.analysis.historical.waitP90', {
-                          p90: analysis.waitStats.p90Minutes,
+                          p90: analysis.waitStats.p90Seconds,
                           samples: analysis.waitStats.samples
                         })
                       }}

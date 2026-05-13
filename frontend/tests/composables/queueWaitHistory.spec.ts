@@ -117,18 +117,18 @@ const historyJobs: JobHistoryRecord[] = [
 ]
 
 describe('queueWaitHistory', () => {
-  test('builds minute-level average wait series in minutes', () => {
+  test('builds minute-level average wait series in seconds', () => {
     expect(buildQueueWaitSeries(historyJobs, 'minute')).toEqual([
-      [new Date('2026-04-24T09:10:00Z').getTime(), 10],
-      [new Date('2026-04-24T09:20:00Z').getTime(), 15],
-      [new Date('2026-04-24T10:50:00Z').getTime(), 15]
+      [new Date('2026-04-24T09:10:00Z').getTime(), 600],
+      [new Date('2026-04-24T09:20:00Z').getTime(), 900],
+      [new Date('2026-04-24T10:50:00Z').getTime(), 1200]
     ])
   })
 
-  test('builds hourly averages in minutes', () => {
+  test('builds hourly averages in seconds using submit time as baseline', () => {
     expect(buildQueueWaitSeries(historyJobs, 'hour')).toEqual([
-      [new Date('2026-04-24T09:00:00Z').getTime(), 12.5],
-      [new Date('2026-04-24T10:00:00Z').getTime(), 15]
+      [new Date('2026-04-24T09:00:00Z').getTime(), 750],
+      [new Date('2026-04-24T10:00:00Z').getTime(), 1200]
     ])
   })
 

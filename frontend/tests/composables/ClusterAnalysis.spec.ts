@@ -250,7 +250,7 @@ describe('ClusterAnalysis', () => {
     expect(result.unavailableNodes).toBe(1)
     expect(result.fragmentationJobs).toBe(1)
     expect(result.topReasons[0]).toMatchObject({ reason: 'Resources', count: 1 })
-    expect(result.waitStats.medianMinutes).toBe(15)
+    expect(result.waitStats.medianSeconds).toBe(900)
     expect(result.partitionPressure[0]).toMatchObject({
       name: 'normal',
       pendingJobs: 2,

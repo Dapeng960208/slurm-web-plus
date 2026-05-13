@@ -261,13 +261,13 @@ describe('ClusterAnalysisView.vue', () => {
     expect(wrapper.text()).toContain('Ping')
     expect(wrapper.text()).toContain('Diag')
     expect(wrapper.text()).toContain('Average Queue Wait')
-    expect(wrapper.text()).toContain('grouped in minutes')
+    expect(wrapper.text()).toContain('shown in seconds')
     expect(wrapper.text()).toContain('Node Hotspots')
     expect(wrapper.text()).toContain('Node cn1')
     expect(wrapper.text()).toContain('Jobs Submitted')
     expect(wrapper.text()).not.toContain('extra_field')
     expect(wrapper.get('[data-testid="queue-wait-chart"]').text()).toContain(
-      'minute|[[1777021800000,10]]'
+      'minute|[[1777021800000,600]]'
     )
     expect(mockGatewayAPI.jobs_history).toHaveBeenCalledWith(
       'foo',
@@ -310,13 +310,13 @@ describe('ClusterAnalysisView.vue', () => {
     await flushPromises()
 
     expect(wrapper.get('[data-testid="queue-wait-chart"]').text()).toContain(
-      `hour|[[${new Date('2026-04-24T09:00:00Z').getTime()},10]]`
+      `hour|[[${new Date('2026-04-24T09:00:00Z').getTime()},600]]`
     )
 
     await wrapper.get('[data-testid="queue-wait-aggregation-day"]').trigger('click')
 
     expect(wrapper.get('[data-testid="queue-wait-chart"]').text()).toContain(
-      `day|[[${new Date('2026-04-24T00:00:00Z').getTime()},10]]`
+      `day|[[${new Date('2026-04-24T00:00:00Z').getTime()},600]]`
     )
   })
 })

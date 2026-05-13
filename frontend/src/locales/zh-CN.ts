@@ -30,10 +30,10 @@ const zhCN = {
       },
       waitSample: {
         label: '排队等待',
-        value: '{minutes} 分钟',
+        value: '{seconds} 秒',
         proxy: '代理值',
         detail: '基于最近 {samples} 个已完成作业的中位等待时间。',
-        fallback: '由于缺少历史样本，当前使用实时积压作为排队延迟代理值。'
+        fallback: '由于缺少最近已完成作业，当前使用实时积压作为排队延迟代理值。'
       },
       recovery: {
         label: '恢复潜力',
@@ -91,8 +91,8 @@ const zhCN = {
       },
       waitTime: {
         title: '通过更短时限类别和回填降低排队时间',
-        summary: '观察到的等待样本表明，用户在被接纳前已经经历了较明显的排队。',
-        evidence: '抽样中位排队时间为 {minutes} 分钟，样本覆盖 {samples} 个已完成作业。'
+        summary: '已完成作业的等待历史表明，用户在被接纳前已经经历了较明显的排队。',
+        evidence: '中位排队时间为 {seconds} 秒，统计覆盖 {samples} 个已完成作业。'
       },
       balance: {
         title: '在不同作业规模之间保持接纳平衡',
@@ -1417,7 +1417,7 @@ const zhCN = {
         metricsDisabled: '该集群未启用指标采集，但仍可使用实时分析。',
         metricsUnavailable: '历史指标暂时不可用。',
         avgQueueWait: '平均排队时间',
-        avgQueueWaitDetail: '按提交或可调度时间到启动时间的平均等待时长分组展示，单位为分钟。',
+        avgQueueWaitDetail: '按提交时间到启动时间的平均等待时长分组展示，数值单位为秒。',
         aggregationLabel: '聚合粒度',
         aggregationAria: '排队时间聚合粒度 {value}',
         aggregationOptions: {
@@ -1425,14 +1425,14 @@ const zhCN = {
           hour: '小时',
           day: '天'
         },
-        minutesUnit: '分钟',
+        secondsUnit: '秒',
         latestTelemetry: '最新遥测',
         latestTelemetryDetail: '所选时间范围内最近一次指标采样的作业情况。',
-        waitSamples: '等待样本',
-        waitMedian: '中位等待 {minutes} 分钟',
-        waitP90: 'p90 为 {p90} 分钟，基于最近 {samples} 个已完成作业。',
-        waitUnavailable: '该集群或时间范围内的作业历史样本不可用。',
-        waitDisabled: '该集群未启用历史等待样本。'
+        waitSamples: '已完成作业',
+        waitMedian: '中位等待 {seconds} 秒',
+        waitP90: 'p90 为 {p90} 秒，基于最近 {samples} 个已完成作业。',
+        waitUnavailable: '该集群或时间范围内的已完成作业历史不可用。',
+        waitDisabled: '该集群未启用已完成作业历史。'
       },
       health: {
         ping: 'Ping',
@@ -1648,20 +1648,20 @@ const zhCN = {
             detail: '基于所选时间窗口内捕获的已完成作业'
           },
           running: {
-            title: '运行中样本',
-            detail: '所选时间窗口内观察到的运行中或收尾作业样本'
+            title: '运行中作业',
+            detail: '所选时间窗口内观察到的运行中或收尾作业'
           },
           pending: {
-            title: '排队中样本',
-            detail: '所选时间窗口内观察到的待调度作业样本'
+            title: '排队中作业',
+            detail: '所选时间窗口内观察到的待调度作业'
           },
           failed: {
-            title: '失败样本',
-            detail: '所选时间窗口内观察到的失败或超时作业样本'
+            title: '失败作业',
+            detail: '所选时间窗口内观察到的失败或超时作业'
           },
           cancelled: {
-            title: '取消样本',
-            detail: '所选时间窗口内观察到的取消或抢占作业样本'
+            title: '取消作业',
+            detail: '所选时间窗口内观察到的取消或抢占作业'
           }
         },
         activity: {

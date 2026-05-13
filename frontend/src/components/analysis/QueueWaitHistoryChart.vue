@@ -23,17 +23,15 @@ const { series, aggregation } = defineProps<{
 const { t, locale } = useI18n()
 const chartCanvas = useTemplateRef<HTMLCanvasElement>('chartCanvas')
 const label = computed(() => t('pages.analysis.historical.avgQueueWait'))
-const minutesUnit = computed(() => t('pages.analysis.historical.minutesUnit'))
+const secondsUnit = computed(() => t('pages.analysis.historical.secondsUnit'))
 let chart: Chart<'line'> | null = null
 
 function toPoints(values: MetricValue[]): Point[] {
   return values.map(([x, y]) => ({ x, y }))
 }
 
-function formatMinutes(value: number): string {
-  if (value >= 100) return String(Math.round(value))
-  if (value >= 10) return value.toFixed(1)
-  return value.toFixed(1)
+function formatSeconds(value: number): string {
+  return String(Math.round(value))
 }
 
 function updateChart() {
@@ -43,12 +41,12 @@ function updateChart() {
     {
       label: label.value,
       data: toPoints(series),
-      borderColor: '#7bbf1f',
-      backgroundColor: 'rgba(123, 191, 31, 0.18)',
+      borderColor: '#50697f',
+      backgroundColor: 'rgba(80, 105, 127, 0.18)',
       borderWidth: 2.8,
       pointRadius,
       pointHoverRadius: pointRadius === 0 ? 4 : 6,
-      pointBackgroundColor: '#7bbf1f',
+      pointBackgroundColor: '#b6e82c',
       pointBorderColor: '#f8fbf5',
       pointBorderWidth: 2,
       tension: 0.26,
@@ -67,7 +65,7 @@ function updateChart() {
     yScale.title = {
       ...yScale.title,
       display: true,
-      text: minutesUnit.value,
+      text: secondsUnit.value,
       color: '#6c7a80'
     }
   }
@@ -105,7 +103,7 @@ onMounted(() => {
           padding: 12,
           callbacks: {
             label: (context) =>
-              `${context.dataset.label}: ${formatMinutes(context.parsed.y)} ${minutesUnit.value}`
+              `${context.dataset.label}: ${formatSeconds(context.parsed.y)} ${secondsUnit.value}`
           }
         }
       },
@@ -130,11 +128,11 @@ onMounted(() => {
           },
           ticks: {
             color: '#6c7a80',
-            callback: (value) => `${formatMinutes(Number(value))}`
+            callback: (value) => `${formatSeconds(Number(value))}`
           },
           title: {
             display: true,
-            text: minutesUnit.value,
+            text: secondsUnit.value,
             color: '#6c7a80'
           }
         }
