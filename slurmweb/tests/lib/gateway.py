@@ -9,41 +9,14 @@ import unittest
 import tempfile
 import os
 import time
-import sys
-import types
 
 import werkzeug
 import jinja2
 
 from rfl.authentication.user import AuthenticatedUser, AnonymousUser
+from .ldap_stub import ensure_ldap_stub
 
-# The gateway app imports LDAP support unconditionally, while the test
-# environment may not have python-ldap installed. Provide a minimal stub so
-# gateway-only tests can still import the module graph.
-if "ldap" not in sys.modules:
-    ldap_stub = types.ModuleType("ldap")
-    ldap_stub.__path__ = []
-    ldap_stub.VERSION3 = 3
-    ldap_stub.OPT_X_TLS_REQUIRE_CERT = 0
-    ldap_stub.OPT_X_TLS_DEMAND = 0
-    ldap_stub.OPT_X_TLS_CACERTDIR = 0
-    ldap_stub.OPT_X_TLS_CACERTFILE = 0
-    ldap_stub.OPT_X_TLS_NEWCTX = 0
-    ldap_stub.SCOPE_BASE = 0
-    ldap_stub.SCOPE_SUBTREE = 1
-    ldap_stub.CONNECT_ERROR = type("CONNECT_ERROR", (Exception,), {})
-    ldap_stub.SERVER_DOWN = type("SERVER_DOWN", (Exception,), {})
-    ldap_stub.NO_SUCH_OBJECT = type("NO_SUCH_OBJECT", (Exception,), {})
-    ldap_stub.OPERATIONS_ERROR = type("OPERATIONS_ERROR", (Exception,), {})
-    ldap_stub.INVALID_CREDENTIALS = type("INVALID_CREDENTIALS", (Exception,), {})
-    ldap_stub.UNWILLING_TO_PERFORM = type("UNWILLING_TO_PERFORM", (Exception,), {})
-    ldap_stub.ldapobject = types.SimpleNamespace(LDAPObject=object)
-    ldap_stub.initialize = lambda *args, **kwargs: object()
-    ldap_filter_stub = types.ModuleType("ldap.filter")
-    ldap_filter_stub.filter_format = lambda pattern, values: pattern % tuple(values)
-    ldap_stub.filter = ldap_filter_stub
-    sys.modules["ldap"] = ldap_stub
-    sys.modules["ldap.filter"] = ldap_filter_stub
+ensure_ldap_stub()
 
 from slurmweb.version import get_version
 from slurmweb.apps import SlurmwebAppSeed

@@ -46,6 +46,16 @@
 
 ## 2. 已完成项
 
+- LDAP / Active Directory 兼容层已补一轮后端收口：
+  - `user_base` 与 `group_base` 现已支持多值列表配置，适配用户分散在多个并列 OU 的 AD 目录
+  - 登录链路在 `lookup_user_dn=yes` 时会逐个 `user_base` 查找单个用户 DN，并在跨 base 命中多个同名用户时明确报错
+  - LDAP 组解析会跨多个 `group_base` 合并去重
+  - `slurm-web ldap-check` 与全量 `users()` 枚举在支持分页控件的目录服务器上改用 paged search，降低 AD 域根或大 OU 上直接触发 `Size limit exceeded` 的概率
+  - 本轮已补对应后端定向验证：
+    - `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/test_ldap_authentifier.py`
+    - `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/apps/test_ldap.py`
+    - `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/apps/test_gateway.py`
+
 - Dashboard / Admin 前端缺陷已继续收口：
   - `DashboardView` 选择分区后，统计卡会优先按当前分区节点与作业数据本地聚合，避免继续显示整集群资源总量
   - Dashboard 分区下拉框已移除与外层 toolbar pill 重叠的双层描边

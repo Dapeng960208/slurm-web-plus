@@ -166,13 +166,19 @@ ldap:
     default: false
     doc: Use STARTTLS protocol to negociate TLS connection with LDAP server
   user_base:
-    type: str
-    doc: Base DN for users entries
-    ex: ou=people,dc=example,dc=org
+    type: list
+    content: str
+    doc: Base DN list for users entries
+    ex:
+    - ou=people,dc=example,dc=org
+    - ou=staff,dc=example,dc=org
   group_base:
-    type: str
-    doc: Base DN for group entries
-    ex: ou=group,dc=example,dc=org
+    type: list
+    content: str
+    doc: Base DN list for group entries
+    ex:
+    - ou=group,dc=example,dc=org
+    - ou=roles,dc=example,dc=org
   user_class:
     type: str
     default: posixAccount

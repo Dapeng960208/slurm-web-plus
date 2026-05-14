@@ -8,6 +8,9 @@ import io
 from unittest import mock
 
 from rfl.authentication.errors import LDAPAuthenticationError
+from ..lib.ldap_stub import ensure_ldap_stub
+
+ensure_ldap_stub()
 
 from slurmweb.apps import SlurmwebAppSeed
 from slurmweb.apps.ldap import SlurmwebAppLDAPCheck

@@ -1,5 +1,21 @@
 # 最新功能
 
+## 本轮：LDAP 已支持多 Base DN 和 AD 大目录分页枚举
+
+本轮补了一组面向 Active Directory 的 LDAP 兼容增强，重点解决“用户分散在多个并列 OU”与“域根枚举直接撞 `Size limit exceeded`”两类现场问题：
+
+- `user_base` 与 `group_base` 现在支持配置为多值列表，不再只能写单个 Base DN。
+- 登录链路在 `lookup_user_dn=yes` 时，会逐个 `user_base` 查找单个用户 DN，适配用户落在多个并列 OU 的场景。
+- 如果同一个用户名在多个 `user_base` 下都命中，后端会明确报“找到多个用户”，避免静默选错 DN。
+- LDAP 组解析会跨多个 `group_base` 合并并去重。
+- `slurm-web ldap-check` 与 LDAP 全量用户枚举在目录服务器支持分页控件时，会改用 paged search，降低 Active Directory 大目录上直接触发 `Size limit exceeded` 的概率。
+
+本轮新增验证：
+
+- `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/test_ldap_authentifier.py`
+- `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/apps/test_ldap.py`
+- `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/apps/test_gateway.py`
+
 ## 本轮：集群分析平均排队时间曲线改为 `submit_time -> start_time` 秒级口径
 
 本轮继续修正 `Cluster Analysis` 中“平均排队时间曲线没有明显显示”的问题：

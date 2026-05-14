@@ -309,6 +309,34 @@ squeue
 sacct -S now-1hour
 ```
 
+### 问题 5：LDAP 在 Active Directory 上报 `Size limit exceeded`
+
+**现象：**
+
+- 运行 `slurm-web ldap-check --debug --debug-flags rfl` 时，日志显示服务账号已 bind，但随后报 `ldap.SIZELIMIT_EXCEEDED`
+- 常见于 `user_base` / `group_base` 直接配置为域根 `DC=...`
+
+**检查步骤：**
+```bash
+# 1. 检查 LDAP base 是否配置为多行列表或过宽的域根
+grep -A 20 "^\[ldap\]" /etc/slurm-web/gateway.ini
+
+# 2. 确认服务账号可以查到单个用户
+ldapsearch -x -H ldap://your-dc \
+  -D "CN=bind-user,OU=Service,DC=example,DC=com" -W \
+  -b "OU=Users,DC=example,DC=com" \
+  "(sAMAccountName=your-user)" dn cn sAMAccountName
+
+# 3. 重新执行 LDAP 检查
+slurm-web ldap-check --debug --debug-flags rfl
+```
+
+**当前实现说明：**
+
+- `user_base` 与 `group_base` 现在支持配置多个 Base DN；Slurm-web 会逐个 base 查找单个登录用户
+- `slurm-web ldap-check` 和全量 `users()` 枚举在支持分页控件的目录服务器上会使用 paged search，降低 AD 上直接触发目录 size limit 的概率
+- 如果目录非常大，仍建议把 `user_base` / `group_base` 收窄到实际 OU，而不是依赖域根全量搜索
+
 ---
 
 ## 4. 性能验证

@@ -11,8 +11,11 @@ from rfl.authentication.ldap import LDAPAuthentifier
 from rfl.authentication.errors import LDAPAuthenticationError
 
 from . import SlurmwebGenericApp, load_ldap_password_from_file
+from ..ldap_ext import patch_ldap_authentifier
 
 logger = logging.getLogger(__name__)
+
+patch_ldap_authentifier()
 
 
 class SlurmwebAppLDAPCheck(SlurmwebGenericApp):

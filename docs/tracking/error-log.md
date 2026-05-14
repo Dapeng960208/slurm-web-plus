@@ -11,6 +11,11 @@
 
 ## 条目
 
+### 2026-05-14：AD 域根做 LDAP 用户枚举时触发 `Size limit exceeded`
+- 时间：2026-05-14
+- 现象：`slurm-web ldap-check --debug --debug-flags rfl` 在服务账号 bind 成功后，继续对 `DC=...` 域根执行用户枚举时抛 `ldap.SIZELIMIT_EXCEEDED`；而现场目录结构同时把用户分散在多个并列 OU 下，单一 `user_base` 又不足以覆盖全部登录入口
+- 解决办法：本地 LDAP 适配层已补多 `user_base` / `group_base` 支持，登录时逐个 base 查单用户；`ldap-check` / `users()` 在支持分页控件时改用 paged search，降低 Active Directory 大目录直接撞 size limit 的概率；运维侧仍建议优先把 base 收窄到真实 OU，而不是继续使用域根
+
 ### 2026-05-12：Dashboard 分区切换后统计卡仍可能显示整集群资源，且队列下拉框与外层描边重叠
 - 时间：2026-05-12
 - 现象：在 `/:cluster/dashboard` 选择具体分区后，下方统计卡仍可能继续显示整集群的节点、CPU、内存和作业总量；同时分区下拉框的内层描边与外层 pill 容器边缘叠在一起，视觉上像“双层挤压”

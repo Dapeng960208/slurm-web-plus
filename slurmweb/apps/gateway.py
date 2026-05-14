@@ -26,6 +26,7 @@ except ModuleNotFoundError:
     from werkzeug import wsgi as dispatcher
 
 from . import SlurmwebWebApp, load_ldap_password_from_file
+from ..ldap_ext import patch_ldap_authentifier
 from ..ui import prepare_ui_assets
 from ..views import SlurmwebAppRoute
 from ..views import gateway as views
@@ -35,6 +36,8 @@ from ..errors import (
 )
 
 logger = logging.getLogger(__name__)
+
+patch_ldap_authentifier()
 
 
 SlurmwebAgentRacksDBSettings = collections.namedtuple(
