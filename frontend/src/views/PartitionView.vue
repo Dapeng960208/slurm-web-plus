@@ -121,7 +121,7 @@ function resetMetricsWindow() {
       </PageHeader>
 
       <div class="ui-scroll-region min-h-0 flex-1 pr-1">
-        <div class="ui-section-stack pb-2">
+        <div class="ui-section-stack partition-page-stack pb-2">
           <InfoAlert v-if="!partitionRecord">
             {{ t('pages.partition.notFound', { partition }) }}
           </InfoAlert>
@@ -158,16 +158,17 @@ function resetMetricsWindow() {
               </div>
             </div>
 
-            <section class="ui-panel ui-section" data-testid="partition-dashboard-charts">
-              <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-                <div class="min-w-0">
+            <section class="ui-panel ui-section partition-metrics-panel" data-testid="partition-dashboard-charts">
+              <div class="partition-metrics-toolbar">
+                <div class="partition-metrics-copy min-w-0">
                   <p class="ui-page-kicker">{{ t('pages.partition.metrics.kicker') }}</p>
                   <h2 class="ui-panel-title">{{ t('pages.partition.metrics.title') }}</h2>
-                  <p class="ui-panel-description mt-2">
+                  <p class="ui-panel-description mt-1.5">
                     {{ t('pages.partition.metrics.description', { partition }) }}
                   </p>
                 </div>
                 <MetricRangeSelector
+                  class="partition-metrics-range"
                   :model-value="runtimeStore.dashboard.range"
                   :aria-label="t('pages.partition.metrics.selectRange')"
                   enable-custom-window
@@ -181,10 +182,11 @@ function resetMetricsWindow() {
                 />
               </div>
               <DashboardCharts
-                class="mt-6"
+                class="partition-dashboard-charts"
                 :cluster="cluster"
                 :metrics-query="partitionMetricsQuery"
                 route-target-name="partition"
+                compact
               />
             </section>
           </template>
@@ -193,3 +195,57 @@ function resetMetricsWindow() {
     </div>
   </ClusterMainLayout>
 </template>
+
+<style scoped>
+.partition-page-stack {
+  gap: 1rem;
+}
+
+.partition-metrics-panel {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.partition-metrics-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.85rem;
+}
+
+.partition-metrics-copy {
+  max-width: 34rem;
+}
+
+.partition-metrics-range {
+  flex: 0 0 auto;
+}
+
+.partition-dashboard-charts {
+  display: grid;
+  gap: 0.85rem;
+}
+
+:deep(.partition-chart-shell) {
+  height: 13.25rem;
+}
+
+@media (max-width: 1279px) {
+  :deep(.partition-chart-shell) {
+    height: 12.5rem;
+  }
+}
+
+@media (max-width: 767px) {
+  .partition-metrics-range {
+    width: 100%;
+  }
+
+  :deep(.partition-chart-shell) {
+    height: 11.75rem;
+  }
+}
+</style>

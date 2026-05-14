@@ -13,7 +13,7 @@ import { Dialog, DialogPanel, DialogTitle, TransitionChild, TransitionRoot } fro
 import FormFieldLabel from '@/components/forms/FormFieldLabel.vue'
 import { translate } from '@/i18n/translate'
 
-export type ActionFieldType = 'text' | 'textarea' | 'number' | 'select'
+export type ActionFieldType = 'text' | 'textarea' | 'number' | 'select' | 'datetime-local'
 export type ActionSubmitVariant = 'primary' | 'warning' | 'danger'
 
 export interface ActionFieldOption {
@@ -201,7 +201,13 @@ watch(
                   <input
                     v-else
                     v-model="form[field.key]"
-                    :type="field.type === 'number' ? 'number' : 'text'"
+                    :type="
+                      field.type === 'number'
+                        ? 'number'
+                        : field.type === 'datetime-local'
+                          ? 'datetime-local'
+                          : 'text'
+                    "
                     class="mt-2 block w-full rounded-[18px] border border-[rgba(80,105,127,0.14)] bg-white px-3 py-2.5 text-sm outline-hidden focus:border-[rgba(182,232,44,0.65)] focus:ring-4 focus:ring-[rgba(182,232,44,0.18)]"
                     :placeholder="field.placeholder ? translate(field.placeholder) : undefined"
                   />

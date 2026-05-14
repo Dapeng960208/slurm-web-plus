@@ -72,6 +72,51 @@ const canDeleteReservation = computed(() =>
   runtimeStore.hasRoutePermission(cluster, 'reservations', 'delete')
 )
 
+function formatReservationDateTimeLocal(epochSeconds?: number | null): string {
+  if (!epochSeconds) return ''
+  const date = new Date(epochSeconds * 1000)
+  const pad = (value: number) => value.toString().padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
+}
+
+function parseReservationDateTime(value: string): number | null {
+  if (!value.trim()) return null
+  const timestamp = new Date(value).getTime()
+  if (Number.isNaN(timestamp)) return null
+  return Math.floor(timestamp / 1000)
+}
+
+function buildReservationTimePayload(
+  payload: Record<string, string>,
+  options: { requireEndTime?: boolean } = {}
+) {
+  const startTimestamp = parseReservationDateTime(payload.start_time ?? '')
+  const endTimestamp = parseReservationDateTime(payload.end_time ?? '')
+
+  if (!startTimestamp) {
+    throw new Error(t('pages.reservations.errors.startTimeRequired'))
+  }
+  if (options.requireEndTime && !endTimestamp) {
+    throw new Error(t('pages.reservations.errors.endTimeRequired'))
+  }
+  if (endTimestamp && endTimestamp <= startTimestamp) {
+    throw new Error(t('pages.reservations.errors.invalidTimeRange'))
+  }
+
+  return {
+    start_time: {
+      set: true,
+      number: startTimestamp
+    },
+    end_time: endTimestamp
+      ? {
+          set: true,
+          number: endTimestamp
+        }
+      : undefined
+  }
+}
+
 function updateQueryParameters() {
   const query: LocationQueryRaw = {}
   if (page.value !== 1) query.page = page.value
@@ -111,12 +156,15 @@ async function createReservation(payload: Record<string, string>) {
   operationBusy.value = true
   operationError.value = null
   try {
+    const timePayload = buildReservationTimePayload(payload, { requireEndTime: true })
     await gateway.save_reservation(cluster, {
       name: payload.name || undefined,
       node_list: payload.node_list || undefined,
       partition: payload.partition || undefined,
       users: parseCsvList(payload.users),
-      accounts: parseCsvList(payload.accounts)
+      accounts: parseCsvList(payload.accounts),
+      start_time: timePayload.start_time,
+      end_time: timePayload.end_time
     })
     runtimeStore.reportInfo(
       t('pages.reservations.notifications.createRequested', { name: payload.name || '' })
@@ -134,12 +182,15 @@ async function updateReservation(payload: Record<string, string>) {
   operationBusy.value = true
   operationError.value = null
   try {
+    const timePayload = buildReservationTimePayload(payload)
     await gateway.update_reservation(cluster, selectedReservation.value.name, {
       name: selectedReservation.value.name,
       node_list: payload.node_list || undefined,
       partition: payload.partition || undefined,
       users: parseCsvList(payload.users),
-      accounts: parseCsvList(payload.accounts)
+      accounts: parseCsvList(payload.accounts),
+      start_time: timePayload.start_time,
+      end_time: timePayload.end_time
     })
     runtimeStore.reportInfo(
       t('pages.reservations.notifications.updateRequested', {
@@ -356,6 +407,20 @@ if (route.query.page_size) {
           required: true,
           type: 'textarea'
         },
+        {
+          key: 'start_time',
+          label: 'pages.reservations.dialogs.fields.startTime',
+          required: true,
+          type: 'datetime-local',
+          hint: 'pages.reservations.dialogs.hints.startTime'
+        },
+        {
+          key: 'end_time',
+          label: 'pages.reservations.dialogs.fields.endTime',
+          required: true,
+          type: 'datetime-local',
+          hint: 'pages.reservations.dialogs.hints.endTime'
+        },
         { key: 'partition', label: 'pages.reservations.dialogs.fields.partition' },
         { key: 'users', label: 'pages.reservations.dialogs.fields.users' },
         { key: 'accounts', label: 'pages.reservations.dialogs.fields.accounts' }
@@ -374,6 +439,8 @@ if (route.query.page_size) {
       :error="operationError"
       :initial-values="{
         node_list: selectedReservation?.node_list ?? '',
+        start_time: formatReservationDateTimeLocal(selectedReservation?.start_time?.number),
+        end_time: formatReservationDateTimeLocal(selectedReservation?.end_time?.number),
         partition: '',
         users: stringifyList(selectedReservation?.users),
         accounts: stringifyList(selectedReservation?.accounts)
@@ -384,6 +451,19 @@ if (route.query.page_size) {
           label: 'pages.reservations.dialogs.fields.nodeList',
           required: true,
           type: 'textarea'
+        },
+        {
+          key: 'start_time',
+          label: 'pages.reservations.dialogs.fields.startTime',
+          required: true,
+          type: 'datetime-local',
+          hint: 'pages.reservations.dialogs.hints.startTime'
+        },
+        {
+          key: 'end_time',
+          label: 'pages.reservations.dialogs.fields.endTime',
+          type: 'datetime-local',
+          hint: 'pages.reservations.dialogs.hints.endTimeOptional'
         },
         { key: 'partition', label: 'pages.reservations.dialogs.fields.partition' },
         { key: 'users', label: 'pages.reservations.dialogs.fields.users' },

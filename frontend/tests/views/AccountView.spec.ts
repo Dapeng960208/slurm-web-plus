@@ -319,6 +319,7 @@ describe('AccountView.vue', () => {
         }
       ]
     })
+    expect(mockClusterDataPoller.refresh).toHaveBeenCalledTimes(1)
 
     await wrapper.findAll('button').find((button) => button.text() === 'Edit QOS')!.trigger('click')
     await nextTick()
@@ -341,6 +342,7 @@ describe('AccountView.vue', () => {
         }
       ]
     })
+    expect(mockClusterDataPoller.refresh).toHaveBeenCalledTimes(2)
 
     await wrapper.findAll('button').find((button) => button.text() === 'Delete')!.trigger('click')
     await nextTick()
@@ -358,6 +360,7 @@ describe('AccountView.vue', () => {
         }
       ]
     })
+    expect(mockClusterDataPoller.refresh).toHaveBeenCalledTimes(3)
     wrapper.unmount()
   })
 
@@ -415,6 +418,7 @@ describe('AccountView.vue', () => {
         }
       ]
     })
+    expect(mockClusterDataPoller.refresh).toHaveBeenCalledTimes(1)
     wrapper.unmount()
   })
 
@@ -474,6 +478,7 @@ describe('AccountView.vue', () => {
       parent_account: undefined,
       qos: ['normal']
     })
+    expect(mockClusterDataPoller.refresh).toHaveBeenCalledTimes(1)
     wrapper.unmount()
   })
 })

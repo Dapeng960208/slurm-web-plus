@@ -51,11 +51,12 @@
 ## 2. 已完成项
 
 - Dashboard / Analysis 工具条与 Admin 搜索区统一收口已完成：
-  - `DashboardView` 顶部分区与时间范围筛选区已去卡片化，保留分区轻量 inline label，移除时间范围额外可见 label
+  - `DashboardView` 顶部分区与时间范围筛选区已移除分区选择器和时间范围选择器外层白色胶囊壳，只保留控件本体；分区保留轻量 inline label，时间范围移除额外可见 label
   - `Dashboard` 统计卡与图表区块间距已回归共享 `ui-section-stack` / `ui-stat-grid` 节奏
   - `ClusterAnalysisView` 顶部时间范围控件已与 Dashboard 使用同一套工具条节奏
   - 平均排队时间聚合切换组件继续保留 `minute / hour / day` 三档，并恢复轻量可见说明；`aria-label` 与 `queue-wait-aggregation-*` 测试锚点保持不变
   - `SettingsAccessControl`、`SettingsLdapCache`、`SettingsAI` 的搜索区已统一为 inline search bar；原有搜索、重置、刷新与前端即时过滤行为保持不变
+  - `SettingsAI` 对话审计筛选区已补齐 `Search / Reset / Refresh` 三类操作；共享 `ui-admin-search-field` 宽度已统一收窄，避免管理页搜索输入框在桌面端撑满整行
   - 本轮没有新增接口、权限或配置项
   - 本轮已补前端定向验证：
     - `cd frontend && npx vitest run tests/views/DashboardView.spec.ts tests/views/ClusterAnalysisView.spec.ts tests/views/settings/SettingsAccessControl.spec.ts tests/views/settings/SettingsLdapCache.spec.ts tests/views/settings/SettingsAI.spec.ts`
@@ -91,8 +92,10 @@
   - `JobView` 与 `JobHistoryView` 字段正文已统一为“摘要条 + 分组详情清单”，不再混用上方卡片网格和下方明细列表
   - 长字段如 `submit line`、`script`、`working directory`、`command` 已改为可换行代码块式展示，避免内容顶出容器
   - `JobFieldComment` 改为结构化备注块展示，长文本仍保持可读
+  - `JobView` 与 `JobHistoryView` 详情正文已进一步改成“短字段 2-3 列并排 + 长字段整行展开”，并删除冗余小标题如“作业身份与归档信息”“详细资源与命令”
   - `PartitionView` 已删除顶部摘要下方重复的 `Partition Details` / `Node Sets` 区块
   - `Allocated Nodes` 与 `Idle Nodes` 已并入分区顶部摘要卡片区
+  - `PartitionView` 实时曲线区已改成更紧凑的单页工作区：副标题从实现口径改为用户可读说明，并压缩了图表上下留白与分区场景图表高度
 - 本轮性能优化定向验证已通过：
   - `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/slurmrestd/test_slurmrestd_filtered_cached.py slurmweb/tests/views/test_agent.py slurmweb/tests/views/test_agent_operations.py slurmweb/tests/views/test_gateway.py`
   - `cd frontend && npx vitest run tests/components/jobs/UserFilterSelector.spec.ts tests/components/jobs/JobsFiltersPanel.spec.ts tests/views/JobsView.spec.ts tests/composables/GatewayAPI.spec.ts tests/composables/DataPoller.spec.ts`
@@ -119,6 +122,7 @@
   - Dashboard 分区下拉框已移除与外层 toolbar pill 重叠的双层描边
   - `/:cluster/admin` 顶层默认入口已补权限判定；普通用户没有任何 `admin/*` 权限时，直接访问该入口也会返回 `forbidden`
   - `Admin > AI` 页面已把页头和两块主内容收口为更轻的单工作区层级，减少多张大卡片纵向堆叠
+  - `AssistantView` 发送区附近已新增当前模型显示；具备 `admin/ai:view:*` 的用户可直接切换启用模型，普通用户保持无 `403` 前提下的只读模型状态展示
 - 本轮前端定向验证已通过：
   - `cd frontend && npx vitest run tests/views/DashboardView.spec.ts tests/router/AdminPermissions.spec.ts tests/components/MainMenu.spec.ts tests/views/settings/SettingsAI.spec.ts`
   - `npm --prefix frontend run type-check`
@@ -785,3 +789,24 @@
 - 2026-05-11：本轮 GitHub CI autofix 链路改动已完成本地提交 `3ed8ad6 feat(ci): add local github actions autofix flow`
 - 同日执行 `git push origin main` 失败，远端返回 `Recv failure: Connection was reset`
 - 当前状态：本地 `main` 相对 `origin/main` ahead 1，待网络恢复后重新 push；因此本轮无法在远端真实触发新一轮 Actions 验证“push 后自动修复”闭环
+
+- 2026-05-14：修复 `Reservations` 创建预留未收集 `start_time` / `end_time`，导致 `slurmrestd` 返回 `A start time must be given` 的问题。
+- 本轮实现：
+  - 创建对话框新增开始时间和结束时间输入
+  - 编辑对话框补充开始时间和可选结束时间输入
+  - 前端在提交前执行时间范围本地校验，并把 `datetime-local` 值转换为 `slurmrestd` 时间对象
+  - `ActionDialog` 扩展支持 `datetime-local` 字段类型
+- 已验证：
+  - `cd frontend && npx vitest run tests/components/operations/ActionDialog.spec.ts tests/views/ReservationsView.spec.ts`
+  - `npm --prefix frontend run type-check`
+
+- 2026-05-14：审查“创建 test 账户后向其中添加用户，页面与接口提示成功但账户详情看不到用户”的问题。
+- 审查结论：
+  - Slurm 中账户对象创建与账户用户关联创建是两条独立写链路，后者通过 `associations` 完成
+  - `AccountView` 账户详情页的用户列表完全依赖 `/associations`
+  - 当前异常的直接原因是账户详情页在添加用户、编辑关联、删除关联和编辑账户后没有立即刷新 `associations`，导致页面保留旧数据
+- 本轮修复：
+  - `AccountView` 在账户与关联写操作完成后立即执行 `refreshAssociations()`
+- 已验证：
+  - `cd frontend && npx vitest run tests/views/AccountView.spec.ts`
+  - `npm --prefix frontend run type-check`

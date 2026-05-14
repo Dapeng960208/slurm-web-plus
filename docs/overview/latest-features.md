@@ -4,10 +4,11 @@
 
 本轮只处理前端页面结构与样式收口，不涉及接口、配置或状态逻辑变更：
 
-- `Dashboard` 顶部筛选区已去掉多余外层卡片，改为直接输出的轻量工具条；保留分区控件轻量 inline label，移除时间范围可见 label。
+- `Dashboard` 顶部筛选区已去掉分区选择器和时间范围选择器外层的白色胶囊包裹，只保留控件本体；分区保留轻量 inline label，时间范围不再显示额外可见 label。
 - `Cluster Analysis` 顶部时间范围控件已与 `Dashboard` 使用同一套工具条节奏；平均排队时间聚合切换继续保留 `minute / hour / day` 三档，并改为轻量 inline 说明。
 - `Dashboard` 统计卡与区块间距已按全局节奏收紧，不再额外放大工具条到统计卡之间的间距。
 - `Admin > Access Control`、`Admin > Users`、`Admin > AI` 的搜索/筛选区已统一为 inline search bar，输入框、按钮尺寸、圆角和间距保持一致。
+- `Admin > AI` 对话审计筛选区已补齐 `Search / Reset / Refresh` 操作；管理页各子页面的共享搜索输入宽度也已收窄到统一上限，避免桌面端输入框无节制撑满整行。
 
 本轮新增验证：
 
@@ -34,6 +35,11 @@
 - 字段区按“身份归属 / 调度执行 / 资源记录 / 命令上下文”分段展示，长命令、脚本、工作目录等字段改为可换行代码面板，避免内容溢出显示区域。
 - 备注字段改为结构化块展示，保持长文本可读性和复制友好性。
 - 分区详情页已删除顶部摘要下方重复的“分区详情 / 节点集合”块，并把“已分配节点 / 空闲节点”并入顶部摘要卡片。
+
+补充收口：
+
+- `Job` 与 `Job History` 详情正文已进一步改成“短字段 2-3 列并排 + 长字段整行展开”的连续信息面板，不再保留“作业身份 / 归档信息 / 详细资源与命令”等冗余小标题。
+- 资源、备注、命令、脚本、工作目录等长内容字段会自动在整行块内换行，避免窄屏和长字符串挤出显示区域。
 
 本轮新增验证：
 
@@ -133,6 +139,11 @@
 
 - `cd frontend && npx vitest run tests/views/PartitionView.spec.ts tests/views/JobView.spec.ts tests/views/JobHistoryView.spec.ts tests/views/JobsView.spec.ts tests/views/JobsHistoryView.spec.ts tests/components/dashboard/ChartResourcesHistory.spec.ts tests/components/dashboard/DashboardCharts.spec.ts`
 
+补充收口：
+
+- 分区详情页实时曲线区的副标题已改成面向用户的“分区活动”说明，不再使用“复用 dashboard 曲线”的实现口径。
+- 分区页实时曲线工作区已改为更紧凑的单页布局：压缩了摘要到图表、图表标题到画布之间的留白，并为分区场景单独降低图表高度，减少首屏溢出和深滚动。
+
 ## 本轮：Dashboard 分区统计、Admin 门禁与 AI 管理页样式已继续收口
 
 本轮继续修正一组已经在真实页面上暴露出的前端问题：
@@ -173,6 +184,11 @@
 本轮新增验证：
 
 - `cd frontend && npx vitest run tests/views/AssistantView.spec.ts`
+
+补充收口：
+
+- `AI` 对话页发送区附近已新增当前模型显示。
+- 具备 `admin/ai:view:*` 的用户可直接在发送区旁切换启用模型；普通用户保持不请求管理员模型配置接口，但仍会看到当前对话模型或集群默认模型状态。
 
 ## 本轮：集群分析、用户分析、资源与分区页面补齐分析视图增强
 
@@ -1192,3 +1208,32 @@
 - `frontend/tests/composables/GatewayAPI.spec.ts` 已按权限规则归一化后的 `rules[]` / `permissions[]` 断言
 - `frontend/tests/components/user/UserToolAnalysisChart.spec.ts` 已从旧 Chart.js canvas 断言切到当前 DOM 条形图实现
 - `frontend/tests/views/JobHistoryView.spec.ts`、`JobView.spec.ts`、`UserAnalysisView.spec.ts` 与 `MainMenuAIContract.spec.ts` 已同步当前页面结构和权限模型
+
+## 10. 预留创建表单补齐 Slurm 必需时间字段
+
+本轮修复了管理页“创建预留”直接报 `A start time must be given` 的问题，范围如下：
+
+- `Reservations` 创建对话框新增 `start_time` 与 `end_time` 输入，并在前端本地校验“开始时间必填、创建时结束时间必填、结束时间必须晚于开始时间”
+- 预留创建与编辑提交现在会把本地 `datetime-local` 值转换为 `slurmrestd` 可接受的时间对象并写入 `start_time` / `end_time`
+- `ActionDialog` 扩展支持 `datetime-local` 字段类型，供管理类写操作对话框复用
+
+已补充验证：
+
+- `frontend/tests/components/operations/ActionDialog.spec.ts`
+- `frontend/tests/views/ReservationsView.spec.ts`
+
+## 11. 账户详情页补齐用户关联写后刷新
+
+本轮审查了 Slurm 账户创建与账户用户关联逻辑，并修复了一个直接影响可见性的前端缺口：
+
+- Slurm 中“创建账户”和“把用户加入账户”是两条独立写链路：
+  - 账户创建走 `accounts`
+  - 用户加入账户走 `associations`
+- `AccountView` 详情页展示账户下用户列表时，数据来源是 `/associations`，不是 `/accounts`
+- 原实现中，添加用户、编辑用户 QOS、删除用户关联、编辑账户后没有立即刷新 `/associations`，导致页面会继续显示旧状态，看起来像“接口成功但账户里没有用户”
+- 现在账户详情页在上述写操作完成后会立即刷新 `associations`，让账户成员关系与页面展示保持同步
+
+已补充验证：
+
+- `frontend/tests/views/AccountView.spec.ts`
+- `npm --prefix frontend run type-check`

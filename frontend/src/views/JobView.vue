@@ -95,6 +95,18 @@ type JobComponentField = {
 
 type JobFieldRow = JobTextField | JobComponentField
 
+const compactFieldIds = new Set<JobField>([
+  'group',
+  'account',
+  'user',
+  'wckeys',
+  'priority',
+  'nodes',
+  'partition',
+  'qos',
+  'exit-code'
+])
+
 function isValidJobField(key: string): key is JobField {
   return typeof key === 'string' && jobsFields.includes(key as JobField)
 }
@@ -125,28 +137,6 @@ const displayTags = ref<Record<JobField, { show: boolean; highlight: boolean }>>
   'tres-allocated': { show: false, highlight: false },
   'tres-requested': { show: false, highlight: false }
 })
-
-const detailSectionMeta: Record<
-  JobFieldGroup,
-  { title: string; description: string }
-> = {
-  identity: {
-    title: 'pages.job.sections.identityTitle',
-    description: 'pages.job.sections.identityDescription'
-  },
-  scheduling: {
-    title: 'pages.job.sections.schedulingTitle',
-    description: 'pages.job.sections.schedulingDescription'
-  },
-  payload: {
-    title: 'pages.job.sections.payloadTitle',
-    description: 'pages.job.sections.payloadDescription'
-  },
-  resources: {
-    title: 'pages.job.sections.resourcesTitle',
-    description: 'pages.job.sections.resourcesDescription'
-  }
-}
 
 function fmtField(value: string | number | null | undefined) {
   if (value == null || value === '') return '-'
@@ -235,14 +225,12 @@ const jobFieldsContent = computed((): JobFieldRow[] => {
   ]
 })
 
-const detailSections = computed(() =>
-  (Object.keys(detailSectionMeta) as JobFieldGroup[])
-    .map((group) => ({
-      id: group,
-      ...detailSectionMeta[group],
-      fields: jobFieldsContent.value.filter((field) => field.group === group)
-    }))
-    .filter((section) => section.fields.length > 0)
+const compactDetailFields = computed(() =>
+  jobFieldsContent.value.filter((field) => compactFieldIds.has(field.id))
+)
+
+const fullDetailFields = computed(() =>
+  jobFieldsContent.value.filter((field) => !compactFieldIds.has(field.id))
 )
 
 const summaryItems = computed(() => {
@@ -488,80 +476,107 @@ watch(
                   {{ t('pages.job.panels.configurationDescription') }}
                 </p>
               </div>
-              <section class="space-y-6">
-                <div>
-                  <div class="mb-4">
-                    <h3 class="ui-panel-title">{{ t('pages.job.panels.detailedTitle') }}</h3>
-                    <p class="ui-panel-description mt-1">
-                      {{ t('pages.job.panels.detailedDescription') }}
-                    </p>
-                  </div>
-                  <div class="ui-detail-sections" data-testid="job-detail-sections">
-                    <section
-                      v-for="section in detailSections"
-                      :key="section.id"
-                      class="ui-detail-section"
-                    >
-                      <div class="ui-detail-section-heading">
-                        <h4 class="ui-detail-section-title">{{ t(section.title) }}</h4>
-                        <p class="ui-detail-section-description">{{ t(section.description) }}</p>
-                      </div>
-                      <div class="ui-detail-list" data-testid="job-detail-list">
-                        <dl>
-                          <div
-                            v-for="field in section.fields"
-                            :key="field.id"
-                            :id="field.id"
-                            :class="[
-                              displayTags[field.id].highlight
-                                ? 'rounded-[18px] bg-[rgba(182,232,44,0.16)] px-4 sm:px-5'
-                                : '',
-                              'px-4 py-3 transition-colors duration-700 sm:grid sm:grid-cols-3 sm:gap-5 sm:px-0'
-                            ]"
-                            @mouseenter="displayTags[field.id].show = true"
-                            @mouseleave="displayTags[field.id].show = false"
-                          >
-                            <dt class="text-sm leading-6 font-semibold text-[var(--color-brand-ink-strong)]">
-                              <a :href="`#${field.id}`" class="ui-detail-anchor" @click.prevent="highlightField(field.id)">
-                                <span
-                                  :class="[
-                                    displayTags[field.id].show
-                                      ? 'ui-detail-anchor-icon ui-detail-anchor-icon-active'
-                                      : 'ui-detail-anchor-icon'
-                                  ]"
-                                >
-                                  <HashtagIcon class="h-3.5 w-3.5" aria-hidden="true" />
-                                </span>
-                                <span>{{ t(field.label) }}</span>
-                              </a>
-                            </dt>
-                            <dd
-                              v-if="field.kind === 'text'"
-                              class="ui-detail-value-shell mt-1 sm:col-span-2 sm:mt-0"
-                            >
-                              <PartitionLinkChip
-                                v-if="field.link?.kind === 'partition' && field.value !== '-'"
-                                :cluster="cluster"
-                                :partition="field.value"
-                              />
-                              <RouterLink
-                                v-else-if="field.link?.to && field.value !== '-'"
-                                :to="field.link.to"
-                                class="ui-inline-link ui-detail-rich-text"
-                              >
-                                {{ field.value }}
-                              </RouterLink>
-                              <pre v-else-if="field.monospace" class="ui-detail-codeblock">{{ field.value }}</pre>
-                              <p v-else class="ui-detail-rich-text">{{ field.value }}</p>
-                            </dd>
-                            <component v-else :is="field.component" v-bind="field.props" />
-                          </div>
-                        </dl>
-                      </div>
-                    </section>
-                  </div>
+              <div class="ui-detail-layout" data-testid="job-detail-sections">
+                <div
+                  v-if="compactDetailFields.length"
+                  class="ui-detail-grid"
+                  data-testid="job-detail-grid"
+                >
+                  <section
+                    v-for="field in compactDetailFields"
+                    :key="field.id"
+                    :id="field.id"
+                    :class="[
+                      displayTags[field.id].highlight ? 'ui-detail-item-highlight' : '',
+                      'ui-detail-card'
+                    ]"
+                    @mouseenter="displayTags[field.id].show = true"
+                    @mouseleave="displayTags[field.id].show = false"
+                  >
+                    <div class="ui-detail-card-label">
+                      <a :href="`#${field.id}`" class="ui-detail-anchor" @click.prevent="highlightField(field.id)">
+                        <span
+                          :class="[
+                            displayTags[field.id].show
+                              ? 'ui-detail-anchor-icon ui-detail-anchor-icon-active'
+                              : 'ui-detail-anchor-icon'
+                          ]"
+                        >
+                          <HashtagIcon class="h-3.5 w-3.5" aria-hidden="true" />
+                        </span>
+                        <span>{{ t(field.label) }}</span>
+                      </a>
+                    </div>
+                    <div class="ui-detail-card-value">
+                      <PartitionLinkChip
+                        v-if="field.kind === 'text' && field.link?.kind === 'partition' && field.value !== '-'"
+                        :cluster="cluster"
+                        :partition="field.value"
+                      />
+                      <RouterLink
+                        v-else-if="field.kind === 'text' && field.link?.to && field.value !== '-'"
+                        :to="field.link.to"
+                        class="ui-inline-link ui-detail-rich-text"
+                      >
+                        {{ field.value }}
+                      </RouterLink>
+                      <pre v-else-if="field.kind === 'text' && field.monospace" class="ui-detail-codeblock">{{ field.value }}</pre>
+                      <p v-else-if="field.kind === 'text'" class="ui-detail-rich-text">{{ field.value }}</p>
+                      <component v-else :is="field.component" v-bind="field.props" />
+                    </div>
+                  </section>
                 </div>
-              </section>
+
+                <div
+                  v-if="fullDetailFields.length"
+                  class="ui-detail-long-stack"
+                  data-testid="job-detail-long-fields"
+                >
+                  <section
+                    v-for="field in fullDetailFields"
+                    :key="field.id"
+                    :id="field.id"
+                    :class="[
+                      displayTags[field.id].highlight ? 'ui-detail-item-highlight' : '',
+                      'ui-detail-block'
+                    ]"
+                    @mouseenter="displayTags[field.id].show = true"
+                    @mouseleave="displayTags[field.id].show = false"
+                  >
+                    <div class="ui-detail-block-label">
+                      <a :href="`#${field.id}`" class="ui-detail-anchor" @click.prevent="highlightField(field.id)">
+                        <span
+                          :class="[
+                            displayTags[field.id].show
+                              ? 'ui-detail-anchor-icon ui-detail-anchor-icon-active'
+                              : 'ui-detail-anchor-icon'
+                          ]"
+                        >
+                          <HashtagIcon class="h-3.5 w-3.5" aria-hidden="true" />
+                        </span>
+                        <span>{{ t(field.label) }}</span>
+                      </a>
+                    </div>
+                    <div class="ui-detail-block-body">
+                      <PartitionLinkChip
+                        v-if="field.kind === 'text' && field.link?.kind === 'partition' && field.value !== '-'"
+                        :cluster="cluster"
+                        :partition="field.value"
+                      />
+                      <RouterLink
+                        v-else-if="field.kind === 'text' && field.link?.to && field.value !== '-'"
+                        :to="field.link.to"
+                        class="ui-inline-link ui-detail-rich-text"
+                      >
+                        {{ field.value }}
+                      </RouterLink>
+                      <pre v-else-if="field.kind === 'text' && field.monospace" class="ui-detail-codeblock">{{ field.value }}</pre>
+                      <p v-else-if="field.kind === 'text'" class="ui-detail-rich-text">{{ field.value }}</p>
+                      <component v-else :is="field.component" v-bind="field.props" />
+                    </div>
+                  </section>
+                </div>
+              </div>
             </div>
           </div>
         </div>

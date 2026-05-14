@@ -17,6 +17,7 @@ import ErrorAlert from '@/components/ErrorAlert.vue'
 const props = defineProps<{
   cluster: string
   metricsQuery?: DashboardMetricsQuery
+  compact?: boolean
 }>()
 
 const runtimeStore = useRuntimeStore()
@@ -99,14 +100,17 @@ watch(
 
 <template>
   <div
-    class="border-b border-gray-200 pt-16 pb-5 sm:flex sm:items-center sm:justify-between dark:border-gray-700"
+    :class="[
+      'border-b border-gray-200 sm:flex sm:items-center sm:justify-between dark:border-gray-700',
+      props.compact ? 'pb-3 pt-2' : 'pb-5 pt-16'
+    ]"
   >
     <h3 class="text-base font-semibold text-gray-900 dark:text-gray-200">Jobs Queue</h3>
   </div>
   <ErrorAlert v-if="liveChart.metrics.unable.value" class="mt-4"
     >Unable to retrieve jobs metrics.</ErrorAlert
   >
-  <div v-else class="ui-chart-shell">
+  <div v-else :class="['ui-chart-shell', props.compact ? 'partition-chart-shell' : '']">
     <ChartSkeleton v-show="!liveChart.metrics.loaded.value" />
     <canvas
       v-show="liveChart.metrics.loaded.value"

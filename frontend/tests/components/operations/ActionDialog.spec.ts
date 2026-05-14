@@ -137,4 +137,48 @@ describe('ActionDialog.vue', () => {
     await wrapper.get('form').trigger('submit')
     expect(wrapper.emitted('submit')?.[0]).toEqual([{ description: 'Typing in progress' }])
   })
+
+  test('renders datetime-local fields and submits entered timestamps', async () => {
+    const wrapper = mount(ActionDialog, {
+      global: {
+        stubs: {
+          Dialog: { template: '<div><slot /></div>' },
+          DialogPanel: { template: '<div><slot /></div>' },
+          DialogTitle: { template: '<div><slot /></div>' },
+          TransitionChild: { template: '<div><slot /></div>' },
+          TransitionRoot: { template: '<div><slot /></div>' }
+        }
+      },
+      props: {
+        open: true,
+        title: 'pages.reservations.dialogs.create.title',
+        submitLabel: 'pages.reservations.dialogs.create.submit',
+        fields: [
+          {
+            key: 'start_time',
+            label: 'pages.reservations.dialogs.fields.startTime',
+            type: 'datetime-local',
+            required: true
+          },
+          {
+            key: 'end_time',
+            label: 'pages.reservations.dialogs.fields.endTime',
+            type: 'datetime-local',
+            required: true
+          }
+        ]
+      }
+    })
+
+    const inputs = wrapper.findAll('input[type="datetime-local"]')
+    expect(inputs).toHaveLength(2)
+
+    await inputs[0].setValue('2026-05-14T10:30')
+    await inputs[1].setValue('2026-05-14T12:00')
+    await wrapper.get('form').trigger('submit')
+
+    expect(wrapper.emitted('submit')?.[0]).toEqual([
+      { start_time: '2026-05-14T10:30', end_time: '2026-05-14T12:00' }
+    ])
+  })
 })

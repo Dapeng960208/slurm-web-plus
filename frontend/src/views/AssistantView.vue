@@ -104,6 +104,33 @@ const hasUsableModel = computed(() => {
   if (enabledModels.value.length > 0) return true
   return clusterDetails.value?.ai?.default_model_id != null
 })
+const canSwitchModels = computed(() => canInspectModels.value && enabledModels.value.length > 0)
+const activeModelLabel = computed(() => {
+  if (selectedModelConfig.value) return selectedModelConfig.value.display_name || selectedModelConfig.value.model
+  if (selectedConversation.value?.model_config_id) {
+    return t('pages.assistant.composer.currentModelId', {
+      id: selectedConversation.value.model_config_id
+    })
+  }
+  if (clusterDetails.value?.ai?.default_model_id) {
+    return t('pages.assistant.composer.defaultModelId', {
+      id: clusterDetails.value.ai.default_model_id
+    })
+  }
+  return t('pages.assistant.composer.noModelSelected')
+})
+const modelStatusText = computed(() => {
+  if (selectedModelConfig.value?.is_default) {
+    return t('pages.assistant.composer.modelDefault')
+  }
+  if (selectedConversation.value?.model_config_id) {
+    return t('pages.assistant.composer.modelFromConversation')
+  }
+  if (clusterDetails.value?.ai?.default_model_id) {
+    return t('pages.assistant.composer.modelFromClusterDefault')
+  }
+  return t('pages.assistant.composer.modelUnavailable')
+})
 const renderedMessages = computed<AIConversationMessage[]>(() => {
   const messages = [...(selectedConversation.value?.messages ?? [])]
   if (pendingUserMessage.value) {
@@ -761,6 +788,34 @@ watch(
                     class="block w-full rounded-[28px] border border-[rgba(80,105,127,0.16)] bg-white px-5 py-4 text-sm leading-6 text-[var(--color-brand-ink-strong)] shadow-[var(--shadow-soft)] outline-hidden focus:border-[rgba(182,232,44,0.65)] focus:ring-4 focus:ring-[rgba(182,232,44,0.18)]"
                     :placeholder="t('pages.assistant.composer.placeholder')"
                   />
+                  <div
+                    class="assistant-composer-toolbar rounded-[24px] border border-[rgba(80,105,127,0.12)] bg-[rgba(255,255,255,0.86)] px-4 py-3 shadow-[var(--shadow-soft)]"
+                  >
+                    <div class="assistant-composer-model" data-testid="assistant-model-picker">
+                      <div class="assistant-composer-model-copy">
+                        <span class="assistant-composer-model-label">
+                          {{ t('pages.assistant.composer.modelLabel') }}
+                        </span>
+                        <p class="assistant-composer-model-name">
+                          {{ activeModelLabel }}
+                        </p>
+                        <p class="assistant-composer-model-meta">
+                          {{ modelStatusText }}
+                        </p>
+                      </div>
+                      <select
+                        v-if="canSwitchModels"
+                        v-model.number="selectedModelId"
+                        class="ui-select-field assistant-composer-model-select"
+                        :aria-label="t('pages.assistant.composer.modelSelectAria')"
+                        :disabled="sending"
+                      >
+                        <option v-for="config in enabledModels" :key="config.id" :value="config.id">
+                          {{ config.display_name || config.model }}
+                        </option>
+                      </select>
+                    </div>
+                  </div>
                   <div class="flex flex-wrap items-center justify-between gap-3">
                     <div class="text-sm text-[var(--color-brand-muted)]">
                       <span
@@ -880,3 +935,62 @@ watch(
     </div>
   </ClusterMainLayout>
 </template>
+
+<style scoped>
+.assistant-composer-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.9rem;
+}
+
+.assistant-composer-model {
+  display: flex;
+  width: 100%;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.85rem;
+}
+
+.assistant-composer-model-copy {
+  min-width: 0;
+  flex: 1 1 14rem;
+}
+
+.assistant-composer-model-label {
+  color: var(--color-brand-muted);
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.assistant-composer-model-name {
+  margin-top: 0.28rem;
+  color: var(--color-brand-ink-strong);
+  font-size: 0.96rem;
+  font-weight: 700;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.assistant-composer-model-meta {
+  margin-top: 0.2rem;
+  color: var(--color-brand-muted);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.assistant-composer-model-select {
+  width: min(100%, 19rem);
+  min-width: 12rem;
+}
+
+@media (max-width: 767px) {
+  .assistant-composer-model-select {
+    width: 100%;
+  }
+}
+</style>

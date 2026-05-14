@@ -816,6 +816,20 @@ onUnmounted(() => {
                       </div>
                     </div>
                     <div class="flex flex-wrap items-center justify-end gap-2">
+                      <div data-testid="queue-wait-range-selector">
+                        <MetricRangeSelector
+                          :model-value="selectedRange"
+                          :aria-label="t('pages.analysis.historical.selectRange')"
+                          enable-custom-window
+                          :start-value="customStart"
+                          :end-value="customEnd"
+                          custom-button-label="common.labels.timeRange"
+                          reset-label="common.metricRanges.lastHour"
+                          @update:model-value="renderRange"
+                          @apply-window="applyCustomWindow"
+                          @reset-window="resetCustomWindow"
+                        />
+                      </div>
                       <span class="ui-inline-field-label">
                         {{ t('pages.analysis.historical.aggregationLabel') }}
                       </span>

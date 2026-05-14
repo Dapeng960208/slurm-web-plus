@@ -1185,9 +1185,9 @@ const en = {
         'Review the partition node set definition and the currently visible capacity in this workspace.',
       metrics: {
         kicker: 'Realtime Metrics',
-        title: 'Partition live metrics',
+        title: 'Partition activity',
         description:
-          'Reuse the dashboard curves for partition {partition} to compare resources and job movement in context.',
+          'Track live resource pressure and queue movement for partition {partition} in one compact workspace.',
         selectRange: 'Select partition metrics time range'
       },
       nodeSets: 'Node sets',
@@ -1512,6 +1512,7 @@ const en = {
         avgQueueWait: 'Average Queue Wait',
         avgQueueWaitDetail:
           'Average wait from submit time to start time, grouped by the selected bucket and shown in seconds.',
+        selectRange: 'Select queue wait time range',
         aggregationLabel: 'Aggregation',
         aggregationAria: 'Queue wait aggregation {value}',
         aggregationOptions: {
@@ -1577,10 +1578,22 @@ const en = {
         fields: {
           name: 'Reservation name',
           nodeList: 'Node list',
+          startTime: 'Start time',
+          endTime: 'End time',
           partition: 'Partition',
           users: 'Users (comma separated)',
           accounts: 'Accounts (comma separated)'
+        },
+        hints: {
+          startTime: 'Required by Slurm when creating or updating a reservation.',
+          endTime: 'Required when creating a reservation unless a duration is supplied.',
+          endTimeOptional: 'Leave empty only if the reservation should keep its existing end time.'
         }
+      },
+      errors: {
+        startTimeRequired: 'A reservation start time is required.',
+        endTimeRequired: 'A reservation end time is required for creation.',
+        invalidTimeRange: 'Reservation end time must be later than the start time.'
       },
       notifications: {
         createRequested: 'Reservation {name} creation requested.',
@@ -1917,6 +1930,15 @@ const en = {
       composer: {
         placeholder:
           'Ask about a job, node resources, partitions, or another read-only cluster question.',
+        modelLabel: 'Current Model',
+        modelSelectAria: 'Select AI chat model',
+        currentModelId: 'Conversation model #{id}',
+        defaultModelId: 'Cluster default model #{id}',
+        noModelSelected: 'No model selected',
+        modelDefault: 'Using the default enabled model for this conversation.',
+        modelFromConversation: 'Using the model stored on the current conversation.',
+        modelFromClusterDefault: 'Using the cluster default model for new requests.',
+        modelUnavailable: 'No readable model metadata is currently available.',
         estimatedTokens: 'Estimated tokens {current} / {limit}',
         tokenExceededHint:
           'Token estimate exceeds the current limit. Shorten the prompt or start a new chat.'

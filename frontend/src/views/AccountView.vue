@@ -50,11 +50,14 @@ const operationBusy = ref(false)
 const operationError = ref<string | null>(null)
 const accountDetails = ref<AccountDescription | null>(null)
 const selectedAssociation = ref<ClusterAssociation | null>(null)
-const { data, unable, loaded, initialLoading, setCluster } = useClusterDataPoller<ClusterAssociation[]>(
-  cluster,
-  'associations',
-  120000
-)
+const {
+  data,
+  unable,
+  loaded,
+  initialLoading,
+  refresh: refreshAssociations,
+  setCluster
+} = useClusterDataPoller<ClusterAssociation[]>(cluster, 'associations', 120000)
 
 watch(
   () => cluster,
@@ -179,6 +182,7 @@ async function saveAccount(payload: Record<string, string>) {
       parent_account: payload.parent_account || undefined,
       qos: parseCsvList(payload.qos)
     })
+    await refreshAssociations()
     runtimeStore.reportInfo(t('pages.account.notifications.updateRequested', { account }))
     await loadAccountDetails()
     editOpen.value = false
@@ -202,6 +206,7 @@ async function addUserAssociation(payload: Record<string, string>) {
         default_qos: payload.default_qos
       })
     )
+    await refreshAssociations()
     runtimeStore.reportInfo(
       t('pages.account.notifications.addUserRequested', { user: payload.user, account })
     )
@@ -227,6 +232,7 @@ async function saveUserAssociationQos(payload: Record<string, string>) {
         default_qos: payload.default_qos
       })
     )
+    await refreshAssociations()
     runtimeStore.reportInfo(
       t('pages.account.notifications.updateQosRequested', {
         user: selectedAssociation.value.user,
@@ -253,6 +259,7 @@ async function removeUserAssociation() {
         user: selectedAssociation.value.user
       })
     )
+    await refreshAssociations()
     runtimeStore.reportInfo(
       t('pages.account.notifications.removeUserRequested', {
         user: selectedAssociation.value.user,

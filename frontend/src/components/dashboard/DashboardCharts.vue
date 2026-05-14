@@ -17,6 +17,7 @@ const props = defineProps<{
   cluster: string
   metricsQuery?: DashboardMetricsQuery
   routeTargetName?: string
+  compact?: boolean
 }>()
 
 const runtimeStore = useRuntimeStore()
@@ -30,10 +31,12 @@ const canViewJobs = computed(() => runtimeStore.hasRoutePermission(props.cluster
     :cluster="props.cluster"
     :metrics-query="props.metricsQuery"
     :route-target-name="props.routeTargetName"
+    :compact="props.compact"
   />
   <ChartJobsHistogram
     v-if="canViewJobs"
     :cluster="props.cluster"
     :metrics-query="props.metricsQuery"
+    :compact="props.compact"
   />
 </template>

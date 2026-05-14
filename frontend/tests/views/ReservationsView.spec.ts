@@ -1,8 +1,10 @@
 import { describe, test, expect, beforeEach, vi } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { nextTick } from 'vue'
+import { flushPromises, mount } from '@vue/test-utils'
 import ReservationsView from '@/views/ReservationsView.vue'
 import ErrorAlert from '@/components/ErrorAlert.vue'
 import InfoAlert from '@/components/InfoAlert.vue'
+import ActionDialog from '@/components/operations/ActionDialog.vue'
 import { init_plugins, getMockClusterDataPoller } from '../lib/common'
 import { useRuntimeStore } from '@/stores/runtime'
 import { i18n } from '@/plugins/i18n'
@@ -10,17 +12,36 @@ import type { ClusterReservation } from '@/composables/GatewayAPI'
 import reservations from '../assets/reservations.json'
 
 const mockClusterDataPoller = getMockClusterDataPoller<ClusterReservation[]>()
+const mockGatewayAPI = {
+  save_reservation: vi.fn(),
+  update_reservation: vi.fn(),
+  delete_reservation: vi.fn()
+}
 
 vi.mock('@/composables/DataPoller', () => ({
   useClusterDataPoller: () => mockClusterDataPoller
 }))
+
+vi.mock('@/composables/GatewayAPI', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/composables/GatewayAPI')>()
+  return {
+    ...actual,
+    useGatewayAPI: () => mockGatewayAPI
+  }
+})
+
 describe('ReservationsView.vue', () => {
   beforeEach(() => {
     init_plugins()
+    vi.clearAllMocks()
     useRuntimeStore().availableClusters = [
       {
         name: 'foo',
-        permissions: { roles: [], actions: [] },
+        permissions: {
+          roles: [],
+          actions: [],
+          rules: ['reservations:view:*', 'reservations:edit:*', 'reservations:delete:*']
+        },
         infrastructure: 'foo',
         metrics: true,
         racksdb: false,
@@ -92,6 +113,78 @@ describe('ReservationsView.vue', () => {
     })
     expect(wrapper.getComponent(InfoAlert).text()).toBe(
       i18n.global.t('pages.reservations.noReservations', { cluster: 'foo' })
+    )
+  })
+
+  test('submits reservation create payload with required time fields', async () => {
+    mockClusterDataPoller.data.value = reservations
+    mockGatewayAPI.save_reservation.mockResolvedValue({ result: 'ok' })
+
+    const wrapper = mount(ReservationsView, {
+      props: {
+        cluster: 'foo'
+      }
+    })
+
+    await wrapper.get('button.ui-button-primary').trigger('click')
+    await nextTick()
+    const createDialog = wrapper.findAllComponents(ActionDialog)[0]
+    expect(createDialog.props('open')).toBe(true)
+    createDialog.vm.$emit('submit', {
+      name: 'maint-weekend',
+      node_list: 'cn001,cn002',
+      start_time: '2026-05-14T10:30',
+      end_time: '2026-05-14T12:00',
+      partition: 'gpu',
+      users: 'alice,bob',
+      accounts: 'science'
+    })
+    await flushPromises()
+
+    expect(mockGatewayAPI.save_reservation).toHaveBeenCalledWith('foo', {
+      name: 'maint-weekend',
+      node_list: 'cn001,cn002',
+      partition: 'gpu',
+      users: ['alice', 'bob'],
+      accounts: ['science'],
+      start_time: {
+        set: true,
+        number: Math.floor(new Date('2026-05-14T10:30').getTime() / 1000)
+      },
+      end_time: {
+        set: true,
+        number: Math.floor(new Date('2026-05-14T12:00').getTime() / 1000)
+      }
+    })
+  })
+
+  test('shows local validation error when create reservation end time is missing', async () => {
+    mockClusterDataPoller.data.value = reservations
+
+    const wrapper = mount(ReservationsView, {
+      props: {
+        cluster: 'foo'
+      }
+    })
+
+    await wrapper.get('button.ui-button-primary').trigger('click')
+    await nextTick()
+    const createDialog = wrapper.findAllComponents(ActionDialog)[0]
+    expect(createDialog.props('open')).toBe(true)
+    createDialog.vm.$emit('submit', {
+      name: 'maint-window',
+      node_list: 'cn003',
+      start_time: '2026-05-14T10:30',
+      end_time: '',
+      partition: '',
+      users: '',
+      accounts: ''
+    })
+    await flushPromises()
+
+    expect(mockGatewayAPI.save_reservation).not.toHaveBeenCalled()
+    expect(wrapper.findAllComponents(ActionDialog)[0].props('error')).toBe(
+      i18n.global.t('pages.reservations.errors.endTimeRequired')
     )
   })
 })

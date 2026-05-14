@@ -121,34 +121,28 @@ type HistoryResourceField = HistoryFieldBase & {
 
 type HistoryFieldRow = HistoryTextField | HistoryResourceField
 
+const compactFieldIds = new Set<HistoryField>([
+  'job-id',
+  'state-reason',
+  'user',
+  'group',
+  'account',
+  'partition',
+  'qos',
+  'priority',
+  'nodes',
+  'time-limit',
+  'exit-code',
+  'max-memory',
+  'used-cpu-cores-avg'
+])
+
 const displayTags = ref<Record<HistoryField, { show: boolean; highlight: boolean }>>(
   Object.fromEntries(allFields.map((field) => [field, { show: false, highlight: false }])) as Record<
     HistoryField,
     { show: boolean; highlight: boolean }
   >
 )
-
-const detailSectionMeta: Record<
-  HistoryFieldGroup,
-  { title: string; description: string }
-> = {
-  identity: {
-    title: 'pages.jobHistoryDetail.sections.identityTitle',
-    description: 'pages.jobHistoryDetail.sections.identityDescription'
-  },
-  scheduling: {
-    title: 'pages.jobHistoryDetail.sections.schedulingTitle',
-    description: 'pages.jobHistoryDetail.sections.schedulingDescription'
-  },
-  resources: {
-    title: 'pages.jobHistoryDetail.sections.resourcesTitle',
-    description: 'pages.jobHistoryDetail.sections.resourcesDescription'
-  },
-  payload: {
-    title: 'pages.jobHistoryDetail.sections.payloadTitle',
-    description: 'pages.jobHistoryDetail.sections.payloadDescription'
-  }
-}
 
 function highlightField(field: HistoryField) {
   displayTags.value[field].highlight = true
@@ -340,16 +334,12 @@ const fields = (record: JobHistoryRecord): HistoryFieldRow[] => [
 ]
 
 const timeline = computed(() => (job.value ? timelineSteps(job.value) : []))
-const detailSections = computed(() =>
-  job.value
-    ? (Object.keys(detailSectionMeta) as HistoryFieldGroup[])
-        .map((group) => ({
-          id: group,
-          ...detailSectionMeta[group],
-          fields: fields(job.value!).filter((field) => field.group === group)
-        }))
-        .filter((section) => section.fields.length > 0)
-    : []
+const compactDetailFields = computed(() =>
+  job.value ? fields(job.value).filter((field) => compactFieldIds.has(field.id)) : []
+)
+
+const fullDetailFields = computed(() =>
+  job.value ? fields(job.value).filter((field) => !compactFieldIds.has(field.id)) : []
 )
 
 const summaryItems = computed(() => {
@@ -541,99 +531,125 @@ watch(
                 {{ t('pages.jobHistoryDetail.recordedFieldsDescription') }}
               </p>
             </div>
-            <section class="space-y-6">
-              <div>
-                <div class="mb-4">
-                  <h3 class="ui-panel-title">{{ t('pages.jobHistoryDetail.detailedTitle') }}</h3>
-                  <p class="ui-panel-description mt-1">
-                    {{ t('pages.jobHistoryDetail.detailedDescription') }}
-                  </p>
-                </div>
-                <div class="ui-detail-sections" data-testid="job-history-detail-sections">
-                  <section
-                    v-for="section in detailSections"
-                    :key="section.id"
-                    class="ui-detail-section"
-                  >
-                    <div class="ui-detail-section-heading">
-                      <h4 class="ui-detail-section-title">{{ t(section.title) }}</h4>
-                      <p class="ui-detail-section-description">{{ t(section.description) }}</p>
-                    </div>
-                    <div class="ui-detail-list" data-testid="job-history-detail-list">
-                      <dl>
-                        <div
-                          v-for="field in section.fields"
-                          :key="field.id"
-                          :id="field.id"
-                          :class="[
-                            displayTags[field.id as HistoryField].highlight
-                              ? 'rounded-[18px] bg-[rgba(182,232,44,0.16)] px-4 sm:px-5'
-                              : '',
-                            'px-4 py-3 transition-colors duration-700 sm:grid sm:grid-cols-3 sm:gap-5 sm:px-0'
-                          ]"
-                          @mouseenter="displayTags[field.id as HistoryField].show = true"
-                          @mouseleave="displayTags[field.id as HistoryField].show = false"
-                        >
-                          <dt class="text-sm leading-6 font-semibold text-[var(--color-brand-ink-strong)]">
-                            <a
-                              :href="`#${field.id}`"
-                              class="ui-detail-anchor"
-                              @click.prevent="highlightField(field.id as HistoryField)"
-                            >
-                              <span
-                                :class="[
-                                  displayTags[field.id as HistoryField].show
-                                    ? 'ui-detail-anchor-icon ui-detail-anchor-icon-active'
-                                    : 'ui-detail-anchor-icon'
-                                ]"
-                              >
-                                <HashtagIcon class="h-3.5 w-3.5" aria-hidden="true" />
-                              </span>
-                              <span>{{ translate(field.label) }}</span>
-                            </a>
-                          </dt>
-                          <JobResources
-                            v-if="field.kind === 'resource' && field.tres && field.tres.length > 0"
-                            :tres="field.tres"
-                            :gpu="field.gpu"
-                          />
-                          <dd
-                            v-else-if="field.kind === 'resource'"
-                            class="ui-detail-value-shell mt-1 sm:col-span-2 sm:mt-0"
-                          >
-                            <p class="ui-detail-rich-text">-</p>
-                          </dd>
-                          <dd
-                            v-else-if="field.id === 'user' && field.value !== '-'"
-                            class="ui-detail-value-shell mt-1 sm:col-span-2 sm:mt-0"
-                          >
-                            <RouterLink
-                              :to="{ name: 'user', params: { cluster, user: field.value } }"
-                              class="ui-user-link ui-detail-rich-text"
-                            >
-                              {{ field.value }}
-                            </RouterLink>
-                          </dd>
-                          <dd
-                            v-else-if="field.id === 'partition' && field.value !== '-'"
-                            class="ui-detail-value-shell mt-1 sm:col-span-2 sm:mt-0"
-                          >
-                            <PartitionLinkChip :cluster="cluster" :partition="field.value" />
-                          </dd>
-                          <dd
-                            v-else
-                            class="ui-detail-value-shell mt-1 sm:col-span-2 sm:mt-0"
-                          >
-                            <pre v-if="field.monospace" class="ui-detail-codeblock">{{ field.value }}</pre>
-                            <p v-else class="ui-detail-rich-text">{{ field.value }}</p>
-                          </dd>
-                        </div>
-                      </dl>
-                    </div>
-                  </section>
-                </div>
+            <div class="ui-detail-layout" data-testid="job-history-detail-sections">
+              <div
+                v-if="compactDetailFields.length"
+                class="ui-detail-grid"
+                data-testid="job-history-detail-grid"
+              >
+                <section
+                  v-for="field in compactDetailFields"
+                  :key="field.id"
+                  :id="field.id"
+                  :class="[
+                    displayTags[field.id as HistoryField].highlight ? 'ui-detail-item-highlight' : '',
+                    'ui-detail-card'
+                  ]"
+                  @mouseenter="displayTags[field.id as HistoryField].show = true"
+                  @mouseleave="displayTags[field.id as HistoryField].show = false"
+                >
+                  <div class="ui-detail-card-label">
+                    <a
+                      :href="`#${field.id}`"
+                      class="ui-detail-anchor"
+                      @click.prevent="highlightField(field.id as HistoryField)"
+                    >
+                      <span
+                        :class="[
+                          displayTags[field.id as HistoryField].show
+                            ? 'ui-detail-anchor-icon ui-detail-anchor-icon-active'
+                            : 'ui-detail-anchor-icon'
+                        ]"
+                      >
+                        <HashtagIcon class="h-3.5 w-3.5" aria-hidden="true" />
+                      </span>
+                      <span>{{ translate(field.label) }}</span>
+                    </a>
+                  </div>
+                  <div class="ui-detail-card-value">
+                    <JobResources
+                      v-if="field.kind === 'resource' && field.tres && field.tres.length > 0"
+                      :tres="field.tres"
+                      :gpu="field.gpu"
+                    />
+                    <p v-else-if="field.kind === 'resource'" class="ui-detail-rich-text">-</p>
+                    <RouterLink
+                      v-else-if="field.id === 'user' && field.value !== '-'"
+                      :to="{ name: 'user', params: { cluster, user: field.value } }"
+                      class="ui-user-link ui-detail-rich-text"
+                    >
+                      {{ field.value }}
+                    </RouterLink>
+                    <PartitionLinkChip
+                      v-else-if="field.id === 'partition' && field.value !== '-'"
+                      :cluster="cluster"
+                      :partition="field.value"
+                    />
+                    <pre v-else-if="field.kind === 'text' && field.monospace" class="ui-detail-codeblock">{{ field.value }}</pre>
+                    <p v-else class="ui-detail-rich-text">{{ field.kind === 'text' ? field.value : '-' }}</p>
+                  </div>
+                </section>
               </div>
-            </section>
+
+              <div
+                v-if="fullDetailFields.length"
+                class="ui-detail-long-stack"
+                data-testid="job-history-detail-long-fields"
+              >
+                <section
+                  v-for="field in fullDetailFields"
+                  :key="field.id"
+                  :id="field.id"
+                  :class="[
+                    displayTags[field.id as HistoryField].highlight ? 'ui-detail-item-highlight' : '',
+                    'ui-detail-block'
+                  ]"
+                  @mouseenter="displayTags[field.id as HistoryField].show = true"
+                  @mouseleave="displayTags[field.id as HistoryField].show = false"
+                >
+                  <div class="ui-detail-block-label">
+                    <a
+                      :href="`#${field.id}`"
+                      class="ui-detail-anchor"
+                      @click.prevent="highlightField(field.id as HistoryField)"
+                    >
+                      <span
+                        :class="[
+                          displayTags[field.id as HistoryField].show
+                            ? 'ui-detail-anchor-icon ui-detail-anchor-icon-active'
+                            : 'ui-detail-anchor-icon'
+                        ]"
+                      >
+                        <HashtagIcon class="h-3.5 w-3.5" aria-hidden="true" />
+                      </span>
+                      <span>{{ translate(field.label) }}</span>
+                    </a>
+                  </div>
+                  <div class="ui-detail-block-body">
+                    <JobResources
+                      v-if="field.kind === 'resource' && field.tres && field.tres.length > 0"
+                      :tres="field.tres"
+                      :gpu="field.gpu"
+                    />
+                    <p v-else-if="field.kind === 'resource'" class="ui-detail-rich-text">-</p>
+                    <RouterLink
+                      v-else-if="field.id === 'user' && field.value !== '-'"
+                      :to="{ name: 'user', params: { cluster, user: field.value } }"
+                      class="ui-user-link ui-detail-rich-text"
+                    >
+                      {{ field.value }}
+                    </RouterLink>
+                    <PartitionLinkChip
+                      v-else-if="field.id === 'partition' && field.value !== '-'"
+                      :cluster="cluster"
+                      :partition="field.value"
+                    />
+                    <pre v-else-if="field.kind === 'text' && field.monospace" class="ui-detail-codeblock">{{ field.value }}</pre>
+                    <p v-else class="ui-detail-rich-text">{{ field.kind === 'text' ? field.value : '-' }}</p>
+                  </div>
+                </section>
+              </div>
+            </div>
           </div>
         </div>
       </div>

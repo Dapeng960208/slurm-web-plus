@@ -272,6 +272,9 @@ describe('ClusterAnalysisView.vue', () => {
     expect(wrapper.text()).toContain('Average Queue Wait')
     expect(wrapper.text()).toContain('shown in seconds')
     expect(wrapper.text()).toContain('Aggregation')
+    expect(wrapper.get('[data-testid="queue-wait-range-selector"]').text()).toContain(
+      'Time Range'
+    )
     expect(wrapper.text()).toContain('Node Hotspots')
     expect(wrapper.text()).toContain('Node cn1')
     expect(wrapper.text()).toContain('Jobs Submitted')
@@ -465,6 +468,52 @@ describe('ClusterAnalysisView.vue', () => {
     )
     expect(wrapper.get('[data-testid="queue-wait-chart"]').text()).toContain(
       `minute|[[${new Date('2026-04-24T09:10:00Z').getTime()},600],[${new Date('2026-04-24T10:20:00Z').getTime()},1200]]`
+    )
+  })
+
+  test('updates queue wait history when using the card time range selector', async () => {
+    const wrapper = mount(ClusterAnalysisView, {
+      props: { cluster: 'foo' },
+      global: {
+        stubs: {
+          ClusterMainLayout: { template: '<div><slot /></div>' },
+          RouterLink: { template: '<a><slot /></a>' },
+          PartitionLinkChip: {
+            props: ['cluster', 'partition'],
+            template:
+              '<a data-testid="analysis-partition-link" :data-cluster="cluster" :data-partition="partition">{{ partition }}</a>'
+          },
+          QueueWaitHistoryChart: {
+            props: ['series', 'aggregation'],
+            template:
+              '<div data-testid="queue-wait-chart">{{ aggregation }}|{{ JSON.stringify(series) }}</div>'
+          }
+        }
+      }
+    })
+
+    await flushPromises()
+    mockGatewayAPI.jobs_history.mockClear()
+
+    await wrapper
+      .get('[data-testid="queue-wait-range-selector"] [data-testid="metric-range-custom-button"]')
+      .trigger('click')
+    await wrapper
+      .get('[data-testid="metric-range-quick-7d"]')
+      .trigger('click')
+    await wrapper
+      .get('[data-testid="metric-range-apply"]')
+      .trigger('click')
+
+    await flushPromises()
+
+    expect(mockGatewayAPI.jobs_history).toHaveBeenCalledWith(
+      'foo',
+      expect.objectContaining({
+        state: 'COMPLETED',
+        start: expect.stringMatching(/T/),
+        end: expect.stringMatching(/T/)
+      })
     )
   })
 })

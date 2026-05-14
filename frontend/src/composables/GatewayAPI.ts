@@ -1254,9 +1254,18 @@ export interface NodeUpdatePayload extends Record<string, unknown> {
 
 export interface ReservationPayload extends Record<string, unknown> {
   name?: string
+  node_list?: string
   partition?: string
   users?: string[]
   accounts?: string[]
+  start_time?: {
+    set: boolean
+    number: number
+  }
+  end_time?: {
+    set: boolean
+    number: number
+  }
 }
 
 export interface SlurmdbObjectPayload extends Record<string, unknown> {

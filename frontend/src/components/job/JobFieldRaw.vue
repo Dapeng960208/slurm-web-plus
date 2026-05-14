@@ -22,17 +22,13 @@ const {
 </script>
 
 <template>
-  <dd class="ui-detail-value-shell mt-1 sm:col-span-2 sm:mt-0">
-    <RouterLink
-      v-if="to"
-      :to="to"
-      class="ui-inline-link ui-detail-rich-text"
-    >
+  <div class="ui-detail-value-shell">
+    <RouterLink v-if="to" :to="to" class="ui-inline-link ui-detail-rich-text">
       {{ field }}
     </RouterLink>
     <pre v-else-if="monospace" class="ui-detail-codeblock">{{ field }}</pre>
     <p v-else class="ui-detail-rich-text">
       {{ field }}
     </p>
-  </dd>
+  </div>
 </template>

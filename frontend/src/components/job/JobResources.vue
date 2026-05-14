@@ -27,16 +27,13 @@ const { t } = useI18n()
 </script>
 
 <template>
-  <dd
+  <div
     v-if="resources.node == -1 && resources.cpu == -1 && resources.memory == -1"
-    class="mt-1 text-sm leading-6 text-[var(--color-brand-muted)] sm:col-span-2 sm:mt-0"
+    class="ui-detail-rich-text"
   >
     -
-  </dd>
-  <dd
-    v-else
-    class="mt-1 text-sm leading-6 text-[var(--color-brand-muted)] sm:col-span-2 sm:mt-0"
-  >
+  </div>
+  <div v-else class="ui-detail-resource-list">
     <ul class="space-y-2.5">
       <li>
         <span class="inline-flex items-center gap-2"
@@ -74,5 +71,5 @@ const { t } = useI18n()
         >
       </li>
     </ul>
-  </dd>
+  </div>
 </template>

@@ -1125,8 +1125,8 @@ const zhCN = {
       detailDescription: '查看该分区的节点集合定义以及当前工作区可见的容量情况。',
       metrics: {
         kicker: '实时指标',
-        title: '分区实时曲线',
-        description: '复用 dashboard 曲线，按分区 {partition} 查看资源和作业走势。',
+        title: '分区活动',
+        description: '在一个紧凑工作区内查看分区 {partition} 的实时资源压力和队列变化。',
         selectRange: '选择分区指标时间范围'
       },
       nodeSets: '节点集合',
@@ -1432,6 +1432,7 @@ const zhCN = {
         metricsUnavailable: '历史指标暂时不可用。',
         avgQueueWait: '平均排队时间',
         avgQueueWaitDetail: '按提交时间到启动时间的平均等待时长分组展示，数值单位为秒。',
+        selectRange: '选择排队时间曲线时间范围',
         aggregationLabel: '聚合粒度',
         aggregationAria: '排队时间聚合粒度 {value}',
         aggregationOptions: {
@@ -1496,10 +1497,22 @@ const zhCN = {
         fields: {
           name: '预留名称',
           nodeList: '节点列表',
+          startTime: '开始时间',
+          endTime: '结束时间',
           partition: '分区',
           users: '用户（逗号分隔）',
           accounts: '账户（逗号分隔）'
+        },
+        hints: {
+          startTime: 'Slurm 创建或更新预留时必须提供开始时间。',
+          endTime: '创建预留时必须提供结束时间，除非后端改为支持持续时长。',
+          endTimeOptional: '留空则不修改当前预留的结束时间。'
         }
+      },
+      errors: {
+        startTimeRequired: '创建或更新预留时必须提供开始时间。',
+        endTimeRequired: '创建预留时必须提供结束时间。',
+        invalidTimeRange: '结束时间必须晚于开始时间。'
       },
       notifications: {
         createRequested: '已请求创建预留 {name}。',
@@ -1820,6 +1833,15 @@ const zhCN = {
       },
       composer: {
         placeholder: '可以询问作业、节点资源、分区或其他只读型集群问题。',
+        modelLabel: '当前模型',
+        modelSelectAria: '选择 AI 对话模型',
+        currentModelId: '当前对话模型 #{id}',
+        defaultModelId: '集群默认模型 #{id}',
+        noModelSelected: '当前没有可用模型',
+        modelDefault: '当前对话使用默认启用模型。',
+        modelFromConversation: '当前使用该对话已绑定的模型。',
+        modelFromClusterDefault: '当前新请求使用集群默认模型。',
+        modelUnavailable: '暂时无法读取可展示的模型元数据。',
         estimatedTokens: '预计 tokens {current} / {limit}',
         tokenExceededHint: '当前预计 token 数已超过限制。请缩短问题，或开启新对话。'
       },

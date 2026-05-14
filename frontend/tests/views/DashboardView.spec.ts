@@ -138,7 +138,7 @@ describe('DashboardView.vue', () => {
     expect(runtimeStore.dashboard.partition).toBe('gpu')
     expect((wrapper.get('#dashboard-partition').element as HTMLSelectElement).value).toBe('gpu')
     expect(wrapper.text()).toContain('Realtime Metrics')
-    expect(wrapper.findAll('.ui-inline-field-label').map((node) => node.text())).toEqual([
+    expect(wrapper.findAll('.ui-toolbar-field-label').map((node) => node.text())).toEqual([
       'Partition / Queue'
     ])
   })
@@ -250,7 +250,7 @@ describe('DashboardView.vue', () => {
 
     expect(wrapper.find('#dashboard-partition').exists()).toBe(false)
     expect(runtimeStore.dashboard.partition).toBe('')
-    expect(wrapper.find('.ui-inline-field-label').exists()).toBe(false)
+    expect(wrapper.find('.ui-toolbar-field-label').exists()).toBe(false)
   })
 
   test('renders a cardless toolbar with partition and time range controls', () => {
@@ -267,8 +267,9 @@ describe('DashboardView.vue', () => {
 
     const toolbar = wrapper.get('[data-testid="dashboard-toolbar"]')
     expect(toolbar.text()).toContain('Partition / Queue')
-    expect(toolbar.findAll('.ui-inline-field-label')).toHaveLength(1)
+    expect(toolbar.findAll('.ui-toolbar-field-label')).toHaveLength(1)
     expect(wrapper.find('[data-testid="metric-range-custom-button"]').exists()).toBe(true)
+    expect(toolbar.findAll('.ui-inline-field')).toHaveLength(0)
     expect(wrapper.findAll('.dashboard-surface').length).toBe(9)
     expect(wrapper.find('.dashboard-surface.mt-6').exists()).toBe(false)
   })

@@ -274,9 +274,9 @@ watch(
             <div data-testid="dashboard-toolbar" class="ui-toolbar-fields">
               <label
                 v-if="canSelectPartition"
-                class="ui-inline-field"
+                class="ui-toolbar-field"
               >
-                <span class="ui-inline-field-label">{{ t('pages.dashboard.toolbar.partitionQueue') }}</span>
+                <span class="ui-toolbar-field-label">{{ t('pages.dashboard.toolbar.partitionQueue') }}</span>
                 <select
                   id="dashboard-partition"
                   v-model="runtimeStore.dashboard.partition"
@@ -292,7 +292,7 @@ watch(
                 </select>
               </label>
 
-              <div class="ui-inline-field ui-inline-field-compact">
+              <div class="ui-toolbar-field ui-toolbar-field-range">
                 <MetricRangeSelector
                   :model-value="runtimeStore.dashboard.range"
                   :aria-label="t('pages.dashboard.toolbar.selectMetricsRange')"

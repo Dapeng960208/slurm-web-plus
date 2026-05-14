@@ -104,8 +104,10 @@ describe('JobView.vue', () => {
     expect(summary.text()).toContain(i18n.global.t('pages.job.summary.allocated'))
 
     const detailSections = wrapper.get('[data-testid="job-detail-sections"]')
-    expect(detailSections.text()).toContain(i18n.global.t('pages.job.sections.identityTitle'))
-    expect(detailSections.text()).toContain(i18n.global.t('pages.job.sections.payloadTitle'))
+    const detailGrid = wrapper.get('[data-testid="job-detail-grid"]')
+    const detailLongFields = wrapper.get('[data-testid="job-detail-long-fields"]')
+    expect(detailGrid.classes()).toContain('ui-detail-grid')
+    expect(detailLongFields.classes()).toContain('ui-detail-long-stack')
     expect(detailSections.text()).toContain(i18n.global.t('pages.job.fields.workingDirectory'))
     const detailPartitionLinks = detailSections
       .findAllComponents({ name: 'RouterLink' })
@@ -120,9 +122,12 @@ describe('JobView.vue', () => {
     expect(detailPartitionLinks).toHaveLength(1)
     expect(wrapper.get('#workdir').text()).toContain(jobRunning.working_directory)
     expect(wrapper.get('#submit-line pre').text()).toContain(jobRunning.submit_line)
+    expect(wrapper.get('#script').text()).toContain(jobRunning.script)
     expect(detailSections.text()).toContain(i18n.global.t('pages.job.fields.requested'))
     expect(detailSections.text()).toContain(i18n.global.t('pages.job.fields.allocated'))
     expect(detailSections.text()).toContain(i18n.global.t('pages.job.fields.exitCode'))
+    expect(detailSections.text()).not.toContain(i18n.global.t('pages.job.sections.identityTitle'))
+    expect(detailSections.text()).not.toContain(i18n.global.t('pages.job.panels.detailedTitle'))
     expect(wrapper.find('.ui-scroll-region').classes()).toEqual(
       expect.arrayContaining(['ui-scroll-region', 'min-h-0', 'flex-1', 'pr-1'])
     )
@@ -140,8 +145,8 @@ describe('JobView.vue', () => {
     await nextTick()
 
     expect(wrapper.get('#workdir').text()).toContain(jobRunning.working_directory)
-    expect(wrapper.get('#workdir').classes()).toContain('bg-[rgba(182,232,44,0.16)]')
-    expect(wrapper.get('#script').classes()).not.toContain('bg-[rgba(182,232,44,0.16)]')
+    expect(wrapper.get('#workdir').classes()).toContain('ui-detail-item-highlight')
+    expect(wrapper.get('#script').classes()).not.toContain('ui-detail-item-highlight')
   })
 
   test('renders job skeleton before data arrives', () => {

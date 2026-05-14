@@ -85,7 +85,10 @@ describe('PartitionView.vue', () => {
     expect(wrapper.text()).not.toContain('cn[1-4]')
     expect(wrapper.text()).not.toContain('gpu[1-2]')
     expect(wrapper.get('[data-testid="partition-dashboard-charts"]').text()).toContain(
-      'Partition live metrics'
+      'Partition activity'
+    )
+    expect(wrapper.get('[data-testid="partition-dashboard-charts"]').classes()).toContain(
+      'partition-metrics-panel'
     )
     expect(wrapper.get('[data-testid="partition-dashboard-props"]').text()).toContain('foo|partition|')
     expect(wrapper.get('[data-testid="partition-dashboard-props"]').text()).toContain(

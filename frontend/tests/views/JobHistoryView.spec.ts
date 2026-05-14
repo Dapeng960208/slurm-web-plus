@@ -96,6 +96,10 @@ describe('JobHistoryView.vue', () => {
     expect(wrapper.get('[data-testid="detail-summary-strip"]').text()).toContain('Job ID')
     expect(wrapper.get('[data-testid="detail-summary-strip"]').text()).toContain('Exit Code')
     const detailSections = wrapper.get('[data-testid="job-history-detail-sections"]')
+    expect(wrapper.get('[data-testid="job-history-detail-grid"]').classes()).toContain('ui-detail-grid')
+    expect(wrapper.get('[data-testid="job-history-detail-long-fields"]').classes()).toContain(
+      'ui-detail-long-stack'
+    )
     const detailCompactLinks = detailSections
       .findAllComponents({ name: 'RouterLink' })
       .filter((link) => JSON.stringify(link.props('to')) === JSON.stringify({
@@ -103,11 +107,11 @@ describe('JobHistoryView.vue', () => {
         params: { cluster: 'foo', partition: 'normal' }
       }))
     expect(detailCompactLinks).toHaveLength(1)
-    expect(detailSections.text()).toContain('Identity & Archive Context')
-    expect(detailSections.text()).toContain('Command & Execution Context')
     expect(detailSections.text()).toContain('Resources')
     expect(detailSections.text()).toContain('Command')
     expect(wrapper.get('#command pre').text()).toContain('sleep 1')
+    expect(detailSections.text()).not.toContain('Identity & Archive Context')
+    expect(detailSections.text()).not.toContain('Command & Execution Context')
     expect(wrapper.text()).not.toContain('Submit Time')
     expect(wrapper.text()).not.toContain('End Time')
   })

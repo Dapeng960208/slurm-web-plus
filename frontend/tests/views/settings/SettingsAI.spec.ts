@@ -205,11 +205,22 @@ describe('views/settings/SettingsAI.vue', () => {
     expect(wrapper.text()).toContain('Node capacity')
     expect(wrapper.find('.ui-admin-search-bar').exists()).toBe(true)
     expect(wrapper.findAll('.ui-admin-search-field')).toHaveLength(2)
-    expect(wrapper.find('.ui-admin-search-actions .ui-button-secondary').text()).toBe(
+    expect(wrapper.findAll('.ui-admin-search-actions button').map((button) => button.text())).toEqual([
+      i18n.global.t('common.buttons.search'),
+      i18n.global.t('common.buttons.reset'),
       i18n.global.t('common.buttons.refresh')
-    )
+    ])
 
     await wrapper.get('[data-testid="audit-username-filter"]').setValue('alice')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Queue pressure')
+    expect(wrapper.text()).toContain('Node capacity')
+
+    await wrapper
+      .findAll('.ui-admin-search-actions button')
+      .find((button) => button.text() === i18n.global.t('common.buttons.search'))!
+      .trigger('click')
     await flushPromises()
 
     expect(wrapper.text()).toContain('Queue pressure')
@@ -218,9 +229,24 @@ describe('views/settings/SettingsAI.vue', () => {
     await wrapper.get('[data-testid="audit-keyword-filter"]').setValue('queue')
     await flushPromises()
 
+    await wrapper
+      .findAll('.ui-admin-search-actions button')
+      .find((button) => button.text() === i18n.global.t('common.buttons.search'))!
+      .trigger('click')
+    await flushPromises()
+
     expect(wrapper.text()).toContain('Queue pressure')
     expect(wrapper.findAll('[data-testid="audit-detail-link"]')).toHaveLength(1)
     expect(mockGatewayAPI.ai_admin_conversation).not.toHaveBeenCalled()
+
+    await wrapper
+      .findAll('.ui-admin-search-actions button')
+      .find((button) => button.text() === i18n.global.t('common.buttons.reset'))!
+      .trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Queue pressure')
+    expect(wrapper.text()).toContain('Node capacity')
 
     const detailLinks = wrapper.findAllComponents(RouterLinkStub)
     const detailLink = detailLinks.find((link) => link.props('to')?.name === 'admin-ai-conversation')

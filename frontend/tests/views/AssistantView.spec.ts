@@ -143,9 +143,12 @@ describe('views/AssistantView.vue', () => {
     expect(mockGatewayAPI.ai_conversation).toHaveBeenCalledWith('foo', 9)
     expect(wrapper.text()).toContain('Queue pressure')
     expect(wrapper.text()).toContain('GPU partition is saturated.')
-    expect(wrapper.text()).not.toContain('Active model')
-    expect(wrapper.text()).not.toContain('Qwen Prod')
-    expect(wrapper.text()).not.toContain('Chat requests send the selected')
+    expect(wrapper.text()).toContain('Current Model')
+    expect(wrapper.text()).toContain('Qwen Prod')
+    expect(wrapper.get('[data-testid="assistant-model-picker"]').text()).toContain(
+      'Using the default enabled model for this conversation.'
+    )
+    expect(wrapper.find('select[aria-label="Select AI chat model"]').exists()).toBe(true)
     expect(wrapper.text()).toContain('HTTP 200')
     expect(wrapper.text()).not.toContain('{"limit":10}')
     expect(wrapper.text()).not.toContain('10 jobs')
@@ -215,6 +218,10 @@ describe('views/AssistantView.vue', () => {
     expect(mockGatewayAPI.ai_conversations).toHaveBeenCalledWith('foo')
     expect(mockGatewayAPI.ai_conversation).toHaveBeenCalledWith('foo', 9)
     expect(wrapper.text()).toContain('Queue pressure')
+    expect(wrapper.text()).toContain('Current Model')
+    expect(wrapper.text()).toContain('Conversation model #9')
+    expect(wrapper.text()).toContain('Using the model stored on the current conversation.')
+    expect(wrapper.find('select[aria-label="Select AI chat model"]').exists()).toBe(false)
     expect(wrapper.text()).not.toContain('Request failed with status code 403')
   })
 

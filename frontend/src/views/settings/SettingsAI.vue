@@ -58,6 +58,8 @@ const configs = ref<AIModelConfig[]>([])
 const auditConversations = ref<AIConversationSummary[]>([])
 const auditUsernameFilter = ref('')
 const auditKeywordFilter = ref('')
+const appliedAuditUsernameFilter = ref('')
+const appliedAuditKeywordFilter = ref('')
 const auditLoading = ref(false)
 const auditError = ref<string | null>(null)
 const modalOpen = ref(false)
@@ -136,8 +138,8 @@ const sortedConfigs = computed(() =>
   })
 )
 const filteredAuditConversations = computed(() => {
-  const username = auditUsernameFilter.value.trim().toLowerCase()
-  const keyword = auditKeywordFilter.value.trim().toLowerCase()
+  const username = appliedAuditUsernameFilter.value.trim().toLowerCase()
+  const keyword = appliedAuditKeywordFilter.value.trim().toLowerCase()
   return auditConversations.value.filter((conversation) => {
     const conversationUsername = (conversation.username ?? '').toLowerCase()
     const title = conversation.title.toLowerCase()
@@ -169,6 +171,17 @@ function providerLabel(config: AIModelConfig): string {
 function clearFeedback() {
   submitError.value = null
   submitSuccess.value = null
+}
+
+function applyAuditFilters() {
+  appliedAuditUsernameFilter.value = auditUsernameFilter.value
+  appliedAuditKeywordFilter.value = auditKeywordFilter.value
+}
+
+function resetAuditFilters() {
+  auditUsernameFilter.value = ''
+  auditKeywordFilter.value = ''
+  applyAuditFilters()
 }
 
 function resetForm() {
@@ -662,6 +675,7 @@ onMounted(async () => {
               class="ui-input-field ui-admin-search-field"
               :aria-label="t('settings.ai.audit.filters.username')"
               :placeholder="t('settings.ai.audit.filters.usernamePlaceholder')"
+              @keyup.enter="applyAuditFilters"
             />
             <input
               v-model="auditKeywordFilter"
@@ -670,9 +684,16 @@ onMounted(async () => {
               class="ui-input-field ui-admin-search-field"
               :aria-label="t('settings.ai.audit.filters.title')"
               :placeholder="t('settings.ai.audit.filters.titlePlaceholder')"
+              @keyup.enter="applyAuditFilters"
             />
           </div>
           <div class="ui-admin-search-actions">
+            <button type="button" class="ui-button-primary" @click="applyAuditFilters">
+              {{ t('common.buttons.search') }}
+            </button>
+            <button type="button" class="ui-button-secondary" @click="resetAuditFilters">
+              {{ t('common.buttons.reset') }}
+            </button>
             <button type="button" class="ui-button-secondary" :disabled="auditLoading" @click="loadAuditConversations">
               {{ t('common.buttons.refresh') }}
             </button>
