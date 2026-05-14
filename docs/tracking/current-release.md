@@ -63,8 +63,9 @@
 - GitHub CI 状态：
   - 本地已完成提交 `5da2593 fix(partition): remove duplicate resource details`
   - 本地已完成提交 `c55f76f feat(performance): cache jobs stats and analysis polling`
-  - 2026-05-14 连续两次执行仓库 `scripts/push-and-watch-github-ci.ps1` 均在 `git push origin main` 阶段因 `Recv failure: Connection was reset` 失败，远端尚未触发当前提交的 GitHub Actions run
-  - 当前状态为本地已提交、待网络恢复后继续使用 `push-and-watch-github-ci.ps1` 推送并追踪 CI
+  - 本地已完成提交 `c2fc0b1 docs(tracking): record ci push network failure`
+  - 2026-05-14 连续三次执行仓库 `scripts/push-and-watch-github-ci.ps1` 均在 `git push origin main` 阶段失败：前两次为 `Recv failure: Connection was reset`，第三次为无法连接 `github.com:443`
+  - 当前远端尚未触发这些提交的 GitHub Actions run；状态为本地已提交、待网络恢复后继续使用 `push-and-watch-github-ci.ps1` 推送并追踪 CI
 
 - LDAP / Active Directory 兼容层已补一轮后端收口：
   - `user_base` 与 `group_base` 现已支持多值列表配置，适配用户分散在多个并列 OU 的 AD 目录
