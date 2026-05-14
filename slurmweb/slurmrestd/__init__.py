@@ -1037,7 +1037,52 @@ class SlurmrestdFilteredCached(SlurmrestdFiltered):
         for key in keys:
             self.service.delete(key)
 
+    @staticmethod
+    def _split_query_values(value: t.Any) -> t.List[str]:
+        if value in (None, ""):
+            return []
+        if isinstance(value, (list, tuple, set)):
+            values = value
+        else:
+            values = str(value).split(",")
+        return [str(item).strip().lower() for item in values if str(item).strip()]
+
+    @classmethod
+    def _filter_cached_jobs(
+        cls, jobs: t.List[t.Dict[str, t.Any]], query: t.Dict[str, t.Any]
+    ) -> t.List[t.Dict[str, t.Any]]:
+        users = cls._split_query_values(query.get("user") or query.get("users"))
+        states = cls._split_query_values(query.get("state") or query.get("states"))
+        accounts = cls._split_query_values(query.get("account") or query.get("accounts"))
+        qos_values = cls._split_query_values(query.get("qos"))
+        partitions = cls._split_query_values(
+            query.get("partition") or query.get("partitions")
+        )
+
+        def matches(job: t.Dict[str, t.Any]) -> bool:
+            if users and str(job.get("user_name", "")).lower() not in users:
+                return False
+            if accounts and str(job.get("account", "")).lower() not in accounts:
+                return False
+            if qos_values and str(job.get("qos", "")).lower() not in qos_values:
+                return False
+            if partitions and str(job.get("partition", "")).lower() not in partitions:
+                return False
+            if states:
+                job_states = [
+                    str(state).lower() for state in job.get("job_state", [])
+                ]
+                if not any(state in job_states for state in states):
+                    return False
+            return True
+
+        return [job for job in jobs if matches(job)]
+
     def jobs(self, **kwargs):
+        query = kwargs.get("query")
+        if query and self.cache.enabled:
+            jobs = self._cached(CacheKey("jobs"), self.cache.jobs, super().jobs)
+            return self._filter_cached_jobs(jobs, query)
         if kwargs:
             return super().jobs(**kwargs)
         return self._cached(CacheKey("jobs"), self.cache.jobs, super().jobs)
@@ -1109,6 +1154,29 @@ class SlurmrestdFilteredCached(SlurmrestdFiltered):
         if kwargs:
             return super().qos(**kwargs)
         return self._cached(CacheKey("qos"), self.cache.qos, super().qos)
+
+    def job_submit(self, payload: t.Dict[str, t.Any]):
+        result = super().job_submit(payload)
+        self._invalidate_cached_keys(CacheKey("jobs"), CacheKey("jobs-unfiltered", "jobs"))
+        return result
+
+    def job_update(self, job_id: int, payload: t.Dict[str, t.Any]):
+        result = super().job_update(job_id, payload)
+        self._invalidate_cached_keys(
+            CacheKey("jobs"),
+            CacheKey("jobs-unfiltered", "jobs"),
+            CacheKey(f"job-{job_id}", "individual-job"),
+        )
+        return result
+
+    def job_cancel(self, job_id: int, payload: t.Optional[t.Dict[str, t.Any]] = None):
+        result = super().job_cancel(job_id, payload)
+        self._invalidate_cached_keys(
+            CacheKey("jobs"),
+            CacheKey("jobs-unfiltered", "jobs"),
+            CacheKey(f"job-{job_id}", "individual-job"),
+        )
+        return result
 
     def accounts_update(self, payload: t.Dict[str, t.Any]):
         result = super().accounts_update(payload)

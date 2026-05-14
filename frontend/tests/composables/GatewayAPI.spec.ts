@@ -382,6 +382,26 @@ describe('gateway data APIs', () => {
     )
   })
 
+  test('builds jobs URLs with optional node and filter query params', async () => {
+    mockRestAPI.get.mockResolvedValue([])
+
+    const gateway = useGatewayAPI()
+    await gateway.jobs('cluster', 'cn 01')
+    await gateway.jobs('cluster', {
+      users: 'alice,bob',
+      states: 'RUNNING,PENDING',
+      accounts: 'science',
+      qos: 'normal',
+      partitions: 'gpu'
+    })
+
+    expect(mockRestAPI.get).toHaveBeenNthCalledWith(1, '/agents/cluster/jobs?node=cn+01')
+    expect(mockRestAPI.get).toHaveBeenNthCalledWith(
+      2,
+      '/agents/cluster/jobs?users=alice%2Cbob&states=RUNNING%2CPENDING&accounts=science&qos=normal&partitions=gpu'
+    )
+  })
+
   test('uses the corrected write routes for jobs and nodes', async () => {
     mockRestAPI.post.mockResolvedValue({ result: 'ok' })
     mockRestAPI.delete.mockResolvedValue({ result: 'ok' })

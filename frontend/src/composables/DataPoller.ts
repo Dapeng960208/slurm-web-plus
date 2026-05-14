@@ -28,6 +28,7 @@ export interface ClusterDataPoller<ResponseType> {
   loaded: Ref<boolean>
   initialLoading: Ref<boolean>
   refreshing: Ref<boolean>
+  refresh: () => Promise<void>
   setCluster: (newCluster: string) => void
   setCallback: (newCallback: GatewayAnyClusterApiKey) => void
   setParam: (newOtherParam: ClusterDataPollerParam | undefined) => void
@@ -47,10 +48,15 @@ export function useClusterDataPoller<Type>(
   const initialLoading: Ref<boolean> = ref(true)
   const refreshing: Ref<boolean> = ref(false)
   let _stop: boolean = false
+  let _polling: boolean = false
   const gateway = useGatewayAPI()
   const runtime = useRuntimeStore()
   const { reportAuthenticationError, reportPermissionError } = useErrorsHandler()
   let _timeout: number = -1
+
+  function serializeParam(param: ClusterDataPollerParam | undefined): string {
+    return JSON.stringify(param ?? null)
+  }
 
   function reportOtherError(error: Error) {
     runtime.reportError(i18n.global.t('errors.server', { message: error.message }))
@@ -58,6 +64,8 @@ export function useClusterDataPoller<Type>(
   }
 
   async function poll() {
+    if (_polling) return
+    _polling = true
     initialLoading.value = !loaded.value
     refreshing.value = loaded.value
     try {
@@ -88,15 +96,21 @@ export function useClusterDataPoller<Type>(
     } finally {
       initialLoading.value = false
       refreshing.value = false
+      _polling = false
     }
   }
 
   async function start() {
     console.log(`Start polling ${callback} on cluster ${cluster}`)
+    clearTimeout(_timeout)
+    if (typeof document !== 'undefined' && document.hidden) {
+      _stop = true
+      return
+    }
     _stop = false
     await poll()
     if (!_stop) {
-      _timeout = window.setTimeout(start, timeout, cluster)
+      _timeout = window.setTimeout(start, timeout)
     }
   }
 
@@ -130,6 +144,7 @@ export function useClusterDataPoller<Type>(
   }
 
   function setParam(newOtherParam: ClusterDataPollerParam | undefined) {
+    if (serializeParam(otherParam) === serializeParam(newOtherParam)) return
     stop()
     otherParam = newOtherParam
     data.value = undefined
@@ -140,10 +155,29 @@ export function useClusterDataPoller<Type>(
     start()
   }
 
+  async function refresh() {
+    clearTimeout(_timeout)
+    _stop = false
+    await poll()
+    if (!_stop && (typeof document === 'undefined' || !document.hidden)) {
+      _timeout = window.setTimeout(start, timeout)
+    }
+  }
+
+  function handleVisibilityChange() {
+    if (document.hidden) {
+      stop()
+    } else {
+      start()
+    }
+  }
+
   onMounted(() => {
+    document.addEventListener('visibilitychange', handleVisibilityChange)
     start()
   })
   onUnmounted(() => {
+    document.removeEventListener('visibilitychange', handleVisibilityChange)
     stop()
   })
 
@@ -153,6 +187,7 @@ export function useClusterDataPoller<Type>(
     loaded,
     initialLoading,
     refreshing,
+    refresh,
     setCluster,
     setCallback,
     setParam

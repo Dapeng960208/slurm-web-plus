@@ -477,6 +477,14 @@ cache:
     type: int
     default: 10
     doc: Expiration delay in seconds for invidual jobs in cache
+  stats:
+    type: int
+    default: 60
+    doc: Expiration delay in seconds for dashboard and analysis summary statistics in cache
+  analysis:
+    type: int
+    default: 60
+    doc: Expiration delay in seconds for analysis helper data in cache
   nodes:
     type: int
     default: 30

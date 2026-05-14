@@ -534,6 +534,23 @@ class TestGatewayViews(TestGatewayBase):
             headers=mock.ANY,
         )
 
+    @mock.patch("slurmweb.views.gateway.aiohttp.ClientSession.get")
+    def test_jobs_forwards_filters_to_agent(self, mock_get):
+        foo = fake_slurmweb_agent("foo")
+        self.app_set_agents({"foo": foo})
+        _, mock_get.return_value = mock_agent_aio_response(content=[{"job_id": 42}])
+
+        response = self.client.get(
+            "/api/agents/foo/jobs?users=alice,bob&states=running&partitions=gpu"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json, [{"job_id": 42}])
+        mock_get.assert_called_once_with(
+            f"http://foo/v{foo.version}/jobs?users=alice,bob&states=running&partitions=gpu",
+            headers=mock.ANY,
+        )
+
     @mock.patch("slurmweb.views.gateway.proxy_agent")
     def test_node_metrics_history(self, mock_proxy_agent):
         self.app_set_agents({"foo": fake_slurmweb_agent("foo")})

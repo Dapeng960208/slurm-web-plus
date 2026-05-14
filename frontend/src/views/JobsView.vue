@@ -15,7 +15,7 @@ import { useRuntimeStore } from '@/stores/runtime'
 import type { JobSortCriterion, JobSortOrder } from '@/stores/runtime/jobs'
 import { useClusterDataPoller } from '@/composables/DataPoller'
 import { compareClusterJobSortOrder } from '@/composables/GatewayAPI'
-import type { ClusterJob } from '@/composables/GatewayAPI'
+import type { ClusterJob, JobsQuery } from '@/composables/GatewayAPI'
 import { useGatewayAPI } from '@/composables/GatewayAPI'
 import JobsSorter from '@/components/jobs/JobsSorter.vue'
 import JobStatusBadge from '@/components/job/JobStatusBadge.vue'
@@ -33,16 +33,22 @@ import PartitionLinkChip from '@/components/PartitionLinkChip.vue'
 import { lastPage, parsePageSize, parsePositivePage, type PageSizeOption } from '@/composables/Pagination'
 import { useAuthStore } from '@/stores/auth'
 
-import { PencilSquareIcon, PlusSmallIcon, WindowIcon, XMarkIcon } from '@heroicons/vue/24/outline'
+import {
+  ArrowPathIcon,
+  PencilSquareIcon,
+  PlusSmallIcon,
+  WindowIcon,
+  XMarkIcon
+} from '@heroicons/vue/24/outline'
 
 const { cluster } = defineProps<{ cluster: string }>()
 
 const route = useRoute()
 const { t } = useI18n()
-const { data, unable, loaded, setCluster } = useClusterDataPoller<ClusterJob[]>(
+const { data, unable, loaded, refreshing, refresh, setCluster, setParam } = useClusterDataPoller<ClusterJob[]>(
   cluster,
   'jobs',
-  5000
+  30000
 )
 
 const router = useRouter()
@@ -59,6 +65,26 @@ const selectedJob = ref<ClusterJob | null>(null)
 
 function compareClusterJob(a: ClusterJob, b: ClusterJob): number {
   return compareClusterJobSortOrder(a, b, runtimeStore.jobs.sort, runtimeStore.jobs.order)
+}
+
+function commaSeparated(values: string[]): string | undefined {
+  const normalized = values.map((value) => value.trim()).filter((value) => value.length > 0)
+  return normalized.length ? normalized.join(',') : undefined
+}
+
+function buildJobsQuery(): JobsQuery | undefined {
+  const query: JobsQuery = {
+    users: commaSeparated(runtimeStore.jobs.filters.users),
+    states: commaSeparated(runtimeStore.jobs.filters.states),
+    accounts: commaSeparated(runtimeStore.jobs.filters.accounts),
+    qos: commaSeparated(runtimeStore.jobs.filters.qos),
+    partitions: commaSeparated(runtimeStore.jobs.filters.partitions)
+  }
+  return Object.values(query).some((value) => value !== undefined) ? query : undefined
+}
+
+function updateJobsPollerParam() {
+  setParam(buildJobsQuery())
 }
 
 const sortedJobs = computed(() => {
@@ -142,6 +168,7 @@ async function submitJob(payload: Record<string, string>) {
     })
     runtimeStore.reportInfo(t('pages.jobs.notifications.submitRequested', { cluster }))
     submitOpen.value = false
+    await refresh()
   } catch (error: unknown) {
     operationError.value = error instanceof Error ? error.message : String(error)
   } finally {
@@ -170,6 +197,7 @@ async function editJob(payload: Record<string, string>) {
       t('pages.jobs.notifications.updateRequested', { jobId: selectedJob.value.job_id })
     )
     editOpen.value = false
+    await refresh()
   } catch (error: unknown) {
     operationError.value = error instanceof Error ? error.message : String(error)
   } finally {
@@ -199,6 +227,7 @@ async function cancelJob(payload: Record<string, string>) {
       t('pages.jobs.notifications.cancelRequested', { jobId: selectedJob.value.job_id })
     )
     cancelOpen.value = false
+    await refresh()
   } catch (error: unknown) {
     operationError.value = error instanceof Error ? error.message : String(error)
   } finally {
@@ -215,6 +244,7 @@ function resetPageAndUpdateQueryParameters() {
   if (hydratingQuery.value) return
   runtimeStore.jobs.page = 1
   updateQueryParameters()
+  updateJobsPollerParam()
 }
 
 function updatePage(page: number) {
@@ -234,23 +264,28 @@ function updateQueryParameters() {
 
 watch(
   () => runtimeStore.jobs.filters.states,
-  () => resetPageAndUpdateQueryParameters()
+  () => resetPageAndUpdateQueryParameters(),
+  { deep: true }
 )
 watch(
   () => runtimeStore.jobs.filters.users,
-  () => resetPageAndUpdateQueryParameters()
+  () => resetPageAndUpdateQueryParameters(),
+  { deep: true }
 )
 watch(
   () => runtimeStore.jobs.filters.accounts,
-  () => resetPageAndUpdateQueryParameters()
+  () => resetPageAndUpdateQueryParameters(),
+  { deep: true }
 )
 watch(
   () => runtimeStore.jobs.filters.qos,
-  () => resetPageAndUpdateQueryParameters()
+  () => resetPageAndUpdateQueryParameters(),
+  { deep: true }
 )
 watch(
   () => runtimeStore.jobs.filters.partitions,
-  () => resetPageAndUpdateQueryParameters()
+  () => resetPageAndUpdateQueryParameters(),
+  { deep: true }
 )
 watch(
   () => cluster,
@@ -313,6 +348,7 @@ onMounted(async () => {
   }
   await nextTick()
   hydratingQuery.value = false
+  updateJobsPollerParam()
 })
 </script>
 
@@ -335,6 +371,18 @@ onMounted(async () => {
       >
         <template #actions>
           <div class="ui-page-tools-end">
+            <button
+              type="button"
+              class="ui-button-secondary"
+              :disabled="refreshing"
+              @click="refresh"
+            >
+              <ArrowPathIcon
+                :class="['h-5 w-5', refreshing ? 'animate-spin' : '']"
+                aria-hidden="true"
+              />
+              {{ t('common.buttons.refresh') }}
+            </button>
             <button
               type="button"
               class="ui-button-secondary"

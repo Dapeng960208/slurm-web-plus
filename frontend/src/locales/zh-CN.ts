@@ -834,6 +834,10 @@ const zhCN = {
     closeMenu: '关闭菜单',
     remove: '移除筛选 {group}:{value}',
     partitions: '分区',
+    users: {
+      usernamePlaceholder: '输入用户名...',
+      addUsername: '添加用户名'
+    },
     states: {
       completed: '已完成',
       failed: '失败',

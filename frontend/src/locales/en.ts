@@ -882,6 +882,10 @@ const en = {
     closeMenu: 'Close menu',
     remove: 'Remove filter for {group}:{value}',
     partitions: 'Partitions',
+    users: {
+      usernamePlaceholder: 'Enter username...',
+      addUsername: 'Add username'
+    },
     states: {
       completed: 'Completed',
       failed: 'Failed',

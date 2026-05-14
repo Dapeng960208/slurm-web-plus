@@ -3,6 +3,7 @@ import type { Ref } from 'vue'
 import { vi } from 'vitest'
 import { runtimeConfiguration } from '@/plugins/runtimeConfiguration'
 import type { GatewayAnyClusterApiKey } from '@/composables/GatewayAPI'
+import type { ClusterDataPollerParam } from '@/composables/DataPoller'
 import { httpPlugin } from '@/plugins/http'
 import { i18n } from '@/plugins/i18n'
 import { createTestingPinia } from '@pinia/testing'
@@ -53,9 +54,10 @@ interface MockClusterDataPoller<ResultType> {
   loaded: Ref<boolean>
   initialLoading: Ref<boolean>
   refreshing: Ref<boolean>
+  refresh: () => Promise<void>
   setCluster: (newCluster: string) => void
   setCallback: (newCallback: GatewayAnyClusterApiKey) => void
-  setParam: (newOtherParam: string | number) => void
+  setParam: (newOtherParam: ClusterDataPollerParam | undefined) => void
 }
 
 export function getMockClusterDataPoller<ResultType>(): MockClusterDataPoller<ResultType> {
@@ -65,6 +67,7 @@ export function getMockClusterDataPoller<ResultType>(): MockClusterDataPoller<Re
     loaded: ref(true),
     initialLoading: ref(false),
     refreshing: ref(false),
+    refresh: vi.fn().mockResolvedValue(undefined),
     setCluster: vi.fn(),
     setCallback: vi.fn(),
     setParam: vi.fn()

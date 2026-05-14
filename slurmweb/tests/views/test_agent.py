@@ -16,6 +16,7 @@ from slurmweb.slurmrestd.errors import (
     SlurmrestdInvalidResponseError,
 )
 from slurmweb.cache import CachingService
+from slurmweb.cache import CacheKey
 from slurmweb.views.agent import racksdb_get_version
 
 from ..lib.agent import RemoveActionInPolicy, TestAgentBase
@@ -935,6 +936,70 @@ class TestAgentViews(TestAgentBase):
                 "memory_available": 2560,
                 "gpus": 2,
             },
+        )
+
+    def test_request_stats_uses_cache(self):
+        self.app.cache = mock.Mock(spec=CachingService)
+        cached = {
+            "resources": {
+                "nodes": 2,
+                "cores": 128,
+                "memory": 2048,
+                "memory_allocated": 512,
+                "memory_available": 1536,
+                "gpus": 4,
+            },
+            "jobs": {"running": 3, "total": 5},
+        }
+        self.app.cache.get.return_value = cached
+        self.app.slurmrestd.jobs = mock.Mock()
+        self.app.slurmrestd.nodes_unfiltered = mock.Mock()
+
+        response = self.client.get(f"/v{get_version()}/stats")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json, cached)
+        self.app.cache.get.assert_called_once_with(CacheKey("stats"))
+        self.app.cache.count_hit.assert_called_once_with(CacheKey("stats"))
+        self.app.cache.put.assert_not_called()
+        self.app.slurmrestd.jobs.assert_not_called()
+        self.app.slurmrestd.nodes_unfiltered.assert_not_called()
+
+    def test_request_stats_caches_partition_miss(self):
+        self.app.cache = mock.Mock(spec=CachingService)
+        self.app.cache.get.return_value = None
+        self.app.slurmrestd.jobs = mock.Mock(return_value=[{"job_state": ["RUNNING"]}])
+        self.app.slurmrestd.nodes_unfiltered = mock.Mock(
+            return_value=[{"cpus": 8, "real_memory": 1024, "alloc_memory": 256, "gres": ""}]
+        )
+
+        response = self.client.get(f"/v{get_version()}/stats?partition=debug")
+
+        self.assertEqual(response.status_code, 200)
+        key = CacheKey("stats-partition-debug", "stats")
+        self.app.cache.get.assert_called_once_with(key)
+        self.app.cache.put.assert_called_once_with(key, response.json, self.app.settings.cache.stats)
+        self.app.cache.count_miss.assert_called_once_with(key)
+
+    def test_request_jobs_filters_from_query_args(self):
+        self._enable_job_view_all_rules()
+        self.app.slurmrestd.jobs = mock.Mock(
+            return_value=[{"job_id": 42, "user_name": "alice", "job_state": ["RUNNING"]}]
+        )
+
+        response = self.client.get(
+            f"/v{get_version()}/jobs?users=alice,bob&states=running&accounts=science&qos=normal&partitions=gpu"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.app.slurmrestd.jobs.assert_called_once_with(
+            query={
+                "users": ["alice", "bob"],
+                "states": ["running"],
+                "accounts": ["science"],
+                "qos": ["normal"],
+                "partitions": ["gpu"],
+            }
         )
 
     @all_slurm_api_versions

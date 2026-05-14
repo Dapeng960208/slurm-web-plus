@@ -49,7 +49,7 @@ export function useLiveHistogram<MetricKeyType extends string>(
   const metrics = useClusterDataPoller<Record<MetricKeyType, MetricValue[]>>(
     cluster,
     callback,
-    30000,
+    60000,
     buildMetricsQuery(range, filterQuery)
   )
   let chart: Chart | null

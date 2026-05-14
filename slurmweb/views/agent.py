@@ -17,6 +17,7 @@ from rfl.authentication.user import AnonymousUser
 from ..ai.service import AIProviderValidationError, AIRequestError
 from ..version import get_version
 from ..errors import SlurmwebCacheError, SlurmwebMetricsDBError
+from ..cache import CacheKey
 from ..persistence.jobs_store import normalize_history_exit_code
 
 from ..slurmrestd.errors import (
@@ -63,6 +64,42 @@ def _parse_metrics_window_query_args():
     if start_time >= end_time:
         raise ValueError("start must be earlier than end")
     return start_time, end_time
+
+
+def _cache_get_or_put(key: CacheKey, expiration: int, callback: Callable[[], Any]):
+    if current_app.cache is None:
+        return callback()
+    data = current_app.cache.get(key)
+    if data is None:
+        data = callback()
+        current_app.cache.put(key, data, expiration)
+        current_app.cache.count_miss(key)
+    else:
+        current_app.cache.count_hit(key)
+    return data
+
+
+def _query_values(name: str):
+    values = []
+    for raw in request.args.getlist(name):
+        values.extend(item.strip() for item in str(raw).split(",") if item.strip())
+    return values
+
+
+def _jobs_query_args():
+    query = {}
+    mapping = {
+        "users": "users",
+        "states": "states",
+        "accounts": "accounts",
+        "qos": "qos",
+        "partitions": "partitions",
+    }
+    for arg, key in mapping.items():
+        values = _query_values(arg)
+        if values:
+            query[key] = values
+    return query
 
 
 def _normalize_job_history_record(record: dict) -> dict:
@@ -494,13 +531,27 @@ def analysis_node_hotspots():
         start_time, end_time = _parse_metrics_window_query_args()
         if start_time is None or end_time is None:
             raise ValueError("start and end must both be provided")
-        nodes = slurmrest("nodes")
-        node_names = [node.get("name") for node in nodes if isinstance(node, dict) and node.get("name")]
-        result = current_app.node_metrics_db.cluster_node_hotspots(
-            node_names,
-            current_app.settings.node_metrics.node_hostname_label,
-            start_time=start_time,
-            end_time=end_time,
+        key = CacheKey(
+            f"analysis-node-hotspots-{start_time.isoformat()}-{end_time.isoformat()}",
+            "analysis",
+        )
+
+        def collect_hotspots():
+            nodes = slurmrest("nodes")
+            node_names = [
+                node.get("name")
+                for node in nodes
+                if isinstance(node, dict) and node.get("name")
+            ]
+            return current_app.node_metrics_db.cluster_node_hotspots(
+                node_names,
+                current_app.settings.node_metrics.node_hostname_label,
+                start_time=start_time,
+                end_time=end_time,
+            )
+
+        result = _cache_get_or_put(
+            key, current_app.settings.cache.analysis, collect_hotspots
         )
         return jsonify(result)
     except ValueError as err:
@@ -523,6 +574,18 @@ def slurmrest(method: str, *args: Tuple[Any, ...]):
 def stats():
     partition = request.args.get("partition")
     query = {"partition": partition} if partition else None
+
+    key = CacheKey(f"stats-partition-{partition}", "stats") if partition else CacheKey("stats")
+    return jsonify(
+        _cache_get_or_put(
+            key,
+            current_app.settings.cache.stats,
+            lambda: _collect_stats(query),
+        )
+    )
+
+
+def _collect_stats(query):
     total = 0
     running = 0
 
@@ -566,19 +629,17 @@ def stats():
         memory_allocated += node_memory_allocated
         gpus += current_app.slurmrestd.node_gres_extract_gpus(node["gres"])
     memory_available = max(memory - memory_allocated, 0)
-    return jsonify(
-        {
-            "resources": {
-                "nodes": nodes,
-                "cores": cores,
-                "memory": memory,
-                "memory_allocated": memory_allocated,
-                "memory_available": memory_available,
-                "gpus": gpus,
-            },
-            "jobs": {"running": running, "total": total},
-        }
-    )
+    return {
+        "resources": {
+            "nodes": nodes,
+            "cores": cores,
+            "memory": memory,
+            "memory_allocated": memory_allocated,
+            "memory_available": memory_available,
+            "gpus": gpus,
+        },
+        "jobs": {"running": running, "total": total},
+    }
 
 
 @handle_slurmrestd_errors
@@ -595,7 +656,8 @@ def jobs():
     elif scope == "self":
         result = current_app.slurmrestd.jobs(query={"user": _user_login()})
     else:
-        result = slurmrest("jobs")
+        query = _jobs_query_args()
+        result = current_app.slurmrestd.jobs(query=query) if query else slurmrest("jobs")
     if scope == "self":
         result = _filter_jobs_for_owner(result, _user_login())
     return jsonify(result)

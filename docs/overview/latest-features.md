@@ -1,5 +1,21 @@
 # 最新功能
 
+## 本轮：实时作业与 Dashboard/Analysis 缓存性能优化
+
+本轮针对实时作业、Dashboard 和 Cluster Analysis 的高频请求做了性能收口：
+
+- `Jobs` 用户筛选改为直接输入用户名并添加，不再通过 gateway `/users` 触发 LDAP 全量用户枚举。
+- `GET /api/agents/<cluster>/jobs` 支持透传 `users/states/accounts/qos/partitions/node` query；Agent 在 Redis 作业全量缓存命中时先本地过滤，减少分页和筛选导致的 `slurmrestd` 全量请求。
+- `GET /stats` 新增 `cache.stats=60` 默认缓存，并按 `partition` 独立缓存 key。
+- `GET /analysis/node-hotspots` 新增 `cache.analysis=60` 默认缓存，并按 `start/end` 时间窗独立缓存 key。
+- 前端 `useClusterDataPoller` 在页面不可见时暂停轮询，恢复可见后立即刷新；`Jobs` 默认轮询从 `5s` 降到 `30s` 并新增手动刷新，Dashboard stats 和图表轮询对齐到 `60s`。
+
+本轮新增验证：
+
+- `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/slurmrestd/test_slurmrestd_filtered_cached.py slurmweb/tests/views/test_agent.py slurmweb/tests/views/test_agent_operations.py slurmweb/tests/views/test_gateway.py`
+- `cd frontend && npx vitest run tests/components/jobs/UserFilterSelector.spec.ts tests/components/jobs/JobsFiltersPanel.spec.ts tests/views/JobsView.spec.ts tests/composables/GatewayAPI.spec.ts tests/composables/DataPoller.spec.ts`
+- `npm --prefix frontend run type-check`
+
 ## 本轮：分区详情页移除重复资源展示
 
 本轮针对 `/:cluster/partitions/:partition` 页面做了信息层级优化：
@@ -11,6 +27,7 @@
 本轮新增验证：
 
 - `cd frontend && npx vitest run tests/views/PartitionView.spec.ts`
+
 ## 本轮：LDAP 已支持多 Base DN 和 AD 大目录分页枚举
 
 本轮补了一组面向 Active Directory 的 LDAP 兼容增强，重点解决“用户分散在多个并列 OU”与“域根枚举直接撞 `Size limit exceeded`”两类现场问题：

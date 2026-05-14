@@ -8,7 +8,6 @@
 
 <script setup lang="ts">
 import { useRuntimeStore } from '@/stores/runtime'
-import { useRuntimeConfiguration } from '@/plugins/runtimeConfiguration'
 import { useI18n } from 'vue-i18n'
 import PartitionFilterSelector from '@/components/filters/PartitionFilterSelector.vue'
 import UserFilterSelector from '@/components/jobs/UserFilterSelector.vue'
@@ -37,7 +36,6 @@ import { XMarkIcon } from '@heroicons/vue/24/outline'
 const { cluster, nbJobs } = defineProps<{ cluster: string; nbJobs: number }>()
 
 const runtimeStore = useRuntimeStore()
-const runtimeConfiguration = useRuntimeConfiguration()
 const { t } = useI18n()
 
 const state_filters = [
@@ -150,13 +148,7 @@ function canViewJobFilter(resource: 'jobs/filter-accounts' | 'jobs/filter-qos' |
                   </div>
                 </DisclosurePanel>
               </Disclosure>
-              <!--
-                Hide users filters disclosure panel when authentication is disabled. The list of
-                users are retrieved from authentication backend. When authentication is disabled,
-                the list of users cannot be retrieved.
-              -->
               <Disclosure
-                v-if="runtimeConfiguration.authentication"
                 as="div"
                 class="border-t border-t-gray-200 px-4 py-6 dark:border-t-gray-600"
                 v-slot="{ open }"

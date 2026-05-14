@@ -13,6 +13,7 @@ import { useRuntimeConfiguration } from '@/plugins/runtimeConfiguration'
 import { AuthenticationError, APIServerError } from '@/composables/HTTPErrors'
 import type { JobSortCriterion, JobSortOrder } from '@/stores/runtime/jobs'
 import { useAuthStore } from '@/stores/auth'
+import type { ClusterDataPollerQuery } from '@/composables/DataPoller'
 
 interface loginIdents {
   user: string
@@ -1475,6 +1476,14 @@ export interface DateTimeWindowQuery {
 export interface DashboardPartitionQuery {
   partition?: string
 }
+export interface JobsQuery extends ClusterDataPollerQuery {
+  node?: string
+  users?: string
+  states?: string
+  accounts?: string
+  qos?: string
+  partitions?: string
+}
 export type DashboardMetricsQuery = DashboardPartitionQuery &
   (
     | {
@@ -1686,6 +1695,21 @@ function buildDashboardMetricsQueryString(query: string | DashboardMetricsQuery)
   return `?${params.toString()}`
 }
 
+function buildJobsQueryString(query?: string | JobsQuery): string {
+  const params = new URLSearchParams()
+  if (typeof query === 'string') {
+    params.append('node', query)
+  } else if (query) {
+    Object.entries(query).forEach(([key, value]) => {
+      if (value) {
+        params.append(key, String(value))
+      }
+    })
+  }
+  const result = params.toString()
+  return result ? `?${result}` : ''
+}
+
 export function useGatewayAPI() {
   const restAPI = useRESTAPI()
   const runtimeConfiguration = useRuntimeConfiguration()
@@ -1783,9 +1807,8 @@ export function useGatewayAPI() {
     }
   }
 
-  async function jobs(cluster: string, node?: string): Promise<ClusterJob[]> {
-    if (node) return await restAPI.get<ClusterJob[]>(`/agents/${cluster}/jobs?node=${node}`)
-    return await restAPI.get<ClusterJob[]>(`/agents/${cluster}/jobs`)
+  async function jobs(cluster: string, query?: string | JobsQuery): Promise<ClusterJob[]> {
+    return await restAPI.get<ClusterJob[]>(`/agents/${cluster}/jobs${buildJobsQueryString(query)}`)
   }
 
   async function job(cluster: string, job: number): Promise<ClusterIndividualJob> {

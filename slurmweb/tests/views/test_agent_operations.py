@@ -6,6 +6,7 @@
 
 from unittest import mock
 
+from slurmweb.cache import CachingService, CacheKey
 from slurmweb.version import get_version
 
 from ..lib.agent import TestAgentBase
@@ -78,6 +79,37 @@ class TestAgentOperations(TestAgentBase):
         self.assertEqual(response.json["events"][0]["node"], "cn1")
         args, _ = self.app.node_metrics_db.cluster_node_hotspots.call_args
         self.assertEqual(args[1], "instance")
+
+    def test_analysis_node_hotspots_uses_cache(self):
+        self.setup_client(node_metrics=True)
+        self.app.cache = mock.Mock(spec=CachingService)
+        cached = {
+            "window": {
+                "start": "2026-04-21T00:00:00+00:00",
+                "end": "2026-04-24T00:00:00+00:00",
+            },
+            "threshold": 80,
+            "events": [],
+        }
+        self.app.cache.get.return_value = cached
+        self.app.slurmrestd.nodes = mock.Mock()
+        self.app.node_metrics_db.cluster_node_hotspots = mock.Mock()
+
+        response = self.client.get(
+            f"/v{get_version()}/analysis/node-hotspots?start=2026-04-21T00:00:00Z&end=2026-04-24T00:00:00Z"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json, cached)
+        key = CacheKey(
+            "analysis-node-hotspots-2026-04-21T00:00:00+00:00-2026-04-24T00:00:00+00:00",
+            "analysis",
+        )
+        self.app.cache.get.assert_called_once_with(key)
+        self.app.cache.count_hit.assert_called_once_with(key)
+        self.app.cache.put.assert_not_called()
+        self.app.slurmrestd.nodes.assert_not_called()
+        self.app.node_metrics_db.cluster_node_hotspots.assert_not_called()
 
     def test_analysis_node_hotspots_requires_window(self):
         self.setup_client(node_metrics=True)

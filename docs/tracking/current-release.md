@@ -44,8 +44,22 @@
 - 资源页新增 `Rack` 列与分区详情跳转，补 `/:cluster/partitions/:partition` 分区详情页
 - 修复 AI 取消作业兼容性：当模型直接输出 `job/cancel` 作为 tool name 时，后端会兼容映射到同名写接口，不再返回 `Unsupported tool`
 - 修复普通用户 AI 页面初始化权限口径：仅具备 `ai:view:*` 的用户不再首屏请求 `admin/ai:view:*` 才能访问的 `ai/configs`
+- 实时作业与 Dashboard/Analysis 性能优化：Jobs 用户筛选改为手输用户名，`/jobs` query 可透传到 Agent 并优先复用 Redis 全量作业缓存，`stats` 与 `analysis/node-hotspots` 新增默认 `60s` Redis 缓存，前端轮询在后台标签页暂停并降低高开销页面刷新频率
 
 ## 2. 已完成项
+
+- 实时作业与 Dashboard/Analysis 性能优化已落地：
+  - `Jobs` 用户筛选不再请求 gateway `/users`，避免实时作业筛选面板触发 LDAP 全量枚举
+  - `GET /api/agents/<cluster>/jobs` 支持 `users/states/accounts/qos/partitions/node` query 透传；Agent 对 `users/states/accounts/qos/partitions` 优先复用 Redis `jobs` 全量缓存并在内存中过滤
+  - `GET /stats` 通过 `cache.stats` 缓存统计摘要，默认 `60` 秒；无分区使用 `stats` key，有分区使用 `stats-partition-<partition>` 并归类为 `stats`
+  - `GET /analysis/node-hotspots` 通过 `cache.analysis` 缓存节点热点，默认 `60` 秒；缓存 key 包含 `start/end` 时间窗
+  - 作业 submit/update/cancel 完成后会失效 `jobs`、兼容 `jobs-unfiltered` 与对应 `job-<id>` 缓存，降低写后 stale 风险
+  - `useClusterDataPoller` 已支持手动 `refresh()`，页面隐藏时暂停轮询，恢复可见时立即刷新一次
+  - `JobsView` 默认轮询从 `5s` 调整为 `30s` 并新增手动刷新；Dashboard stats 与 dashboard 图表轮询调整为 `60s`
+- 本轮性能优化定向验证已通过：
+  - `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/slurmrestd/test_slurmrestd_filtered_cached.py slurmweb/tests/views/test_agent.py slurmweb/tests/views/test_agent_operations.py slurmweb/tests/views/test_gateway.py`
+  - `cd frontend && npx vitest run tests/components/jobs/UserFilterSelector.spec.ts tests/components/jobs/JobsFiltersPanel.spec.ts tests/views/JobsView.spec.ts tests/composables/GatewayAPI.spec.ts tests/composables/DataPoller.spec.ts`
+  - `npm --prefix frontend run type-check`
 
 - LDAP / Active Directory 兼容层已补一轮后端收口：
   - `user_base` 与 `group_base` 现已支持多值列表配置，适配用户分散在多个并列 OU 的 AD 目录

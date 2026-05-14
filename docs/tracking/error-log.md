@@ -431,6 +431,16 @@
 - 现象：`npm test -- --run ...` 报缺少脚本，`npm run test:unit -- --run ...` 在当前环境下超时
 - 解决办法：改用 `npx vitest run <spec...>` 执行定向前端单测
 
+### 2026-05-14：Gateway 测试工具不接受空数组作为 `mock_agent_aio_response(content=...)`
+- 时间：2026-05-14
+- 现象：新增 gateway `/jobs` query 透传测试时，`mock_agent_aio_response(content=[])` 在 `mock_component_aio_response()` 内触发 `assert content`
+- 解决办法：测试使用非空响应体验证代理透传行为，例如 `content=[{"job_id": 42}]`，避免把 mock helper 的 truthy 限制误判为接口失败
+
+### 2026-05-14：DataPoller 可见性测试未卸载组件导致旧监听器重复触发
+- 时间：2026-05-14
+- 现象：`DataPoller.spec.ts` 中多个挂载组件共享 `visibilitychange`，未卸载的旧 poller 监听器在后续用例里继续触发，导致请求次数多于预期
+- 解决办法：在该 spec 中启用 `enableAutoUnmount(afterEach)`，并在可见性用例里只 flush Promise、不推进定时器队列，避免测试自身触发下一轮轮询
+
 ### 2026-05-06：AI 对话页输入框脱离左侧聊天列，流式对话时面板整体下移
 - 时间：2026-05-06
 - 现象：左侧聊天区没有完整撑满工作区宽度，输入框脱离左侧列；流式回复和 trace 更新时，对话面板会整体下移

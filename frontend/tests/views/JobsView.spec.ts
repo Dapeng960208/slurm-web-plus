@@ -12,6 +12,7 @@ import InfoAlert from '@/components/InfoAlert.vue'
 import TableSkeletonRows from '@/components/TableSkeletonRows.vue'
 
 const mockClusterDataPoller = getMockClusterDataPoller<ClusterJob[]>()
+const useClusterDataPoller = vi.hoisted(() => vi.fn())
 const mockGatewayAPI = {
   submit_job: vi.fn(),
   update_job: vi.fn(),
@@ -19,7 +20,7 @@ const mockGatewayAPI = {
 }
 
 vi.mock('@/composables/DataPoller', () => ({
-  useClusterDataPoller: () => mockClusterDataPoller
+  useClusterDataPoller
 }))
 
 vi.mock('@/composables/GatewayAPI', async (importOriginal) => {
@@ -72,7 +73,50 @@ describe('JobsView.vue', () => {
     mockClusterDataPoller.unable.value = false
     mockClusterDataPoller.loaded.value = true
     mockClusterDataPoller.initialLoading.value = false
+    mockClusterDataPoller.refreshing.value = false
+    useClusterDataPoller.mockReturnValue(mockClusterDataPoller)
     document.body.innerHTML = ''
+  })
+
+  test('polls jobs every 30 seconds and sends filter query params', async () => {
+    const runtimeStore = useRuntimeStore()
+    runtimeStore.jobs.filters.users = ['alice']
+    runtimeStore.jobs.filters.states = ['RUNNING']
+    mockClusterDataPoller.data.value = [buildJob(101, 'alice')]
+
+    const wrapper = mount(JobsView, {
+      props: {
+        cluster: 'foo'
+      }
+    })
+    await flushPromises()
+
+    expect(useClusterDataPoller).toHaveBeenCalledWith('foo', 'jobs', 30000)
+    expect(mockClusterDataPoller.setParam).toHaveBeenCalledWith({
+      users: 'alice',
+      states: 'RUNNING',
+      accounts: undefined,
+      qos: undefined,
+      partitions: undefined
+    })
+    wrapper.unmount()
+  })
+
+  test('manual refresh button refreshes jobs', async () => {
+    mockClusterDataPoller.data.value = [buildJob(101, 'alice')]
+    const wrapper = mount(JobsView, {
+      props: {
+        cluster: 'foo'
+      }
+    })
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === i18n.global.t('common.buttons.refresh'))!
+      .trigger('click')
+
+    expect(mockClusterDataPoller.refresh).toHaveBeenCalled()
+    wrapper.unmount()
   })
 
   test('displays jobs with the actions column and no batch controls', () => {

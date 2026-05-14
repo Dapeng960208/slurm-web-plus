@@ -1,6 +1,6 @@
-import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { defineComponent } from 'vue'
-import { mount } from '@vue/test-utils'
+import { enableAutoUnmount, mount } from '@vue/test-utils'
 import { createTestingPinia } from '@pinia/testing'
 import { setActivePinia } from 'pinia'
 import { useClusterDataPoller } from '@/composables/DataPoller'
@@ -26,15 +26,26 @@ vi.mock('@/composables/ErrorsHandler', () => ({
   useErrorsHandler: () => mockErrorsHandler
 }))
 
+enableAutoUnmount(afterEach)
+
 describe('useClusterDataPoller', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    vi.useRealTimers()
+    Object.defineProperty(document, 'hidden', {
+      configurable: true,
+      value: false
+    })
     setActivePinia(
       createTestingPinia({
         createSpy: vi.fn,
         stubActions: false
       })
     )
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
   })
 
   test('passes structured dashboard query params to gateway methods', async () => {
@@ -52,6 +63,56 @@ describe('useClusterDataPoller', () => {
     await Promise.resolve()
 
     expect(mockGateway.stats).toHaveBeenCalledWith('foo', { partition: 'gpu' })
+  })
+
+  test('pauses polling when page is hidden and refreshes when visible again', async () => {
+    vi.useFakeTimers()
+    mockGateway.stats.mockResolvedValue({ resources: {}, jobs: {} })
+
+    mount(
+      defineComponent({
+        setup() {
+          useClusterDataPoller('foo', 'stats', 10000)
+          return () => null
+        }
+      })
+    )
+    await Promise.resolve()
+    expect(mockGateway.stats).toHaveBeenCalledTimes(1)
+
+    Object.defineProperty(document, 'hidden', {
+      configurable: true,
+      value: true
+    })
+    document.dispatchEvent(new Event('visibilitychange'))
+    expect(mockGateway.abort).toHaveBeenCalled()
+
+    Object.defineProperty(document, 'hidden', {
+      configurable: true,
+      value: false
+    })
+    document.dispatchEvent(new Event('visibilitychange'))
+    await Promise.resolve()
+
+    expect(mockGateway.stats).toHaveBeenCalledTimes(2)
+  })
+
+  test('exposes a manual refresh method', async () => {
+    mockGateway.stats.mockResolvedValue({ resources: {}, jobs: {} })
+    let poller: ReturnType<typeof useClusterDataPoller<{ resources: object; jobs: object }>>
+    mount(
+      defineComponent({
+        setup() {
+          poller = useClusterDataPoller('foo', 'stats', 10000)
+          return () => null
+        }
+      })
+    )
+    await Promise.resolve()
+
+    await poller!.refresh()
+
+    expect(mockGateway.stats).toHaveBeenCalledTimes(2)
   })
 
   test('cluster data getter ignores stale responses after cluster switch', async () => {

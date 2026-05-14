@@ -36,7 +36,7 @@ const cluster = computed(() => props.cluster)
 const { data, unable, loaded, setCluster, setParam } = useClusterDataPoller<ClusterStats>(
   cluster.value,
   'stats',
-  10000,
+  60000,
   runtimeStore.dashboard.partition ? { partition: runtimeStore.dashboard.partition } : undefined
 )
 const canSelectPartition = computed(() =>

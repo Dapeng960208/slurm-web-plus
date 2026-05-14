@@ -115,3 +115,41 @@ class TestSlurmrestdFilteredCached(TestSlurmrestdBase):
             self.slurmrestd.jobs()
         self.slurmrestd.service.get.assert_called_once_with(CacheKey("jobs"))
         self.slurmrestd.service.put.assert_called_once()
+
+    @all_slurm_api_versions
+    def test_query_filters_cached_jobs(self, slurm_version, api_version):
+        self.setup_slurmrestd(slurm_version, api_version)
+        [asset] = self.mock_slurmrestd_responses(
+            slurm_version,
+            api_version,
+            [("slurm-jobs", "jobs")],
+        )
+        selected = asset[0]
+        self.slurmrestd.service.get = mock.Mock(return_value=asset)
+        self.slurmrestd.service.put = mock.Mock()
+        self.slurmrestd.service.count_hit = mock.Mock()
+        self.slurmrestd.service.count_miss = mock.Mock()
+
+        jobs = self.slurmrestd.jobs(
+            query={
+                "users": [selected["user_name"]],
+                "states": selected["job_state"],
+                "accounts": [selected["account"]],
+                "qos": [selected["qos"]],
+                "partitions": [selected["partition"]],
+            }
+        )
+
+        self.assertGreaterEqual(len(jobs), 1)
+        for job in jobs:
+            self.assertEqual(job["user_name"], selected["user_name"])
+            self.assertEqual(job["account"], selected["account"])
+            self.assertEqual(job["qos"], selected["qos"])
+            self.assertEqual(job["partition"], selected["partition"])
+            self.assertTrue(
+                set(state.lower() for state in selected["job_state"])
+                & set(state.lower() for state in job["job_state"])
+            )
+        self.slurmrestd.service.get.assert_called_once_with(CacheKey("jobs"))
+        self.slurmrestd.service.put.assert_not_called()
+        self.slurmrestd.service.count_hit.assert_called_once_with(CacheKey("jobs"))
