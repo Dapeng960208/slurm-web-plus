@@ -16,6 +16,11 @@
 - `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/apps/test_ldap.py`
 - `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/apps/test_gateway.py`
 
+补充修复：
+
+- `scripts/fetch-github-ci-result.ps1` 现在会在下载 artifact 前先清空当前 run 目录下已有 artifact 子目录。
+- 重复对同一个 GitHub Actions run 执行 `fetch-github-ci-result.ps1` 或 `continue-from-github-ci.ps1` dry-run 时，不再因旧 `failure-context.json` / `result.json` 残留导致 `gh run download` 解压中断。
+
 ## 本轮：集群分析平均排队时间曲线改为 `submit_time -> start_time` 秒级口径
 
 本轮继续修正 `Cluster Analysis` 中“平均排队时间曲线没有明显显示”的问题：

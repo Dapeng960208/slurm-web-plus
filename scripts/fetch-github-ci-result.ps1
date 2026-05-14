@@ -127,6 +127,10 @@ $summaryPath = Join-Path $runDir "run-summary.json"
 $summary | ConvertTo-Json -Depth 5 | Set-Content -Encoding UTF8 $summaryPath
 
 if ($DownloadArtifacts) {
+    $existingArtifactDirs = Get-ChildItem -Path $runDir -Directory -ErrorAction SilentlyContinue
+    foreach ($existingArtifactDir in $existingArtifactDirs) {
+        Remove-Item -Recurse -Force $existingArtifactDir.FullName
+    }
     foreach ($artifactName in Get-ArtifactNames -RunId $runId) {
         $artifactDir = Join-Path $runDir $artifactName
         if (Test-Path $artifactDir) {
