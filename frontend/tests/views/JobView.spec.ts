@@ -79,7 +79,6 @@ describe('JobView.vue', () => {
     expect(backButton.text()).toBe('Back to jobs')
 
     const summary = wrapper.get('[data-testid="detail-summary-strip"]')
-    const details = wrapper.get('[data-testid="job-detail-list"]')
     const links = summary.findAllComponents({ name: 'RouterLink' })
     const userLink = links[0]
     const partitionLink = links[1]
