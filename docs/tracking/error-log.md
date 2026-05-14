@@ -441,6 +441,11 @@
 - 现象：`DataPoller.spec.ts` 中多个挂载组件共享 `visibilitychange`，未卸载的旧 poller 监听器在后续用例里继续触发，导致请求次数多于预期
 - 解决办法：在该 spec 中启用 `enableAutoUnmount(afterEach)`，并在可见性用例里只 flush Promise、不推进定时器队列，避免测试自身触发下一轮轮询
 
+### 2026-05-14：通过 `push-and-watch-github-ci.ps1` 推送到 GitHub 时 HTTPS 连接被重置
+- 时间：2026-05-14
+- 现象：连续两次执行 `powershell -ExecutionPolicy Bypass -File scripts\push-and-watch-github-ci.ps1 -PollIntervalSeconds 30 -TimeoutMinutes 45`，均在脚本内部 `git push origin main` 阶段失败，远端返回 `Recv failure: Connection was reset`
+- 解决办法：本地提交已完成并保留可追溯状态；由于失败发生在 push 阶段，尚未触发 GitHub Actions run，待网络恢复后继续使用同一仓库脚本推送并追踪 CI
+
 ### 2026-05-06：AI 对话页输入框脱离左侧聊天列，流式对话时面板整体下移
 - 时间：2026-05-06
 - 现象：左侧聊天区没有完整撑满工作区宽度，输入框脱离左侧列；流式回复和 trace 更新时，对话面板会整体下移

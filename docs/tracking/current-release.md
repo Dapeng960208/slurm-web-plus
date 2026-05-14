@@ -60,6 +60,11 @@
   - `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/slurmrestd/test_slurmrestd_filtered_cached.py slurmweb/tests/views/test_agent.py slurmweb/tests/views/test_agent_operations.py slurmweb/tests/views/test_gateway.py`
   - `cd frontend && npx vitest run tests/components/jobs/UserFilterSelector.spec.ts tests/components/jobs/JobsFiltersPanel.spec.ts tests/views/JobsView.spec.ts tests/composables/GatewayAPI.spec.ts tests/composables/DataPoller.spec.ts`
   - `npm --prefix frontend run type-check`
+- GitHub CI 状态：
+  - 本地已完成提交 `5da2593 fix(partition): remove duplicate resource details`
+  - 本地已完成提交 `c55f76f feat(performance): cache jobs stats and analysis polling`
+  - 2026-05-14 连续两次执行仓库 `scripts/push-and-watch-github-ci.ps1` 均在 `git push origin main` 阶段因 `Recv failure: Connection was reset` 失败，远端尚未触发当前提交的 GitHub Actions run
+  - 当前状态为本地已提交、待网络恢复后继续使用 `push-and-watch-github-ci.ps1` 推送并追踪 CI
 
 - LDAP / Active Directory 兼容层已补一轮后端收口：
   - `user_base` 与 `group_base` 现已支持多值列表配置，适配用户分散在多个并列 OU 的 AD 目录
