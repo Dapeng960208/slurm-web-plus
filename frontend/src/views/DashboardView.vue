@@ -262,56 +262,54 @@ watch(
 
       <div class="ui-scroll-region min-h-0 flex-1 pr-1">
         <div class="ui-section-stack pb-2">
-          <div class="dashboard-surface mt-6 px-4 py-4 sm:px-5">
-            <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-              <div class="min-w-0">
-                <p class="dashboard-toolbar-kicker">{{ t('pages.dashboard.toolbar.kicker') }}</p>
-                <h2 class="ui-panel-title">{{ t('pages.dashboard.toolbar.title') }}</h2>
-                <p class="ui-panel-description">
-                  {{ t('pages.dashboard.toolbar.description') }}
-                </p>
-              </div>
-              <div data-testid="dashboard-toolbar" class="dashboard-toolbar-fields">
-                <label
-                  v-if="canSelectPartition"
-                  class="dashboard-toolbar-field"
-                >
-                  <span class="dashboard-toolbar-label">{{ t('pages.dashboard.toolbar.partitionQueue') }}</span>
-                  <select
-                    id="dashboard-partition"
-                    v-model="runtimeStore.dashboard.partition"
-                    class="dashboard-toolbar-select"
-                  >
-                    <option
-                      v-for="option in partitionOptions"
-                      :key="option.value || '__all__'"
-                      :value="option.value"
-                    >
-                      {{ option.label }}
-                    </option>
-                  </select>
-                </label>
+          <div class="ui-toolbar-strip">
+            <div class="ui-toolbar-copy min-w-0">
+              <p class="ui-toolbar-kicker">{{ t('pages.dashboard.toolbar.kicker') }}</p>
+              <h2 class="ui-panel-title">{{ t('pages.dashboard.toolbar.title') }}</h2>
+              <p class="ui-panel-description">
+                {{ t('pages.dashboard.toolbar.description') }}
+              </p>
+            </div>
 
-                <div class="dashboard-toolbar-field">
-                  <span class="dashboard-toolbar-label">{{ t('common.labels.timeRange') }}</span>
-                  <MetricRangeSelector
-                    :model-value="runtimeStore.dashboard.range"
-                    :aria-label="t('pages.dashboard.toolbar.selectMetricsRange')"
-                    enable-custom-window
-                    :start-value="runtimeStore.dashboard.start"
-                    :end-value="runtimeStore.dashboard.end"
-                    custom-button-label="common.labels.timeRange"
-                    reset-label="common.metricRanges.lastHour"
-                    @update:model-value="setRange"
-                    @apply-window="applyMetricsWindow"
-                    @reset-window="resetMetricsWindow"
-                  />
-                </div>
+            <div data-testid="dashboard-toolbar" class="ui-toolbar-fields">
+              <label
+                v-if="canSelectPartition"
+                class="ui-inline-field"
+              >
+                <span class="ui-inline-field-label">{{ t('pages.dashboard.toolbar.partitionQueue') }}</span>
+                <select
+                  id="dashboard-partition"
+                  v-model="runtimeStore.dashboard.partition"
+                  class="ui-toolbar-select-field"
+                >
+                  <option
+                    v-for="option in partitionOptions"
+                    :key="option.value || '__all__'"
+                    :value="option.value"
+                  >
+                    {{ option.label }}
+                  </option>
+                </select>
+              </label>
+
+              <div class="ui-inline-field ui-inline-field-compact">
+                <MetricRangeSelector
+                  :model-value="runtimeStore.dashboard.range"
+                  :aria-label="t('pages.dashboard.toolbar.selectMetricsRange')"
+                  enable-custom-window
+                  :start-value="runtimeStore.dashboard.start"
+                  :end-value="runtimeStore.dashboard.end"
+                  custom-button-label="common.labels.timeRange"
+                  reset-label="common.metricRanges.lastHour"
+                  @update:model-value="setRange"
+                  @apply-window="applyMetricsWindow"
+                  @reset-window="resetMetricsWindow"
+                />
               </div>
             </div>
           </div>
 
-          <div v-if="!unable" class="ui-stat-grid mt-4">
+          <div v-if="!unable" class="ui-stat-grid">
             <div v-for="card in statsCards" :key="card.id" class="ui-stat-card dashboard-surface">
               <p class="ui-stat-label">{{ card.label }}</p>
               <span
@@ -371,83 +369,5 @@ watch(
   font-size: clamp(1.4rem, 1.6vw, 2rem);
   font-weight: 700;
   line-height: 1;
-}
-
-.dashboard-toolbar-kicker {
-  margin-bottom: 0.35rem;
-  color: var(--color-brand-muted);
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-}
-
-.dashboard-toolbar-fields {
-  display: grid;
-  gap: 0.85rem;
-  width: 100%;
-}
-
-.dashboard-toolbar-field {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  min-height: 3rem;
-  border-radius: 999px;
-  border: 1px solid rgba(80, 105, 127, 0.12);
-  background: rgba(255, 255, 255, 0.82);
-  padding: 0.32rem 0.4rem 0.32rem 0.92rem;
-}
-
-.dashboard-toolbar-label {
-  color: var(--color-brand-muted);
-  font-size: 0.82rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  white-space: nowrap;
-}
-
-.dashboard-toolbar-select {
-  min-width: 14rem;
-  border-radius: 999px;
-  border: 0;
-  background: rgba(255, 255, 255, 0.98);
-  padding: 0.72rem 1rem;
-  color: var(--color-brand-ink-strong);
-  font-size: 0.92rem;
-  box-shadow: inset 0 0 0 1px rgba(80, 105, 127, 0.12);
-  outline: none;
-  transition:
-    box-shadow 160ms ease,
-    background-color 160ms ease;
-}
-
-.dashboard-toolbar-select:focus {
-  box-shadow:
-    inset 0 0 0 1px rgba(182, 232, 44, 0.8),
-    0 0 0 4px rgba(182, 232, 44, 0.12);
-}
-
-@media (min-width: 1024px) {
-  .dashboard-toolbar-fields {
-    width: auto;
-    grid-template-columns: repeat(2, minmax(0, auto));
-  }
-}
-
-@media (max-width: 767px) {
-  .dashboard-toolbar-field {
-    align-items: flex-start;
-    border-radius: 1.4rem;
-    flex-direction: column;
-    padding: 0.85rem 0.95rem;
-  }
-
-  .dashboard-toolbar-select {
-    min-width: 100%;
-    width: 100%;
-  }
 }
 </style>

@@ -7,6 +7,7 @@
 import sys
 import unittest
 from unittest import mock
+from datetime import datetime, timezone
 
 from slurmweb.errors import SlurmwebConfigurationError
 
@@ -236,3 +237,62 @@ class TestAgentApp(TestAgentBase):
         mock_user_analytics_store.assert_called_once()
         mock_user_analytics_store.return_value.start.assert_called_once()
         self.assertTrue(self.app.user_metrics_enabled)
+
+    @mock.patch("slurmweb.persistence.node_hotspot_store.NodeHotspotStore")
+    @mock.patch("slurmweb.persistence.migrations.run_database_migrations")
+    @mock.patch("slurmweb.persistence.users_store.UsersStore")
+    def test_app_enables_node_hotspot_persistence_when_database_and_node_metrics_are_available(
+        self,
+        mock_users_store,
+        mock_run_database_migrations,
+        mock_node_hotspot_store,
+    ):
+        self.setup_client(database=True, persistence=True, node_metrics=True)
+
+        mock_users_store.assert_called_once()
+        mock_run_database_migrations.assert_called_once()
+        mock_node_hotspot_store.assert_called_once()
+        mock_node_hotspot_store.return_value.validate_connection.assert_called_once()
+        mock_node_hotspot_store.return_value.start.assert_called_once()
+        self.assertIs(self.app.node_hotspot_store, mock_node_hotspot_store.return_value)
+
+    @mock.patch("slurmweb.persistence.node_hotspot_store.NodeHotspotStore.cleanup")
+    @mock.patch("slurmweb.persistence.node_hotspot_store.NodeHotspotStore.capture_snapshot")
+    @mock.patch("slurmweb.persistence.node_hotspot_store.sa.create_engine")
+    def test_node_hotspot_store_logs_cycle_summary(
+        self,
+        mock_create_engine,
+        mock_capture_snapshot,
+        mock_cleanup,
+    ):
+        from slurmweb.persistence.node_hotspot_store import NodeHotspotStore
+
+        mock_capture_snapshot.return_value = 3
+        mock_cleanup.return_value = 2
+        mock_create_engine.return_value = mock.Mock()
+        settings = mock.Mock(
+            host="127.0.0.1",
+            port=5432,
+            database="slurmweb",
+            user="slurmweb",
+            password="secret",
+            snapshot_interval=60,
+            retention_days=7,
+        )
+        store = NodeHotspotStore(
+            settings=settings,
+            node_metrics_db=mock.Mock(),
+            cluster_name="cluster-a",
+        )
+        store._stop = mock.Mock()
+        store._stop.is_set.side_effect = [False, True]
+        store._stop.wait = mock.Mock()
+        sampled_at = datetime(2026, 5, 14, 10, 0, tzinfo=timezone.utc)
+
+        with mock.patch("slurmweb.persistence.node_hotspot_store.datetime") as mock_datetime:
+            mock_datetime.now.return_value = sampled_at
+            with self.assertLogs("slurmweb", level="INFO") as cm:
+                store._run()
+
+        self.assertIn("INFO:slurmweb.persistence.node_hotspot_store:Node hotspot persistence thread started", cm.output)
+        self.assertIn("INFO:slurmweb.persistence.node_hotspot_store:Node hotspot persistence cycle completed: cluster=cluster-a sampled_at=2026-05-14T10:00:00+00:00 captured_nodes=3 retention_days=7 deleted_rows=2 interval_seconds=60", cm.output)

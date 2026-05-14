@@ -17,6 +17,7 @@
 - 用户分析（User Analytics / User Metrics）
 - AI 集群助手（模型配置、会话、工具审计）
 - 节点实时/历史指标（Node Metrics）
+- 节点热点持久化（Node Hotspot Persistence）
 
 ## 2. 推荐部署顺序（生产）
 
@@ -175,6 +176,30 @@ node_hostname_label = instance
 - `GET /api/agents/<cluster>/node/<name>/metrics`
 - `GET /api/agents/<cluster>/node/<name>/metrics/history?range=hour|day|week`
 
+### 3.7 节点热点持久化
+
+节点热点持久化没有独立开关，当前按依赖自动启用。
+
+依赖：
+
+- 数据库可用（`[database] enabled = yes`）
+- 节点指标可用（已配置 `node_metrics.prometheus_host`）
+- `persistence.snapshot_interval` 与 `persistence.retention_days` 已配置
+
+运行行为：
+
+- Agent 启动时会执行数据库迁移，并初始化节点热点持久化线程
+- 后台线程按 `persistence.snapshot_interval` 采样节点 CPU / memory 使用率并写入 `node_metric_samples`
+- 线程按 `persistence.retention_days` 清理过期样本
+- 每个采样周期会输出一条核心摘要日志，便于排查采样数量、清理数量和实际周期
+- `GET /api/agents/<cluster>/analysis/node-hotspots?start=<iso>&end=<iso>` 只查询持久化样本；当前时间窗无事件时返回空结果
+
+验证点：
+
+- Agent 日志包含 `Node hotspot persistence enabled`
+- Agent 日志包含 `Node hotspot persistence cycle completed: ...`
+- `GET /api/agents/<cluster>/analysis/node-hotspots?start=<iso>&end=<iso>`
+
 ## 4. 数据库迁移（必须）
 
 迁移说明见：[`docs/guides/database-migrations.md`](./database-migrations.md)。
@@ -198,6 +223,7 @@ node_hostname_label = instance
    - 历史作业：`GET /api/agents/<cluster>/jobs/history`
    - 访问控制：`GET /api/agents/<cluster>/access/roles`
    - AI：`GET /api/agents/<cluster>/ai/configs`
+   - 节点热点：`GET /api/agents/<cluster>/analysis/node-hotspots?start=<iso>&end=<iso>`
 
 ## 6. 快速回滚边界
 

@@ -1070,6 +1070,16 @@ const zhCN = {
         detailedTitle: '详细资源与命令',
         detailedDescription: '较长字段保持展开，便于阅读和复制。'
       },
+      sections: {
+        identityTitle: '身份与归属',
+        identityDescription: '作业提交人、账户和归属信息。',
+        schedulingTitle: '调度与执行',
+        schedulingDescription: '当前调度参数、节点落点和退出状态。',
+        payloadTitle: '命令与上下文',
+        payloadDescription: '名称、备注、脚本、提交命令和工作目录。',
+        resourcesTitle: '请求与分配资源',
+        resourcesDescription: '查看作业请求到的 TRES 和当前已分配资源。'
+      },
       actions: {
         edit: '编辑',
         cancel: '取消'
@@ -1851,6 +1861,16 @@ const zhCN = {
       executionTimelineDescription: '查看提交、调度到完成各阶段的历史检查点。',
       detailedTitle: '详细资源与命令',
       detailedDescription: '较长字段保持展开，便于阅读和复制。',
+      sections: {
+        identityTitle: '身份与归档信息',
+        identityDescription: '历史记录中的作业编号、用户与账户归属。',
+        schedulingTitle: '调度结果',
+        schedulingDescription: '历史状态原因、分区、优先级和完成结果。',
+        resourcesTitle: '资源记录',
+        resourcesDescription: '历史账本中的资源请求、分配和使用情况。',
+        payloadTitle: '命令与执行上下文',
+        payloadDescription: '保留的命令、工作目录和其它长文本字段。'
+      },
       timeline: {
         submitted: '已提交',
         eligible: '可调度',

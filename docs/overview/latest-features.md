@@ -1,5 +1,45 @@
 # 最新功能
 
+## 本轮：Dashboard / Analysis 工具条与 Admin 搜索区已统一收口
+
+本轮只处理前端页面结构与样式收口，不涉及接口、配置或状态逻辑变更：
+
+- `Dashboard` 顶部筛选区已去掉多余外层卡片，改为直接输出的轻量工具条；保留分区控件轻量 inline label，移除时间范围可见 label。
+- `Cluster Analysis` 顶部时间范围控件已与 `Dashboard` 使用同一套工具条节奏；平均排队时间聚合切换继续保留 `minute / hour / day` 三档，并改为轻量 inline 说明。
+- `Dashboard` 统计卡与区块间距已按全局节奏收紧，不再额外放大工具条到统计卡之间的间距。
+- `Admin > Access Control`、`Admin > Users`、`Admin > AI` 的搜索/筛选区已统一为 inline search bar，输入框、按钮尺寸、圆角和间距保持一致。
+
+本轮新增验证：
+
+- `cd frontend && npx vitest run tests/views/DashboardView.spec.ts tests/views/ClusterAnalysisView.spec.ts tests/views/settings/SettingsAccessControl.spec.ts tests/views/settings/SettingsLdapCache.spec.ts tests/views/settings/SettingsAI.spec.ts`
+- `npm --prefix frontend run type-check`
+
+补充说明：
+
+- 本轮已额外修复 `Cluster Analysis` 平均等待时间曲线在 `day / week / 自定义窗口` 下只基于历史首页样本聚合的问题；现在会按当前时间窗跨页拉取全部历史作业后再做 `minute / hour / day` 聚合。
+- “节点热点持久化存储并默认查数据库”的计划现已落地：
+  - 新增 `node_metric_samples` 表，按 `cluster + node + sampled_at` 持久化 CPU / memory 使用率快照。
+  - Agent 在数据库与 node metrics 同时可用时，会按 `persistence.snapshot_interval` 后台采样节点使用率并入库。
+  - `analysis/node-hotspots` 现在只基于持久化样本重建热点事件，不再为慢查询场景回退到 Prometheus 实时链路。
+
+本轮新增后端验证：
+
+- `.venv\\Scripts\\python.exe -m pytest -q slurmweb/tests/views/test_agent_operations.py slurmweb/tests/apps/test_agent.py slurmweb/tests/metrics/test_hotspots.py`
+
+## 本轮：作业详情页与历史作业详情页字段展示已统一重构
+
+本轮对 `Job` 和 `Job History` 两个详情页做了同一套字段展示重构，并继续收口分区详情页冗余信息：
+
+- 实时作业详情和历史作业详情不再混用“上方 card + 下方表格/列表”的字段结构，统一改为“摘要条 + 分组详情清单”。
+- 字段区按“身份归属 / 调度执行 / 资源记录 / 命令上下文”分段展示，长命令、脚本、工作目录等字段改为可换行代码面板，避免内容溢出显示区域。
+- 备注字段改为结构化块展示，保持长文本可读性和复制友好性。
+- 分区详情页已删除顶部摘要下方重复的“分区详情 / 节点集合”块，并把“已分配节点 / 空闲节点”并入顶部摘要卡片。
+
+本轮新增验证：
+
+- `cd frontend && npx vitest run tests/views/JobView.spec.ts tests/views/JobHistoryView.spec.ts tests/views/PartitionView.spec.ts`
+- `npm --prefix frontend run type-check`
+
 ## 本轮：GitHub 后端 CI 覆盖 Python 3.9+ 多版本并输出测试数量
 
 本轮把 `Backend Tests` 从单一 Python 版本扩展为多版本矩阵：

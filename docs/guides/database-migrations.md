@@ -134,6 +134,18 @@
 
 升级后应配合运行全表重建脚本 `slurmweb/scripts/rebuild-user-tool.py`，按新聚合口径重建历史 `user_tool_daily_stats`。
 
+### 3.12 `20260514_0012`：节点热点持久化样本表
+
+引入：
+
+- `node_metric_samples`
+- 主键：`cluster`、`node`、`sampled_at`
+- 索引：
+  - `idx_node_metric_samples_cluster_sampled_at`
+  - `idx_node_metric_samples_cluster_node_sampled_at`
+
+该表用于持久化节点 CPU / memory 使用率快照，供 `analysis/node-hotspots` 在任意 `start/end` 时间窗内重建热点事件。采样周期与保留周期分别复用 Agent 的 `persistence.snapshot_interval` 和 `persistence.retention_days`。
+
 ## 4. 迁移验证（最小集）
 
 1. Alembic revision：
@@ -148,6 +160,7 @@
 - `GET /api/agents/<cluster>/jobs/history`：确认历史作业接口可用（当 `persistence = true`）
 - `GET /api/agents/<cluster>/access/roles`：确认访问控制接口可用（当 `access_control = true`）
 - `GET /api/agents/<cluster>/ai/configs`：确认 AI 配置列表可用（当 `ai.enabled = true`，该能力现在由数据库与 AI stores 初始化结果自动推导）
+- `GET /api/agents/<cluster>/analysis/node-hotspots?start=<iso>&end=<iso>`：确认节点热点接口可用，并优先走持久化样本链路
 
 ## 5. 回滚边界与风险
 

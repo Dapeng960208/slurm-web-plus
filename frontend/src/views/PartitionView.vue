@@ -66,13 +66,6 @@ const idleNodeCount = computed(() =>
   partitionNodes.value.filter((node) => node.state.includes('IDLE')).length
 )
 
-const partitionChips = computed(() =>
-  (partitionRecord.value?.node_sets ?? '')
-    .split(',')
-    .map((item) => item.trim())
-    .filter(Boolean)
-)
-
 const partitionMetricsQuery = computed(() => {
   if (runtimeStore.dashboard.start && runtimeStore.dashboard.end) {
     return {
@@ -155,52 +148,14 @@ function resetMetricsWindow() {
                 <div class="ui-summary-label">{{ t('pages.partition.summary.gpu') }}</div>
                 <div class="ui-summary-value">{{ totalGpu }}</div>
               </div>
-            </div>
-
-            <div class="grid gap-6 xl:grid-cols-[minmax(0,0.92fr)_minmax(18rem,1.08fr)]">
-              <section class="ui-panel ui-section">
-                <div class="mb-4">
-                  <h2 class="ui-panel-title">{{ t('pages.partition.detailTitle') }}</h2>
-                  <p class="ui-panel-description mt-2">
-                    {{ t('pages.partition.detailDescription') }}
-                  </p>
-                </div>
-                <div class="ui-detail-list">
-                  <div class="ui-detail-row">
-                    <div class="ui-detail-term">{{ t('common.labels.name') }}</div>
-                    <div class="ui-detail-value">{{ partitionRecord.name }}</div>
-                  </div>
-                  <div class="ui-detail-row">
-                    <div class="ui-detail-term">{{ t('pages.partition.summary.allocatedNodes') }}</div>
-                    <div class="ui-detail-value">{{ allocatedNodeCount }}</div>
-                  </div>
-                  <div class="ui-detail-row">
-                    <div class="ui-detail-term">{{ t('pages.partition.summary.idleNodes') }}</div>
-                    <div class="ui-detail-value">{{ idleNodeCount }}</div>
-                  </div>
-                </div>
-              </section>
-
-              <section class="ui-panel ui-section">
-                <div class="mb-4">
-                  <h2 class="ui-panel-title">{{ t('pages.partition.nodeSets') }}</h2>
-                  <p class="ui-panel-description mt-2">
-                    {{ t('pages.partition.nodeSetsDescription') }}
-                  </p>
-                </div>
-                <div v-if="partitionChips.length" class="flex flex-wrap gap-2">
-                  <span
-                    v-for="item in partitionChips"
-                    :key="item"
-                    class="ui-chip"
-                  >
-                    {{ item }}
-                  </span>
-                </div>
-                <p v-else class="ui-panel-description">
-                  {{ t('pages.partition.nodeSetsEmpty') }}
-                </p>
-              </section>
+              <div class="ui-summary-item">
+                <div class="ui-summary-label">{{ t('pages.partition.summary.allocatedNodes') }}</div>
+                <div class="ui-summary-value">{{ allocatedNodeCount }}</div>
+              </div>
+              <div class="ui-summary-item">
+                <div class="ui-summary-label">{{ t('pages.partition.summary.idleNodes') }}</div>
+                <div class="ui-summary-value">{{ idleNodeCount }}</div>
+              </div>
             </div>
 
             <section class="ui-panel ui-section" data-testid="partition-dashboard-charts">

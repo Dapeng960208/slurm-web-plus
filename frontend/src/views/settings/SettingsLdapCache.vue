@@ -167,35 +167,30 @@ onMounted(async () => {
           {{ t('settings.ldapUsers.alerts.databaseDisabled') }}
         </InfoAlert>
         <div v-else class="space-y-4">
-          <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-            <div class="w-full max-w-xl">
-              <label
-                :for="`ldap-users-query-${cluster.name}`"
-                class="mb-2 block text-sm font-semibold text-[var(--color-brand-ink-strong)]"
-              >
-                {{ t('settings.ldapUsers.search.label') }}
-              </label>
-              <div class="flex flex-col gap-3 sm:flex-row">
-                <input
-                  :id="`ldap-users-query-${cluster.name}`"
-                  v-model="clusterQueries[cluster.name]"
-                  type="text"
-                  class="block w-full rounded-[18px] border border-[rgba(80,105,127,0.16)] bg-white px-4 py-3 text-sm text-[var(--color-brand-ink-strong)] shadow-[var(--shadow-soft)] outline-hidden focus:border-[rgba(182,232,44,0.65)] focus:ring-4 focus:ring-[rgba(182,232,44,0.18)]"
-                  :placeholder="t('settings.ldapUsers.search.placeholder')"
-                  @keyup.enter="searchClusterUsers(cluster)"
-                />
-                <button type="button" class="ui-button-primary" @click="searchClusterUsers(cluster)">
-                  {{ t('common.buttons.search') }}
-                </button>
-                <button type="button" class="ui-button-secondary" @click="resetClusterUsers(cluster)">
-                  {{ t('common.buttons.reset') }}
-                </button>
-              </div>
+          <div class="ui-admin-search-bar">
+            <div class="ui-admin-search-fields">
+              <input
+                :id="`ldap-users-query-${cluster.name}`"
+                v-model="clusterQueries[cluster.name]"
+                type="search"
+                class="ui-input-field ui-admin-search-field"
+                :aria-label="t('settings.ldapUsers.search.label')"
+                :placeholder="t('settings.ldapUsers.search.placeholder')"
+                @keyup.enter="searchClusterUsers(cluster)"
+              />
+            </div>
+            <div class="ui-admin-search-actions">
+              <button type="button" class="ui-button-primary" @click="searchClusterUsers(cluster)">
+                {{ t('common.buttons.search') }}
+              </button>
+              <button type="button" class="ui-button-secondary" @click="resetClusterUsers(cluster)">
+                {{ t('common.buttons.reset') }}
+              </button>
             </div>
 
             <div
               v-if="!clusterLoading[cluster.name] && !clusterErrors[cluster.name]"
-              class="text-sm text-[var(--color-brand-muted)]"
+              class="ui-admin-search-meta"
             >
               {{
                 (clusterTotals[cluster.name] ?? 0) === 1

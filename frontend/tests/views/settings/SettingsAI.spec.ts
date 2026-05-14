@@ -203,6 +203,11 @@ describe('views/settings/SettingsAI.vue', () => {
     expect(mockGatewayAPI.ai_admin_conversation).not.toHaveBeenCalled()
     expect(wrapper.text()).toContain('Queue pressure')
     expect(wrapper.text()).toContain('Node capacity')
+    expect(wrapper.find('.ui-admin-search-bar').exists()).toBe(true)
+    expect(wrapper.findAll('.ui-admin-search-field')).toHaveLength(2)
+    expect(wrapper.find('.ui-admin-search-actions .ui-button-secondary').text()).toBe(
+      i18n.global.t('common.buttons.refresh')
+    )
 
     await wrapper.get('[data-testid="audit-username-filter"]').setValue('alice')
     await flushPromises()

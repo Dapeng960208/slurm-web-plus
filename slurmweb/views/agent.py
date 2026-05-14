@@ -523,7 +523,7 @@ def analysis_diag():
 
 @permission_required(("analysis", "view", "*"), legacy_action="view-stats")
 def analysis_node_hotspots():
-    if current_app.node_metrics_db is None:
+    if current_app.node_metrics_db is None and getattr(current_app, "node_hotspot_store", None) is None:
         error = "Node metrics is disabled"
         logger.warning(error)
         abort(501, error)
@@ -537,18 +537,19 @@ def analysis_node_hotspots():
         )
 
         def collect_hotspots():
-            nodes = slurmrest("nodes")
-            node_names = [
-                node.get("name")
-                for node in nodes
-                if isinstance(node, dict) and node.get("name")
-            ]
-            return current_app.node_metrics_db.cluster_node_hotspots(
-                node_names,
-                current_app.settings.node_metrics.node_hostname_label,
-                start_time=start_time,
-                end_time=end_time,
-            )
+            store = getattr(current_app, "node_hotspot_store", None)
+            if store is not None:
+                return store.cluster_node_hotspots(
+                    start_time=start_time,
+                    end_time=end_time,
+                )
+            if current_app.node_metrics_db is None:
+                error = "Node hotspot persistence is disabled"
+                logger.warning(error)
+                abort(501, error)
+            error = "Node hotspot persistence is unavailable"
+            logger.warning(error)
+            abort(501, error)
 
         result = _cache_get_or_put(
             key, current_app.settings.cache.analysis, collect_hotspots

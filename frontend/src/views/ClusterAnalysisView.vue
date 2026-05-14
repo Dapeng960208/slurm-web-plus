@@ -52,6 +52,7 @@ const route = useRoute()
 const gateway = useGatewayAPI()
 const runtimeStore = useRuntimeStore()
 const { t, locale } = useI18n()
+const HISTORY_PAGE_SIZE = 500
 
 const selectedRange = ref<MetricRange>('hour')
 const customStart = ref('')
@@ -280,6 +281,20 @@ function rangeStartISO(range: MetricRange): string {
   return new Date(now - duration).toISOString()
 }
 
+function resolvedHistoryWindowQuery(): DateTimeWindowQuery {
+  const customWindow = historyWindowQuery()
+  if (customWindow) {
+    return {
+      start: new Date(customWindow.start).toISOString(),
+      end: new Date(customWindow.end).toISOString()
+    }
+  }
+  return {
+    start: rangeStartISO(selectedRange.value),
+    end: new Date().toISOString()
+  }
+}
+
 function historyWindowQuery(): DateTimeWindowQuery | null {
   if (!customStart.value || !customEnd.value) return null
   return {
@@ -295,6 +310,37 @@ function hotspotWindowQuery(): DateTimeWindowQuery {
     start: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
     end: new Date().toISOString()
   }
+}
+
+async function loadCompletedHistoryJobs(): Promise<JobHistoryRecord[]> {
+  const window = resolvedHistoryWindowQuery()
+  const firstPage = await gateway.jobs_history(cluster, {
+    state: 'COMPLETED',
+    sort: 'submit_time',
+    order: 'desc',
+    page: 1,
+    page_size: HISTORY_PAGE_SIZE,
+    start: window.start,
+    end: window.end
+  })
+
+  const jobs = [...firstPage.jobs]
+  const totalPages = Math.max(Math.ceil(firstPage.total / firstPage.page_size), 1)
+
+  for (let page = 2; page <= totalPages; page += 1) {
+    const nextPage = await gateway.jobs_history(cluster, {
+      state: 'COMPLETED',
+      sort: 'submit_time',
+      order: 'desc',
+      page,
+      page_size: HISTORY_PAGE_SIZE,
+      start: window.start,
+      end: window.end
+    })
+    jobs.push(...nextPage.jobs)
+  }
+
+  return jobs
 }
 
 async function loadAnalysis() {
@@ -394,19 +440,9 @@ async function loadAnalysis() {
 
   if (canViewHistory.value) {
     tasks.push(
-      gateway
-        .jobs_history(cluster, {
-          state: 'COMPLETED',
-          sort: 'submit_time',
-          order: 'desc',
-          page: 1,
-          page_size: 200,
-          ...(historyWindowQuery()
-            ? historyWindowQuery()!
-            : { start: rangeStartISO(selectedRange.value) })
-        })
+      loadCompletedHistoryJobs()
         .then((payload) => {
-          historyJobs.value = payload.jobs
+          historyJobs.value = payload
         })
         .catch(() => {
           historyJobs.value = []
@@ -567,7 +603,7 @@ onUnmounted(() => {
         </div>
 
         <div v-else class="ui-section-stack pb-2">
-          <div class="flex flex-wrap items-center justify-between gap-3">
+          <div class="ui-toolbar-strip">
             <div class="flex flex-wrap gap-2">
               <span class="ui-chip">{{ t('pages.analysis.status.prefix') }} {{ analysis.scoreLabel }}</span>
               <span v-if="updatedAtLabel" class="ui-chip">
@@ -779,10 +815,10 @@ onUnmounted(() => {
                         {{ t('pages.analysis.historical.avgQueueWaitDetail') }}
                       </div>
                     </div>
-                    <div class="flex flex-col items-end gap-2">
-                      <div class="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-[var(--color-brand-muted)]">
+                    <div class="flex flex-wrap items-center justify-end gap-2">
+                      <span class="ui-inline-field-label">
                         {{ t('pages.analysis.historical.aggregationLabel') }}
-                      </div>
+                      </span>
                       <span
                         class="ui-segmented-control"
                         :aria-label="t('pages.analysis.historical.aggregationLabel')"

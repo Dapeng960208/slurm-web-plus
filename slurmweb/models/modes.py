@@ -197,6 +197,35 @@ class UserToolDailyStat(Base):
     __mapper_args__ = {"primary_key": [activity_date, user_id, tool]}
 
 
+class NodeMetricSample(Base):
+    __tablename__ = "node_metric_samples"
+    __table_args__ = (
+        sa.PrimaryKeyConstraint("cluster", "node", "sampled_at", name="pk_node_metric_samples"),
+        sa.Index(
+            "idx_node_metric_samples_cluster_sampled_at",
+            "cluster",
+            sa.text("sampled_at DESC"),
+        ),
+        sa.Index(
+            "idx_node_metric_samples_cluster_node_sampled_at",
+            "cluster",
+            "node",
+            sa.text("sampled_at DESC"),
+        ),
+    )
+
+    cluster = sa.Column(sa.Text(), nullable=False)
+    node = sa.Column(sa.Text(), nullable=False)
+    sampled_at = sa.Column(sa.TIMESTAMP(timezone=True), nullable=False)
+    cpu_usage = sa.Column(sa.Float(), nullable=True)
+    memory_usage = sa.Column(sa.Float(), nullable=True)
+    created_at = sa.Column(
+        sa.TIMESTAMP(timezone=True),
+        nullable=False,
+        server_default=sa.text("NOW()"),
+    )
+
+
 class AIModelConfig(Base):
     __tablename__ = "ai_model_configs"
     __table_args__ = (

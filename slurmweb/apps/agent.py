@@ -481,6 +481,7 @@ class SlurmwebAppAgent(SlurmwebWebApp, RFLTokenizedRBACWebApp):
 
         # Initialize node real-time metrics (new, optional)
         self.node_metrics_db = None
+        self.node_hotspot_store = None
         node_metrics_host = getattr(self.settings.node_metrics, "prometheus_host", None)
         if node_metrics_host:
             from ..metrics.db import SlurmwebMetricsDB as _MetricsDB
@@ -492,6 +493,35 @@ class SlurmwebAppAgent(SlurmwebWebApp, RFLTokenizedRBACWebApp):
             logger.info("Node real-time metrics enabled")
         else:
             logger.debug("Node real-time metrics is disabled")
+
+        if database_ready and self.node_metrics_db is not None:
+            try:
+                from ..persistence.migrations import run_database_migrations
+                from ..persistence.node_hotspot_store import NodeHotspotStore
+
+                store_settings = SimpleNamespace(
+                    host=self.settings.database.host,
+                    port=self.settings.database.port,
+                    database=self.settings.database.database,
+                    user=self.settings.database.user,
+                    password=self.settings.database.password,
+                    snapshot_interval=self.settings.persistence.snapshot_interval,
+                    retention_days=self.settings.persistence.retention_days,
+                )
+                run_database_migrations(store_settings)
+                self.node_hotspot_store = NodeHotspotStore(
+                    store_settings,
+                    self.node_metrics_db,
+                    cluster_name=self.settings.service.cluster,
+                    hostname_label=self.settings.node_metrics.node_hostname_label,
+                )
+                self.node_hotspot_store.validate_connection()
+                self.node_hotspot_store.start()
+                logger.info("Node hotspot persistence enabled")
+            except Exception as err:
+                logger.warning("Unable to initialize node hotspot persistence: %s", err)
+        else:
+            logger.debug("Node hotspot persistence is disabled")
 
         if database_ready:
             try:

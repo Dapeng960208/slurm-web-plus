@@ -66,38 +66,34 @@ const jobsFields = [
 ] as const
 
 type JobField = (typeof jobsFields)[number]
-type JobFieldLayout = 'compact' | 'full'
 
-type JobCompactField = {
+type JobFieldGroup = 'identity' | 'scheduling' | 'payload' | 'resources'
+
+type JobLink = {
+  to: RouteLocationRaw
+  kind?: 'partition' | 'default'
+}
+
+type JobTextField = {
   id: JobField
   label: string
-  layout: 'compact'
+  kind: 'text'
   value: string
   monospace?: boolean
-  to?: RouteLocationRaw
+  group: JobFieldGroup
+  link?: JobLink
 }
 
 type JobComponentField = {
   id: JobField
   label: string
-  layout: 'full'
+  kind: 'component'
   component: Component
   props: object
+  group: JobFieldGroup
 }
 
-type JobFieldRow = JobCompactField | JobComponentField
-
-const compactFieldIds: JobField[] = [
-  'user',
-  'group',
-  'account',
-  'wckeys',
-  'priority',
-  'nodes',
-  'partition',
-  'qos',
-  'exit-code'
-]
+type JobFieldRow = JobTextField | JobComponentField
 
 function isValidJobField(key: string): key is JobField {
   return typeof key === 'string' && jobsFields.includes(key as JobField)
@@ -130,8 +126,26 @@ const displayTags = ref<Record<JobField, { show: boolean; highlight: boolean }>>
   'tres-requested': { show: false, highlight: false }
 })
 
-function fieldLayout(id: JobField): JobFieldLayout {
-  return compactFieldIds.includes(id) ? 'compact' : 'full'
+const detailSectionMeta: Record<
+  JobFieldGroup,
+  { title: string; description: string }
+> = {
+  identity: {
+    title: 'pages.job.sections.identityTitle',
+    description: 'pages.job.sections.identityDescription'
+  },
+  scheduling: {
+    title: 'pages.job.sections.schedulingTitle',
+    description: 'pages.job.sections.schedulingDescription'
+  },
+  payload: {
+    title: 'pages.job.sections.payloadTitle',
+    description: 'pages.job.sections.payloadDescription'
+  },
+  resources: {
+    title: 'pages.job.sections.resourcesTitle',
+    description: 'pages.job.sections.resourcesDescription'
+  }
 }
 
 function fmtField(value: string | number | null | undefined) {
@@ -139,22 +153,24 @@ function fmtField(value: string | number | null | undefined) {
   return String(value)
 }
 
-function compactField(
+function textField(
   id: JobField,
   label: string,
   value: string | number | null | undefined,
-  to?: RouteLocationRaw
-): JobCompactField {
-  return { id, label, layout: fieldLayout(id) as 'compact', value: fmtField(value), to }
+  group: JobFieldGroup,
+  link?: JobLink
+): JobTextField {
+  return { id, label, kind: 'text', value: fmtField(value), group, link }
 }
 
 function fullField(
   id: JobField,
   label: string,
   component: Component,
-  props: object
+  props: object,
+  group: JobFieldGroup
 ): JobComponentField {
-  return { id, label, layout: fieldLayout(id) as 'full', component, props }
+  return { id, label, kind: 'component', component, props, group }
 }
 
 const jobFieldsContent = computed((): JobFieldRow[] => {
@@ -162,64 +178,71 @@ const jobFieldsContent = computed((): JobFieldRow[] => {
   const account = data.value.association.account
 
   return [
-    compactField('group', 'pages.job.fields.group', data.value.group),
-    compactField(
+    textField('group', 'pages.job.fields.group', data.value.group, 'identity'),
+    textField(
       'account',
       'pages.job.fields.account',
       account,
-      account ? { name: 'account', params: { cluster, account } } : undefined
+      'identity',
+      account ? { to: { name: 'account', params: { cluster, account } } } : undefined
     ),
-    compactField('user', 'pages.job.fields.user', data.value.user, {
-      name: 'user',
-      params: { cluster, user: data.value.user }
+    textField('user', 'pages.job.fields.user', data.value.user, 'identity', {
+      to: { name: 'user', params: { cluster, user: data.value.user } }
     }),
-    compactField('wckeys', 'pages.job.fields.wckeys', data.value.wckey.wckey),
-    compactField('priority', 'pages.job.fields.priority', data.value.priority.number),
-    compactField('nodes', 'pages.job.fields.nodes', data.value.nodes),
-    compactField(
+    textField('wckeys', 'pages.job.fields.wckeys', data.value.wckey.wckey, 'identity'),
+    textField('priority', 'pages.job.fields.priority', data.value.priority.number, 'scheduling'),
+    textField('nodes', 'pages.job.fields.nodes', data.value.nodes, 'scheduling'),
+    textField(
       'partition',
       'pages.job.fields.partition',
       data.value.partition,
+      'scheduling',
       data.value.partition
-        ? { name: 'partition', params: { cluster, partition: data.value.partition } }
+        ? {
+            to: { name: 'partition', params: { cluster, partition: data.value.partition } },
+            kind: 'partition'
+          }
         : undefined
     ),
-    compactField('qos', 'pages.job.fields.qos', data.value.qos),
-    compactField(
+    textField('qos', 'pages.job.fields.qos', data.value.qos, 'scheduling'),
+    textField(
       'exit-code',
       'pages.job.fields.exitCode',
-      formatJobExitCode(data.value.exit_code)
+      formatJobExitCode(data.value.exit_code),
+      'scheduling'
     ),
-    fullField('name', 'pages.job.fields.name', JobFieldRaw, { field: data.value.name }),
+    fullField('name', 'pages.job.fields.name', JobFieldRaw, { field: data.value.name }, 'payload'),
     fullField('comments', 'pages.job.fields.comments', JobFieldComment, {
       comment: data.value.comment
-    }),
+    }, 'payload'),
     fullField('submit-line', 'pages.job.fields.submitLine', JobFieldRaw, {
       field: data.value.submit_line,
       monospace: true
-    }),
-    fullField('script', 'pages.job.fields.script', JobFieldRaw, { field: data.value.script }),
+    }, 'payload'),
+    fullField('script', 'pages.job.fields.script', JobFieldRaw, { field: data.value.script }, 'payload'),
     fullField('workdir', 'pages.job.fields.workingDirectory', JobFieldRaw, {
       field: data.value.working_directory,
       monospace: true
-    }),
+    }, 'payload'),
     fullField('tres-requested', 'pages.job.fields.requested', JobResources, {
       tres: data.value.tres.requested,
       gpu: jobRequestedGPU(data.value)
-    }),
+    }, 'resources'),
     fullField('tres-allocated', 'pages.job.fields.allocated', JobResources, {
       tres: data.value.tres.allocated,
       gpu: { count: jobAllocatedGPU(data.value), reliable: true }
-    })
+    }, 'resources')
   ]
 })
 
-const fullFields = computed((): JobComponentField[] =>
-  jobFieldsContent.value.filter((field): field is JobComponentField => field.layout === 'full')
-)
-
-const compactFields = computed((): JobCompactField[] =>
-  jobFieldsContent.value.filter((field): field is JobCompactField => field.layout === 'compact')
+const detailSections = computed(() =>
+  (Object.keys(detailSectionMeta) as JobFieldGroup[])
+    .map((group) => ({
+      id: group,
+      ...detailSectionMeta[group],
+      fields: jobFieldsContent.value.filter((field) => field.group === group)
+    }))
+    .filter((section) => section.fields.length > 0)
 )
 
 const summaryItems = computed(() => {
@@ -473,73 +496,69 @@ watch(
                       {{ t('pages.job.panels.detailedDescription') }}
                     </p>
                   </div>
-                  <div class="ui-detail-compact-grid" data-testid="job-detail-compact-grid">
-                    <div
-                      v-for="field in compactFields"
-                      :key="field.id"
-                      class="ui-detail-compact-card"
+                  <div class="ui-detail-sections" data-testid="job-detail-sections">
+                    <section
+                      v-for="section in detailSections"
+                      :key="section.id"
+                      class="ui-detail-section"
                     >
-                      <div class="ui-detail-compact-label">{{ t(field.label) }}</div>
-                      <div class="ui-detail-compact-value">
-                        <PartitionLinkChip
-                          v-if="field.id === 'partition' && field.value !== '-'"
-                          :cluster="cluster"
-                          :partition="field.value"
-                        />
-                        <RouterLink
-                          v-else-if="field.to && field.value !== '-'"
-                          :to="field.to"
-                          class="ui-inline-link"
-                        >
-                          {{ field.value }}
-                        </RouterLink>
-                        <template v-else>
-                          {{ field.value }}
-                        </template>
+                      <div class="ui-detail-section-heading">
+                        <h4 class="ui-detail-section-title">{{ t(section.title) }}</h4>
+                        <p class="ui-detail-section-description">{{ t(section.description) }}</p>
                       </div>
-                    </div>
-                  </div>
-                  <div class="ui-detail-list" data-testid="job-detail-list">
-                    <dl>
-                      <div
-                        v-for="field in fullFields"
-                        :key="field.id"
-                        :id="field.id"
-                        :class="[
-                          displayTags[field.id].highlight
-                            ? 'rounded-[18px] bg-[rgba(182,232,44,0.16)] px-4 sm:px-5'
-                            : '',
-                          'px-4 py-3 transition-colors duration-700 sm:grid sm:grid-cols-3 sm:gap-5 sm:px-0'
-                        ]"
-                        @mouseenter="displayTags[field.id].show = true"
-                        @mouseleave="displayTags[field.id].show = false"
-                      >
-                        <dt class="text-sm leading-6 font-semibold text-[var(--color-brand-ink-strong)]">
-                        <a :href="`#${field.id}`" @click.prevent="highlightField(field.id)">
-                            <span class="group inline-flex items-center gap-2 rounded-full px-1.5 py-1 transition-colors hover:bg-[rgba(182,232,44,0.12)]">
-                              <span
-                                :class="[
-                                  displayTags[field.id].show
-                                    ? 'border-[rgba(182,232,44,0.38)] bg-[rgba(182,232,44,0.18)] text-[var(--color-brand-blue)] shadow-[0_8px_16px_rgba(182,232,44,0.14)]'
-                                    : 'border-transparent bg-transparent text-[var(--color-brand-muted)]/70',
-                                  'inline-flex h-6 w-6 items-center justify-center rounded-full border transition-all duration-200'
-                                ]"
+                      <div class="ui-detail-list" data-testid="job-detail-list">
+                        <dl>
+                          <div
+                            v-for="field in section.fields"
+                            :key="field.id"
+                            :id="field.id"
+                            :class="[
+                              displayTags[field.id].highlight
+                                ? 'rounded-[18px] bg-[rgba(182,232,44,0.16)] px-4 sm:px-5'
+                                : '',
+                              'px-4 py-3 transition-colors duration-700 sm:grid sm:grid-cols-3 sm:gap-5 sm:px-0'
+                            ]"
+                            @mouseenter="displayTags[field.id].show = true"
+                            @mouseleave="displayTags[field.id].show = false"
+                          >
+                            <dt class="text-sm leading-6 font-semibold text-[var(--color-brand-ink-strong)]">
+                              <a :href="`#${field.id}`" class="ui-detail-anchor" @click.prevent="highlightField(field.id)">
+                                <span
+                                  :class="[
+                                    displayTags[field.id].show
+                                      ? 'ui-detail-anchor-icon ui-detail-anchor-icon-active'
+                                      : 'ui-detail-anchor-icon'
+                                  ]"
+                                >
+                                  <HashtagIcon class="h-3.5 w-3.5" aria-hidden="true" />
+                                </span>
+                                <span>{{ t(field.label) }}</span>
+                              </a>
+                            </dt>
+                            <dd
+                              v-if="field.kind === 'text'"
+                              class="ui-detail-value-shell mt-1 sm:col-span-2 sm:mt-0"
+                            >
+                              <PartitionLinkChip
+                                v-if="field.link?.kind === 'partition' && field.value !== '-'"
+                                :cluster="cluster"
+                                :partition="field.value"
+                              />
+                              <RouterLink
+                                v-else-if="field.link?.to && field.value !== '-'"
+                                :to="field.link.to"
+                                class="ui-inline-link ui-detail-rich-text"
                               >
-                                <HashtagIcon class="h-3.5 w-3.5" aria-hidden="true" />
-                              </span>
-                              <span>{{ t(field.label) }}</span>
-                            </span>
-                          </a>
-                        </dt>
-                        <dd
-                          v-if="field.id === 'partition' && data?.partition"
-                          class="mt-1 sm:col-span-2 sm:mt-0"
-                        >
-                          <PartitionLinkChip :cluster="cluster" :partition="data.partition" />
-                        </dd>
-                        <component v-else :is="field.component" v-bind="field.props" />
+                                {{ field.value }}
+                              </RouterLink>
+                              <pre v-else-if="field.monospace" class="ui-detail-codeblock">{{ field.value }}</pre>
+                              <p v-else class="ui-detail-rich-text">{{ field.value }}</p>
+                            </dd>
+                            <component v-else :is="field.component" v-bind="field.props" />
+                          </div>
+                        </dl>
                       </div>
-                    </dl>
+                    </section>
                   </div>
                 </div>
               </section>

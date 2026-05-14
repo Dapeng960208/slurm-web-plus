@@ -95,16 +95,19 @@ describe('JobHistoryView.vue', () => {
     expect(wrapper.get('[data-testid="detail-summary-strip"]').text()).toContain('-')
     expect(wrapper.get('[data-testid="detail-summary-strip"]').text()).toContain('Job ID')
     expect(wrapper.get('[data-testid="detail-summary-strip"]').text()).toContain('Exit Code')
-    const detailCompactLinks = wrapper
-      .get('[data-testid="job-history-detail-compact-grid"]')
+    const detailSections = wrapper.get('[data-testid="job-history-detail-sections"]')
+    const detailCompactLinks = detailSections
       .findAllComponents({ name: 'RouterLink' })
       .filter((link) => JSON.stringify(link.props('to')) === JSON.stringify({
         name: 'partition',
         params: { cluster: 'foo', partition: 'normal' }
       }))
     expect(detailCompactLinks).toHaveLength(1)
-    expect(wrapper.get('[data-testid="job-history-detail-list"]').text()).toContain('Resources')
-    expect(wrapper.get('[data-testid="job-history-detail-list"]').text()).toContain('Command')
+    expect(detailSections.text()).toContain('Identity & Archive Context')
+    expect(detailSections.text()).toContain('Command & Execution Context')
+    expect(detailSections.text()).toContain('Resources')
+    expect(detailSections.text()).toContain('Command')
+    expect(wrapper.get('#command pre').text()).toContain('sleep 1')
     expect(wrapper.text()).not.toContain('Submit Time')
     expect(wrapper.text()).not.toContain('End Time')
   })
@@ -180,8 +183,8 @@ describe('JobHistoryView.vue', () => {
     expect(wrapper.get('#step-terminated').text()).not.toContain('\n                  -')
     expect(wrapper.get('[data-testid="detail-summary-strip"]').text()).toContain('SUCCESS (0)')
     expect(wrapper.get('[data-testid="detail-summary-strip"]').text()).toContain('Avg CPU Cores')
-    expect(wrapper.get('[data-testid="job-history-detail-list"]').text()).toContain('Requested')
-    expect(wrapper.get('[data-testid="job-history-detail-list"]').text()).toContain('Working Directory')
+    expect(wrapper.get('[data-testid="job-history-detail-sections"]').text()).toContain('Requested')
+    expect(wrapper.get('[data-testid="job-history-detail-sections"]').text()).toContain('Working Directory')
     expect(wrapper.text()).not.toContain('Submit Time')
     expect(wrapper.text()).not.toContain('Eligible Time')
     expect(wrapper.text()).not.toContain('Start Time')

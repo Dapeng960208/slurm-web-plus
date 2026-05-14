@@ -47,29 +47,24 @@ class TestAgentOperations(TestAgentBase):
 
     def test_analysis_node_hotspots(self):
         self.setup_client(node_metrics=True)
-        self.app.settings.node_metrics.node_hostname_label = "instance"
-        self.app.slurmrestd.nodes = mock.Mock(
-            return_value=[{"name": "cn1"}, {"name": "cn2"}]
-        )
-        self.app.node_metrics_db.cluster_node_hotspots = mock.Mock(
-            return_value={
-                "window": {
-                    "start": "2026-04-21T00:00:00+00:00",
-                    "end": "2026-04-24T00:00:00+00:00",
-                },
-                "threshold": 80,
-                "events": [
-                    {
-                        "node": "cn1",
-                        "metric": "cpu",
-                        "start": "2026-04-23T09:00:00+00:00",
-                        "end": "2026-04-23T09:20:00+00:00",
-                        "duration_seconds": 1200,
-                        "peak_usage": 93,
-                    }
-                ],
-            }
-        )
+        self.app.node_hotspot_store = mock.Mock()
+        self.app.node_hotspot_store.cluster_node_hotspots.return_value = {
+            "window": {
+                "start": "2026-04-21T00:00:00+00:00",
+                "end": "2026-04-24T00:00:00+00:00",
+            },
+            "threshold": 80,
+            "events": [
+                {
+                    "node": "cn1",
+                    "metric": "cpu",
+                    "start": "2026-04-23T09:00:00+00:00",
+                    "end": "2026-04-23T09:20:00+00:00",
+                    "duration_seconds": 1200,
+                    "peak_usage": 93,
+                }
+            ],
+        }
 
         response = self.client.get(
             f"/v{get_version()}/analysis/node-hotspots?start=2026-04-21T00:00:00Z&end=2026-04-24T00:00:00Z"
@@ -77,12 +72,12 @@ class TestAgentOperations(TestAgentBase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json["events"][0]["node"], "cn1")
-        args, _ = self.app.node_metrics_db.cluster_node_hotspots.call_args
-        self.assertEqual(args[1], "instance")
+        self.app.node_hotspot_store.cluster_node_hotspots.assert_called_once()
 
     def test_analysis_node_hotspots_uses_cache(self):
         self.setup_client(node_metrics=True)
         self.app.cache = mock.Mock(spec=CachingService)
+        self.app.node_hotspot_store = mock.Mock()
         cached = {
             "window": {
                 "start": "2026-04-21T00:00:00+00:00",
@@ -108,8 +103,7 @@ class TestAgentOperations(TestAgentBase):
         self.app.cache.get.assert_called_once_with(key)
         self.app.cache.count_hit.assert_called_once_with(key)
         self.app.cache.put.assert_not_called()
-        self.app.slurmrestd.nodes.assert_not_called()
-        self.app.node_metrics_db.cluster_node_hotspots.assert_not_called()
+        self.app.node_hotspot_store.cluster_node_hotspots.assert_not_called()
 
     def test_analysis_node_hotspots_requires_window(self):
         self.setup_client(node_metrics=True)
@@ -121,6 +115,37 @@ class TestAgentOperations(TestAgentBase):
             self.assertEqual(response.json["description"], "start and end must both be provided")
         else:
             self.assertIn("start and end must both be provided", response.text)
+
+    def test_analysis_node_hotspots_returns_persisted_empty_result_without_fallback(self):
+        self.setup_client(node_metrics=True)
+        self.app.node_hotspot_store = mock.Mock()
+        self.app.node_hotspot_store.cluster_node_hotspots.return_value = {
+            "window": {
+                "start": "2026-04-21T00:00:00+00:00",
+                "end": "2026-04-24T00:00:00+00:00",
+            },
+            "threshold": 80,
+            "events": [],
+        }
+
+        response = self.client.get(
+            f"/v{get_version()}/analysis/node-hotspots?start=2026-04-21T00:00:00Z&end=2026-04-24T00:00:00Z"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json["events"], [])
+        self.app.node_hotspot_store.cluster_node_hotspots.assert_called_once()
+
+    def test_analysis_node_hotspots_returns_501_without_persistence_store(self):
+        self.setup_client(node_metrics=True)
+        self.app.node_hotspot_store = None
+
+        response = self.client.get(
+            f"/v{get_version()}/analysis/node-hotspots?start=2026-04-21T00:00:00Z&end=2026-04-24T00:00:00Z"
+        )
+
+        self.assertEqual(response.status_code, 501)
+        self.assertEqual(response.json["description"], "Node hotspot persistence is unavailable")
 
     def test_admin_system_route_removed(self):
         self.setup_client()

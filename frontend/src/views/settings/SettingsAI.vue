@@ -647,38 +647,36 @@ onMounted(async () => {
               {{ t('settings.ai.audit.description') }}
             </p>
           </div>
-          <div class="ui-page-tools-end">
-            <button type="button" class="ui-button-secondary" :disabled="auditLoading" @click="loadAuditConversations">
-              {{ t('common.buttons.refresh') }}
-            </button>
-          </div>
         </div>
 
         <ErrorAlert v-if="auditError" class="mt-5">
           {{ auditError }}
         </ErrorAlert>
 
-        <div class="mt-5 grid gap-3 lg:grid-cols-2">
-          <label class="block">
-            <span class="text-sm font-semibold text-[var(--color-brand-ink-strong)]">{{ t('settings.ai.audit.filters.username') }}</span>
+        <div class="mt-5 ui-admin-search-bar">
+          <div class="ui-admin-search-fields">
             <input
               v-model="auditUsernameFilter"
               data-testid="audit-username-filter"
               type="search"
-              class="ui-input-field mt-2"
+              class="ui-input-field ui-admin-search-field"
+              :aria-label="t('settings.ai.audit.filters.username')"
               :placeholder="t('settings.ai.audit.filters.usernamePlaceholder')"
             />
-          </label>
-          <label class="block">
-            <span class="text-sm font-semibold text-[var(--color-brand-ink-strong)]">{{ t('settings.ai.audit.filters.title') }}</span>
             <input
               v-model="auditKeywordFilter"
               data-testid="audit-keyword-filter"
               type="search"
-              class="ui-input-field mt-2"
+              class="ui-input-field ui-admin-search-field"
+              :aria-label="t('settings.ai.audit.filters.title')"
               :placeholder="t('settings.ai.audit.filters.titlePlaceholder')"
             />
-          </label>
+          </div>
+          <div class="ui-admin-search-actions">
+            <button type="button" class="ui-button-secondary" :disabled="auditLoading" @click="loadAuditConversations">
+              {{ t('common.buttons.refresh') }}
+            </button>
+          </div>
         </div>
 
         <div v-if="auditLoading" class="mt-6 text-[var(--color-brand-muted)]">

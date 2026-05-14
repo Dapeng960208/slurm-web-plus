@@ -138,7 +138,9 @@ describe('DashboardView.vue', () => {
     expect(runtimeStore.dashboard.partition).toBe('gpu')
     expect((wrapper.get('#dashboard-partition').element as HTMLSelectElement).value).toBe('gpu')
     expect(wrapper.text()).toContain('Realtime Metrics')
-    expect(wrapper.text()).toContain('Time Range')
+    expect(wrapper.findAll('.ui-inline-field-label').map((node) => node.text())).toEqual([
+      'Partition / Queue'
+    ])
   })
 
   test('keeps a valid partition query until partitions finish loading', async () => {
@@ -248,10 +250,10 @@ describe('DashboardView.vue', () => {
 
     expect(wrapper.find('#dashboard-partition').exists()).toBe(false)
     expect(runtimeStore.dashboard.partition).toBe('')
-    expect(wrapper.text()).toContain('Time Range')
+    expect(wrapper.find('.ui-inline-field-label').exists()).toBe(false)
   })
 
-  test('renders partition and time range controls in the same panel', () => {
+  test('renders a cardless toolbar with partition and time range controls', () => {
     const wrapper = mount(DashboardView, {
       props: {
         cluster: 'foo'
@@ -265,8 +267,10 @@ describe('DashboardView.vue', () => {
 
     const toolbar = wrapper.get('[data-testid="dashboard-toolbar"]')
     expect(toolbar.text()).toContain('Partition / Queue')
-    expect(toolbar.text()).toContain('Time Range')
-    expect(wrapper.findAll('.dashboard-surface').length).toBeGreaterThan(2)
+    expect(toolbar.findAll('.ui-inline-field-label')).toHaveLength(1)
+    expect(wrapper.find('[data-testid="metric-range-custom-button"]').exists()).toBe(true)
+    expect(wrapper.findAll('.dashboard-surface').length).toBe(9)
+    expect(wrapper.find('.dashboard-surface.mt-6').exists()).toBe(false)
   })
 
   test('wraps dashboard content in an internal scroll region', () => {

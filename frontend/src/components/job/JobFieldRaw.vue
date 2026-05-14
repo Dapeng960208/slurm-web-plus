@@ -22,21 +22,17 @@ const {
 </script>
 
 <template>
-  <dd
-    :class="[
-      monospace ? 'font-mono' : '',
-      'mt-1 text-sm leading-6 text-gray-700 sm:col-span-2 sm:mt-0 dark:text-gray-300'
-    ]"
-  >
+  <dd class="ui-detail-value-shell mt-1 sm:col-span-2 sm:mt-0">
     <RouterLink
       v-if="to"
       :to="to"
-      class="text-slurmweb hover:text-slurmweb-dark dark:text-slurmweb-light font-semibold"
+      class="ui-inline-link ui-detail-rich-text"
     >
       {{ field }}
     </RouterLink>
-    <template v-else>
+    <pre v-else-if="monospace" class="ui-detail-codeblock">{{ field }}</pre>
+    <p v-else class="ui-detail-rich-text">
       {{ field }}
-    </template>
+    </p>
   </dd>
 </template>

@@ -187,6 +187,20 @@ describe('views/settings/SettingsAccessControl.vue', () => {
     expect(wrapper.text()).toContain(i18n.global.t('settings.accessControl.roles.title'))
     expect(wrapper.text()).toContain(i18n.global.t('settings.accessControl.users.title'))
     expect(wrapper.text()).toContain('db-admin')
+    expect(wrapper.find('.ui-admin-search-bar').exists()).toBe(true)
+    expect(wrapper.find('input[type="search"]').exists()).toBe(true)
+    expect(
+      wrapper
+        .find('.ui-admin-search-actions')
+        .findAll('button')
+        .map((button) => button.text().trim())
+    ).toEqual(
+      expect.arrayContaining([
+        i18n.global.t('common.buttons.search'),
+        i18n.global.t('common.buttons.reset'),
+        i18n.global.t('common.buttons.refresh')
+      ])
+    )
 
     await wrapper.get('input[placeholder="ops-viewer"]').setValue('ops-viewer')
     await wrapper

@@ -156,7 +156,7 @@ describe('ClusterAnalysisView.vue', () => {
     mockGatewayAPI.jobs_history.mockResolvedValue({
       total: 1,
       page: 1,
-      page_size: 200,
+      page_size: 500,
       jobs: [
         {
           id: 1,
@@ -271,6 +271,7 @@ describe('ClusterAnalysisView.vue', () => {
     expect(wrapper.text()).toContain('Diag')
     expect(wrapper.text()).toContain('Average Queue Wait')
     expect(wrapper.text()).toContain('shown in seconds')
+    expect(wrapper.text()).toContain('Aggregation')
     expect(wrapper.text()).toContain('Node Hotspots')
     expect(wrapper.text()).toContain('Node cn1')
     expect(wrapper.text()).toContain('Jobs Submitted')
@@ -282,7 +283,8 @@ describe('ClusterAnalysisView.vue', () => {
       'foo',
       expect.objectContaining({
         state: 'COMPLETED',
-        page_size: 200
+        page_size: 500,
+        end: expect.stringMatching(/T/)
       })
     )
     expect(mockGatewayAPI.analysis_ping).toHaveBeenCalledWith('foo')
@@ -331,6 +333,138 @@ describe('ClusterAnalysisView.vue', () => {
 
     expect(wrapper.get('[data-testid="queue-wait-chart"]').text()).toContain(
       `day|[[${new Date('2026-04-24T00:00:00Z').getTime()},600]]`
+    )
+  })
+
+  test('loads all history pages for queue wait aggregation within the selected window', async () => {
+    mockGatewayAPI.jobs_history
+      .mockResolvedValueOnce({
+        total: 2,
+        page: 1,
+        page_size: 1,
+        jobs: [
+          {
+            id: 1,
+            snapshot_time: '2026-04-24T10:00:00Z',
+            job_id: 1,
+            job_name: 'job-1',
+            job_state: 'COMPLETED',
+            state_reason: 'None',
+            user_id: 1,
+            user_name: 'alice',
+            account: 'science',
+            group: 'science',
+            partition: 'normal',
+            qos: 'normal',
+            nodes: 'cn1',
+            node_count: 1,
+            cpus: 16,
+            priority: 0,
+            tres_req_str: null,
+            tres_per_job: null,
+            tres_per_node: null,
+            gres_detail: null,
+            submit_time: '2026-04-24T09:00:00Z',
+            eligible_time: null,
+            start_time: '2026-04-24T09:10:00Z',
+            end_time: '2026-04-24T09:40:00Z',
+            last_sched_evaluation_time: null,
+            time_limit_minutes: 60,
+            tres_requested: null,
+            tres_allocated: null,
+            used_memory_gb: null,
+            usage_stats: null,
+            used_cpu_cores_avg: null,
+            exit_code: '0:0',
+            working_directory: null,
+            command: null
+          }
+        ]
+      })
+      .mockResolvedValueOnce({
+        total: 2,
+        page: 2,
+        page_size: 1,
+        jobs: [
+          {
+            id: 2,
+            snapshot_time: '2026-04-24T11:00:00Z',
+            job_id: 2,
+            job_name: 'job-2',
+            job_state: 'COMPLETED',
+            state_reason: 'None',
+            user_id: 2,
+            user_name: 'bob',
+            account: 'science',
+            group: 'science',
+            partition: 'normal',
+            qos: 'normal',
+            nodes: 'cn2',
+            node_count: 1,
+            cpus: 16,
+            priority: 0,
+            tres_req_str: null,
+            tres_per_job: null,
+            tres_per_node: null,
+            gres_detail: null,
+            submit_time: '2026-04-24T10:00:00Z',
+            eligible_time: null,
+            start_time: '2026-04-24T10:20:00Z',
+            end_time: '2026-04-24T10:50:00Z',
+            last_sched_evaluation_time: null,
+            time_limit_minutes: 60,
+            tres_requested: null,
+            tres_allocated: null,
+            used_memory_gb: null,
+            usage_stats: null,
+            used_cpu_cores_avg: null,
+            exit_code: '0:0',
+            working_directory: null,
+            command: null
+          }
+        ]
+      })
+
+    const wrapper = mount(ClusterAnalysisView, {
+      props: { cluster: 'foo' },
+      global: {
+        stubs: {
+          ClusterMainLayout: { template: '<div><slot /></div>' },
+          RouterLink: { template: '<a><slot /></a>' },
+          PartitionLinkChip: {
+            props: ['cluster', 'partition'],
+            template:
+              '<a data-testid="analysis-partition-link" :data-cluster="cluster" :data-partition="partition">{{ partition }}</a>'
+          },
+          QueueWaitHistoryChart: {
+            props: ['series', 'aggregation'],
+            template:
+              '<div data-testid="queue-wait-chart">{{ aggregation }}|{{ JSON.stringify(series) }}</div>'
+          }
+        }
+      }
+    })
+
+    await flushPromises()
+
+    expect(mockGatewayAPI.jobs_history).toHaveBeenNthCalledWith(
+      1,
+      'foo',
+      expect.objectContaining({
+        page: 1,
+        page_size: 500
+      })
+    )
+    expect(mockGatewayAPI.jobs_history).toHaveBeenNthCalledWith(
+      2,
+      'foo',
+      expect.objectContaining({
+        page: 2,
+        page_size: 500
+      })
+    )
+    expect(wrapper.get('[data-testid="queue-wait-chart"]').text()).toContain(
+      `minute|[[${new Date('2026-04-24T09:10:00Z').getTime()},600],[${new Date('2026-04-24T10:20:00Z').getTime()},1200]]`
     )
   })
 })

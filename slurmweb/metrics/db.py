@@ -16,6 +16,7 @@ import aiohttp
 from rfl.core.asyncio import asyncio_run
 
 from ..errors import SlurmwebMetricsDBError
+from .hotspots import build_hotspot_events_from_metric_series
 
 SlurmWebRangeResolutionSet = collections.namedtuple(
     "SlurmWebRangeResolutionSet", ["hour", "day", "week"]
@@ -395,6 +396,48 @@ class SlurmwebMetricsDB:
 
         return asyncio_run(_fetch_all())
 
+    def node_instant_metrics_all(self, hostname_label: str = "hostname"):
+        queries = {
+            "cpu_usage": f'100 - (avg by ({hostname_label}) (rate(node_cpu_seconds_total{{mode="idle"}}[1m])) * 100)',
+            "memory_usage": (
+                f"100 * (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes))"
+            ),
+        }
+
+        async def _fetch_all():
+            results: t.Dict[str, t.Dict[str, t.Optional[float]]] = {}
+            async with aiohttp.ClientSession() as session:
+                for metric_key, promql in queries.items():
+                    url = f"{self.base_uri.geturl()}{self.REQUEST_BASE_PATH}query?query={promql}"
+                    logger.debug("Node metrics all request: %s", url)
+                    try:
+                        async with session.get(url) as response:
+                            if response.status != 200:
+                                raise SlurmwebMetricsDBError(
+                                    "Unexpected response status "
+                                    f"{response.status} for metrics database request {url}"
+                                )
+                            json_data = await response.json()
+                    except aiohttp.ClientConnectionError as err:
+                        raise SlurmwebMetricsDBError(
+                            f"Metrics database connection error: {str(err)}"
+                        ) from err
+
+                    for item in json_data.get("data", {}).get("result", []):
+                        node_name = item.get("metric", {}).get(hostname_label)
+                        if not node_name:
+                            continue
+                        try:
+                            value = round(float(item["value"][1]), 2)
+                        except (TypeError, ValueError, IndexError, KeyError) as err:
+                            raise SlurmwebMetricsDBError(
+                                f"Unexpected result on metrics query {promql}"
+                            ) from err
+                        results.setdefault(node_name, {})[metric_key] = value
+            return results
+
+        return asyncio_run(_fetch_all())
+
     def user_history_metrics(self, username: str, last: str):
         try:
             resolution = getattr(self.RANGE_RESOLUTIONS["1m"], last)
@@ -569,6 +612,7 @@ class SlurmwebMetricsDB:
 
         duration = end_time - start_time
         resolution = self._duration_resolution(duration)
+        step_seconds = resolution.rounding
         start_ts = int(start_time.timestamp() - start_time.timestamp() % resolution.rounding)
         end_ts = int(end_time.timestamp() - end_time.timestamp() % resolution.rounding)
         if not node_names:
@@ -628,57 +672,12 @@ class SlurmwebMetricsDB:
                     results[metric_key] = series
             return results
 
-        def _extract_events(metric_name: str, series_by_node: t.Dict[str, t.List[t.List[t.Any]]]):
-            events = []
-            for node_name, values in series_by_node.items():
-                event_start = None
-                event_end = None
-                peak = threshold
-                previous_ts = None
-                for index, (timestamp_ms, value) in enumerate(values):
-                    ts = datetime.fromtimestamp(timestamp_ms / 1000, tz=timezone.utc)
-                    is_hot = value >= threshold
-                    if is_hot and event_start is None:
-                        event_start = ts
-                        peak = value
-                    if is_hot:
-                        peak = max(peak, value)
-                        event_end = ts
-                    if (not is_hot or index == len(values) - 1) and event_start is not None:
-                        if event_end is None:
-                            event_end = previous_ts or ts
-                        next_ts = ts if not is_hot else ts
-                        duration_seconds = max(
-                            int((event_end - event_start).total_seconds()) + resolution.rounding,
-                            resolution.rounding,
-                        )
-                        events.append(
-                            {
-                                "node": node_name,
-                                "metric": metric_name,
-                                "start": event_start.isoformat(),
-                                "end": event_end.isoformat(),
-                                "duration_seconds": duration_seconds,
-                                "peak_usage": round(peak, 1),
-                            }
-                        )
-                        event_start = None
-                        event_end = None
-                        peak = threshold
-                    previous_ts = ts
-            return events
-
         metrics = asyncio_run(_fetch())
-        events = []
-        for metric_name, series_by_node in metrics.items():
-            events.extend(_extract_events(metric_name, series_by_node))
-        events.sort(
-            key=lambda item: (
-                item["start"],
-                item["duration_seconds"],
-                item["peak_usage"],
-            ),
-            reverse=True,
+        events = build_hotspot_events_from_metric_series(
+            metrics,
+            threshold=threshold,
+            step_seconds=step_seconds,
+            limit=limit,
         )
         return {
             "window": {
@@ -686,5 +685,5 @@ class SlurmwebMetricsDB:
                 "end": end_time.isoformat(),
             },
             "threshold": threshold,
-            "events": events[: max(limit, 0)],
+            "events": events,
         }

@@ -99,7 +99,10 @@ describe('settings/SettingsLdapCache.vue', () => {
     expect(wrapper.text()).toContain('users')
     expect(wrapper.text()).not.toContain('Cluster foo')
     expect(wrapper.text()).not.toContain('LDAP Cache')
-    expect(wrapper.text()).toContain(i18n.global.t('settings.ldapUsers.search.label'))
+    expect(wrapper.find('.ui-admin-search-bar').exists()).toBe(true)
+    expect(wrapper.get('input[type="search"]').attributes('aria-label')).toBe(
+      i18n.global.t('settings.ldapUsers.search.label')
+    )
     expect(wrapper.text()).toContain('alice')
     expect(wrapper.text()).toContain('Alice Doe')
     expect(wrapper.text()).toContain('bob')

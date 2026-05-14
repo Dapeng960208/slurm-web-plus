@@ -1127,6 +1127,17 @@ const en = {
         detailedDescription:
           'Longer fields stay expanded for readability and copy-friendly access.'
       },
+      sections: {
+        identityTitle: 'Identity & Ownership',
+        identityDescription: 'Submitter, account, and ownership details for this job.',
+        schedulingTitle: 'Scheduling & Runtime',
+        schedulingDescription: 'Current scheduling attributes, placement, and exit status.',
+        payloadTitle: 'Command & Context',
+        payloadDescription: 'Name, comments, script, submit line, and working directory.',
+        resourcesTitle: 'Requested & Allocated Resources',
+        resourcesDescription:
+          'TRES requested by the job and the resources currently allocated.'
+      },
       actions: {
         edit: 'Edit',
         cancel: 'Cancel'
@@ -1953,6 +1964,17 @@ const en = {
       detailedTitle: 'Detailed Resources & Commands',
       detailedDescription:
         'Longer fields stay expanded for readability and copy-friendly access.',
+      sections: {
+        identityTitle: 'Identity & Archive Context',
+        identityDescription: 'Recorded job id, user, group, and account ownership.',
+        schedulingTitle: 'Scheduling Outcome',
+        schedulingDescription: 'Archived scheduler state, partition, priority, and exit result.',
+        resourcesTitle: 'Resource Record',
+        resourcesDescription: 'Requested, allocated, and observed resource data from history.',
+        payloadTitle: 'Command & Execution Context',
+        payloadDescription:
+          'Preserved command, working directory, and other long-form execution fields.'
+      },
       timeline: {
         submitted: 'Submitted',
         eligible: 'Eligible',

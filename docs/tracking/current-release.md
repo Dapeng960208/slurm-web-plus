@@ -45,17 +45,54 @@
 - 修复 AI 取消作业兼容性：当模型直接输出 `job/cancel` 作为 tool name 时，后端会兼容映射到同名写接口，不再返回 `Unsupported tool`
 - 修复普通用户 AI 页面初始化权限口径：仅具备 `ai:view:*` 的用户不再首屏请求 `admin/ai:view:*` 才能访问的 `ai/configs`
 - 实时作业与 Dashboard/Analysis 性能优化：Jobs 用户筛选改为手输用户名，`/jobs` query 可透传到 Agent 并优先复用 Redis 全量作业缓存，`stats` 与 `analysis/node-hotspots` 新增默认 `60s` Redis 缓存，前端轮询在后台标签页暂停并降低高开销页面刷新频率
+- 重构实时作业详情页与历史作业详情页字段展示，统一为分组详情清单，修复长命令、脚本、路径字段溢出；同时移除分区详情页顶部摘要下方的重复详情块，并将已分配节点/空闲节点并入摘要卡片
+- 收口 `Dashboard / Analysis` 工具条与 `Admin` 搜索区：Dashboard/Analysis 去掉多余工具条外层卡片，Dashboard 统计卡间距按全局规范收紧，`Access Control`、`Users`、`AI Audit` 搜索区统一为 inline search bar
 
 ## 2. 已完成项
+
+- Dashboard / Analysis 工具条与 Admin 搜索区统一收口已完成：
+  - `DashboardView` 顶部分区与时间范围筛选区已去卡片化，保留分区轻量 inline label，移除时间范围额外可见 label
+  - `Dashboard` 统计卡与图表区块间距已回归共享 `ui-section-stack` / `ui-stat-grid` 节奏
+  - `ClusterAnalysisView` 顶部时间范围控件已与 Dashboard 使用同一套工具条节奏
+  - 平均排队时间聚合切换组件继续保留 `minute / hour / day` 三档，并恢复轻量可见说明；`aria-label` 与 `queue-wait-aggregation-*` 测试锚点保持不变
+  - `SettingsAccessControl`、`SettingsLdapCache`、`SettingsAI` 的搜索区已统一为 inline search bar；原有搜索、重置、刷新与前端即时过滤行为保持不变
+  - 本轮没有新增接口、权限或配置项
+  - 本轮已补前端定向验证：
+    - `cd frontend && npx vitest run tests/views/DashboardView.spec.ts tests/views/ClusterAnalysisView.spec.ts tests/views/settings/SettingsAccessControl.spec.ts tests/views/settings/SettingsLdapCache.spec.ts tests/views/settings/SettingsAI.spec.ts`
+    - `npm --prefix frontend run type-check`
+
+- Cluster Analysis 平均等待时间窗口与聚合行为已补一轮功能修复：
+  - 历史作业不再固定只读 `jobs_history` 首页 `200` 条；当前会按所选时间窗跨页读取全部历史结果，再做平均等待时间聚合
+  - 解决了 `day / week / 自定义窗口` 下样本被首页截断，导致 `minute / hour / day` 聚合结果看起来不按预期工作的前端问题
+  - 本轮仅修复前端历史数据读取与聚合展示逻辑，未调整后端 `jobs/history` 接口契约
+  - 本轮已补定向验证：
+    - `cd frontend && npx vitest run tests/views/ClusterAnalysisView.spec.ts tests/composables/queueWaitHistory.spec.ts`
+    - `npm --prefix frontend run type-check`
+
+- 节点热点持久化链路已落地：
+  - 新增 `node_metric_samples` 表，按 `cluster + node + sampled_at` 持久化节点 CPU / memory 使用率快照
+  - Agent 在数据库与 node metrics 同时可用时，会在启动阶段执行数据库迁移，并按 `persistence.snapshot_interval` 启动后台采样线程
+  - 后台线程会按 `persistence.retention_days` 清理过期节点样本
+  - `analysis/node-hotspots` 现在只从持久化样本重建热点事件；无样本时直接返回空结果，不再回退到 Prometheus 实时查询
+  - 节点热点后台线程每个采样周期都会输出一条核心摘要日志，包含集群、采样时间、采样节点数、保留天数、清理行数和周期秒数
+  - Redis `cache.analysis=60` 仍保留在接口外层，用于削峰热点窗口重复请求
+  - 本轮已补对应后端定向验证：
+    - `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/views/test_agent_operations.py slurmweb/tests/apps/test_agent.py slurmweb/tests/metrics/test_hotspots.py`
 
 - 实时作业与 Dashboard/Analysis 性能优化已落地：
   - `Jobs` 用户筛选不再请求 gateway `/users`，避免实时作业筛选面板触发 LDAP 全量枚举
   - `GET /api/agents/<cluster>/jobs` 支持 `users/states/accounts/qos/partitions/node` query 透传；Agent 对 `users/states/accounts/qos/partitions` 优先复用 Redis `jobs` 全量缓存并在内存中过滤
   - `GET /stats` 通过 `cache.stats` 缓存统计摘要，默认 `60` 秒；无分区使用 `stats` key，有分区使用 `stats-partition-<partition>` 并归类为 `stats`
-  - `GET /analysis/node-hotspots` 通过 `cache.analysis` 缓存节点热点，默认 `60` 秒；缓存 key 包含 `start/end` 时间窗
+  - `GET /analysis/node-hotspots` 通过 `cache.analysis` 缓存节点热点，默认 `60` 秒；缓存 key 包含 `start/end` 时间窗，接口内部只查询持久化节点样本
   - 作业 submit/update/cancel 完成后会失效 `jobs`、兼容 `jobs-unfiltered` 与对应 `job-<id>` 缓存，降低写后 stale 风险
   - `useClusterDataPoller` 已支持手动 `refresh()`，页面隐藏时暂停轮询，恢复可见时立即刷新一次
   - `JobsView` 默认轮询从 `5s` 调整为 `30s` 并新增手动刷新；Dashboard stats 与 dashboard 图表轮询调整为 `60s`
+- 作业详情与分区详情展示已继续收口：
+  - `JobView` 与 `JobHistoryView` 字段正文已统一为“摘要条 + 分组详情清单”，不再混用上方卡片网格和下方明细列表
+  - 长字段如 `submit line`、`script`、`working directory`、`command` 已改为可换行代码块式展示，避免内容顶出容器
+  - `JobFieldComment` 改为结构化备注块展示，长文本仍保持可读
+  - `PartitionView` 已删除顶部摘要下方重复的 `Partition Details` / `Node Sets` 区块
+  - `Allocated Nodes` 与 `Idle Nodes` 已并入分区顶部摘要卡片区
 - 本轮性能优化定向验证已通过：
   - `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/slurmrestd/test_slurmrestd_filtered_cached.py slurmweb/tests/views/test_agent.py slurmweb/tests/views/test_agent_operations.py slurmweb/tests/views/test_gateway.py`
   - `cd frontend && npx vitest run tests/components/jobs/UserFilterSelector.spec.ts tests/components/jobs/JobsFiltersPanel.spec.ts tests/views/JobsView.spec.ts tests/composables/GatewayAPI.spec.ts tests/composables/DataPoller.spec.ts`
@@ -578,6 +615,15 @@
 - `docs/overview/project-overview.md`
 - `docs/overview/architecture-overview.md`
 - `docs/overview/latest-features.md`
+- `frontend/src/views/JobView.vue`
+- `frontend/src/views/JobHistoryView.vue`
+- `frontend/src/views/PartitionView.vue`
+- `frontend/src/components/job/JobFieldRaw.vue`
+- `frontend/src/components/job/JobFieldComment.vue`
+- `frontend/src/style.css`
+- `frontend/tests/views/JobView.spec.ts`
+- `frontend/tests/views/JobHistoryView.spec.ts`
+- `frontend/tests/views/PartitionView.spec.ts`
 - `docs/standards/development-error-summary.md`
 - `docs/standards/ai-development-standard.md`
 - `docs/features/management-center/test-plan.md`
@@ -618,6 +664,9 @@
 ## 6. 验证状态
 
 已通过：
+
+- `cd frontend && npx vitest run tests/views/JobView.spec.ts tests/views/JobHistoryView.spec.ts tests/views/PartitionView.spec.ts`
+- `npm --prefix frontend run type-check`
 
 - `Get-Content -Encoding UTF8 docs/tracking/error-log.md`
 - `Get-Content -Encoding UTF8 docs/standards/development-error-summary.md`

@@ -762,7 +762,7 @@ onMounted(async () => {
         </section>
 
         <section class="ui-panel ui-section">
-          <div class="flex items-start justify-between gap-4">
+          <div class="ui-page-tools">
             <div>
               <p class="ui-page-kicker">{{ t('settings.accessControl.users.kicker') }}</p>
               <h2 class="ui-panel-title">{{ t('settings.accessControl.users.title') }}</h2>
@@ -770,9 +770,6 @@ onMounted(async () => {
                 {{ t('settings.accessControl.users.description') }}
               </p>
             </div>
-            <button type="button" class="ui-button-secondary" @click="loadUsers">
-              {{ t('common.buttons.refresh') }}
-            </button>
           </div>
 
           <ErrorAlert v-if="usersError" class="mt-5">
@@ -782,20 +779,27 @@ onMounted(async () => {
             {{ userAssignmentError }}
           </ErrorAlert>
 
-          <div class="mt-5 flex flex-col gap-3 sm:flex-row">
-            <input
-              v-model="userSearch"
-              type="text"
-              class="block w-full rounded-[18px] border border-[rgba(80,105,127,0.16)] bg-white px-4 py-3 text-sm text-[var(--color-brand-ink-strong)] shadow-[var(--shadow-soft)] outline-hidden focus:border-[rgba(182,232,44,0.65)] focus:ring-4 focus:ring-[rgba(182,232,44,0.18)]"
-              :placeholder="t('settings.accessControl.users.searchPlaceholder')"
-              @keyup.enter="searchUsers"
-            />
-            <button type="button" class="ui-button-primary" @click="searchUsers">
-              {{ t('common.buttons.search') }}
-            </button>
-            <button type="button" class="ui-button-secondary" @click="resetUsersSearch">
-              {{ t('common.buttons.reset') }}
-            </button>
+          <div class="mt-5 ui-admin-search-bar">
+            <div class="ui-admin-search-fields">
+              <input
+                v-model="userSearch"
+                type="search"
+                class="ui-input-field ui-admin-search-field"
+                :placeholder="t('settings.accessControl.users.searchPlaceholder')"
+                @keyup.enter="searchUsers"
+              />
+            </div>
+            <div class="ui-admin-search-actions">
+              <button type="button" class="ui-button-primary" @click="searchUsers">
+                {{ t('common.buttons.search') }}
+              </button>
+              <button type="button" class="ui-button-secondary" @click="resetUsersSearch">
+                {{ t('common.buttons.reset') }}
+              </button>
+              <button type="button" class="ui-button-secondary" @click="loadUsers">
+                {{ t('common.buttons.refresh') }}
+              </button>
+            </div>
           </div>
 
           <div v-if="usersLoading" class="mt-6 text-[var(--color-brand-muted)]">
