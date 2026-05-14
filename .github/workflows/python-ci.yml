@@ -12,17 +12,21 @@ permissions:
 
 jobs:
   python_tests:
-    name: Python unit tests (Python 3.9)
+    name: Python unit tests (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.9", "3.10", "3.11", "3.12"]
     env:
-      RESULTS_DIR: ci-results/backend-python-3.9
-      ARTIFACT_NAME: backend-python-3.9
+      RESULTS_DIR: ci-results/backend-python-${{ matrix.python-version }}
+      ARTIFACT_NAME: backend-python-${{ matrix.python-version }}
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.9"
+          python-version: ${{ matrix.python-version }}
 
       - name: Run backend unit test command
         run: |
@@ -41,6 +45,7 @@ jobs:
             --results-dir "$RESULTS_DIR" \
             --artifact-name "$ARTIFACT_NAME" \
             --label "backend-unit-tests" \
+            --junit-path "${RESULTS_DIR}/junit.xml" \
             --command "pytest slurmweb/tests --junitxml=${RESULTS_DIR}/junit.xml"
 
       - name: Upload backend unit test artifact

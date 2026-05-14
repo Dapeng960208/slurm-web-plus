@@ -11,7 +11,7 @@
 - 在 `analysis` 页面补 `Slurm ping` 与 `diag`
 - 以 `jobs:view|edit|delete:*|self` 落地 owner-aware 权限校验
 - 补齐 `slurmrestd 0.39-0.44` 的读写兼容策略与测试基线
-- 收敛 GitHub CI 到 `main` 分支自动测试，并为后续 AI / 脚本补结构化结果产物；当前后端主线自动测试版本已切到 `Python 3.9`
+- 收敛 GitHub CI 到 `main` 分支自动测试，并为后续 AI / 脚本补结构化结果产物；当前后端主线自动测试覆盖 `Python 3.9`、`3.10`、`3.11`、`3.12`
 - 统一节点 `Real Metrics` 与用户工具分析的自定义起止时间弹框
 - 收敛普通 AI 对话页配置展示，补会话逻辑删除、复制和管理员审计
 - 优化管理员 AI 配置页为弹窗式编辑、紧凑标签展示，并补审计搜索与对话 token 超限提示
@@ -442,7 +442,7 @@
   - `pull_request` 到 `main`
   - `push` 到 `main`
 - 自动 CI 当前固定版本为：
-  - 后端 `Python 3.9`
+  - 后端 `Python 3.9`、`3.10`、`3.11`、`3.12`
   - 前端 `Node 18`
 - 自动 CI 当前覆盖：
   - 后端单元测试
@@ -458,6 +458,7 @@
   - `result.json`
   - `failure-context.json`
   - `junit.xml`（测试类 job）
+- 测试类 CI 结果会从 `junit.xml` 解析并输出 `test_stats.tests/failures/errors/skipped`，GitHub Job Summary 与 `CI Triage` 汇总表也会展示测试数量
 - 新增手工 `CI Triage` workflow，可按 `run_id` 聚合 `backend` / `frontend` / `all` artifact
 - `JobsHistoryFiltersPanel` / `JobsHistoryFiltersBar` 已改为 `update:filters` 事件链，修复 `vue/no-mutating-props` 导致的前端 CI 失败
 - `JobHistoryView`、`ClusterAnalysis`、`SettingsTabs` 与 `GatewayAPI` 已清理剩余 ESLint 阻塞项，修复未使用符号和空接口类型告警
@@ -523,10 +524,11 @@
 - `ClusterAnalysis` 内存容量详情已改为 GB 展示，评分和百分比计算仍使用原始 MB 数值
 - `JobsView` 与 `JobView` 的编辑作业弹框已新增 `Memory per CPU (MB)`，空值不发送，正整数提交为 Slurm REST `memory_per_cpu` 对象
 - Jobs 用户筛选已支持直接输入用户名并点击 `Add username` 加入筛选；空值不添加，重复用户名不重复添加，添加后清空输入
-- GitHub `Backend Tests` 工作流已从 `Python 3.12` 切到 `Python 3.9`：
-  - `.github/workflows/python-ci.yml` 已改为 `python-version: "3.9"`
-  - job 名称、`RESULTS_DIR` 与 `ARTIFACT_NAME` 已同步切到 `backend-python-3.9`
-  - 其余自动 CI / 手工 CI 工作流职责不变
+- GitHub `Backend Tests` 工作流已从单版本扩展为 `Python 3.9+` 多版本矩阵：
+  - `.github/workflows/python-ci.yml` 覆盖 `Python 3.9`、`3.10`、`3.11`、`3.12`
+  - job 名称、`RESULTS_DIR` 与 `ARTIFACT_NAME` 已按版本生成 `backend-python-<version>`
+  - 结果脚本会解析 JUnit 并输出测试用例数量
+  - 其余前端自动 CI / 手工 OS 集成 workflow 职责不变
 - GitHub `Backend Tests` 发布后已补一处 collection 阶段回归：
   - `slurmweb/tests/lib/gateway.py` 里的测试侧 `ldap` stub 已补 `ldap.filter` 子模块
   - 修复 Linux CI 未安装 `python-ldap` 时，`rfl.authentication.ldap` 导入 `ldap.filter` 直接中断 gateway / ldap 相关测试收集的问题
@@ -644,6 +646,7 @@
 - `node --check .github/scripts/ensure-ci-result.mjs`
 - `node --check .github/scripts/build-triage-context.mjs`
 - `Get-Content -Raw -Encoding UTF8 .github/workflows/python-ci.yml | npx --yes yaml valid`
+- `node .github/scripts/run-ci-command.mjs --results-dir <temp> --artifact-name test-artifact --label test-label --junit-path <temp>/junit.xml --command "node --version"`（临时 JUnit fixture 验证 `result.json.test_stats`）
 - `Get-Content -Raw -Encoding UTF8 .github/workflows/python-os-ci.yml | npx --yes yaml valid`
 - `Get-Content -Raw -Encoding UTF8 .github/workflows/frontend-ci.yml | npx --yes yaml valid`
 - `Get-Content -Raw -Encoding UTF8 .github/workflows/frontend-static.yml | npx --yes yaml valid`

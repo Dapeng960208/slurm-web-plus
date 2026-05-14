@@ -1,5 +1,22 @@
 # 最新功能
 
+## 本轮：GitHub 后端 CI 覆盖 Python 3.9+ 多版本并输出测试数量
+
+本轮把 `Backend Tests` 从单一 Python 版本扩展为多版本矩阵：
+
+- `.github/workflows/python-ci.yml` 现在覆盖 `Python 3.9`、`3.10`、`3.11`、`3.12`。
+- 后端矩阵使用 `fail-fast: false`，单个版本失败时仍继续保留其它版本结果。
+- 每个版本独立生成 `backend-python-<version>` artifact。
+- `run-ci-command.mjs` 和 `ensure-ci-result.mjs` 会从 `junit.xml` 解析 `tests/failures/errors/skipped` 并写入 `result.json.test_stats` 与 `failure-context.json.test_stats`。
+- GitHub Job Summary 与 `CI Triage` 汇总表会展示每个 artifact 的测试数量。
+
+本轮新增验证：
+
+- `Get-Content -Raw -Encoding UTF8 .github/workflows/python-ci.yml | npx --yes yaml valid`
+- `node --check .github/scripts/run-ci-command.mjs`
+- `node --check .github/scripts/ensure-ci-result.mjs`
+- `node --check .github/scripts/build-triage-context.mjs`
+
 ## 本轮：实时作业与 Dashboard/Analysis 缓存性能优化
 
 本轮针对实时作业、Dashboard 和 Cluster Analysis 的高频请求做了性能收口：

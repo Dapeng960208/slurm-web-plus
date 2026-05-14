@@ -7,7 +7,7 @@
 本轮目标是：
 
 - 将核心前后端检查切到 `main` 分支的自动触发
-- 收敛为单版本快速反馈 CI
+- 后端主线 CI 覆盖 Python 3.9 以上多个版本
 - 为每个 job 统一生成结构化结果产物
 - 提供手工 triage 入口，按指定 run 聚合结果
 
@@ -17,10 +17,12 @@
 
 - `.github/workflows/python-ci.yml`
   - 后端单元测试
-  - 固定 `Python 3.9`
+  - 覆盖 `Python 3.9`、`3.10`、`3.11`、`3.12`
+  - 使用 `fail-fast: false`，单个 Python 版本失败时仍保留其它版本结果
   - 测试入口固定为 `pytest slurmweb/tests`
   - 依赖安装固定包含 `.[agent]`、`.[gateway]`、`.[tests]`，其中 `cryptography` 由 `agent/tests` extras 提供
   - gateway / ldap 相关测试当前允许在无 `python-ldap` 的环境下通过测试侧 `ldap` stub 导入 `rfl.authentication.ldap`，避免仅因 `import ldap.filter` 在 collection 阶段中断
+  - 每个版本独立上传 `backend-python-<version>` artifact
 - `.github/workflows/frontend-ci.yml`
   - 前端单元测试
   - 固定 `Node 18`
@@ -66,6 +68,15 @@
 测试类 job 额外输出：
 
 - `junit.xml`
+
+`result.json` 与 `failure-context.json` 会在 JUnit 可用时额外包含 `test_stats`：
+
+- `tests`
+- `failures`
+- `errors`
+- `skipped`
+
+GitHub Job Summary 与 `CI Triage` 汇总表也会展示测试数量，便于直接确认每个 Python 版本实际执行的用例数。
 
 `failure-context.json` 固定字段：
 

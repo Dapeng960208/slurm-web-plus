@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync, appendFileSync, existsSync } from 'node:fs'
+import { mkdirSync, writeFileSync, appendFileSync, existsSync, readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 
 function parseArgs(argv) {
@@ -35,11 +35,66 @@ function appendSummary(markdown) {
   appendFileSync(summaryPath, `${markdown}\n`, 'utf8')
 }
 
+function parseXmlAttributes(text) {
+  const attributes = {}
+  const pattern = /([A-Za-z_:][\w:.-]*)\s*=\s*"([^"]*)"/g
+  let match = pattern.exec(text)
+  while (match) {
+    attributes[match[1]] = match[2]
+    match = pattern.exec(text)
+  }
+  return attributes
+}
+
+function numberAttribute(attributes, name) {
+  const value = Number.parseInt(attributes[name] ?? '0', 10)
+  return Number.isFinite(value) ? value : 0
+}
+
+function parseJunitStats(junitPath) {
+  if (!junitPath) {
+    return null
+  }
+  const resolvedPath = resolve(junitPath)
+  if (!existsSync(resolvedPath)) {
+    return null
+  }
+
+  const xml = readFileSync(resolvedPath, 'utf8')
+  const suitesMatch = xml.match(/<testsuites\b([^>]*)>/)
+  if (suitesMatch) {
+    const attributes = parseXmlAttributes(suitesMatch[1])
+    return {
+      tests: numberAttribute(attributes, 'tests'),
+      failures: numberAttribute(attributes, 'failures'),
+      errors: numberAttribute(attributes, 'errors'),
+      skipped: numberAttribute(attributes, 'skipped'),
+    }
+  }
+
+  const suiteMatches = [...xml.matchAll(/<testsuite\b([^>]*)>/g)]
+  if (!suiteMatches.length) {
+    return null
+  }
+  return suiteMatches.reduce(
+    (total, match) => {
+      const attributes = parseXmlAttributes(match[1])
+      total.tests += numberAttribute(attributes, 'tests')
+      total.failures += numberAttribute(attributes, 'failures')
+      total.errors += numberAttribute(attributes, 'errors')
+      total.skipped += numberAttribute(attributes, 'skipped')
+      return total
+    },
+    { tests: 0, failures: 0, errors: 0, skipped: 0 }
+  )
+}
+
 const options = parseArgs(process.argv.slice(2))
 const resultsDir = resolve(requireOption(options, 'results-dir'))
 const artifactName = requireOption(options, 'artifact-name')
 const label = requireOption(options, 'label')
 const command = options.command ?? 'n/a'
+const junitPathOption = options['junit-path'] ?? null
 
 mkdirSync(resultsDir, { recursive: true })
 
@@ -50,6 +105,8 @@ const failureContextPath = join(resultsDir, 'failure-context.json')
 if (existsSync(resultPath) && existsSync(failureContextPath)) {
   process.exit(0)
 }
+
+const testStats = parseJunitStats(junitPathOption)
 
 if (!existsSync(stdoutPath)) {
   writeFileSync(
@@ -76,7 +133,8 @@ const result = {
   finished_at: new Date().toISOString(),
   duration_ms: null,
   primary_log: 'stdout.log',
-  junit_path: null,
+  junit_path: junitPathOption,
+  test_stats: testStats,
   output_excerpt: 'Main CI command was not executed or failed before result generation.',
   summary,
 }
@@ -90,6 +148,8 @@ const failureContext = {
   status: result.status,
   artifact_names: [artifactName],
   primary_log: result.primary_log,
+  junit_path: result.junit_path,
+  test_stats: testStats,
   summary,
   failed_step: label,
 }
@@ -103,7 +163,12 @@ appendSummary(
     '',
     `- Status: **failure**`,
     `- Artifact: \`${artifactName}\``,
+    testStats
+      ? `- Tests: **${testStats.tests}** total, **${testStats.failures}** failures, **${testStats.errors}** errors, **${testStats.skipped}** skipped`
+      : null,
     `- Summary: ${summary}`,
     '',
-  ].join('\n')
+  ]
+    .filter(Boolean)
+    .join('\n')
 )

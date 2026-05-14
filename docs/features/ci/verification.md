@@ -21,7 +21,8 @@
 
 预期：
 
-- `Backend Tests` 固定使用 `Python 3.9`
+- `Backend Tests` 使用矩阵覆盖 `Python 3.9`、`3.10`、`3.11`、`3.12`
+- 每个 Python 版本生成独立 job 和 `backend-python-<version>` artifact
 - `Backend Tests` 只收集 `slurmweb/tests`
 - `Backend Tests` 安装 `.[agent]`、`.[gateway]`、`.[tests]` 后，AI 相关测试可正常导入 `cryptography`
 - `Backend Tests` 在未安装 `python-ldap` 的环境下，gateway / ldap 相关测试也不应因 `import ldap.filter` 在 collection 阶段失败
@@ -52,6 +53,16 @@
 
 - `junit.xml`
 
+测试类 job 的结构化结果还应包含：
+
+- `result.json.test_stats.tests`
+- `result.json.test_stats.failures`
+- `result.json.test_stats.errors`
+- `result.json.test_stats.skipped`
+- `failure-context.json.test_stats`
+
+GitHub Job Summary 应显示测试总数、失败数、错误数和跳过数。
+
 ### 3.1 前端失败验证
 
 可以临时制造一个前端单测失败，确认：
@@ -77,6 +88,7 @@
 - workflow 成功下载目标 run 的 artifact
 - 输出 `triage-context.json`
 - summary 展示 artifact 数量与失败数量
+- summary 表格展示每个 artifact 的测试数量
 - `scope=backend` 时只聚合 `backend-*` artifact
 - `scope=frontend` 时只聚合 `frontend-*` artifact
 

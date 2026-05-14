@@ -1,4 +1,4 @@
-import { mkdirSync, createWriteStream, writeFileSync, appendFileSync, existsSync } from 'node:fs'
+import { mkdirSync, createWriteStream, writeFileSync, appendFileSync, existsSync, readFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { spawn } from 'node:child_process'
 
@@ -41,6 +41,60 @@ function appendSummary(markdown) {
     return
   }
   appendFileSync(summaryPath, `${markdown}\n`, 'utf8')
+}
+
+function parseXmlAttributes(text) {
+  const attributes = {}
+  const pattern = /([A-Za-z_:][\w:.-]*)\s*=\s*"([^"]*)"/g
+  let match = pattern.exec(text)
+  while (match) {
+    attributes[match[1]] = match[2]
+    match = pattern.exec(text)
+  }
+  return attributes
+}
+
+function numberAttribute(attributes, name) {
+  const value = Number.parseInt(attributes[name] ?? '0', 10)
+  return Number.isFinite(value) ? value : 0
+}
+
+function parseJunitStats(junitPath) {
+  if (!junitPath) {
+    return null
+  }
+  const resolvedPath = resolve(junitPath)
+  if (!existsSync(resolvedPath)) {
+    return null
+  }
+
+  const xml = readFileSync(resolvedPath, 'utf8')
+  const suitesMatch = xml.match(/<testsuites\b([^>]*)>/)
+  if (suitesMatch) {
+    const attributes = parseXmlAttributes(suitesMatch[1])
+    return {
+      tests: numberAttribute(attributes, 'tests'),
+      failures: numberAttribute(attributes, 'failures'),
+      errors: numberAttribute(attributes, 'errors'),
+      skipped: numberAttribute(attributes, 'skipped'),
+    }
+  }
+
+  const suiteMatches = [...xml.matchAll(/<testsuite\b([^>]*)>/g)]
+  if (!suiteMatches.length) {
+    return null
+  }
+  return suiteMatches.reduce(
+    (total, match) => {
+      const attributes = parseXmlAttributes(match[1])
+      total.tests += numberAttribute(attributes, 'tests')
+      total.failures += numberAttribute(attributes, 'failures')
+      total.errors += numberAttribute(attributes, 'errors')
+      total.skipped += numberAttribute(attributes, 'skipped')
+      return total
+    },
+    { tests: 0, failures: 0, errors: 0, skipped: 0 }
+  )
 }
 
 const options = parseArgs(process.argv.slice(2))
@@ -86,6 +140,7 @@ child.on('close', (code, signal) => {
   const finishedAt = new Date()
   const exitCode = typeof code === 'number' ? code : 1
   const status = exitCode === 0 && !signal ? 'success' : 'failure'
+  const testStats = parseJunitStats(junitPathOption)
   const summary =
     status === 'success'
       ? `${label} succeeded.`
@@ -107,6 +162,7 @@ child.on('close', (code, signal) => {
     duration_ms: finishedAt.getTime() - startedAt.getTime(),
     primary_log: 'stdout.log',
     junit_path: junitPathOption ?? null,
+    test_stats: testStats,
     output_excerpt: outputBuffer,
     summary,
   }
@@ -120,6 +176,8 @@ child.on('close', (code, signal) => {
     status,
     artifact_names: [artifactName],
     primary_log: result.primary_log,
+    junit_path: result.junit_path,
+    test_stats: testStats,
     summary,
     failed_step: status === 'failure' ? label : null,
   }
@@ -131,6 +189,9 @@ child.on('close', (code, signal) => {
     junitPathOption && existsSync(resolve(junitPathOption))
       ? `- JUnit: \`${junitPathOption}\``
       : ''
+  const testStatsLine = testStats
+    ? `- Tests: **${testStats.tests}** total, **${testStats.failures}** failures, **${testStats.errors}** errors, **${testStats.skipped}** skipped`
+    : ''
   appendSummary(
     [
       `### ${label}`,
@@ -140,6 +201,7 @@ child.on('close', (code, signal) => {
       `- Command: \`${command}\``,
       `- Log: \`${dirname(stdoutPath) === resultsDir ? 'stdout.log' : stdoutPath}\``,
       junitLine,
+      testStatsLine,
       `- Summary: ${summary}`,
       '',
     ]

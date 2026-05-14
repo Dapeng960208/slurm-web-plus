@@ -446,6 +446,11 @@
 - 现象：连续执行 `powershell -ExecutionPolicy Bypass -File scripts\push-and-watch-github-ci.ps1 -PollIntervalSeconds 30 -TimeoutMinutes 45`，均在脚本内部 `git push origin main` 阶段失败；前两次返回 `Recv failure: Connection was reset`，第三次返回 `Failed to connect to github.com port 443 after 21067 ms`
 - 解决办法：本地提交已完成并保留可追溯状态；由于失败发生在 push 阶段，尚未触发 GitHub Actions run，待网络恢复后继续使用同一仓库脚本推送并追踪 CI
 
+### 2026-05-14：PowerShell 中给 Node `--command` 传内联 `node -e` 容易被引号转义破坏
+- 时间：2026-05-14
+- 现象：验证 `.github/scripts/run-ci-command.mjs` 的 JUnit 解析时，使用 `--command "node -e \"process.exit(0)\""` 会在 PowerShell 传参后变成非法 JS，Node 报 `SyntaxError: Unexpected number`
+- 解决办法：验证 CI wrapper 时优先使用无需嵌套引号的命令，例如 `--command "node --version"`；如必须使用 `node -e`，需要单独处理 PowerShell 的嵌套引号
+
 ### 2026-05-06：AI 对话页输入框脱离左侧聊天列，流式对话时面板整体下移
 - 时间：2026-05-06
 - 现象：左侧聊天区没有完整撑满工作区宽度，输入框脱离左侧列；流式回复和 trace 更新时，对话面板会整体下移

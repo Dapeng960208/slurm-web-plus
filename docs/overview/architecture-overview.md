@@ -272,12 +272,13 @@ Vue 页面
 ```text
 GitHub push / pull_request(main)
   -> GitHub Actions workflows
-     -> 单版本后端/前端检查
+     -> Python 3.9+ 后端矩阵 / 前端检查
      -> 统一 artifact 目录
         -> stdout.log
         -> result.json
         -> failure-context.json
         -> junit.xml (tests only)
+        -> test_stats (from junit.xml)
   -> 手工 CI Triage workflow
      -> 按 run_id 下载 artifact
      -> 生成 triage-context.json
@@ -287,7 +288,7 @@ GitHub push / pull_request(main)
 
 - `python-ci.yml`
   - 自动后端单元测试
-  - 固定 `Python 3.9`
+  - 覆盖 `Python 3.9`、`3.10`、`3.11`、`3.12`
   - 仅收集 `slurmweb/tests`
 - `frontend-ci.yml`
   - 自动前端单元测试

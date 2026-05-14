@@ -133,11 +133,15 @@ const summaryLines = [
 if (selectedArtifacts.length === 0) {
   summaryLines.push('未找到符合条件的结构化 CI artifact。')
 } else {
-  summaryLines.push('| Artifact | Status | Job | Summary |')
-  summaryLines.push('|---|---|---|---|')
+  summaryLines.push('| Artifact | Status | Job | Tests | Summary |')
+  summaryLines.push('|---|---|---|---:|---|')
   for (const artifact of selectedArtifacts) {
+    const testStats = artifact.result?.test_stats ?? artifact.failure_context?.test_stats ?? null
+    const tests = testStats
+      ? `${testStats.tests} (${testStats.failures} failed, ${testStats.errors} errors, ${testStats.skipped} skipped)`
+      : '-'
     summaryLines.push(
-      `| ${artifact.artifact_name} | ${artifact.failure_context?.status ?? 'unknown'} | ${artifact.failure_context?.job ?? '-'} | ${artifact.failure_context?.summary ?? '-'} |`
+      `| ${artifact.artifact_name} | ${artifact.failure_context?.status ?? 'unknown'} | ${artifact.failure_context?.job ?? '-'} | ${tests} | ${artifact.failure_context?.summary ?? '-'} |`
     )
   }
 }
