@@ -61,6 +61,7 @@
 - `/:cluster/partitions/:partition` 页面显示实时图表区块。
 - 传给 dashboard 图表的 query 固定带当前 `partition`。
 - 分区详情页切换资源图表类型时，路由仍保持在 `partition`，不跳回 `dashboard`。
+- 顶部摘要卡片展示资源容量字段后，下方详情区不再重复展示节点数、总 CPU、已分配 CPU、总内存和 GPU。
 
 ### 4.2 分区跳转入口
 

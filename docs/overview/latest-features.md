@@ -1,5 +1,16 @@
 # 最新功能
 
+## 本轮：分区详情页移除重复资源展示
+
+本轮针对 `/:cluster/partitions/:partition` 页面做了信息层级优化：
+
+- 顶部摘要卡片继续展示节点数、总 CPU、已分配 CPU、总内存和 GPU。
+- 下方“分区详情”不再重复展示已在摘要卡出现的资源容量字段，只保留名称、已分配节点和空闲节点等补充信息。
+- 节点集合与分区实时曲线保持不变。
+
+本轮新增验证：
+
+- `cd frontend && npx vitest run tests/views/PartitionView.spec.ts`
 ## 本轮：LDAP 已支持多 Base DN 和 AD 大目录分页枚举
 
 本轮补了一组面向 Active Directory 的 LDAP 兼容增强，重点解决“用户分散在多个并列 OU”与“域根枚举直接撞 `Size limit exceeded`”两类现场问题：

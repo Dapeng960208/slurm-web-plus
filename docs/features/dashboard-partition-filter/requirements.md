@@ -53,6 +53,7 @@
   - 时间范围继续复用 dashboard 现有 `range / start / end`
   - query 固定带当前 `partition`
   - 图表切换资源类型时，仍需停留在当前分区详情路由，不得跳回 `dashboard`
+- 分区详情页顶部摘要卡片负责展示节点数、总 CPU、已分配 CPU、总内存和 GPU；下方详情区不得重复展示这些资源容量字段，只保留名称、已分配节点、空闲节点等补充信息。
 - 以下页面中的 `partition` 展示统一改为可点击入口，跳转到 `/:cluster/partitions/:partition`：
   - `/:cluster/job/:id`
   - `/:cluster/jobs`

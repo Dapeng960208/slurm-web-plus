@@ -171,32 +171,12 @@ function resetMetricsWindow() {
                     <div class="ui-detail-value">{{ partitionRecord.name }}</div>
                   </div>
                   <div class="ui-detail-row">
-                    <div class="ui-detail-term">{{ t('pages.partition.summary.nodes') }}</div>
-                    <div class="ui-detail-value">{{ partitionNodes.length }}</div>
-                  </div>
-                  <div class="ui-detail-row">
                     <div class="ui-detail-term">{{ t('pages.partition.summary.allocatedNodes') }}</div>
                     <div class="ui-detail-value">{{ allocatedNodeCount }}</div>
                   </div>
                   <div class="ui-detail-row">
                     <div class="ui-detail-term">{{ t('pages.partition.summary.idleNodes') }}</div>
                     <div class="ui-detail-value">{{ idleNodeCount }}</div>
-                  </div>
-                  <div class="ui-detail-row">
-                    <div class="ui-detail-term">{{ t('pages.partition.summary.totalCpu') }}</div>
-                    <div class="ui-detail-value">{{ totalCpu }}</div>
-                  </div>
-                  <div class="ui-detail-row">
-                    <div class="ui-detail-term">{{ t('pages.partition.summary.allocatedCpu') }}</div>
-                    <div class="ui-detail-value">{{ allocatedCpu }}</div>
-                  </div>
-                  <div class="ui-detail-row">
-                    <div class="ui-detail-term">{{ t('pages.partition.summary.totalMemory') }}</div>
-                    <div class="ui-detail-value">{{ getMBHumanUnit(totalMemory) }}</div>
-                  </div>
-                  <div class="ui-detail-row">
-                    <div class="ui-detail-term">{{ t('pages.partition.summary.gpu') }}</div>
-                    <div class="ui-detail-value">{{ totalGpu }}</div>
                   </div>
                 </div>
               </section>

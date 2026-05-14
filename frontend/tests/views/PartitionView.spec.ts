@@ -53,7 +53,7 @@ describe('PartitionView.vue', () => {
     useRuntimeStore().dashboard.range = 'day'
   })
 
-  test('renders partition summary and node set chips', () => {
+  test('renders partition summary, non-duplicated details, and node set chips', () => {
     const wrapper = mount(PartitionView, {
       props: {
         cluster: 'foo',
@@ -73,10 +73,18 @@ describe('PartitionView.vue', () => {
     })
 
     expect(wrapper.text()).toContain('Partition Details')
-    expect(wrapper.text()).toContain('Nodes')
-    expect(wrapper.text()).toContain('Allocated Nodes')
-    expect(wrapper.text()).toContain('Idle Nodes')
-    expect(wrapper.text()).toContain('GPU')
+    expect(wrapper.findAll('.ui-summary-strip .ui-summary-item')).toHaveLength(5)
+    expect(wrapper.find('.ui-summary-strip').text()).toContain('Nodes')
+    expect(wrapper.find('.ui-summary-strip').text()).toContain('Total CPU')
+    expect(wrapper.find('.ui-summary-strip').text()).toContain('Allocated CPU')
+    expect(wrapper.find('.ui-summary-strip').text()).toContain('Total Memory')
+    expect(wrapper.find('.ui-summary-strip').text()).toContain('GPU')
+    expect(wrapper.find('.ui-detail-list').text()).toContain('Allocated Nodes')
+    expect(wrapper.find('.ui-detail-list').text()).toContain('Idle Nodes')
+    expect(wrapper.find('.ui-detail-list').text()).not.toContain('Total CPU')
+    expect(wrapper.find('.ui-detail-list').text()).not.toContain('Allocated CPU')
+    expect(wrapper.find('.ui-detail-list').text()).not.toContain('Total Memory')
+    expect(wrapper.find('.ui-detail-list').text()).not.toContain('GPU')
     expect(wrapper.text()).toContain('cn[1-4]')
     expect(wrapper.text()).toContain('gpu[1-2]')
     expect(wrapper.get('[data-testid="partition-dashboard-charts"]').text()).toContain(
