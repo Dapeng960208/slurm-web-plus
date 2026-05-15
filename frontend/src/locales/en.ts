@@ -1323,6 +1323,10 @@ const en = {
       unableToRetrieve: 'Unable to retrieve accounts from cluster {cluster}',
       noAccounts: 'No account defined on cluster {cluster}',
       paginationLabel: 'root account',
+      errors: {
+        createFailed: 'Unable to create the account.',
+        createAssociationFailed: 'Unable to attach the account to its parent.'
+      },
       dialogs: {
         create: {
           title: 'Create Account',

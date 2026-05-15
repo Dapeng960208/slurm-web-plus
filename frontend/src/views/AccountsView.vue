@@ -182,6 +182,10 @@ const availableAccounts = computed<Set<string>>(() => {
   return accounts
 })
 
+function hasOperationErrors(result: { errors?: unknown[] } | null | undefined): boolean {
+  return Array.isArray(result?.errors) && result.errors.length > 0
+}
+
 function autoExpandTree(nodes: ClusterAccountTreeNode[]) {
   const queue = [...nodes]
   expandedAccounts.value = new Set()
@@ -226,13 +230,33 @@ async function createAccount(payload: Record<string, string>) {
   operationBusy.value = true
   operationError.value = null
   try {
-    await gateway.save_account(cluster, {
-      name: payload.name || undefined,
+    const accountName = payload.name || undefined
+    const parentAccount = payload.parent_account || undefined
+    const qos = parseCsvList(payload.qos)
+    const saveAccountResult = await gateway.save_account(cluster, {
+      name: accountName,
       description: payload.description || undefined,
       organization: payload.organization || undefined,
-      parent_account: payload.parent_account || undefined,
-      qos: parseCsvList(payload.qos)
+      parent_account: parentAccount,
+      qos
     })
+    if (hasOperationErrors(saveAccountResult)) {
+      throw new Error(t('pages.accounts.errors.createFailed'))
+    }
+    if (accountName && parentAccount) {
+      const saveAssociationResult = await gateway.save_association(cluster, {
+        associations: [
+          {
+            account: accountName,
+            parent_account: parentAccount,
+            qos
+          }
+        ]
+      })
+      if (hasOperationErrors(saveAssociationResult)) {
+        throw new Error(t('pages.accounts.errors.createAssociationFailed'))
+      }
+    }
     refreshAccounts('accounts')
     refreshAssociations('associations')
     runtimeStore.reportInfo(

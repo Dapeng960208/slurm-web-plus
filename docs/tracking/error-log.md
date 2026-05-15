@@ -11,6 +11,11 @@
 
 ## 条目
 
+### 2026-05-15：AccountView 父账户兜底测试受 RouterLinkStub 文本渲染限制
+- 时间：2026-05-15
+- 现象：执行 `cd frontend && npx vitest run tests/views/AccountsView.spec.ts tests/views/AccountView.spec.ts` 时，新增的“association 暂未刷新但 account details 带 parent_account”测试断言 `div#parents` 包含 `root`，但实际只渲染到 `Parent accounts`；调试确认 `AccountBreadcrumb` 已收到 `{ account: "test", parent_account: "root", user: "" }` 并生成 `RouterLinkStub`，但当前测试 stub 不渲染插槽文本。
+- 解决办法：`AccountBreadcrumb` 改为保留 `props` 对象读取，避免后续异步 props 更新丢响应性；主视图测试改为断言子组件收到合成 association，避免把 `RouterLinkStub` 的文本渲染限制误判为业务失败。
+
 ### 2026-05-15：移除平均排队时间分钟聚合后默认值和测试断言仍指向旧结构
 - 时间：2026-05-15
 - 现象：执行 `npm --prefix frontend run type-check` 时，`ClusterAnalysisView.vue` 报 `Argument of type '"minute"' is not assignable to parameter of type 'QueueWaitAggregation'`；执行 `cd frontend && npx vitest run tests/composables/queueWaitHistory.spec.ts tests/views/ClusterAnalysisView.spec.ts` 时，视图测试仍按旧 `minute` 默认聚合和未透传 `windowStart/windowEnd` 的字符串结构断言。

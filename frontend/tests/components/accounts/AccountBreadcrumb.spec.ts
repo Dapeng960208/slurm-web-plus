@@ -1,4 +1,5 @@
 import { describe, test, expect, beforeEach } from 'vitest'
+import { nextTick } from 'vue'
 import { mount } from '@vue/test-utils'
 import { RouterLink } from 'vue-router'
 import AccountBreadcrumb from '@/components/accounts/AccountBreadcrumb.vue'
@@ -166,6 +167,52 @@ describe('AccountBreadcrumb.vue', () => {
     expect(links[1].props('to')).toEqual({
       name: 'account',
       params: { cluster: 'foo', account: 'admin' }
+    })
+  })
+
+  test('updates parent chain when associations are refreshed', async () => {
+    const wrapper = mount(AccountBreadcrumb, {
+      props: {
+        cluster: 'foo',
+        account: 'test',
+        associations: [
+          {
+            account: 'root',
+            parent_account: '',
+            qos: [],
+            user: '',
+            max: associations[0].max
+          }
+        ] as ClusterAssociation[]
+      }
+    })
+
+    expect(wrapper.text()).toBe('∅')
+
+    await wrapper.setProps({
+      associations: [
+        {
+          account: 'root',
+          parent_account: '',
+          qos: [],
+          user: '',
+          max: associations[0].max
+        },
+        {
+          account: 'test',
+          parent_account: 'root',
+          qos: [],
+          user: '',
+          max: associations[0].max
+        }
+      ] as ClusterAssociation[]
+    })
+    await nextTick()
+
+    const rootLink = wrapper.getComponent(RouterLink)
+    expect(rootLink.props('to')).toEqual({
+      name: 'account',
+      params: { cluster: 'foo', account: 'root' }
     })
   })
 })

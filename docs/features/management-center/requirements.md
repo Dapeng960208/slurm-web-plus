@@ -47,6 +47,9 @@
   - 账户删除
   - account-user association 增加用户、编辑 QOS/default QOS、删除用户关联
   - 账户和 association 相关的 `username`、`qos`、`default_qos` 已统一改为可搜索下拉
+  - 创建账户时若填写 `parent_account`，前端会在 `save_account` 成功后继续写入不带 `user` 的 account-level association，确保 SlurmDB 层级关系同步
+  - 账户树以 `/associations` 中不带 `user` 的 account-level row 为准；当新建账户的 association 暂未刷新返回时，使用 `/accounts` 的 `parent_account` 兜底挂到父账户下
+  - `AccountView` 在 account-level association 暂未刷新返回时，会使用 `account/<name>` 返回的 `parent_account` 与 `qos` 作为账户级信息兜底，避免刚创建的子账户被误判为无法添加用户
   - `Add user` 现在先确保用户实体存在，再补 association，并在刷新后校验关联真实可见才显示成功
   - `users.update` 写接口现在接受轻量单用户对象，并由后端统一归一化为 `{"users": [...]}` 后再写入 `slurmrestd`
 - `UserView`

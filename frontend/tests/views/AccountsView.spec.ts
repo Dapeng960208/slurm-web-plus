@@ -16,6 +16,7 @@ const mockAssociationsPoller = getMockClusterDataPoller<ClusterAssociation[]>()
 const mockAccountsPoller = getMockClusterDataPoller<AccountDescription[]>()
 const mockGatewayAPI = {
   save_account: vi.fn(),
+  save_association: vi.fn(),
   qos: vi.fn()
 }
 
@@ -163,6 +164,10 @@ describe('AccountsView.vue', () => {
     mockAccountsPoller.initialLoading.value = false
     mockAccountsPoller.data.value = [{ name: 'root', parent_account: '', qos: ['normal'] }]
     mockGatewayAPI.save_account.mockResolvedValue({ operation: 'accounts.update' })
+    mockGatewayAPI.save_association.mockResolvedValue({
+      operation: 'accounts.associations.update',
+      errors: []
+    })
 
     const wrapper = mount(AccountsView, {
       attachTo: document.body,
@@ -194,6 +199,18 @@ describe('AccountsView.vue', () => {
       parent_account: 'root',
       qos: ['normal', 'study']
     })
+    expect(mockGatewayAPI.save_association).toHaveBeenCalledWith('foo', {
+      associations: [
+        {
+          account: 'science',
+          parent_account: 'root',
+          qos: ['normal', 'study']
+        }
+      ]
+    })
+    expect(mockGatewayAPI.save_account.mock.invocationCallOrder[0]).toBeLessThan(
+      mockGatewayAPI.save_association.mock.invocationCallOrder[0]
+    )
     expect(mockAccountsPoller.setCallback).toHaveBeenCalledWith('accounts')
     expect(mockAssociationsPoller.setCallback).toHaveBeenCalledWith('associations')
     wrapper.unmount()
@@ -219,5 +236,37 @@ describe('AccountsView.vue', () => {
     expect(treeNodes).toHaveLength(1)
     expect(treeNodes[0].props('node').account).toBe('science')
     expect(wrapper.text()).toContain(i18n.global.t('pages.accounts.metricLabel'))
+  })
+
+  test('uses accounts parent as tree fallback before account association is refreshed', () => {
+    mockAssociationsPoller.loaded.value = true
+    mockAssociationsPoller.initialLoading.value = false
+    mockAssociationsPoller.data.value = [
+      {
+        ...(associations as ClusterAssociation[])[0],
+        account: 'root',
+        parent_account: '',
+        user: '',
+        qos: ['normal']
+      }
+    ]
+    mockAccountsPoller.loaded.value = true
+    mockAccountsPoller.initialLoading.value = false
+    mockAccountsPoller.data.value = [
+      { name: 'root', parent_account: '', qos: ['normal'] },
+      { name: 'test', parent_account: 'root', qos: ['normal'] }
+    ]
+
+    const wrapper = mount(AccountsView, {
+      props: {
+        cluster: 'foo'
+      }
+    })
+
+    const rootNode = wrapper
+      .findAllComponents(AccountTreeNode)
+      .find((component) => component.props('node').account === 'root')!
+    expect(rootNode.props('node').children).toHaveLength(1)
+    expect(rootNode.props('node').children[0].account).toBe('test')
   })
 })

@@ -53,6 +53,7 @@
 - `supports_write_operations()` 对 `0.39-0.40` 返回 false
 - user 轻量 payload 会被包装为 `{ users: [...] }`
 - user 写入中的空字符串字段会在后端归一化时剔除，避免直接透传到 `slurmrestd`
+- account-level association 写入 payload 不带 `user` 时，后端仍会按当前集群注入 `cluster`
 - reservation create/update payload normalization 统一覆盖创建与更新路径
 - `allowed_partitions` / `allowedPartitions` / `AllowedPartitions` 会映射到 reservation 写入字段 `partition`
 - reservation 的 `users/groups/accounts/qos` 数组别名会转换为 `slurmrestd` 所需 CSV string
@@ -106,6 +107,10 @@
 - `AccountView` 的 `Add user` 必须先调用 `save_user`，再调用 `save_association`
 - `AccountView` 在 `refreshAssociations()` 后若仍看不到目标 `{ account, user }`，必须提示失败且不能显示成功 toast
 - `AccountView` 删除 association 时只提交选中 `account` 与 `user`，不携带空 `qos/default` 字段
+- `AccountsView` 创建带 `parent_account` 的账户时，必须先调用 `save_account`，再调用 `save_association` 写入不带 `user` 的 account-level association
+- `AccountsView` 当 `/accounts` 已返回 `{ name, parent_account }` 但 `/associations` 暂无该账户的 account-level row 时，账户树仍应把子账户展示在父账户下
+- `AccountView` 当 `account/<name>` 已返回 `parent_account` 但 `/associations` 暂无当前账户的 account-level row 时，仍应识别该账户存在并展示父账户链路
+- `AccountView` 给子账户添加用户时，刷新后只要 `/associations` 出现目标 `{ account, user }` 即判定成功并关闭弹框
 - `UserView` 编辑用户时提交 `default_qos` 和逗号分隔解析后的 `qos`
 - `ActionDialog` 支持共享搜索单选/多选字段，初始值可回填，并在提交时保持 CSV 序列化
 - `RemoteSearchSelect` 支持：

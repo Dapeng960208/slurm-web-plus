@@ -1254,6 +1254,10 @@ const zhCN = {
       unableToRetrieve: '无法从集群 {cluster} 获取账户',
       noAccounts: '集群 {cluster} 上没有定义账户',
       paginationLabel: '根账户',
+      errors: {
+        createFailed: '无法创建账户。',
+        createAssociationFailed: '无法把账户关联到父账户。'
+      },
       dialogs: {
         create: {
           title: '创建账户',

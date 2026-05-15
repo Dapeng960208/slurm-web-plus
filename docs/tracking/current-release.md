@@ -56,6 +56,7 @@
 - 重构 `JobView` / `JobHistoryView` 为参考 `NodeView` 的连续详情列表，移除摘要条、碎片卡片和冗余小标题
 - 修复 `AccountView` 给无关联信息用户加到账户下的假成功：先确保用户实体存在，再补 association，并在刷新后做写后可见性校验
 - 修复 `users.update` 写契约：轻量单用户 payload 现在会由后端统一包装为 `{"users": [...]}`，避免账户加用户与用户编辑继续触发 `Missing required field 'users'`
+- 修复创建 `test` 等子账户后父子展示和添加用户关联不一致的问题：创建时补 account-level association，账户树与详情页在 association 暂未刷新时使用 `/accounts` 的 `parent_account` 兜底
 - 修复 `ClusterAnalysisView` 平均排队时间图的范围联动错误：卡片时间范围与聚合粒度现在独立于顶部全局时间范围
 - 修复 `ClusterAnalysisView` 页头右侧误展示额外时间组件的问题；平均排队时间图只保留卡片自身时间范围，并按该窗口展开横轴
 
@@ -114,6 +115,8 @@
   - `slurmweb.slurmrestd.Slurmrestd.users_update()` 已补 payload normalization，统一接受轻量单用户对象或显式 `users` 包装结构
   - user 写入时，空字符串字段会在后端归一化阶段剔除，避免把无效空值直接透传到底层 `slurmrestd` schema
   - `AccountView` 的 `Add user` 仍固定为 `save_user -> save_association -> refreshAssociations() -> 写后校验`，但第一步现在不再因为缺少 `users` 包装而失败
+  - `AccountsView` 创建带父账户的 account 时会补写不带 `user` 的 account-level association；账户树优先使用 association 层级，并在 association 暂未刷新时使用 `/accounts.parent_account` 兜底
+  - `AccountView` 在当前账户 account-level association 暂未刷新时，会使用 `account/<name>` 的 `parent_account` 与 `qos` 合成账户级信息，确保刚创建的子账户仍可继续添加用户
   - `UserView` 编辑用户继续保持轻量 payload 调用方式，不要求页面手工拼接 `{"users": [...]}` 契约
   - `ClusterAnalysisView` 的平均排队时间图现在使用独立 `queueWaitRange / queueWaitCustomStart / queueWaitCustomEnd / queueWaitAggregation`
   - 卡片时间范围切换会重新请求 `jobs_history`；卡片聚合粒度切换会立即重算 `hour / day` bucket；顶部全局时间范围不再覆盖卡片已经手动选择的独立时间范围

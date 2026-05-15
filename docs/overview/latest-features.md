@@ -1,5 +1,14 @@
 # 最新功能
 
+## 本轮：账户父子层级与添加用户关联已修复
+
+本轮修复 `Accounts / AccountView` 在新建子账户后层级和加用户链路不一致的问题：
+
+- `AccountsView` 创建账户时如果填写 `parent_account`，会在 `save_account` 成功后继续写入不带 `user` 的 account-level association。
+- 账户树优先采用 `/associations` 的 account-level row；当该 row 暂未刷新返回时，用 `/accounts` 的 `parent_account` 兜底，避免 `test` 这类新子账户短时间单独展示。
+- `AccountView` 在 account-level association 暂未刷新返回时，会用 `account/<name>` 返回的 `parent_account` 与 `qos` 合成账户级兜底信息，因此刚创建的子账户仍可添加用户。
+- 添加用户链路继续固定为 `save_user -> save_association -> refreshAssociations() -> 写后可见性校验`，刷新后出现目标 `{ account, user }` 即判定成功。
+
 ## 本轮：集群分析平均排队时间曲线时间范围与聚合已收口
 
 本轮修复 `Cluster Analysis` 平均排队时间曲线与页面时间组件混用的问题：

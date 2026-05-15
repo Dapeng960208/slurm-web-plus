@@ -92,9 +92,67 @@ watch(
   }
 )
 
+function emptyOptionalNumber() {
+  return { set: false, infinite: false, number: 0 }
+}
+
+function emptyAssociationMax(): ClusterAssociation['max'] {
+  return {
+    jobs: {
+      accruing: emptyOptionalNumber(),
+      active: emptyOptionalNumber(),
+      per: {
+        accruing: emptyOptionalNumber(),
+        count: emptyOptionalNumber(),
+        submitted: emptyOptionalNumber(),
+        wall_clock: emptyOptionalNumber()
+      },
+      total: emptyOptionalNumber()
+    },
+    per: {
+      account: {
+        wall_clock: emptyOptionalNumber()
+      }
+    },
+    tres: {
+      group: { active: [], minutes: [] },
+      minutes: { per: { job: [] }, total: [] },
+      per: { job: [], node: [] },
+      total: []
+    }
+  }
+}
+
+function accountDetailsAssociation(details: AccountDescription): ClusterAssociation {
+  return {
+    account: details.name,
+    max: emptyAssociationMax(),
+    parent_account: details.parent_account ?? '',
+    qos: details.qos ?? [],
+    user: ''
+  }
+}
+
 const accountAssociation = computed<ClusterAssociation | undefined>(() => {
-  if (!data.value) return undefined
-  return data.value.find((association) => association.account === account && !association.user)
+  const association = (data.value ?? []).find(
+    (item) => item.account === account && !item.user
+  )
+  if (association) return association
+  if (accountDetails.value?.name === account) {
+    return accountDetailsAssociation(accountDetails.value)
+  }
+  return undefined
+})
+
+const breadcrumbAssociations = computed<ClusterAssociation[]>(() => {
+  const associations = data.value ?? []
+  if (
+    !accountAssociation.value ||
+    associations.some((association) => association.account === account && !association.user)
+  ) {
+    return associations
+  }
+  return [...associations, accountAssociation.value]
 })
 
 const subaccounts = computed(() => {
@@ -571,7 +629,7 @@ function hasDifferentQos(userAssociation: ClusterAssociation): boolean {
               <div id="parents" class="ui-detail-row">
                 <dt class="ui-detail-term">{{ t('pages.account.detail.parentAccounts') }}</dt>
                 <dd class="ui-detail-value">
-                  <AccountBreadcrumb :cluster="cluster" :account="account" :associations="data ?? []" />
+                  <AccountBreadcrumb :cluster="cluster" :account="account" :associations="breadcrumbAssociations" />
                 </dd>
               </div>
 

@@ -12,7 +12,7 @@ import { RouterLink } from 'vue-router'
 import { ChevronRightIcon } from '@heroicons/vue/20/solid'
 import type { ClusterAssociation } from '@/composables/GatewayAPI'
 
-const { cluster, account, associations, showCurrent } = defineProps<{
+const props = defineProps<{
   cluster: string
   account: string
   associations: ClusterAssociation[]
@@ -20,8 +20,8 @@ const { cluster, account, associations, showCurrent } = defineProps<{
 }>()
 
 const breadcrumb = computed(() => {
-  const accountAssociation = associations.find(
-    (association) => association.account === account && !association.user
+  const accountAssociation = props.associations.find(
+    (association) => association.account === props.account && !association.user
   )
   if (!accountAssociation) {
     return []
@@ -31,7 +31,7 @@ const breadcrumb = computed(() => {
   let currentAccount = accountAssociation.parent_account
   const accountMap = new Map<string, ClusterAssociation>()
 
-  for (const association of associations) {
+  for (const association of props.associations) {
     if (!association.user) {
       accountMap.set(association.account, association)
     }
@@ -43,8 +43,8 @@ const breadcrumb = computed(() => {
   }
 
   const items = parents.map((name) => ({ name }))
-  if (showCurrent) {
-    items.push({ name: account })
+  if (props.showCurrent) {
+    items.push({ name: props.account })
   }
 
   return items
@@ -56,7 +56,7 @@ const breadcrumb = computed(() => {
   <div v-else class="flex items-center gap-2">
     <template v-for="(entry, index) in breadcrumb" :key="`${entry.name}-${index}`">
       <RouterLink
-        :to="{ name: 'account', params: { cluster, account: entry.name } }"
+        :to="{ name: 'account', params: { cluster: props.cluster, account: entry.name } }"
         class="text-slurmweb hover:text-slurmweb-dark dark:text-slurmweb-light font-semibold"
       >
         {{ entry.name }}
