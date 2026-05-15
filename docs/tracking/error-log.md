@@ -11,6 +11,11 @@
 
 ## 条目
 
+### 2026-05-15：合并表单远程搜索下拉框后推送 `main` 到 GitHub 失败
+- 时间：2026-05-15
+- 现象：本地已将 `feature/ai-cluster-context` 合并到 `main`，执行 `git push origin main` 时返回 `Failed to connect to github.com port 443 after 21084 ms: Could not connect to server`
+- 解决办法：先完成本地 merge commit，并在 `docs/tracking/current-release.md` 与错误库记录“已本地合并、待网络恢复后重新 push”的状态；网络恢复后重新执行 `git push origin main`
+
 ### 2026-05-15：账户下添加用户时 `/users` 写接口会因缺少 `users` 包装字段被 slurmrestd 拒绝
 - 时间：2026-05-15
 - 现象：在 `AccountView` 向账户下添加用户时，前端已经先调用 `save_user` 再调用 `save_association`，但 `slurmrestd` 返回 `Missing required field 'users' in dictionary`，导致第一步写用户实体直接失败

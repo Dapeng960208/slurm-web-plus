@@ -881,3 +881,11 @@
 - 已验证：
   - `cd frontend && npx vitest run tests/views/AccountView.spec.ts`
   - `npm --prefix frontend run type-check`
+
+- 2026-05-15：`feature/ai-cluster-context` 已合并入本地 `main`，但推送主分支到 GitHub 失败。
+- 本轮合并与提交：
+  - 已先将表单远程搜索下拉框功能提交到分支 `feature/ai-cluster-context`：`9797c18 feat(frontend): add remote search selectors for management forms`
+  - 已在本地 `main` 完成合并提交：`c838d8d merge(frontend): bring remote search selectors into main`
+- 推送结果：
+  - 执行 `git push origin main` 失败，远端返回 `Failed to connect to github.com port 443 after 21084 ms: Could not connect to server`
+  - 当前状态：本地 `main` 已包含本次合并结果，待网络恢复后重新推送到 `origin/main`
