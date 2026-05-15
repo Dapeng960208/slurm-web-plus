@@ -7,6 +7,9 @@
 -->
 
 <script setup lang="ts">
+import RemoteSearchSelect from '@/components/forms/RemoteSearchSelect.vue'
+import { createStaticSearchSource, createUserSearchSource } from '@/composables/searchSelect'
+import { useGatewayAPI } from '@/composables/GatewayAPI'
 import { useI18n } from 'vue-i18n'
 import type { JobHistoryFilters } from '@/composables/GatewayAPI'
 import {
@@ -35,6 +38,7 @@ const props = defineProps<{
   open: boolean
   filters: JobHistoryFilters
   total: number
+  cluster: string
 }>()
 
 const emit = defineEmits<{
@@ -43,6 +47,21 @@ const emit = defineEmits<{
   (e: 'update:filters', filters: JobHistoryFilters): void
 }>()
 const { t } = useI18n()
+const gateway = useGatewayAPI()
+const userSearchSource = createUserSearchSource(props.cluster)
+const partitionSearchSource = createStaticSearchSource(async () =>
+  (await gateway.partitions(props.cluster)).map((partition) => ({
+    value: partition.name,
+    label: partition.name
+  }))
+)
+const qosSearchSource = createStaticSearchSource(async () =>
+  (await gateway.qos(props.cluster)).map((qos) => ({
+    value: qos.name,
+    label: qos.name,
+    description: qos.description || qos.name
+  }))
+)
 
 const state_options = [
   'RUNNING',
@@ -231,11 +250,12 @@ function toggleState(state: string) {
                   </DisclosureButton>
                 </h3>
                 <DisclosurePanel class="pt-4">
-                  <input
-                    :value="props.filters.user"
+                  <RemoteSearchSelect
+                    :model-value="props.filters.user ?? ''"
+                    :source="userSearchSource"
+                    :min-query-length="1"
                     :placeholder="t('filters.history.userPlaceholder')"
-                    class="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-1.5 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-slurmweb"
-                    @input="updateTextFilter('user', $event)"
+                    @update:model-value="updateFilters({ user: $event as string })"
                   />
                 </DisclosurePanel>
               </Disclosure>
@@ -295,11 +315,11 @@ function toggleState(state: string) {
                   </DisclosureButton>
                 </h3>
                 <DisclosurePanel class="pt-4">
-                  <input
-                    :value="props.filters.partition"
+                  <RemoteSearchSelect
+                    :model-value="props.filters.partition ?? ''"
+                    :source="partitionSearchSource"
                     :placeholder="t('filters.history.partitionPlaceholder')"
-                    class="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-1.5 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-slurmweb"
-                    @input="updateTextFilter('partition', $event)"
+                    @update:model-value="updateFilters({ partition: $event as string })"
                   />
                 </DisclosurePanel>
               </Disclosure>
@@ -327,11 +347,11 @@ function toggleState(state: string) {
                   </DisclosureButton>
                 </h3>
                 <DisclosurePanel class="pt-4">
-                  <input
-                    :value="props.filters.qos"
+                  <RemoteSearchSelect
+                    :model-value="props.filters.qos ?? ''"
+                    :source="qosSearchSource"
                     :placeholder="t('filters.history.qosPlaceholder')"
-                    class="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-1.5 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-slurmweb"
-                    @input="updateTextFilter('qos', $event)"
+                    @update:model-value="updateFilters({ qos: $event as string })"
                   />
                 </DisclosurePanel>
               </Disclosure>

@@ -32,6 +32,7 @@ import {
 } from '@/composables/Pagination'
 import { XMarkIcon } from '@heroicons/vue/24/outline'
 import { useRuntimeStore } from '@/stores/runtime'
+import { createStaticSearchSource } from '@/composables/searchSelect'
 
 const { cluster } = defineProps<{ cluster: string }>()
 const route = useRoute()
@@ -54,6 +55,26 @@ const createOpen = ref(false)
 const editOpen = ref(false)
 const deleteOpen = ref(false)
 const selectedReservation = ref<ClusterReservation | null>(null)
+const nodeSearchSource = createStaticSearchSource(async () =>
+  (await gateway.nodes(cluster)).map((node) => ({
+    value: node.name,
+    label: node.name,
+    description: node.partitions.join(', ')
+  }))
+)
+const partitionSearchSource = createStaticSearchSource(async () =>
+  (await gateway.partitions(cluster)).map((partition) => ({
+    value: partition.name,
+    label: partition.name
+  }))
+)
+const qosSearchSource = createStaticSearchSource(async () =>
+  (await gateway.qos(cluster)).map((qos) => ({
+    value: qos.name,
+    label: qos.name,
+    description: qos.description || qos.name
+  }))
+)
 
 const pagedReservations = computed(() => {
   const items = data.value ?? []
@@ -427,7 +448,8 @@ if (route.query.page_size) {
           key: 'node_list',
           label: 'pages.reservations.dialogs.fields.nodeList',
           required: true,
-          type: 'textarea'
+          type: 'search-multi-select',
+          source: nodeSearchSource
         },
         {
           key: 'start_time',
@@ -445,12 +467,19 @@ if (route.query.page_size) {
         },
         {
           key: 'allowed_partitions',
-          label: 'pages.reservations.dialogs.fields.allowedPartitions'
+          label: 'pages.reservations.dialogs.fields.allowedPartitions',
+          type: 'search-multi-select',
+          source: partitionSearchSource
         },
         { key: 'users', label: 'pages.reservations.dialogs.fields.users' },
         { key: 'groups', label: 'pages.reservations.dialogs.fields.groups' },
         { key: 'accounts', label: 'pages.reservations.dialogs.fields.accounts' },
-        { key: 'qos', label: 'pages.reservations.dialogs.fields.qos' }
+        {
+          key: 'qos',
+          label: 'pages.reservations.dialogs.fields.qos',
+          type: 'search-multi-select',
+          source: qosSearchSource
+        }
       ]"
       @close="createOpen = false"
       @submit="createReservation"
@@ -479,7 +508,8 @@ if (route.query.page_size) {
           key: 'node_list',
           label: 'pages.reservations.dialogs.fields.nodeList',
           required: true,
-          type: 'textarea'
+          type: 'search-multi-select',
+          source: nodeSearchSource
         },
         {
           key: 'start_time',
@@ -496,12 +526,19 @@ if (route.query.page_size) {
         },
         {
           key: 'allowed_partitions',
-          label: 'pages.reservations.dialogs.fields.allowedPartitions'
+          label: 'pages.reservations.dialogs.fields.allowedPartitions',
+          type: 'search-multi-select',
+          source: partitionSearchSource
         },
         { key: 'users', label: 'pages.reservations.dialogs.fields.users' },
         { key: 'groups', label: 'pages.reservations.dialogs.fields.groups' },
         { key: 'accounts', label: 'pages.reservations.dialogs.fields.accounts' },
-        { key: 'qos', label: 'pages.reservations.dialogs.fields.qos' }
+        {
+          key: 'qos',
+          label: 'pages.reservations.dialogs.fields.qos',
+          type: 'search-multi-select',
+          source: qosSearchSource
+        }
       ]"
       @close="editOpen = false"
       @submit="updateReservation"

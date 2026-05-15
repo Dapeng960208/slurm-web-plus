@@ -44,6 +44,7 @@
 - Management Center
   - [需求说明](./features/management-center/requirements.md)
   - [测试计划](./features/management-center/test-plan.md)
+  - [共享表单搜索选择器说明](./features/management-center/form-search-selectors.md)
 - 用户分析
   - [后端与页面契约](./features/user-analytics/backend.md)
 - 集群分析与时间窗
@@ -88,6 +89,7 @@
 - AI 单作业查询已强化历史作业认知：实时 `job` 不足或作业完成后，可补查持久化 `jobs/history`，并识别 `used_memory_gb` 与 `used_cpu_cores_avg`。
 - 历史作业页新增跳转实时作业详情入口；作业编辑新增 `Memory per CPU (MB)`。
 - `Reservations` 创建/编辑已补 `groups`、`qos`、`Allowed Partitions`，并在前端本地拦截访问控制字段全空的非法提交。
+- 用户名、QOS、分区、节点相关表单输入已统一向可搜索下拉框收口；用户名使用远程搜索，QOS/分区/节点使用远端列表加载后搜索。
 - `Job` 与 `Job History` 详情页已统一为连续详情列表；`Dashboard` 首屏已删除“实时指标”局部文案并收紧图区留白。
 - `AccountView` 给账户加用户已改为“先建用户实体、再建 association、刷新后写后校验”的链路，不再把“接口表面成功但页面无关联”当成成功。
 - 用户和 account-user association 管理支持默认 QOS、分配 QOS、增加用户关联与删除关联。

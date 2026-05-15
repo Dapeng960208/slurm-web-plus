@@ -130,11 +130,11 @@ const zhCN = {
       zhCN: '简体中文',
       switcher: '语言'
     },
-    buttons: {
-      close: '关闭',
-      cancel: '取消',
-      apply: '应用',
-      reset: '重置',
+      buttons: {
+        close: '关闭',
+        cancel: '取消',
+        apply: '应用',
+        reset: '重置',
       refresh: '刷新',
       clear: '清空',
       goBack: '返回',
@@ -150,10 +150,11 @@ const zhCN = {
       retry: '重试',
       previous: '上一页',
       next: '下一页',
-      send: '发送',
-      enable: '启用',
-      disable: '禁用',
-      today: '今天'
+        send: '发送',
+        enable: '启用',
+        disable: '禁用',
+        today: '今天',
+        remove: '移除'
     },
     notifications: {
       info: '提示',
@@ -185,11 +186,13 @@ const zhCN = {
       highLoad: '高负载',
       highUsage: '高使用率'
     },
-    forms: {
-      required: '必填',
-      optional: '可选',
-      selectOption: '请选择'
-    },
+      forms: {
+        required: '必填',
+        optional: '可选',
+        selectOption: '请选择',
+        noMatches: '没有匹配项',
+        typeMoreCharacters: '至少输入 {count} 个字符'
+      },
     labels: {
       state: '状态',
       user: '用户',

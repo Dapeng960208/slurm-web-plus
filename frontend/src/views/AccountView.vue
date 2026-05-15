@@ -31,6 +31,7 @@ import {
 } from '@/composables/GatewayAPI'
 import { parseCsvList, parseOptionalCsvList, stringifyList } from '@/composables/management'
 import { useRuntimeStore } from '@/stores/runtime'
+import { createStaticSearchSource, createUserSearchSource } from '@/composables/searchSelect'
 
 const { cluster, account } = defineProps<{
   cluster: string
@@ -50,6 +51,14 @@ const operationBusy = ref(false)
 const operationError = ref<string | null>(null)
 const accountDetails = ref<AccountDescription | null>(null)
 const selectedAssociation = ref<ClusterAssociation | null>(null)
+const userSearchSource = createUserSearchSource(cluster)
+const qosSearchSource = createStaticSearchSource(async () =>
+  (await gateway.qos(cluster)).map((qos) => ({
+    value: qos.name,
+    label: qos.name,
+    description: qos.description || qos.name
+  }))
+)
 const {
   data,
   unable,
@@ -780,7 +789,12 @@ function hasDifferentQos(userAssociation: ClusterAssociation): boolean {
         { key: 'description', label: 'pages.account.dialogs.fields.description', type: 'textarea' },
         { key: 'organization', label: 'pages.account.dialogs.fields.organization', required: true },
         { key: 'parent_account', label: 'pages.account.dialogs.fields.parentAccount' },
-        { key: 'qos', label: 'pages.account.dialogs.fields.qosCsv' }
+        {
+          key: 'qos',
+          label: 'pages.account.dialogs.fields.qosCsv',
+          type: 'search-multi-select',
+          source: qosSearchSource
+        }
       ]"
       @close="editOpen = false"
       @submit="saveAccount"
@@ -795,9 +809,26 @@ function hasDifferentQos(userAssociation: ClusterAssociation): boolean {
       :loading="operationBusy"
       :error="operationError"
       :fields="[
-        { key: 'user', label: 'pages.account.dialogs.fields.username', required: true },
-        { key: 'qos', label: 'pages.account.dialogs.fields.assignedQosCsv' },
-        { key: 'default_qos', label: 'pages.account.dialogs.fields.defaultQos' }
+        {
+          key: 'user',
+          label: 'pages.account.dialogs.fields.username',
+          required: true,
+          type: 'search-select',
+          source: userSearchSource,
+          minQueryLength: 1
+        },
+        {
+          key: 'qos',
+          label: 'pages.account.dialogs.fields.assignedQosCsv',
+          type: 'search-multi-select',
+          source: qosSearchSource
+        },
+        {
+          key: 'default_qos',
+          label: 'pages.account.dialogs.fields.defaultQos',
+          type: 'search-select',
+          source: qosSearchSource
+        }
       ]"
       @close="addUserOpen = false"
       @submit="addUserAssociation"
@@ -816,8 +847,18 @@ function hasDifferentQos(userAssociation: ClusterAssociation): boolean {
         default_qos: selectedAssociation?.default?.qos ?? ''
       }"
       :fields="[
-        { key: 'qos', label: 'pages.account.dialogs.fields.assignedQosCsv' },
-        { key: 'default_qos', label: 'pages.account.dialogs.fields.defaultQos' }
+        {
+          key: 'qos',
+          label: 'pages.account.dialogs.fields.assignedQosCsv',
+          type: 'search-multi-select',
+          source: qosSearchSource
+        },
+        {
+          key: 'default_qos',
+          label: 'pages.account.dialogs.fields.defaultQos',
+          type: 'search-select',
+          source: qosSearchSource
+        }
       ]"
       @close="editUserQosOpen = false"
       @submit="saveUserAssociationQos"

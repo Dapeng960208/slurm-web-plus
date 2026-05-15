@@ -1,5 +1,37 @@
 # 最新功能
 
+## 本轮：表单中的用户名、节点、QOS、分区已统一为可搜索下拉
+
+本轮把一批仍然使用文本输入的前端表单字段统一收口到了共享搜索选择器，范围只覆盖 `用户名`、`节点名`、`QOS`、`分区` 四类字段：
+
+- `用户名`
+  - `Jobs` 用户筛选和部分管理弹窗现在改为远程搜索
+  - 前端复用现有 `access/users` 分页与 `username` 过滤接口，不再继续依赖手输用户名再点击 `Add`
+- `QOS / 分区 / 节点`
+  - 统一改为可搜索下拉
+  - 当前不新增后端搜索接口，而是先从现有集群列表接口加载，再在下拉中筛选
+- 多值字段
+  - 统一改为“多选标签 + 已选值回显”
+  - 提交时仍序列化为现有 CSV string，保持后端写接口契约不变
+
+本轮实际接入位置包括：
+
+- `JobsView` / `JobView` 的 `partition`、`qos`
+- `AccountView` / `AccountsView` / `UserView` 中的 `username`、`qos`、`default_qos`
+- `ReservationsView` 的 `node_list`、`allowed_partitions`、`qos`
+- `JobsHistoryFiltersPanel` 的 `user`、`partition`、`qos`
+- `UserFilterSelector`
+
+补充边界：
+
+- `Reservations.node_list` 现在只支持从节点列表多选并回写为逗号分隔字符串，不再支持自由文本 nodeset 表达式输入。
+- 本轮没有新增后端 `qos / partition / node` 模糊搜索接口。
+
+本轮新增验证：
+
+- `npm --prefix frontend run type-check`
+- `cd frontend && npx vitest run tests/components/forms/RemoteSearchSelect.spec.ts tests/components/operations/ActionDialog.spec.ts tests/components/jobs/UserFilterSelector.spec.ts tests/components/jobs/JobsHistoryFiltersPanel.spec.ts tests/views/JobsView.spec.ts tests/views/JobView.spec.ts tests/views/AccountView.spec.ts tests/views/AccountsView.spec.ts tests/views/UserView.spec.ts tests/views/ReservationsView.spec.ts tests/views/JobsHistoryView.spec.ts`
+
 ## 本轮：账户加用户写契约与集群分析平均排队时间独立时间范围已修复
 
 本轮围绕两个已暴露的问题继续收口：

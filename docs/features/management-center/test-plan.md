@@ -98,8 +98,8 @@
 - `JobsView` 在 `jobs:view|edit|delete:self` 下只对本人作业显示 `Edit/Cancel`
 - `JobView` 在 `self` 下只对本人作业显示 `Edit/Cancel`
 - `JobsView` / `JobView` 编辑作业时，填写 `Memory per CPU (MB)` 会提交 `memory_per_cpu: { set: true, infinite: false, number }`
-- `UserFilterSelector` 支持手动输入用户名并点击 `Add username` 加入 `runtimeStore.jobs.filters.users`
-- `UserFilterSelector` 不添加空用户名，也不会重复添加已存在用户名
+- `UserFilterSelector` 改为远程搜索多选用户名，复用 `access_users`，不再通过手工输入 + `Add username` 按钮添加
+- `JobsHistoryFiltersPanel` 的 `user / partition / qos` 使用搜索下拉并通过 `update:filters` 回传
 - `JobsHistoryView` / `JobHistoryView` 的实时作业入口使用 Slurm `job_id` 跳转到 `job` 路由
 - `JobsHistoryView` / `JobHistoryView` 不直接提供历史记录 Edit/Cancel 写操作
 - `AccountView` 可增加 account-user association、编辑 association QOS/default QOS、删除 association，payload 复用现有 associations 写接口
@@ -107,6 +107,11 @@
 - `AccountView` 在 `refreshAssociations()` 后若仍看不到目标 `{ account, user }`，必须提示失败且不能显示成功 toast
 - `AccountView` 删除 association 时只提交选中 `account` 与 `user`，不携带空 `qos/default` 字段
 - `UserView` 编辑用户时提交 `default_qos` 和逗号分隔解析后的 `qos`
+- `ActionDialog` 支持共享搜索单选/多选字段，初始值可回填，并在提交时保持 CSV 序列化
+- `RemoteSearchSelect` 支持：
+  - 用户远程搜索
+  - QOS/分区/节点远端列表加载后搜索
+  - 多选标签回显和移除
 - `ClusterAnalysisView` 的平均排队时间卡片切换自身时间范围时，会重新请求 `jobs_history`
 - `ClusterAnalysisView` 的平均排队时间卡片切换自身时间范围时，不会重拉 metrics 与 node hotspots
 - `ClusterAnalysisView` 顶部全局时间范围变化时，不会覆盖卡片已手动选择的独立时间范围
@@ -176,6 +181,7 @@
 - `cd frontend && npx vitest run tests/views/JobsView.spec.ts tests/views/JobView.spec.ts tests/views/JobsHistoryView.spec.ts tests/views/JobHistoryView.spec.ts tests/views/AccountView.spec.ts tests/views/UserView.spec.ts tests/composables/GatewayAPI.spec.ts tests/composables/ClusterAnalysis.spec.ts tests/components/operations/ActionDialog.spec.ts`
 - `cd frontend && npm exec vitest run tests/views/ReservationsView.spec.ts tests/views/AccountView.spec.ts tests/views/JobView.spec.ts tests/views/JobHistoryView.spec.ts tests/views/DashboardView.spec.ts tests/components/dashboard/ChartResourcesHistory.spec.ts tests/components/dashboard/ChartJobsHistory.spec.ts tests/views/AssistantView.spec.ts tests/views/AssistantViewAIContract.spec.ts`
 - `cd frontend && npx vitest run tests/views/resources/ResourcesView.spec.ts tests/views/NodeView.spec.ts tests/components/operations/ActionDialog.spec.ts tests/components/jobs/UserFilterSelector.spec.ts`
+- `cd frontend && npx vitest run tests/components/forms/RemoteSearchSelect.spec.ts tests/components/operations/ActionDialog.spec.ts tests/components/jobs/UserFilterSelector.spec.ts tests/components/jobs/JobsHistoryFiltersPanel.spec.ts tests/views/JobsView.spec.ts tests/views/JobView.spec.ts tests/views/AccountView.spec.ts tests/views/AccountsView.spec.ts tests/views/UserView.spec.ts tests/views/ReservationsView.spec.ts tests/views/JobsHistoryView.spec.ts`
 - `cd frontend && npx vitest run tests/views/UserView.spec.ts tests/views/JobView.spec.ts tests/views/NodeView.spec.ts tests/views/UserAnalysisView.spec.ts`
 - `cd frontend && npx vitest run tests/views/DashboardView.spec.ts tests/views/ClusterAnalysisView.spec.ts tests/views/AdminLayoutView.spec.ts tests/views/settings/SettingsAI.spec.ts tests/views/settings/SettingsAccessControl.spec.ts tests/views/settings/SettingsCache.spec.ts tests/views/settings/SettingsLdapCache.spec.ts tests/views/settings/SettingsAIConversationDetail.spec.ts`
 - `npm --prefix frontend run type-check`

@@ -32,6 +32,7 @@ import ActionDialog from '@/components/operations/ActionDialog.vue'
 import PartitionLinkChip from '@/components/PartitionLinkChip.vue'
 import { useRuntimeStore } from '@/stores/runtime'
 import { useAuthStore } from '@/stores/auth'
+import { createStaticSearchSource } from '@/composables/searchSelect'
 
 const { cluster, id } = defineProps<{ cluster: string; id: number }>()
 
@@ -44,6 +45,19 @@ const operationError = ref<string | null>(null)
 const operationBusy = ref(false)
 const editOpen = ref(false)
 const cancelOpen = ref(false)
+const partitionSearchSource = createStaticSearchSource(async () =>
+  (await gateway.partitions(cluster)).map((partition) => ({
+    value: partition.name,
+    label: partition.name
+  }))
+)
+const qosSearchSource = createStaticSearchSource(async () =>
+  (await gateway.qos(cluster)).map((qos) => ({
+    value: qos.name,
+    label: qos.name,
+    description: qos.description || qos.name
+  }))
+)
 
 const jobsFields = [
   'user',
@@ -478,8 +492,18 @@ watch(
         comment: data?.comment?.administrator || data?.comment?.job || ''
       }"
       :fields="[
-        { key: 'partition', label: 'pages.jobs.dialogs.edit.fields.partition' },
-        { key: 'qos', label: 'pages.jobs.dialogs.edit.fields.qos' },
+        {
+          key: 'partition',
+          label: 'pages.jobs.dialogs.edit.fields.partition',
+          type: 'search-select',
+          source: partitionSearchSource
+        },
+        {
+          key: 'qos',
+          label: 'pages.jobs.dialogs.edit.fields.qos',
+          type: 'search-select',
+          source: qosSearchSource
+        },
         { key: 'priority', label: 'pages.jobs.dialogs.edit.fields.priority', type: 'number' },
         {
           key: 'memory_per_cpu_mb',

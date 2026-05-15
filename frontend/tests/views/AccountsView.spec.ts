@@ -15,7 +15,8 @@ import AccountTreeNode from '@/components/accounts/AccountTreeNode.vue'
 const mockAssociationsPoller = getMockClusterDataPoller<ClusterAssociation[]>()
 const mockAccountsPoller = getMockClusterDataPoller<AccountDescription[]>()
 const mockGatewayAPI = {
-  save_account: vi.fn()
+  save_account: vi.fn(),
+  qos: vi.fn()
 }
 
 vi.mock('@/composables/DataPoller', () => ({
@@ -53,6 +54,7 @@ describe('AccountsView.vue', () => {
     mockAccountsPoller.unable.value = false
     mockAccountsPoller.loaded.value = false
     mockAccountsPoller.initialLoading.value = false
+    mockGatewayAPI.qos.mockResolvedValue([{ name: 'normal', description: 'Normal', flags: [], limits: {} }])
     document.body.innerHTML = ''
   })
 

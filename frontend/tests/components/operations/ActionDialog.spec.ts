@@ -181,4 +181,44 @@ describe('ActionDialog.vue', () => {
       { start_time: '2026-05-14T10:30', end_time: '2026-05-14T12:00' }
     ])
   })
+
+  test('renders searchable multi select fields and submits serialized values', async () => {
+    const wrapper = mount(ActionDialog, {
+      global: {
+        stubs: {
+          Dialog: { template: '<div><slot /></div>' },
+          DialogPanel: { template: '<div><slot /></div>' },
+          DialogTitle: { template: '<div><slot /></div>' },
+          TransitionChild: { template: '<div><slot /></div>' },
+          TransitionRoot: { template: '<div><slot /></div>' }
+        }
+      },
+      props: {
+        open: true,
+        title: 'pages.account.dialogs.edit.title',
+        submitLabel: 'common.buttons.saveChanges',
+        fields: [
+          {
+            key: 'qos',
+            label: 'pages.account.dialogs.fields.qosCsv',
+            type: 'search-multi-select',
+            source: {
+              search: async () => [
+                { value: 'normal', label: 'normal' },
+                { value: 'debug', label: 'debug' }
+              ]
+            }
+          }
+        ],
+        initialValues: {
+          qos: 'normal, debug'
+        }
+      }
+    })
+
+    expect(wrapper.findComponent({ name: 'RemoteSearchSelect' }).exists()).toBe(true)
+    await wrapper.get('form').trigger('submit')
+
+    expect(wrapper.emitted('submit')?.[0]).toEqual([{ qos: 'normal, debug' }])
+  })
 })

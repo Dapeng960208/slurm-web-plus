@@ -21,7 +21,9 @@ const mockGatewayAPI = {
   delete_account: vi.fn(),
   save_user: vi.fn(),
   save_association: vi.fn(),
-  delete_association: vi.fn()
+  delete_association: vi.fn(),
+  access_users: vi.fn(),
+  qos: vi.fn()
 }
 
 vi.mock('@/composables/DataPoller', () => ({
@@ -59,6 +61,13 @@ describe('AccountView.vue', () => {
       description: 'Root account',
       organization: 'Core HPC'
     })
+    mockGatewayAPI.access_users.mockResolvedValue({
+      items: [{ username: 'alice', fullname: 'Alice Doe', policy_roles: [], policy_actions: [], custom_roles: [], custom_actions: [] }],
+      total: 1,
+      page: 1,
+      page_size: 20
+    })
+    mockGatewayAPI.qos.mockResolvedValue([{ name: 'normal', description: 'Normal', flags: [], limits: {} }])
     document.body.innerHTML = ''
   })
 
