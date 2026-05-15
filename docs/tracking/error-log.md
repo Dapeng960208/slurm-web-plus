@@ -11,6 +11,16 @@
 
 ## 条目
 
+### 2026-05-15：shallowMount 自定义 RouterLink 插槽和 RouterLinkStub 断言限制
+- 时间：2026-05-15
+- 现象：为 `ClustersView` 增加“登出按钮不含 `backdrop-blur`”断言时，`shallowMount` 下 `RouterLink custom v-slot` 被 `RouterLinkStub` 替换，内部 `<button role="link">` 不会出现在 DOM；继续用 `getComponent(RouterLinkStub)` 也因当前 stub 以原生 `<router-link-stub>` 标签渲染而拿不到组件实例。
+- 解决办法：移除这类依赖 shallow stub 细节的视觉类名断言；该视图仍保留集群列表、错误态、空态和自动跳转行为测试，视觉类名收敛由源码 diff 与页面回归覆盖。
+
+### 2026-05-15：PowerShell `Start-Process npm` 不能直接解析 npm shim
+- 时间：2026-05-15
+- 现象：在 Windows PowerShell 中执行 `Start-Process -FilePath npm -ArgumentList 'run','dev'` 启动前端 Vite 服务时报 `%1 is not a valid Win32 application`，进程未启动。
+- 解决办法：改用 Windows 可执行 shim `npm.cmd` 作为 `Start-Process -FilePath`，例如 `Start-Process -FilePath npm.cmd -ArgumentList 'run','dev','--','--host','127.0.0.1'`。
+
 ### 2026-05-15：AccountView 父账户兜底测试受 RouterLinkStub 文本渲染限制
 - 时间：2026-05-15
 - 现象：执行 `cd frontend && npx vitest run tests/views/AccountsView.spec.ts tests/views/AccountView.spec.ts` 时，新增的“association 暂未刷新但 account details 带 parent_account”测试断言 `div#parents` 包含 `root`，但实际只渲染到 `Parent accounts`；调试确认 `AccountBreadcrumb` 已收到 `{ account: "test", parent_account: "root", user: "" }` 并生成 `RouterLinkStub`，但当前测试 stub 不渲染插槽文本。

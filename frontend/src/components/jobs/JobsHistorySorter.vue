@@ -68,7 +68,7 @@ function triggerSortOrder() {
         leave-to-class="transform opacity-0 scale-95"
       >
         <MenuItems
-          class="absolute left-0 z-10 mt-2 w-56 origin-top-right rounded-[22px] border border-white/80 bg-white/95 p-2 shadow-[var(--shadow-panel)] backdrop-blur-lg focus:outline-none"
+          class="absolute left-0 z-10 mt-2 w-56 origin-top-right rounded-[22px] border border-white/80 bg-white p-2 shadow-[var(--shadow-soft)] focus:outline-none"
         >
           <MenuItem v-for="option in sortOptions" :key="option.type" v-slot="{ active }">
             <button

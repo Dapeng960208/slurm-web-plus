@@ -184,13 +184,14 @@ describe('ResourcesCanvas.vue', () => {
     expect(coresInfo.text()).toContain(`${nodes[0].alloc_cpus}/${nodes[0].cpus}`)
   })
 
-  test('shimmer animation starts when nodes are loading', async () => {
+  test('does not start a frame-loop shimmer while nodes are loading', async () => {
+    const requestAnimationFrameSpy = vi.spyOn(window, 'requestAnimationFrame')
     const wrapper = mount(ResourcesCanvas, {
       props: {
         cluster: 'foo',
         nodes: nodes,
         fullscreen: false,
-        loading: true, // nodesLoading = true
+        loading: true,
         modelValue: false
       },
       global: {
@@ -202,13 +203,12 @@ describe('ResourcesCanvas.vue', () => {
     await flushPromises()
     await flushPromises()
 
-    // Check that shimmer animation is active when nodes are loading
-    // The animation should be running (animationId should not be null)
-    const vm = wrapper.vm as { animationId: number | null }
-    expect(vm.animationId).toBeDefined()
+    expect(wrapper.get('canvas').attributes('style')).not.toContain('display: none;')
+    expect(requestAnimationFrameSpy).not.toHaveBeenCalled()
   })
 
-  test('shimmer animation stops when nodes are loaded', async () => {
+  test('keeps canvas rendering static when nodes are loaded', async () => {
+    const requestAnimationFrameSpy = vi.spyOn(window, 'requestAnimationFrame')
     const wrapper = mount(ResourcesCanvas, {
       props: {
         cluster: 'foo',
@@ -226,9 +226,7 @@ describe('ResourcesCanvas.vue', () => {
     await flushPromises()
     await flushPromises()
 
-    // Check that shimmer animation is not active when nodes are loaded
-    // The animation should not be running (animationId should be null)
-    const vm = wrapper.vm as { animationId: number | null }
-    expect(vm.animationId).toBeNull()
+    expect(wrapper.get('canvas').attributes('style')).not.toContain('display: none;')
+    expect(requestAnimationFrameSpy).not.toHaveBeenCalled()
   })
 })

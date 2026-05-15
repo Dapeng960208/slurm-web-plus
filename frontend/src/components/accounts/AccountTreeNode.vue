@@ -87,7 +87,7 @@ function toggle() {
       <!-- Main content card -->
       <div
         :id="`account-tree-node-${node.account}`"
-        class="ui-panel-soft group relative flex items-center gap-x-4 transition-all hover:shadow-md"
+        class="ui-panel-soft group relative flex items-center gap-x-4 transition-colors hover:shadow-md"
         :class="node.level > 0 ? 'ml-12' : ''"
       >
         <!-- Expand/Collapse button -->
@@ -99,17 +99,8 @@ function toggle() {
             @click="toggle"
           >
             <span class="sr-only">Toggle {{ node.account }}</span>
-            <ChevronRightIcon
-              v-if="!isExpanded"
-              class="h-5 w-5 transition-transform duration-200"
-              :class="{ 'rotate-90': isExpanded }"
-              aria-hidden="true"
-            />
-            <ChevronDownIcon
-              v-else
-              class="h-5 w-5 transition-transform duration-200"
-              aria-hidden="true"
-            />
+            <ChevronRightIcon v-if="!isExpanded" class="h-5 w-5" aria-hidden="true" />
+            <ChevronDownIcon v-else class="h-5 w-5" aria-hidden="true" />
           </button>
           <div v-else class="h-8 w-8"></div>
         </div>
@@ -117,7 +108,7 @@ function toggle() {
         <!-- Account content -->
         <RouterLink
           :to="{ name: 'account', params: { cluster, account: node.account } }"
-          class="flex min-w-0 flex-auto items-center justify-between gap-3 px-4 py-4 text-[var(--color-brand-ink-strong)] no-underline transition-colors focus:outline-none hover:text-[var(--color-brand-blue)]"
+        class="flex min-w-0 flex-auto items-center justify-between gap-3 px-4 py-4 text-[var(--color-brand-ink-strong)] no-underline transition-colors focus:outline-none hover:text-[var(--color-brand-blue)]"
         >
           <p class="text-sm leading-6 font-semibold text-[var(--color-brand-ink-strong)]">
             {{ node.account }}
@@ -143,9 +134,7 @@ function toggle() {
                 </div>
               </template>
             </div>
-            <ChevronRightIcon
-              class="h-4 w-4 text-[rgba(80,105,127,0.34)] group-hover:text-[var(--color-brand-blue)]"
-            />
+            <ChevronRightIcon class="h-4 w-4 text-[rgba(80,105,127,0.34)] group-hover:text-[var(--color-brand-blue)]" />
           </div>
         </RouterLink>
       </div>

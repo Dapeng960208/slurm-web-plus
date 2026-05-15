@@ -5,6 +5,7 @@ import AccountTreeNode from '@/components/accounts/AccountTreeNode.vue'
 import { init_plugins } from '../../lib/common'
 import type { ClusterAccountTreeNode } from '@/composables/GatewayAPI'
 import associations from '../../assets/associations.json'
+import { ChevronRightIcon } from '@heroicons/vue/20/solid'
 
 describe('AccountTreeNode.vue', () => {
   beforeEach(() => {
@@ -47,6 +48,7 @@ describe('AccountTreeNode.vue', () => {
     // Verify expand button is present
     const expandButton = rootCard.get('button')
     expect(expandButton.text()).toBe('Toggle root')
+    expect(expandButton.findComponent(ChevronRightIcon).classes()).not.toContain('transition-transform')
 
     // Verify RouterLink exists and has correct props for account name
     const link = rootCard.getComponent(RouterLink)

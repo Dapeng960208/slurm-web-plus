@@ -21,8 +21,7 @@ const {
   cluster,
   nodes,
   fullscreen,
-  mode,
-  loading: nodesLoading
+  mode
 } = defineProps<{
   cluster: string
   nodes: ClusterNode[]
@@ -47,7 +46,6 @@ const nodeTooltipOpen: Ref<boolean> = ref(false)
 const errorMessage: Ref<string | undefined> = ref()
 let timeout: number = -1 // holder for timeout id
 const delay = 250 // delay after event is "complete" to run callback
-let animationId: number | null = null // holder for animation frame id
 let allNodesPaths: Record<
   string,
   { x: number; y: number; width: number; height: number; path: Path2D }
@@ -321,101 +319,6 @@ function drawNodeNameText(
   }
 }
 
-function drawShimmerAnimation(ctx: CanvasRenderingContext2D, time: number): void {
-  if (!bitmap || !canvas.value || !coordinates) return
-
-  const shimmerSpeed = 0.001
-  const shimmerWidth = canvas.value.height * 0.1
-
-  // Calculate global shimmer position across entire canvas (top to bottom)
-  const canvasHeight = canvas.value.height
-  const shimmerProgress = (time * shimmerSpeed) % 1
-  const globalShimmerY = canvasHeight * shimmerProgress
-
-  // Apply shimmer effect to each node
-  for (const [, nodeCoordinates] of Object.entries(coordinates)) {
-    const node_x = nodeCoordinates[0] + x_shift + 0.5
-    const node_y = nodeCoordinates[1] + y_shift - 0.5
-    const node_width = nodeCoordinates[2] - 1
-    const node_height = nodeCoordinates[3]
-
-    // Calculate shimmer intensity for this node based on global vertical position
-    let shimmerIntensity = 0
-    if (globalShimmerY > node_y && globalShimmerY < node_y + node_height) {
-      // Shimmer is within node bounds
-      shimmerIntensity = 1
-    } else if (globalShimmerY > node_y - shimmerWidth && globalShimmerY <= node_y) {
-      // Shimmer is entering from top - intensity higher when closer to global shimmer Y
-      const distanceFromShimmer = Math.abs(globalShimmerY - node_y)
-      const maxDistance = shimmerWidth
-      const proximityFactor = 1 - distanceFromShimmer / maxDistance
-      shimmerIntensity = proximityFactor * 0.8 // Higher intensity when closer
-    } else if (
-      globalShimmerY >= node_y + node_height &&
-      globalShimmerY < node_y + node_height + shimmerWidth
-    ) {
-      // Shimmer is exiting to bottom - intensity higher when closer to global shimmer Y
-      const distanceFromShimmer = Math.abs(globalShimmerY - (node_y + node_height))
-      const maxDistance = shimmerWidth
-      const proximityFactor = 1 - distanceFromShimmer / maxDistance
-      shimmerIntensity = proximityFactor * 0.8 // Higher intensity when closer
-    }
-
-    // Draw the node with shimmered color based on intensity
-    ctx.fillStyle = createShimmeredColor(shimmerIntensity)
-    ctx.fillRect(node_x, node_y, node_width, node_height)
-
-    // Draw black stroke around the rectangle
-    ctx.strokeStyle = 'black'
-    ctx.lineWidth = 1
-    ctx.strokeRect(node_x, node_y, node_width, node_height)
-  }
-}
-
-function createShimmeredColor(intensity: number): string {
-  // base color (color when intensity is 0)
-  const baseColor = { r: 170, g: 170, b: 170 } // #aaaaaa
-
-  // target color (target color when intensity is 1)
-  const targetColor = { r: 117, g: 154, b: 184 } // #759ab8, aka. slurm-web-blue
-
-  // Interpolate between baseColor and targetColor based on intensity
-  const r = Math.round(baseColor.r + (targetColor.r - baseColor.r) * intensity)
-  const g = Math.round(baseColor.g + (targetColor.g - baseColor.g) * intensity)
-  const b = Math.round(baseColor.b + (targetColor.b - baseColor.b) * intensity)
-
-  return `rgb(${r}, ${g}, ${b})`
-}
-
-function startShimmerAnimation(): void {
-  if (animationId) return // Animation already running
-
-  const animate = (time: number) => {
-    // Stop animation when nodes are loaded or canvas is not available
-    if (!nodesLoading || !canvas.value) {
-      animationId = null
-      return
-    }
-
-    const ctx = canvas.value.getContext('2d')
-    if (ctx && bitmap) {
-      // Draw shimmer animation
-      drawShimmerAnimation(ctx, time)
-    }
-
-    animationId = requestAnimationFrame(animate)
-  }
-
-  animationId = requestAnimationFrame(animate)
-}
-
-function stopShimmerAnimation(): void {
-  if (animationId) {
-    cancelAnimationFrame(animationId)
-    animationId = null
-  }
-}
-
 function drawNodeCoresMode(
   ctx: CanvasRenderingContext2D,
   nodeName: string,
@@ -494,10 +397,6 @@ async function updateCanvas(fullUpdate: boolean = true) {
       y_shift = Math.round((canvas.value.height - bitmap.height) / 2)
       emit('imageSize', x_shift, bitmap.width)
       racksLoading.value = false
-      // Start shimmer animation only if nodes are loading
-      if (nodesLoading) {
-        startShimmerAnimation()
-      }
     }
 
     const ctx = canvas.value.getContext('2d')
@@ -673,7 +572,6 @@ onMounted(() => {
 
 onUnmounted(() => {
   window.removeEventListener('resize', updateCanvasDimensions)
-  stopShimmerAnimation()
 })
 </script>
 

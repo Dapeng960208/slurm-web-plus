@@ -95,7 +95,7 @@ export function useLiveHistogram<MetricKeyType extends string>(
     if (!chart) return
     if (!metrics.data.value) {
       chart.data.datasets = []
-      chart.update()
+      chart.update('none')
       return
     }
     chart.data.datasets = buildDatasets()
@@ -103,7 +103,7 @@ export function useLiveHistogram<MetricKeyType extends string>(
       chart.options.scales.x.suggestedMin = suggestedMin()
       ;(chart.options.scales.x as TimeScaleOptions).time.unit = timeframeUnit()
     }
-    chart.update()
+    chart.update('none')
   }
 
   watch(
@@ -177,6 +177,7 @@ export function useLiveHistogram<MetricKeyType extends string>(
   const genericOptions: ChartOptions = {
     responsive: true,
     maintainAspectRatio: false,
+    animation: false,
     plugins: valueFormatter
       ? {
           tooltip: {
@@ -216,7 +217,7 @@ export function useLiveHistogram<MetricKeyType extends string>(
   function clear() {
     if (chart) {
       chart.data.datasets = []
-      chart.update()
+      chart.update('none')
     }
   }
 

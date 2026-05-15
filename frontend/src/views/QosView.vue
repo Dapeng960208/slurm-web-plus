@@ -358,7 +358,7 @@ if (route.query.page_size) {
                   v-if="loaded"
                   class="divide-y divide-gray-200 text-sm text-gray-600 dark:divide-gray-700 dark:text-gray-300"
                 >
-                  <tr v-for="qos in pagedQos" :key="qos.name">
+                  <tr v-for="qos in pagedQos" :key="qos.name" v-memo="[qos]">
                     <td class="py-3 pr-3 whitespace-nowrap text-[var(--color-brand-ink-strong)] sm:pl-6 lg:pl-8">
                       <p class="text-base font-medium">{{ qos.name }}</p>
                       <p class="text-gray-500 text-[var(--color-brand-muted)]">{{ qos.description }}</p>

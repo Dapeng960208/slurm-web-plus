@@ -302,7 +302,7 @@ watch(totalPages, (newLastPage) => {
                 class="divide-y divide-gray-200 text-sm text-gray-500 dark:divide-gray-700 dark:text-gray-300"
               >
                 <template v-for="node in pagedFoldedNodes" :key="node.name">
-                  <tr>
+                  <tr v-memo="[node, foldedNodesShow[node.name]]">
                     <td class="w-4">
                       <button
                         v-if="node.number > 1"
@@ -397,7 +397,7 @@ watch(totalPages, (newLastPage) => {
                             <li
                               v-for="_node in expandNodeset(node.name)"
                               :key="_node"
-                              class="col-span-1 divide-y divide-[rgba(80,105,127,0.08)] rounded-[18px] border border-white/70 bg-white text-left font-mono text-xs shadow-[var(--shadow-soft)] transition-transform hover:scale-[1.03]"
+                              class="col-span-1 divide-y divide-[rgba(80,105,127,0.08)] rounded-[18px] border border-white/70 bg-white text-left font-mono text-xs shadow-[var(--shadow-soft)] hover:border-[rgba(182,232,44,0.45)]"
                             >
                               <button
                                 class="flex w-full items-center justify-between space-x-6 px-4 py-3 text-[var(--color-brand-blue)] transition hover:text-[var(--color-brand-ink-strong)]"

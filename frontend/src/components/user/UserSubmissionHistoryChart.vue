@@ -37,7 +37,7 @@ function updateChart() {
   if (!chart) return
   if (!history) {
     chart.data.datasets = []
-    chart.update()
+    chart.update('none')
     return
   }
 
@@ -103,7 +103,7 @@ function updateChart() {
       fill: false
     }
   ]
-  chart.update()
+  chart.update('none')
 }
 
 onMounted(() => {

@@ -141,7 +141,7 @@ function updateChart() {
       color: '#6c7a80'
     }
   }
-  chart.update()
+  chart.update('none')
 }
 
 onMounted(() => {

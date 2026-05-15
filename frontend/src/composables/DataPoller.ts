@@ -49,6 +49,7 @@ export function useClusterDataPoller<Type>(
   const refreshing: Ref<boolean> = ref(false)
   let _stop: boolean = false
   let _polling: boolean = false
+  let _dataSignature: string | undefined
   const gateway = useGatewayAPI()
   const runtime = useRuntimeStore()
   const { reportAuthenticationError, reportPermissionError } = useErrorsHandler()
@@ -56,6 +57,34 @@ export function useClusterDataPoller<Type>(
 
   function serializeParam(param: ClusterDataPollerParam | undefined): string {
     return JSON.stringify(param ?? null)
+  }
+
+  function serializeData(value: Type): string | undefined {
+    try {
+      return JSON.stringify(value)
+    } catch {
+      return undefined
+    }
+  }
+
+  function resetData() {
+    data.value = undefined
+    _dataSignature = undefined
+  }
+
+  function assignDataIfChanged(value: Type) {
+    const signature = serializeData(value)
+    if (signature !== undefined && signature === _dataSignature) return
+    _dataSignature = signature
+    data.value = value
+  }
+
+  function isTextInputActive(): boolean {
+    if (typeof document === 'undefined') return false
+    const activeElement = document.activeElement
+    if (!(activeElement instanceof HTMLElement)) return false
+    if (activeElement.isContentEditable) return true
+    return ['INPUT', 'TEXTAREA', 'SELECT'].includes(activeElement.tagName)
   }
 
   function reportOtherError(error: Error) {
@@ -75,10 +104,10 @@ export function useClusterDataPoller<Type>(
           cluster: string,
           param: ClusterDataPollerParam
         ) => Promise<Type>
-        data.value = await method(cluster, otherParam)
+        assignDataIfChanged(await method(cluster, otherParam))
       } else {
         const method = gateway[callback] as (cluster: string) => Promise<Type>
-        data.value = await method(cluster)
+        assignDataIfChanged(await method(cluster))
       }
 
       loaded.value = true
@@ -108,7 +137,9 @@ export function useClusterDataPoller<Type>(
       return
     }
     _stop = false
-    await poll()
+    if (!isTextInputActive()) {
+      await poll()
+    }
     if (!_stop) {
       _timeout = window.setTimeout(start, timeout)
     }
@@ -124,7 +155,7 @@ export function useClusterDataPoller<Type>(
   function setCluster(newCluster: string) {
     stop()
     cluster = newCluster
-    data.value = undefined
+    resetData()
     unable.value = false
     loaded.value = false
     initialLoading.value = true
@@ -135,7 +166,7 @@ export function useClusterDataPoller<Type>(
   function setCallback(newCallback: GatewayAnyClusterApiKey) {
     stop()
     callback = newCallback
-    data.value = undefined
+    resetData()
     unable.value = false
     loaded.value = false
     initialLoading.value = true
@@ -147,7 +178,7 @@ export function useClusterDataPoller<Type>(
     if (serializeParam(otherParam) === serializeParam(newOtherParam)) return
     stop()
     otherParam = newOtherParam
-    data.value = undefined
+    resetData()
     unable.value = false
     loaded.value = false
     initialLoading.value = true

@@ -7,7 +7,7 @@
 -->
 
 <script setup lang="ts">
-import { computed, reactive, watch } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Dialog, DialogPanel, DialogTitle, TransitionChild, TransitionRoot } from '@headlessui/vue'
 import FormFieldLabel from '@/components/forms/FormFieldLabel.vue'
@@ -67,13 +67,16 @@ const emit = defineEmits<{
 const { t } = useI18n()
 
 const form = reactive<Record<string, string>>({})
-const fieldsSignature = computed(() =>
-  props.fields
+const activeFields = ref<ActionField[]>([])
+const fieldsSignature = computed(() => buildFieldsSignature(props.fields))
+
+function buildFieldsSignature(fields: ActionField[]) {
+  return fields
     .map((field) =>
       `${field.key}:${field.type ?? 'text'}:${field.options?.map((option) => option.value).join(',') ?? ''}:${field.source ? 'remote' : 'local'}`
     )
     .join('|')
-)
+}
 
 const resolvedSubmitVariant = computed<ActionSubmitVariant>(() => {
   if (props.submitVariant) return props.submitVariant
@@ -110,19 +113,21 @@ function resetForm() {
   for (const key of Object.keys(form)) {
     delete form[key]
   }
-  for (const field of props.fields) {
+  activeFields.value = props.fields.slice()
+  for (const field of activeFields.value) {
     form[field.key] = props.initialValues?.[field.key] ?? ''
   }
 }
 
 const canSubmit = computed(() =>
-  props.fields.every((field) => !field.required || form[field.key].trim().length > 0)
+  activeFields.value.every((field) => !field.required || form[field.key].trim().length > 0)
 )
 
 watch(
   () => props.open,
   (open) => {
     if (open) resetForm()
+    else activeFields.value = props.fields.slice()
   },
   { immediate: true }
 )
@@ -147,7 +152,7 @@ watch(
         leave-from="opacity-100"
         leave-to="opacity-0"
       >
-        <div class="fixed inset-0 bg-[rgba(32,42,53,0.7)] backdrop-blur-sm" />
+        <div class="fixed inset-0 bg-[rgba(32,42,53,0.72)]" />
       </TransitionChild>
 
       <div class="fixed inset-0 overflow-y-auto p-4">
@@ -161,7 +166,7 @@ watch(
             leave-from="opacity-100 translate-y-0 sm:scale-100"
             leave-to="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
           >
-            <DialogPanel class="w-full max-w-2xl rounded-[32px] border border-white/10 bg-white p-6 shadow-[var(--shadow-panel)]">
+            <DialogPanel class="w-full max-w-2xl rounded-[32px] border border-white/10 bg-white p-6 shadow-[var(--shadow-modal)]">
               <div class="flex items-start justify-between gap-4">
                 <div>
                   <p class="ui-page-kicker">{{ t('actionDialog.kicker') }}</p>
@@ -178,7 +183,7 @@ watch(
               </div>
 
               <form class="mt-6 space-y-4" @submit.prevent="emit('submit', { ...form })">
-                <label v-for="field in fields" :key="field.key" class="block">
+                <label v-for="field in activeFields" :key="field.key" class="block">
                   <FormFieldLabel
                     :label="field.label"
                     :required="field.required"

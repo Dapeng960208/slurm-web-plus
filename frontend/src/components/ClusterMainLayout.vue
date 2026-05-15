@@ -48,7 +48,7 @@ onMounted(() => {
   <MainMenu :entry="menuEntry" v-model="sidebarOpen" />
   <div class="ui-shell lg:pl-80">
     <div
-      class="sticky top-0 z-40 mx-3 mt-3 flex h-18 shrink-0 items-center gap-x-4 rounded-[28px] border border-white/60 bg-[rgba(255,255,255,0.8)] px-4 shadow-[var(--shadow-soft)] backdrop-blur-xl sm:gap-x-6 lg:mx-4 lg:px-5"
+      class="sticky top-0 z-40 mx-3 mt-3 flex h-18 shrink-0 items-center gap-x-4 rounded-[28px] border border-white/60 bg-[rgba(255,255,255,0.92)] px-4 shadow-[var(--shadow-soft)] sm:gap-x-6 lg:mx-4 lg:px-5"
     >
       <button
         type="button"
@@ -113,7 +113,7 @@ onMounted(() => {
 
     <main class="ui-content-scroll flex-1 min-h-0 px-2 pt-3 pb-3 sm:px-3 sm:pb-3 lg:px-4 lg:pt-4 lg:pb-4">
       <div
-        class="flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-[36px] border border-white/60 bg-[rgba(255,255,255,0.5)] px-3 py-2.5 shadow-[var(--shadow-soft)] backdrop-blur-sm sm:px-5 sm:py-3 lg:px-6 lg:py-4"
+        class="flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-[36px] border border-white/60 bg-[rgba(255,255,255,0.78)] px-3 py-2.5 shadow-[var(--shadow-soft)] sm:px-5 sm:py-3 lg:px-6 lg:py-4"
       >
         <div v-if="clusterNotFound">{{ t('alerts.clusterNotFound') }}</div>
         <div v-else class="home ui-page ui-page-wide flex-1">

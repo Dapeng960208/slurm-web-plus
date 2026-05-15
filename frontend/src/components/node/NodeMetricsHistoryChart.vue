@@ -34,7 +34,7 @@ function updateChart() {
   if (!chart) return
   if (!history) {
     chart.data.datasets = []
-    chart.update()
+    chart.update('none')
     return
   }
 
@@ -67,7 +67,7 @@ function updateChart() {
       tension: 0.32
     }
   ]
-  chart.update()
+  chart.update('none')
 }
 
 onMounted(() => {

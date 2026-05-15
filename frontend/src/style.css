@@ -40,8 +40,9 @@
   --radius-panel: 24px;
   --radius-chip: 999px;
 
-  --shadow-panel: 0 24px 64px rgba(32, 44, 51, 0.12), 0 8px 20px rgba(32, 44, 51, 0.06);
-  --shadow-soft: 0 14px 34px rgba(32, 44, 51, 0.08), 0 3px 10px rgba(32, 44, 51, 0.04);
+  --shadow-panel: 0 14px 30px rgba(32, 44, 51, 0.1), 0 3px 10px rgba(32, 44, 51, 0.05);
+  --shadow-soft: 0 8px 18px rgba(32, 44, 51, 0.07), 0 1px 4px rgba(32, 44, 51, 0.04);
+  --shadow-modal: 0 18px 40px rgba(32, 44, 51, 0.18), 0 4px 12px rgba(32, 44, 51, 0.08);
 
   --animate-horizontal-shake: horizontal-shaking 0.35s infinite;
 
@@ -104,12 +105,23 @@
       background-color 180ms ease,
       border-color 180ms ease,
       color 180ms ease,
-      box-shadow 180ms ease,
-      transform 180ms ease;
+      box-shadow 180ms ease;
   }
 
   ::selection {
     background: rgba(182, 232, 44, 0.3);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    ::after,
+    ::before,
+    ::backdrop {
+      animation-duration: 0.001ms !important;
+      animation-iteration-count: 1 !important;
+      scroll-behavior: auto !important;
+      transition-duration: 0.001ms !important;
+    }
   }
 
   *,
@@ -131,7 +143,6 @@
     background: rgba(255, 255, 255, 0.92);
     box-shadow: var(--shadow-soft);
     padding: 0.65rem 0.9rem;
-    backdrop-filter: blur(12px);
   }
 
   .brand-logo-image {
@@ -228,7 +239,6 @@
     border: 1px solid rgba(255, 255, 255, 0.7);
     background: rgba(255, 255, 255, 0.88);
     box-shadow: var(--shadow-panel);
-    backdrop-filter: blur(16px);
   }
 
   .ui-page {
@@ -626,7 +636,6 @@
     border: 1px solid rgba(255, 255, 255, 0.76);
     background: rgba(255, 255, 255, 0.94);
     box-shadow: var(--shadow-soft);
-    backdrop-filter: blur(12px);
   }
 
   .ui-table-scroll {
@@ -766,7 +775,6 @@
     border: 1px solid rgba(255, 255, 255, 0.75);
     background: var(--color-brand-panel);
     box-shadow: var(--shadow-panel);
-    backdrop-filter: blur(14px);
   }
 
   .ui-panel-soft {
@@ -1035,9 +1043,8 @@
     overflow: auto;
     border-radius: 20px;
     border: 1px solid rgba(80, 105, 127, 0.12);
-    background: rgba(255, 255, 255, 0.96);
-    box-shadow: var(--shadow-panel);
-    backdrop-filter: blur(14px);
+    background: #ffffff;
+    box-shadow: var(--shadow-soft);
     padding: 0.35rem;
   }
 
@@ -1142,13 +1149,11 @@
     transition:
       border-color 180ms ease,
       color 180ms ease,
-      box-shadow 180ms ease,
-      transform 180ms ease;
+      box-shadow 180ms ease;
   }
 
   .ui-partition-link-chip:hover,
   .ui-partition-link-chip:focus-visible {
-    transform: translateY(-1px);
     border-color: rgba(152, 201, 31, 0.44);
     color: var(--color-brand-ink-strong);
     box-shadow:
@@ -1229,15 +1234,12 @@
     gap: 0.3rem;
     color: var(--color-brand-blue);
     font-weight: 600;
-    transition:
-      color 180ms ease,
-      transform 180ms ease;
+    transition: color 180ms ease;
   }
 
   .ui-inline-link:hover,
   .ui-user-link:hover {
     color: var(--color-brand-ink-strong);
-    transform: translateX(1px);
   }
 
   .ui-markdown {
@@ -1677,7 +1679,6 @@
     border: 1px solid rgba(255, 255, 255, 0.78);
     background: rgba(255, 255, 255, 0.94);
     box-shadow: var(--shadow-panel);
-    backdrop-filter: blur(14px);
   }
 
   .ui-user-menu-header {
@@ -1700,8 +1701,7 @@
     font-weight: 600;
     transition:
       background-color 180ms ease,
-      color 180ms ease,
-      transform 180ms ease;
+      color 180ms ease;
   }
 
   .ui-user-menu-item-active {
@@ -1716,9 +1716,8 @@
     overflow: hidden;
     border-radius: var(--radius-panel);
     border: 1px solid rgba(255, 255, 255, 0.75);
-    background: rgba(255, 255, 255, 0.9);
+    background: rgba(255, 255, 255, 0.94);
     box-shadow: var(--shadow-panel);
-    backdrop-filter: blur(14px);
   }
 
   .ui-table {
@@ -1738,9 +1737,7 @@
   }
 
   .ui-table tbody tr {
-    transition:
-      background-color 180ms ease,
-      transform 180ms ease;
+    transition: background-color 120ms ease;
   }
 
   .ui-table tbody tr:hover {
@@ -1781,12 +1778,10 @@
     box-shadow: var(--shadow-soft);
     transition:
       border-color 180ms ease,
-      box-shadow 180ms ease,
-      transform 180ms ease;
+      box-shadow 180ms ease;
   }
 
   .ui-detail-compact-card:hover {
-    transform: translateY(-1px);
     border-color: rgba(182, 232, 44, 0.26);
   }
 
@@ -1817,7 +1812,6 @@
       radial-gradient(circle at top left, rgba(182, 232, 44, 0.16), transparent 36%);
     box-shadow: var(--shadow-panel);
     padding: 0.85rem;
-    backdrop-filter: blur(14px);
   }
 
   @media (min-width: 768px) {
@@ -2165,8 +2159,7 @@
 
   .ui-frost {
     border: 1px solid rgba(255, 255, 255, 0.7);
-    background: rgba(255, 255, 255, 0.78);
-    backdrop-filter: blur(12px);
+    background: rgba(255, 255, 255, 0.9);
   }
 
   .ui-status-dot {
@@ -2250,5 +2243,22 @@
 
   .ui-tool-chart-fill-jobs {
     background: linear-gradient(135deg, rgba(80, 105, 127, 0.92), rgba(32, 42, 53, 0.92));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ui-chart-skeleton::after,
+  .ui-chart-skeleton-bar {
+    animation: none !important;
+  }
+
+  .ui-user-menu-item,
+  .ui-detail-compact-card,
+  .ui-detail-card,
+  .ui-detail-block,
+  .ui-detail-anchor,
+  .ui-detail-anchor-icon,
+  .ui-table tbody tr {
+    transform: none !important;
   }
 }

@@ -59,8 +59,41 @@
 - 修复创建 `test` 等子账户后父子展示和添加用户关联不一致的问题：创建时补 account-level association，账户树与详情页在 association 暂未刷新时使用 `/accounts` 的 `parent_account` 兜底
 - 修复 `ClusterAnalysisView` 平均排队时间图的范围联动错误：卡片时间范围与聚合粒度现在独立于顶部全局时间范围
 - 修复 `ClusterAnalysisView` 页头右侧误展示额外时间组件的问题；平均排队时间图只保留卡片自身时间范围，并按该窗口展开横轴
+- 前端输入与弹窗交互性能优化：降低共享 surface 阴影和模糊成本，移除主要布局与弹窗遮罩的 `backdrop-blur`，`ActionDialog` 改为打开时锁定字段快照，`Admin > AI` 模型配置弹窗拆为独立表单组件；第二轮补充云桌面优化，降低轮询、图表和 Canvas 动画导致的持续重绘
 
 ## 2. 已完成项
+
+- 前端输入与弹窗交互性能优化已完成：
+  - `frontend/src/style.css` 已降低 `--shadow-panel` / `--shadow-soft` 成本，并新增 `--shadow-modal` 供弹窗使用
+  - 大面积共享容器 `ui-panel`、`ui-table-shell`、`ui-results-pagination`、`ui-combobox-menu`、`ui-frost` 已移除 `backdrop-filter`
+  - 主业务布局、Settings 布局、移动侧栏与共享操作弹窗遮罩已改为普通半透明背景，不再对整页背景做 blur 合成
+  - `button/input/select/textarea` 全局 transition 已移除 `transform`，保留颜色、边框和阴影过渡
+  - `ActionDialog` 打开时复制 `fields` 到内部 `activeFields` 快照，输入期间基于快照渲染和校验，避免父页面内联字段数组变化造成额外重算
+  - `SettingsAI` 模型配置弹窗已拆为 `SettingsAIConfigModal`，输入状态隔离在子组件内，父页面仍只负责配置列表、审计列表和接口调用
+  - 云桌面浏览器专项优化已完成：
+    - `useClusterDataPoller` 对轮询响应做内容签名，相同内容不再替换 `data.value` 引用，减少 Jobs、Resources、Dashboard 等实时页面的无效 diff
+    - Chart.js 实时图、缓存统计图、节点历史图、队列等待图、用户历史图更新改为 `chart.update('none')`，并补齐无动画配置
+    - `ResourcesCanvas` 移除 loading shimmer 的 `requestAnimationFrame` 循环，资源拓扑加载后保持静态绘制
+    - 全局 CSS 增加 `prefers-reduced-motion: reduce` 降级，禁用骨架屏动画、长 transition 和 transform 动效
+  - 第三轮大表与剩余视觉热点优化已完成：
+    - Jobs、Resources、QOS、Admin AI 配置表与审计表行级增加 `v-memo`，父页面输入、刷新状态或过滤状态变化时可跳过未变行 patch
+    - 通知条与 Jobs 历史排序下拉移除剩余 `backdrop-blur`，并降低阴影成本
+    - 常用链接、用户菜单项、详情卡、资源展开节点卡片不再使用 hover 位移或 scale，保留颜色、边框和阴影反馈
+    - 集群入口页右上角操作按钮移除残留 `backdrop-blur`，账户树展开图标取消旋转过渡
+  - 第四轮输入期间轮询让路已完成：
+    - `useClusterDataPoller` 自动轮询 tick 会在 `input`、`textarea`、`select` 或 `contenteditable` 聚焦时跳过本次请求并按原间隔继续调度，减少输入期间主线程和响应式更新竞争
+    - 手动 `refresh()` 不受该策略影响，用户主动刷新仍会立即请求
+  - 本轮没有改动后端接口、权限、路由、缓存策略或提交 payload 契约
+  - 本轮前端定向验证已通过：
+    - `cd frontend && npx vitest run tests/components/operations/ActionDialog.spec.ts tests/components/forms/RemoteSearchSelect.spec.ts tests/views/settings/SettingsAI.spec.ts`
+    - `cd frontend && npx vitest run tests/views/JobsView.spec.ts tests/views/AccountView.spec.ts tests/views/AccountsView.spec.ts tests/views/QosView.spec.ts tests/views/NodeView.spec.ts`
+    - `cd frontend && npx vitest run tests/composables/DataPoller.spec.ts tests/components/resources/ResourcesCanvas.spec.ts tests/components/dashboard/ChartResourcesHistory.spec.ts tests/components/dashboard/ChartJobsHistory.spec.ts tests/components/settings/SettingsCacheStatistics.spec.ts tests/components/settings/SettingsCacheMetrics.spec.ts tests/components/user/UserSubmissionHistoryChart.spec.ts`
+    - `cd frontend && npx vitest run tests/views/JobsView.spec.ts tests/views/resources/ResourcesView.spec.ts tests/views/QosView.spec.ts tests/views/settings/SettingsAI.spec.ts tests/views/JobsHistoryView.spec.ts`
+    - `cd frontend && npx vitest run tests/views/ClustersView.spec.ts tests/components/accounts/AccountTreeNode.spec.ts`
+    - `cd frontend && npx vitest run tests/composables/DataPoller.spec.ts`
+    - `npm --prefix frontend run type-check`
+  - 残留说明：
+    - `JobsView` 定向测试仍会输出既有 Vue `inject()` warning，当前不影响断言通过
 
 - AI 集群状态分析聚合上下文已落地：
   - Agent 新增 `GET /v{version}/analysis/context`

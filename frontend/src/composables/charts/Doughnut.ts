@@ -21,6 +21,7 @@ export default function useDoughnutChart(
   let chart: Chart | null = null
   const genericOptions: ChartOptions = {
     responsive: true,
+    animation: false,
 
     plugins: {
       legend: {
@@ -46,7 +47,7 @@ export default function useDoughnutChart(
         rotation: 180
       }
     ]
-    chart.update()
+    chart.update('none')
   }
 
   function setLabels(newLabels: { name: string; color: string }[]) {
@@ -56,7 +57,7 @@ export default function useDoughnutChart(
     if (chart.data.datasets[0]) {
       chart.data.datasets[0].backgroundColor = currentLabels.map((label) => label.color)
     }
-    chart.update()
+    chart.update('none')
   }
 
   onMounted(() => {

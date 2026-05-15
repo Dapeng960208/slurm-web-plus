@@ -205,7 +205,7 @@ function navigationTarget(route: string): RouteLocationRaw {
         leave-from="opacity-100"
         leave-to="opacity-0"
       >
-        <div class="fixed inset-0 bg-[rgba(32,42,53,0.7)] backdrop-blur-sm" />
+        <div class="fixed inset-0 bg-[rgba(32,42,53,0.72)]" />
       </TransitionChild>
 
       <div class="fixed inset-0 flex">

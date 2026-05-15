@@ -473,7 +473,7 @@ onMounted(async () => {
                 v-if="loaded"
                 class="divide-y divide-gray-200 text-sm text-gray-500 dark:divide-gray-700 dark:text-gray-300"
               >
-                <tr v-for="job in sortedJobs.slice(firstjob, lastjob)" :key="job.job_id">
+                <tr v-for="job in sortedJobs.slice(firstjob, lastjob)" :key="job.job_id" v-memo="[job]">
                   <td class="py-3 pr-3 font-medium whitespace-nowrap text-[var(--color-brand-ink-strong)] sm:pl-6 lg:pl-8">
                     {{ job.job_id }}
                   </td>

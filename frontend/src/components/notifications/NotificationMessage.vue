@@ -26,7 +26,7 @@ const typeLabel = computed(() =>
 
 <template>
   <div
-    class="pointer-events-auto w-full overflow-hidden rounded-[24px] border border-white/70 bg-[rgba(255,255,255,0.92)] shadow-[var(--shadow-panel)] backdrop-blur-xl"
+    class="pointer-events-auto w-full overflow-hidden rounded-[24px] border border-white/70 bg-[rgba(255,255,255,0.96)] shadow-[var(--shadow-soft)]"
   >
     <div class="flex items-start p-4">
       <div class="shrink-0 rounded-full p-2" :class="notification.type == 'INFO' ? 'bg-[rgba(123,191,31,0.12)]' : 'bg-[rgba(216,75,80,0.12)]'">
