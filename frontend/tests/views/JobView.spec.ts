@@ -55,7 +55,7 @@ describe('JobView.vue', () => {
     document.body.innerHTML = ''
   })
 
-  test('displays job details', () => {
+  test('displays job details as a continuous detail list', () => {
     mockClusterDataPoller.data.value = jobRunning
     const wrapper = mount(JobView, {
       props: {
@@ -78,56 +78,34 @@ describe('JobView.vue', () => {
     expect(backButton.props('cluster')).toBe('foo')
     expect(backButton.text()).toBe('Back to jobs')
 
-    const summary = wrapper.get('[data-testid="detail-summary-strip"]')
-    const links = summary.findAllComponents({ name: 'RouterLink' })
-    const userLink = links[0]
-    const partitionLink = links[1]
+    expect(wrapper.find('[data-testid="detail-summary-strip"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="job-detail-grid"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="job-detail-long-fields"]').exists()).toBe(false)
+    expect(wrapper.find('.ui-detail-grid').exists()).toBe(false)
+    expect(wrapper.find('.ui-detail-long-stack').exists()).toBe(false)
 
-    expect(summary.text()).toContain(i18n.global.t('pages.job.summary.user'))
-    expect(userLink.props('to')).toEqual({
-      name: 'user',
-      params: { cluster: 'foo', user: jobRunning.user }
-    })
-    expect(summary.text()).toContain(i18n.global.t('pages.job.summary.account'))
-    expect(summary.text()).toContain('-')
-    expect(links).toHaveLength(2)
-    expect(summary.text()).toContain(i18n.global.t('pages.job.summary.partition'))
-    expect(partitionLink.props('to')).toEqual({
-      name: 'partition',
-      params: { cluster: 'foo', partition: jobRunning.partition }
-    })
-    expect(summary.text()).toContain(i18n.global.t('pages.job.summary.nodes'))
-    expect(summary.text()).toContain(jobRunning.nodes)
-    expect(summary.text()).toContain(i18n.global.t('pages.job.summary.exitCode'))
-    expect(summary.text()).toContain('SUCCESS (0)')
-    expect(summary.text()).toContain(i18n.global.t('pages.job.summary.requested'))
-    expect(summary.text()).toContain(i18n.global.t('pages.job.summary.allocated'))
+    const detailList = wrapper.get('[data-testid="job-detail-list"]')
+    expect(detailList.classes()).toContain('ui-detail-list')
+    expect(detailList.findAll('.ui-detail-row').length).toBeGreaterThan(8)
+    expect(detailList.text()).toContain(i18n.global.t('pages.job.fields.partition'))
+    expect(detailList.text()).toContain(i18n.global.t('pages.job.fields.workingDirectory'))
+    expect(detailList.text()).toContain(i18n.global.t('pages.job.fields.requested'))
+    expect(detailList.text()).toContain(i18n.global.t('pages.job.fields.allocated'))
+    expect(detailList.text()).toContain(i18n.global.t('pages.job.fields.exitCode'))
+    expect(detailList.text()).not.toContain(i18n.global.t('pages.job.sections.identityTitle'))
+    expect(detailList.text()).not.toContain(i18n.global.t('pages.job.panels.detailedTitle'))
 
-    const detailSections = wrapper.get('[data-testid="job-detail-sections"]')
-    const detailGrid = wrapper.get('[data-testid="job-detail-grid"]')
-    const detailLongFields = wrapper.get('[data-testid="job-detail-long-fields"]')
-    expect(detailGrid.classes()).toContain('ui-detail-grid')
-    expect(detailLongFields.classes()).toContain('ui-detail-long-stack')
-    expect(detailSections.text()).toContain(i18n.global.t('pages.job.fields.workingDirectory'))
-    const detailPartitionLinks = detailSections
+    const userLink = detailList
       .findAllComponents({ name: 'RouterLink' })
-      .filter((link) =>
-        JSON.stringify(link.props('to')) ===
-        JSON.stringify({
-          name: 'partition',
-          params: { cluster: 'foo', partition: jobRunning.partition }
-        })
-      )
-    expect(detailSections.text()).toContain(i18n.global.t('pages.job.fields.partition'))
-    expect(detailPartitionLinks).toHaveLength(1)
+      .find((link) => JSON.stringify(link.props('to')) === JSON.stringify({
+        name: 'user',
+        params: { cluster: 'foo', user: jobRunning.user }
+      }))
+    expect(userLink).toBeDefined()
+
     expect(wrapper.get('#workdir').text()).toContain(jobRunning.working_directory)
     expect(wrapper.get('#submit-line pre').text()).toContain(jobRunning.submit_line)
     expect(wrapper.get('#script').text()).toContain(jobRunning.script)
-    expect(detailSections.text()).toContain(i18n.global.t('pages.job.fields.requested'))
-    expect(detailSections.text()).toContain(i18n.global.t('pages.job.fields.allocated'))
-    expect(detailSections.text()).toContain(i18n.global.t('pages.job.fields.exitCode'))
-    expect(detailSections.text()).not.toContain(i18n.global.t('pages.job.sections.identityTitle'))
-    expect(detailSections.text()).not.toContain(i18n.global.t('pages.job.panels.detailedTitle'))
     expect(wrapper.find('.ui-scroll-region').classes()).toEqual(
       expect.arrayContaining(['ui-scroll-region', 'min-h-0', 'flex-1', 'pr-1'])
     )

@@ -80,38 +80,29 @@ describe('JobHistoryView.vue', () => {
         name: 'job',
         params: { cluster: 'foo', id: 1234 }
       }))
-    const partitionSummaryLink = wrapper
+    const partitionLink = wrapper
       .findAllComponents({ name: 'RouterLink' })
       .find((link) => JSON.stringify(link.props('to')) === JSON.stringify({
-        name: 'partition',
-        params: { cluster: 'foo', partition: 'normal' }
+        name: 'account',
+        params: { cluster: 'foo', account: 'science' }
       }))
     expect(liveLink).toBeDefined()
-    expect(partitionSummaryLink).toBeDefined()
+    expect(partitionLink).toBeDefined()
     expect(wrapper.text()).toContain('0 nodes, 0 CPUs')
     expect(wrapper.text()).toContain('Exit Code')
-    expect(wrapper.get('[data-testid="detail-summary-strip"]').text()).toContain('SUCCESS (0)')
-    expect(wrapper.get('[data-testid="detail-summary-strip"]').text()).toContain('Max Memory')
-    expect(wrapper.get('[data-testid="detail-summary-strip"]').text()).toContain('-')
-    expect(wrapper.get('[data-testid="detail-summary-strip"]').text()).toContain('Job ID')
-    expect(wrapper.get('[data-testid="detail-summary-strip"]').text()).toContain('Exit Code')
-    const detailSections = wrapper.get('[data-testid="job-history-detail-sections"]')
-    expect(wrapper.get('[data-testid="job-history-detail-grid"]').classes()).toContain('ui-detail-grid')
-    expect(wrapper.get('[data-testid="job-history-detail-long-fields"]').classes()).toContain(
-      'ui-detail-long-stack'
-    )
-    const detailCompactLinks = detailSections
-      .findAllComponents({ name: 'RouterLink' })
-      .filter((link) => JSON.stringify(link.props('to')) === JSON.stringify({
-        name: 'partition',
-        params: { cluster: 'foo', partition: 'normal' }
-      }))
-    expect(detailCompactLinks).toHaveLength(1)
-    expect(detailSections.text()).toContain('Resources')
-    expect(detailSections.text()).toContain('Command')
+    expect(wrapper.find('[data-testid="detail-summary-strip"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="job-history-detail-grid"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="job-history-detail-long-fields"]').exists()).toBe(false)
+    expect(wrapper.find('.ui-detail-grid').exists()).toBe(false)
+    expect(wrapper.find('.ui-detail-long-stack').exists()).toBe(false)
+
+    const detailList = wrapper.get('[data-testid="job-history-detail-list"]')
+    expect(detailList.classes()).toContain('ui-detail-list')
+    expect(detailList.text()).toContain('Resources')
+    expect(detailList.text()).toContain('Command')
     expect(wrapper.get('#command pre').text()).toContain('sleep 1')
-    expect(detailSections.text()).not.toContain('Identity & Archive Context')
-    expect(detailSections.text()).not.toContain('Command & Execution Context')
+    expect(detailList.text()).not.toContain('Identity & Archive Context')
+    expect(detailList.text()).not.toContain('Command & Execution Context')
     expect(wrapper.text()).not.toContain('Submit Time')
     expect(wrapper.text()).not.toContain('End Time')
   })
@@ -185,10 +176,8 @@ describe('JobHistoryView.vue', () => {
     expect(wrapper.text()).toContain('Max Memory')
     expect(wrapper.text()).toContain('4.00 GB')
     expect(wrapper.get('#step-terminated').text()).not.toContain('\n                  -')
-    expect(wrapper.get('[data-testid="detail-summary-strip"]').text()).toContain('SUCCESS (0)')
-    expect(wrapper.get('[data-testid="detail-summary-strip"]').text()).toContain('Avg CPU Cores')
-    expect(wrapper.get('[data-testid="job-history-detail-sections"]').text()).toContain('Requested')
-    expect(wrapper.get('[data-testid="job-history-detail-sections"]').text()).toContain('Working Directory')
+    expect(wrapper.get('[data-testid="job-history-detail-list"]').text()).toContain('Requested')
+    expect(wrapper.get('[data-testid="job-history-detail-list"]').text()).toContain('Working Directory')
     expect(wrapper.text()).not.toContain('Submit Time')
     expect(wrapper.text()).not.toContain('Eligible Time')
     expect(wrapper.text()).not.toContain('Start Time')
@@ -247,8 +236,8 @@ describe('JobHistoryView.vue', () => {
 
     await flushPromises()
 
-    expect(wrapper.get('[data-testid="detail-summary-strip"]').text()).toContain('FAILED (9)')
-    expect(wrapper.get('[data-testid="detail-summary-strip"]').text()).not.toContain('[object Object]')
+    expect(wrapper.get('#exit-code').text()).toContain('FAILED (9)')
+    expect(wrapper.get('#exit-code').text()).not.toContain('[object Object]')
   })
 
   test('renders signaled exit code from object payload', async () => {
@@ -303,10 +292,10 @@ describe('JobHistoryView.vue', () => {
 
     await flushPromises()
 
-    expect(wrapper.get('[data-testid="detail-summary-strip"]').text()).toContain('SIGNALED (TERM/15)')
+    expect(wrapper.get('#exit-code').text()).toContain('SIGNALED (TERM/15)')
   })
 
-  test('renders average cpu cores used value with help tooltip', async () => {
+  test('renders average cpu cores used value with help text', async () => {
     mockGatewayAPI.job_history_detail.mockResolvedValueOnce({
       id: 5,
       snapshot_time: '2026-04-20T10:00:00+00:00',
@@ -355,11 +344,9 @@ describe('JobHistoryView.vue', () => {
 
     await flushPromises()
 
-    expect(wrapper.get('[data-testid="detail-summary-strip"]').text()).toContain('Avg CPU Cores')
-    expect(wrapper.get('[data-testid="detail-summary-strip"]').text()).toContain('2.005')
-    expect(wrapper.get('[data-testid="detail-summary-strip"]').text()).toContain(
-      'Average concurrent cores used'
-    )
+    expect(wrapper.get('#used-cpu-cores-avg').text()).toContain('2.005')
+    expect(wrapper.get('#used-cpu-cores-avg').text()).toContain('Average CPU Cores Used')
+    expect(wrapper.get('#used-cpu-cores-avg').text()).toContain('Estimated average concurrent CPU cores used')
   })
 
   test('renders dash when average cpu cores used is unavailable', async () => {
@@ -411,8 +398,8 @@ describe('JobHistoryView.vue', () => {
 
     await flushPromises()
 
-    expect(wrapper.get('[data-testid="detail-summary-strip"]').text()).toContain('Avg CPU Cores')
-    expect(wrapper.get('[data-testid="detail-summary-strip"]').text()).toContain('-')
+    expect(wrapper.get('#used-cpu-cores-avg').text()).toContain('Average CPU Cores Used')
+    expect(wrapper.get('#used-cpu-cores-avg').text()).toContain('-')
   })
 
   test('renders job history skeleton before the API resolves', () => {
