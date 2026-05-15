@@ -16,7 +16,7 @@ import { useClusterDataPoller } from '@/composables/DataPoller'
 import type { ClusterReservation } from '@/composables/GatewayAPI'
 import { useGatewayAPI } from '@/composables/GatewayAPI'
 import { representDuration } from '@/composables/TimeDuration'
-import { parseCsvList, stringifyList } from '@/composables/management'
+import { parseCsvList, parseOptionalCsvList, stringifyList } from '@/composables/management'
 import InfoAlert from '@/components/InfoAlert.vue'
 import ErrorAlert from '@/components/ErrorAlert.vue'
 import PageHeader from '@/components/PageHeader.vue'
@@ -117,6 +117,30 @@ function buildReservationTimePayload(
   }
 }
 
+function hasReservationAccessControl(payload: Record<string, string>): boolean {
+  return [
+    payload.users,
+    payload.groups,
+    payload.accounts,
+    payload.qos,
+    payload.allowed_partitions
+  ].some((value) => parseCsvList(value ?? '').length > 0)
+}
+
+function buildReservationAccessPayload(payload: Record<string, string>) {
+  if (!hasReservationAccessControl(payload)) {
+    throw new Error(t('pages.reservations.errors.accessControlRequired'))
+  }
+
+  return {
+    users: parseOptionalCsvList(payload.users ?? ''),
+    groups: parseOptionalCsvList(payload.groups ?? ''),
+    accounts: parseOptionalCsvList(payload.accounts ?? ''),
+    qos: parseOptionalCsvList(payload.qos ?? ''),
+    allowed_partitions: parseOptionalCsvList(payload.allowed_partitions ?? '')
+  }
+}
+
 function updateQueryParameters() {
   const query: LocationQueryRaw = {}
   if (page.value !== 1) query.page = page.value
@@ -157,12 +181,11 @@ async function createReservation(payload: Record<string, string>) {
   operationError.value = null
   try {
     const timePayload = buildReservationTimePayload(payload, { requireEndTime: true })
+    const accessPayload = buildReservationAccessPayload(payload)
     await gateway.save_reservation(cluster, {
       name: payload.name || undefined,
       node_list: payload.node_list || undefined,
-      partition: payload.partition || undefined,
-      users: parseCsvList(payload.users),
-      accounts: parseCsvList(payload.accounts),
+      ...accessPayload,
       start_time: timePayload.start_time,
       end_time: timePayload.end_time
     })
@@ -183,12 +206,11 @@ async function updateReservation(payload: Record<string, string>) {
   operationError.value = null
   try {
     const timePayload = buildReservationTimePayload(payload)
+    const accessPayload = buildReservationAccessPayload(payload)
     await gateway.update_reservation(cluster, selectedReservation.value.name, {
       name: selectedReservation.value.name,
       node_list: payload.node_list || undefined,
-      partition: payload.partition || undefined,
-      users: parseCsvList(payload.users),
-      accounts: parseCsvList(payload.accounts),
+      ...accessPayload,
       start_time: timePayload.start_time,
       end_time: timePayload.end_time
     })
@@ -421,9 +443,14 @@ if (route.query.page_size) {
           type: 'datetime-local',
           hint: 'pages.reservations.dialogs.hints.endTime'
         },
-        { key: 'partition', label: 'pages.reservations.dialogs.fields.partition' },
+        {
+          key: 'allowed_partitions',
+          label: 'pages.reservations.dialogs.fields.allowedPartitions'
+        },
         { key: 'users', label: 'pages.reservations.dialogs.fields.users' },
-        { key: 'accounts', label: 'pages.reservations.dialogs.fields.accounts' }
+        { key: 'groups', label: 'pages.reservations.dialogs.fields.groups' },
+        { key: 'accounts', label: 'pages.reservations.dialogs.fields.accounts' },
+        { key: 'qos', label: 'pages.reservations.dialogs.fields.qos' }
       ]"
       @close="createOpen = false"
       @submit="createReservation"
@@ -441,9 +468,11 @@ if (route.query.page_size) {
         node_list: selectedReservation?.node_list ?? '',
         start_time: formatReservationDateTimeLocal(selectedReservation?.start_time?.number),
         end_time: formatReservationDateTimeLocal(selectedReservation?.end_time?.number),
-        partition: '',
+        allowed_partitions: stringifyList(selectedReservation?.partition),
         users: stringifyList(selectedReservation?.users),
-        accounts: stringifyList(selectedReservation?.accounts)
+        groups: stringifyList(selectedReservation?.groups),
+        accounts: stringifyList(selectedReservation?.accounts),
+        qos: stringifyList(selectedReservation?.qos)
       }"
       :fields="[
         {
@@ -465,9 +494,14 @@ if (route.query.page_size) {
           type: 'datetime-local',
           hint: 'pages.reservations.dialogs.hints.endTimeOptional'
         },
-        { key: 'partition', label: 'pages.reservations.dialogs.fields.partition' },
+        {
+          key: 'allowed_partitions',
+          label: 'pages.reservations.dialogs.fields.allowedPartitions'
+        },
         { key: 'users', label: 'pages.reservations.dialogs.fields.users' },
-        { key: 'accounts', label: 'pages.reservations.dialogs.fields.accounts' }
+        { key: 'groups', label: 'pages.reservations.dialogs.fields.groups' },
+        { key: 'accounts', label: 'pages.reservations.dialogs.fields.accounts' },
+        { key: 'qos', label: 'pages.reservations.dialogs.fields.qos' }
       ]"
       @close="editOpen = false"
       @submit="updateReservation"

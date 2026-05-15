@@ -48,12 +48,13 @@ describe('ReservationsView.vue', () => {
         cache: false
       }
     ]
-    // Reset mockClusterDataPoller unable to its default value before every tests.
-    mockClusterDataPoller.unable.value = false
-  })
-  test('display reservations', () => {
     mockClusterDataPoller.data.value = reservations
-    // Check at least one reservation is present in test asset or the test is pointless.
+    mockClusterDataPoller.unable.value = false
+    mockClusterDataPoller.loaded.value = true
+    mockClusterDataPoller.initialLoading.value = false
+  })
+
+  test('display reservations', () => {
     expect(reservations.length).toBeGreaterThan(0)
     const wrapper = mount(ReservationsView, {
       props: {
@@ -63,36 +64,31 @@ describe('ReservationsView.vue', () => {
     expect(wrapper.find('.ui-table-scroll').exists()).toBe(true)
     expect(wrapper.find('.ui-results-dock .ui-results-pagination').exists()).toBe(true)
     expect(wrapper.find('.ui-table-shell .ui-results-pagination').exists()).toBe(false)
-    // Retrieve table body lines
     const reservationsTableLines = wrapper.get('main table tbody').findAll('tr')
-    // Check one line per reservation in table body
     expect(reservationsTableLines.length).toBe(reservations.length)
-    /* For all reservations defined in test asset, check:
-     * - name in 1st cell
-     * - users in 5th cell
-     * - account in 6th cell
-     * - flags in 7th cell
-     */
     for (const [i] of reservationsTableLines.entries()) {
       const reservationCells = reservationsTableLines[i].findAll('td')
       expect(reservationCells[0].text()).toBe(reservations[i].name)
-      // if users in reservations, check all li items else check li absence
-      if (reservations[i].users.length)
+      if (reservations[i].users.length) {
         expect(reservationCells[4].findAll('li').map((element) => element.text())).toStrictEqual(
           reservations[i].users.split(',')
         )
-      else expect(() => reservationCells[4].get('li')).toThrowError()
-      // if accounts in reservations, check all li items else check li absence
-      if (reservations[i].accounts.length)
+      } else {
+        expect(() => reservationCells[4].get('li')).toThrowError()
+      }
+      if (reservations[i].accounts.length) {
         expect(reservationCells[5].findAll('li').map((element) => element.text())).toStrictEqual(
           reservations[i].accounts.split(',')
         )
-      else expect(() => reservationCells[5].get('li')).toThrowError()
+      } else {
+        expect(() => reservationCells[5].get('li')).toThrowError()
+      }
       expect(reservationCells[6].findAll('span').map((element) => element.text())).toStrictEqual(
         reservations[i].flags
       )
     }
   })
+
   test('show error alert when unable to retrieve reservations', () => {
     mockClusterDataPoller.unable.value = true
     const wrapper = mount(ReservationsView, {
@@ -104,6 +100,7 @@ describe('ReservationsView.vue', () => {
       i18n.global.t('pages.reservations.unableToRetrieve', { cluster: 'foo' })
     )
   })
+
   test('show info alert when no reservation defined', () => {
     mockClusterDataPoller.data.value = []
     const wrapper = mount(ReservationsView, {
@@ -116,8 +113,7 @@ describe('ReservationsView.vue', () => {
     )
   })
 
-  test('submits reservation create payload with required time fields', async () => {
-    mockClusterDataPoller.data.value = reservations
+  test('submits reservation create payload with normalized access fields', async () => {
     mockGatewayAPI.save_reservation.mockResolvedValue({ result: 'ok' })
 
     const wrapper = mount(ReservationsView, {
@@ -135,18 +131,22 @@ describe('ReservationsView.vue', () => {
       node_list: 'cn001,cn002',
       start_time: '2026-05-14T10:30',
       end_time: '2026-05-14T12:00',
-      partition: 'gpu',
+      allowed_partitions: 'gpu, batch',
       users: 'alice,bob',
-      accounts: 'science'
+      groups: 'ops, support',
+      accounts: 'science',
+      qos: 'debug, normal'
     })
     await flushPromises()
 
     expect(mockGatewayAPI.save_reservation).toHaveBeenCalledWith('foo', {
       name: 'maint-weekend',
       node_list: 'cn001,cn002',
-      partition: 'gpu',
       users: ['alice', 'bob'],
+      groups: ['ops', 'support'],
       accounts: ['science'],
+      qos: ['debug', 'normal'],
+      allowed_partitions: ['gpu', 'batch'],
       start_time: {
         set: true,
         number: Math.floor(new Date('2026-05-14T10:30').getTime() / 1000)
@@ -158,9 +158,7 @@ describe('ReservationsView.vue', () => {
     })
   })
 
-  test('shows local validation error when create reservation end time is missing', async () => {
-    mockClusterDataPoller.data.value = reservations
-
+  test('shows local validation error when all access control fields are empty', async () => {
     const wrapper = mount(ReservationsView, {
       props: {
         cluster: 'foo'
@@ -170,21 +168,80 @@ describe('ReservationsView.vue', () => {
     await wrapper.get('button.ui-button-primary').trigger('click')
     await nextTick()
     const createDialog = wrapper.findAllComponents(ActionDialog)[0]
-    expect(createDialog.props('open')).toBe(true)
+    createDialog.vm.$emit('submit', {
+      name: 'maint-window',
+      node_list: 'cn003',
+      start_time: '2026-05-14T10:30',
+      end_time: '2026-05-14T12:00',
+      allowed_partitions: '',
+      users: '',
+      groups: '',
+      accounts: '',
+      qos: ''
+    })
+    await flushPromises()
+
+    expect(mockGatewayAPI.save_reservation).not.toHaveBeenCalled()
+    expect(wrapper.findAllComponents(ActionDialog)[0].props('error')).toBe(
+      i18n.global.t('pages.reservations.errors.accessControlRequired')
+    )
+  })
+
+  test('shows local validation error when create reservation end time is missing', async () => {
+    const wrapper = mount(ReservationsView, {
+      props: {
+        cluster: 'foo'
+      }
+    })
+
+    await wrapper.get('button.ui-button-primary').trigger('click')
+    await nextTick()
+    const createDialog = wrapper.findAllComponents(ActionDialog)[0]
     createDialog.vm.$emit('submit', {
       name: 'maint-window',
       node_list: 'cn003',
       start_time: '2026-05-14T10:30',
       end_time: '',
-      partition: '',
+      allowed_partitions: 'gpu',
       users: '',
-      accounts: ''
+      groups: '',
+      accounts: '',
+      qos: ''
     })
     await flushPromises()
 
     expect(mockGatewayAPI.save_reservation).not.toHaveBeenCalled()
     expect(wrapper.findAllComponents(ActionDialog)[0].props('error')).toBe(
       i18n.global.t('pages.reservations.errors.endTimeRequired')
+    )
+  })
+
+  test('shows local validation error when end time is before start time', async () => {
+    const wrapper = mount(ReservationsView, {
+      props: {
+        cluster: 'foo'
+      }
+    })
+
+    await wrapper.get('button.ui-button-primary').trigger('click')
+    await nextTick()
+    const createDialog = wrapper.findAllComponents(ActionDialog)[0]
+    createDialog.vm.$emit('submit', {
+      name: 'maint-window',
+      node_list: 'cn003',
+      start_time: '2026-05-14T12:30',
+      end_time: '2026-05-14T10:30',
+      allowed_partitions: 'gpu',
+      users: '',
+      groups: '',
+      accounts: '',
+      qos: ''
+    })
+    await flushPromises()
+
+    expect(mockGatewayAPI.save_reservation).not.toHaveBeenCalled()
+    expect(wrapper.findAllComponents(ActionDialog)[0].props('error')).toBe(
+      i18n.global.t('pages.reservations.errors.invalidTimeRange')
     )
   })
 })
