@@ -260,7 +260,7 @@ describe('UserView.vue', () => {
     expect(infoAlert.text()).toContain('User nonexistent has no associations on this cluster')
   })
 
-  test('submits default and assigned QOS when editing a user', async () => {
+  test('submits a light user payload when editing default and assigned QOS', async () => {
     useRuntimeStore().availableClusters = [
       {
         name: 'foo',

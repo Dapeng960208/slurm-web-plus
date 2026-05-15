@@ -374,6 +374,18 @@ class Slurmrestd:
             return normalized
         return {"accounts": [self._normalize_single_account(payload)]}
 
+    def _normalize_users_payload(self, payload: t.Dict[str, t.Any]) -> t.Dict[str, t.Any]:
+        if not isinstance(payload, dict):
+            return payload
+        user_entries = payload.get("users")
+        if isinstance(user_entries, list):
+            normalized = dict(payload)
+            normalized["users"] = [
+                self._normalize_single_user(user) for user in user_entries
+            ]
+            return normalized
+        return {"users": [self._normalize_single_user(payload)]}
+
     def _normalize_single_account(self, payload: t.Dict[str, t.Any]) -> t.Dict[str, t.Any]:
         if not isinstance(payload, dict):
             return payload
@@ -384,6 +396,16 @@ class Slurmrestd:
                 or normalized.get("name")
                 or "unknown"
             )
+        return normalized
+
+    def _normalize_single_user(self, payload: t.Dict[str, t.Any]) -> t.Dict[str, t.Any]:
+        if not isinstance(payload, dict):
+            return payload
+        normalized = {}
+        for key, value in dict(payload).items():
+            if value == "":
+                continue
+            normalized[key] = value
         return normalized
 
     @staticmethod
@@ -834,7 +856,12 @@ class Slurmrestd:
         return self._request("slurmdb", "users", "users")
 
     def users_update(self, payload: t.Dict[str, t.Any]):
-        return self.request_json("POST", "slurmdb", "users", payload=payload)
+        return self.request_json(
+            "POST",
+            "slurmdb",
+            "users",
+            payload=self._normalize_users_payload(payload),
+        )
 
     def user_delete(self, username: str):
         return self.request_json("DELETE", "slurmdb", f"user/{username}")

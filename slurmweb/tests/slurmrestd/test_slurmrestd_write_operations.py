@@ -291,6 +291,81 @@ class TestSlurmrestdWriteOperations(TestSlurmrestdBase):
             },
         )
 
+    def test_users_update_wraps_light_payload(self):
+        self.setup_slurmrestd("25.11.0", "0.0.44")
+        response = mock.create_autospec(requests.Response)
+        response.url = "/mocked/query"
+        response.status_code = 200
+        response.headers = {"content-type": "application/json"}
+        response.json.return_value = {
+            "warnings": [],
+            "errors": [],
+            "users": [],
+        }
+        self.slurmrestd.session.request = mock.Mock(return_value=response)
+
+        self.slurmrestd.users_update(
+            {
+                "name": "guojianpeng",
+                "default_account": "test",
+                "default_qos": "normal",
+                "qos": ["normal", "debug"],
+            }
+        )
+
+        self.slurmrestd.session.request.assert_called_once_with(
+            "POST",
+            "http+unix://slurmrestd/slurmdb/v0.0.44/users",
+            headers=mock.ANY,
+            json={
+                "users": [
+                    {
+                        "name": "guojianpeng",
+                        "default_account": "test",
+                        "default_qos": "normal",
+                        "qos": ["normal", "debug"],
+                    }
+                ]
+            },
+            params=None,
+        )
+
+    def test_users_update_strips_empty_string_fields(self):
+        self.setup_slurmrestd("25.11.0", "0.0.44")
+        response = mock.create_autospec(requests.Response)
+        response.url = "/mocked/query"
+        response.status_code = 200
+        response.headers = {"content-type": "application/json"}
+        response.json.return_value = {
+            "warnings": [],
+            "errors": [],
+            "users": [],
+        }
+        self.slurmrestd.session.request = mock.Mock(return_value=response)
+
+        self.slurmrestd.users_update(
+            {
+                "name": "guojianpeng",
+                "default_account": "",
+                "default_qos": "",
+                "description": "",
+                "admin_level": "Admin",
+            }
+        )
+
+        sent_payload = self.slurmrestd.session.request.call_args.kwargs["json"]
+        self.assertEqual(
+            sent_payload,
+            {
+                "users": [
+                    {
+                        "name": "guojianpeng",
+                        "admin_level": "Admin",
+                    }
+                ]
+            },
+        )
+
     def test_reservation_create_normalizes_payload_aliases(self):
         self.setup_slurmrestd("25.11.0", "0.0.44")
         response = mock.create_autospec(requests.Response)
