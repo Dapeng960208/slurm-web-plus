@@ -87,6 +87,7 @@ npm --prefix frontend run test:unit
   - 普通用户可以通过发送区左侧下拉框切换模型
   - 管理员也通过同一位置切换，而不是通过独立“当前模型”说明块
 - 无 `admin/ai:edit:*` / `admin/ai:delete:*`：不能创建、更新、删除 configs，也不能 validate
+- AI planner prompt 应包含当前 `user.login` 和当前 cluster；用户问“我是谁”时不应要求用户额外提供用户名
 - 有 `ai:view:*` 但无底层权限时不能通过 AI 绕过：
   - 无 `jobs:view:*|self`：不能通过 AI 读不允许访问的 live jobs
   - 无 `jobs-history:view:*`：不能通过 AI 读历史作业

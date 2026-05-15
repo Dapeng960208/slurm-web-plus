@@ -85,6 +85,17 @@ def _normalize_bool(value, default=False):
     return bool(value)
 
 
+def _user_context_prompt(user, cluster: str) -> str:
+    login = getattr(user, "login", None) or "unknown"
+    return (
+        "Current interaction context:\n"
+        f"- Current user login: {login}\n"
+        f"- Current cluster: {cluster}\n"
+        "- Treat first-person user requests as referring to this current user unless the user explicitly names someone else.\n"
+        "- For self-service user interfaces such as user/tools/analysis, omit username or use the current user login."
+    )
+
+
 def normalize_model_config_payload(payload: dict, partial=False) -> dict:
     payload = payload or {}
     normalized = {}
@@ -469,6 +480,8 @@ class AIService:
             {
                 "role": "system",
                 "content": SYSTEM_TOOL_PROMPT
+                + "\n"
+                + _user_context_prompt(user, self.app.settings.service.cluster)
                 + "\nAvailable tools:\n"
                 + tool_descriptions
                 + "\nAvailable agent interfaces:\n"

@@ -72,6 +72,7 @@
 - AI system prompt 已新增硬约束：遇到集群状态、拥塞、容量、排队等待、控制器健康或热点问题时，优先调用 `analysis/context`
 - AI 默认接口目录现在会按当前用户权限过滤；`user/tools/analysis` 作为工具分析能力对 AI 用户保持可见，不传 `username` 时只查当前登录用户，跨用户仍需全局分析权限
 - `query_agent_interface` 与 `mutate_agent_interface` 已按只读/写入分流，不能混用读写接口
+- AI planner system message 会注入当前 `user.login` 与 cluster，因此“我是谁”“我的工具分析”等第一人称请求不再需要用户额外提供用户名
 
 本轮新增验证：
 

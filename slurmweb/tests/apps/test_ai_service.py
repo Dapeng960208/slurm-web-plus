@@ -719,6 +719,22 @@ class TestAIService(TestCase):
         self.assertIn("median_memory_gb", system_prompt)
         self.assertIn("Never expose internal tool-call metadata", system_prompt)
 
+    def test_planner_prompt_includes_current_user_context(self):
+        self._create_model()
+
+        planner_messages = self.service._build_planner_messages(
+            self.user,
+            {"system_prompt": None},
+            [{"role": "user", "content": "Who am I?"}],
+        )
+
+        system_prompt = planner_messages[0]["content"]
+        self.assertIn("Current interaction context", system_prompt)
+        self.assertIn("Current user login: alice", system_prompt)
+        self.assertIn("Current cluster: test", system_prompt)
+        self.assertIn("first-person user requests", system_prompt)
+        self.assertIn("user/tools/analysis", system_prompt)
+
     def test_planner_prompt_prefers_analysis_context_for_cluster_status_questions(self):
         self._create_model()
 
