@@ -533,4 +533,49 @@ describe('ClusterAnalysisView.vue', () => {
     expect(mockGatewayAPI.metrics_gpus).not.toHaveBeenCalled()
     expect(mockGatewayAPI.analysis_node_hotspots).not.toHaveBeenCalled()
   })
+
+  test('keeps queue wait card range independent from the global toolbar range', async () => {
+    const wrapper = mount(ClusterAnalysisView, {
+      props: { cluster: 'foo' },
+      global: {
+        stubs: {
+          ClusterMainLayout: { template: '<div><slot /></div>' },
+          RouterLink: { template: '<a><slot /></a>' },
+          PartitionLinkChip: {
+            props: ['cluster', 'partition'],
+            template:
+              '<a data-testid="analysis-partition-link" :data-cluster="cluster" :data-partition="partition">{{ partition }}</a>'
+          },
+          QueueWaitHistoryChart: {
+            props: ['series', 'aggregation'],
+            template:
+              '<div data-testid="queue-wait-chart">{{ aggregation }}|{{ JSON.stringify(series) }}</div>'
+          }
+        }
+      }
+    })
+
+    await flushPromises()
+    mockGatewayAPI.jobs_history.mockClear()
+
+    await wrapper
+      .get('[data-testid="queue-wait-range-selector"] [data-testid="metric-range-custom-button"]')
+      .trigger('click')
+    await wrapper.get('[data-testid="metric-range-quick-7d"]').trigger('click')
+    await wrapper.get('[data-testid="metric-range-apply"]').trigger('click')
+    await flushPromises()
+
+    const jobHistoryCallsAfterCardRangeChange = mockGatewayAPI.jobs_history.mock.calls.length
+
+    await router.setQuery({
+      start: '2026-04-23T08:00',
+      end: '2026-04-24T08:00'
+    })
+    await flushPromises()
+
+    expect(mockGatewayAPI.jobs_history.mock.calls.length).toBe(jobHistoryCallsAfterCardRangeChange)
+    expect(
+      wrapper.find('[data-testid="queue-wait-range-selector"] [data-testid="metric-range-custom-button"]').text()
+    ).not.toContain('Time Range')
+  })
 })

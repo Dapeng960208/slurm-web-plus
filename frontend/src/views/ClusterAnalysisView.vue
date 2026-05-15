@@ -61,6 +61,7 @@ const queueWaitRange = ref<MetricRange>('hour')
 const queueWaitCustomStart = ref('')
 const queueWaitCustomEnd = ref('')
 const queueWaitAggregation = ref<QueueWaitAggregation>('minute')
+const queueWaitRangeInitialized = ref(false)
 const loading = ref(true)
 const refreshing = ref(false)
 const error = ref<string | null>(null)
@@ -372,6 +373,12 @@ async function loadCompletedHistoryJobs(): Promise<JobHistoryRecord[]> {
 }
 
 async function loadAnalysis() {
+  const initialAnalysisLoad = updatedAt.value === null
+  const queueWaitWindowMatchesGlobal =
+    queueWaitRange.value === selectedRange.value &&
+    queueWaitCustomStart.value === customStart.value &&
+    queueWaitCustomEnd.value === customEnd.value
+
   refreshing.value = !loading.value
   error.value = null
   jobsUnavailable.value = false
@@ -466,7 +473,7 @@ async function loadAnalysis() {
     gpuMetrics.value = null
   }
 
-  if (canViewHistory.value) {
+  if (canViewHistory.value && (initialAnalysisLoad || queueWaitWindowMatchesGlobal)) {
     tasks.push(
       loadCompletedHistoryJobs()
         .then((payload) => {
@@ -477,7 +484,7 @@ async function loadAnalysis() {
           waitSamplesUnavailable.value = true
         })
     )
-  } else {
+  } else if (!canViewHistory.value) {
     historyJobs.value = []
   }
 
@@ -537,7 +544,7 @@ function stopPolling() {
 }
 
 watch(
-  () => route.query.range,
+  () => [route.query.range, route.query.start, route.query.end],
   () => {
     if (route.query.range && isMetricRange(route.query.range)) {
       selectedRange.value = route.query.range
@@ -550,9 +557,12 @@ watch(
       customStart.value = route.query.start
       customEnd.value = route.query.end
     }
-    queueWaitRange.value = selectedRange.value
-    queueWaitCustomStart.value = customStart.value
-    queueWaitCustomEnd.value = customEnd.value
+    if (!queueWaitRangeInitialized.value) {
+      queueWaitRange.value = selectedRange.value
+      queueWaitCustomStart.value = customStart.value
+      queueWaitCustomEnd.value = customEnd.value
+      queueWaitRangeInitialized.value = true
+    }
   },
   { immediate: true }
 )
