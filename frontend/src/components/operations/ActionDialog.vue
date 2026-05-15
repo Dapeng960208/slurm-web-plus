@@ -11,9 +11,18 @@ import { computed, reactive, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Dialog, DialogPanel, DialogTitle, TransitionChild, TransitionRoot } from '@headlessui/vue'
 import FormFieldLabel from '@/components/forms/FormFieldLabel.vue'
+import RemoteSearchSelect from '@/components/forms/RemoteSearchSelect.vue'
 import { translate } from '@/i18n/translate'
+import type { SearchSelectSource } from '@/composables/searchSelect'
 
-export type ActionFieldType = 'text' | 'textarea' | 'number' | 'select' | 'datetime-local'
+export type ActionFieldType =
+  | 'text'
+  | 'textarea'
+  | 'number'
+  | 'select'
+  | 'datetime-local'
+  | 'search-select'
+  | 'search-multi-select'
 export type ActionSubmitVariant = 'primary' | 'warning' | 'danger'
 
 export interface ActionFieldOption {
@@ -27,10 +36,12 @@ export interface ActionField {
   label: string
   type?: ActionFieldType
   options?: ActionFieldOption[]
+  source?: SearchSelectSource
   placeholder?: string
   required?: boolean
   hint?: string
   tooltip?: string
+  minQueryLength?: number
 }
 
 const props = defineProps<{
@@ -58,7 +69,9 @@ const { t } = useI18n()
 const form = reactive<Record<string, string>>({})
 const fieldsSignature = computed(() =>
   props.fields
-    .map((field) => `${field.key}:${field.type ?? 'text'}:${field.options?.map((option) => option.value).join(',') ?? ''}`)
+    .map((field) =>
+      `${field.key}:${field.type ?? 'text'}:${field.options?.map((option) => option.value).join(',') ?? ''}:${field.source ? 'remote' : 'local'}`
+    )
     .join('|')
 )
 
@@ -198,6 +211,28 @@ watch(
                       {{ translate(option.label) }}
                     </option>
                   </select>
+                  <RemoteSearchSelect
+                    v-else-if="
+                      field.type === 'search-select' || field.type === 'search-multi-select'
+                    "
+                    :model-value="
+                      field.type === 'search-multi-select'
+                        ? form[field.key]
+                            .split(',')
+                            .map((item) => item.trim())
+                            .filter((item) => item.length > 0)
+                        : form[field.key]
+                    "
+                    :multiple="field.type === 'search-multi-select'"
+                    :source="field.source!"
+                    :placeholder="field.placeholder ? translate(field.placeholder) : ''"
+                    :min-query-length="field.minQueryLength ?? 0"
+                    @update:model-value="
+                      (value) => {
+                        form[field.key] = Array.isArray(value) ? value.join(', ') : value
+                      }
+                    "
+                  />
                   <input
                     v-else
                     v-model="form[field.key]"

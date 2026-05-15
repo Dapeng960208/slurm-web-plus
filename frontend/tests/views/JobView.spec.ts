@@ -16,7 +16,9 @@ import PanelSkeleton from '@/components/PanelSkeleton.vue'
 const mockClusterDataPoller = getMockClusterDataPoller<ClusterIndividualJob>()
 const mockGatewayAPI = {
   update_job: vi.fn(),
-  cancel_job: vi.fn()
+  cancel_job: vi.fn(),
+  partitions: vi.fn(),
+  qos: vi.fn()
 }
 
 vi.mock('@/composables/DataPoller', () => ({
@@ -52,6 +54,8 @@ describe('JobView.vue', () => {
     mockClusterDataPoller.unable.value = false
     mockClusterDataPoller.loaded.value = true
     mockClusterDataPoller.initialLoading.value = false
+    mockGatewayAPI.partitions.mockResolvedValue([{ name: 'normal', node_sets: 'cn[1-4]' }])
+    mockGatewayAPI.qos.mockResolvedValue([{ name: 'normal', description: 'Normal', flags: [], limits: {} }])
     document.body.innerHTML = ''
   })
 

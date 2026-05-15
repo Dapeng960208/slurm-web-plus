@@ -72,7 +72,7 @@ describe('JobsHistoryView.vue', () => {
       global: {
         stubs: {
           ClusterMainLayout: { template: '<div><slot /></div>' },
-          JobsHistoryFiltersPanel: { template: '<div />' },
+          JobsHistoryFiltersPanel: { template: '<div />', props: ['cluster', 'open', 'filters', 'total'] },
           JobsHistoryFiltersBar: { template: '<div />' },
           JobsHistorySorter: { template: '<div />' }
         }
@@ -136,7 +136,7 @@ describe('JobsHistoryView.vue', () => {
       global: {
         stubs: {
           ClusterMainLayout: { template: '<div><slot /></div>' },
-          JobsHistoryFiltersPanel: { template: '<div />' },
+          JobsHistoryFiltersPanel: { template: '<div />', props: ['cluster', 'open', 'filters', 'total'] },
           JobsHistoryFiltersBar: { template: '<div />' },
           JobsHistorySorter: { template: '<div />' }
         }
@@ -164,7 +164,7 @@ describe('JobsHistoryView.vue', () => {
       global: {
         stubs: {
           ClusterMainLayout: { template: '<div><slot /></div>' },
-          JobsHistoryFiltersPanel: { template: '<div />' },
+          JobsHistoryFiltersPanel: { template: '<div />', props: ['cluster', 'open', 'filters', 'total'] },
           JobsHistoryFiltersBar: { template: '<div />' },
           JobsHistorySorter: {
             template: '<button class="sorter" @click="$emit(\'update:sort\', \'user\')" />'
@@ -198,7 +198,7 @@ describe('JobsHistoryView.vue', () => {
       global: {
         stubs: {
           ClusterMainLayout: { template: '<div><slot /></div>' },
-          JobsHistoryFiltersPanel: { template: '<div />' },
+          JobsHistoryFiltersPanel: { template: '<div />', props: ['cluster', 'open', 'filters', 'total'] },
           JobsHistoryFiltersBar: { template: '<div />' },
           JobsHistorySorter: { template: '<div />' }
         }

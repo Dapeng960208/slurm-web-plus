@@ -32,6 +32,7 @@ import ActionDialog from '@/components/operations/ActionDialog.vue'
 import PartitionLinkChip from '@/components/PartitionLinkChip.vue'
 import { lastPage, parsePageSize, parsePositivePage, type PageSizeOption } from '@/composables/Pagination'
 import { useAuthStore } from '@/stores/auth'
+import { createStaticSearchSource } from '@/composables/searchSelect'
 
 import {
   ArrowPathIcon,
@@ -62,6 +63,19 @@ const submitOpen = ref(false)
 const editOpen = ref(false)
 const cancelOpen = ref(false)
 const selectedJob = ref<ClusterJob | null>(null)
+const partitionSearchSource = createStaticSearchSource(async () =>
+  (await gateway.partitions(cluster)).map((partition) => ({
+    value: partition.name,
+    label: partition.name
+  }))
+)
+const qosSearchSource = createStaticSearchSource(async () =>
+  (await gateway.qos(cluster)).map((qos) => ({
+    value: qos.name,
+    label: qos.name,
+    description: qos.description || qos.name
+  }))
+)
 
 function compareClusterJob(a: ClusterJob, b: ClusterJob): number {
   return compareClusterJobSortOrder(a, b, runtimeStore.jobs.sort, runtimeStore.jobs.order)
@@ -564,9 +578,19 @@ onMounted(async () => {
           type: 'textarea',
           required: true
         },
-        { key: 'partition', label: 'pages.jobs.dialogs.submit.fields.partition' },
+        {
+          key: 'partition',
+          label: 'pages.jobs.dialogs.submit.fields.partition',
+          type: 'search-select',
+          source: partitionSearchSource
+        },
         { key: 'account', label: 'pages.jobs.dialogs.submit.fields.account' },
-        { key: 'qos', label: 'pages.jobs.dialogs.submit.fields.qos' }
+        {
+          key: 'qos',
+          label: 'pages.jobs.dialogs.submit.fields.qos',
+          type: 'search-select',
+          source: qosSearchSource
+        }
       ]"
       @close="submitOpen = false"
       @submit="submitJob"
@@ -589,8 +613,18 @@ onMounted(async () => {
         comment: ''
       }"
       :fields="[
-        { key: 'partition', label: 'pages.jobs.dialogs.edit.fields.partition' },
-        { key: 'qos', label: 'pages.jobs.dialogs.edit.fields.qos' },
+        {
+          key: 'partition',
+          label: 'pages.jobs.dialogs.edit.fields.partition',
+          type: 'search-select',
+          source: partitionSearchSource
+        },
+        {
+          key: 'qos',
+          label: 'pages.jobs.dialogs.edit.fields.qos',
+          type: 'search-select',
+          source: qosSearchSource
+        },
         { key: 'priority', label: 'pages.jobs.dialogs.edit.fields.priority', type: 'number' },
         {
           key: 'memory_per_cpu_mb',

@@ -10,11 +10,13 @@ import ErrorAlert from '@/components/ErrorAlert.vue'
 import InfoAlert from '@/components/InfoAlert.vue'
 import AccountBreadcrumb from '@/components/accounts/AccountBreadcrumb.vue'
 import PanelSkeleton from '@/components/PanelSkeleton.vue'
+import ActionDialog from '@/components/operations/ActionDialog.vue'
 
 const mockClusterDataPoller = getMockClusterDataPoller<ClusterAssociation[]>()
 const mockGatewayAPI = {
   save_user: vi.fn(),
-  delete_user: vi.fn()
+  delete_user: vi.fn(),
+  qos: vi.fn()
 }
 const analyticsPanelsStub = {
   template: '<div data-testid="user-analytics-panels-stub">Completed Job Tool Analysis</div>'
@@ -51,6 +53,7 @@ describe('UserView.vue', () => {
     mockClusterDataPoller.unable.value = false
     mockClusterDataPoller.loaded.value = false
     mockClusterDataPoller.initialLoading.value = false
+    mockGatewayAPI.qos.mockResolvedValue([{ name: 'normal', description: 'Normal', flags: [], limits: {} }])
   })
 
   test('displays user details', async () => {
@@ -303,14 +306,17 @@ describe('UserView.vue', () => {
 
     await wrapper.findAll('button').find((button) => button.text() === 'Edit user')!.trigger('click')
     await nextTick()
-    const inputs = document.body.querySelectorAll<HTMLInputElement>('input')
-    inputs[1].value = 'debug'
-    inputs[1].dispatchEvent(new Event('input', { bubbles: true }))
-    inputs[2].value = 'normal, debug'
-    inputs[2].dispatchEvent(new Event('input', { bubbles: true }))
-    document.body.querySelector<HTMLFormElement>('form')!.dispatchEvent(
-      new Event('submit', { bubbles: true, cancelable: true })
-    )
+    wrapper
+      .findAllComponents(ActionDialog)
+      .find((dialog) => dialog.props('title') === 'pages.user.dialogs.edit.title')!
+      .vm.$emit('submit', {
+        description: '',
+        default_account: 'root',
+        default_qos: 'debug',
+        qos: 'normal, debug',
+        default_wckey: '',
+        admin_level: ''
+      })
     await flushPromises()
 
     expect(mockGatewayAPI.save_user).toHaveBeenCalledWith(

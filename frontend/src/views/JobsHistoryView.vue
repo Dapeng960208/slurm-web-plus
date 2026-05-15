@@ -163,6 +163,7 @@ watch(totalPages, (newLastPage) => {
     <div class="ui-page ui-page-wide ui-content-workspace">
       <JobsHistoryFiltersPanel
         :open="filtersOpen"
+        :cluster="cluster"
         :filters="filters"
         :total="total"
         @close="filtersOpen = false"

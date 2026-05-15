@@ -15,7 +15,10 @@ const mockClusterDataPoller = getMockClusterDataPoller<ClusterReservation[]>()
 const mockGatewayAPI = {
   save_reservation: vi.fn(),
   update_reservation: vi.fn(),
-  delete_reservation: vi.fn()
+  delete_reservation: vi.fn(),
+  nodes: vi.fn(),
+  partitions: vi.fn(),
+  qos: vi.fn()
 }
 
 vi.mock('@/composables/DataPoller', () => ({
@@ -52,6 +55,9 @@ describe('ReservationsView.vue', () => {
     mockClusterDataPoller.unable.value = false
     mockClusterDataPoller.loaded.value = true
     mockClusterDataPoller.initialLoading.value = false
+    mockGatewayAPI.nodes.mockResolvedValue([{ name: 'cn001', partitions: ['gpu'], alloc_cpus: 0, alloc_idle_cpus: 0, cores: 0, cpus: 0, gres: '', gres_used: '', real_memory: 0, sockets: 0, state: [], reason: '' }])
+    mockGatewayAPI.partitions.mockResolvedValue([{ name: 'gpu', node_sets: 'cn[1-4]' }])
+    mockGatewayAPI.qos.mockResolvedValue([{ name: 'debug', description: 'Debug', flags: [], limits: {} }])
   })
 
   test('display reservations', () => {

@@ -142,11 +142,11 @@ const en = {
       zhCN: 'Simplified Chinese',
       switcher: 'Language'
     },
-    buttons: {
-      close: 'Close',
-      cancel: 'Cancel',
-      apply: 'Apply',
-      reset: 'Reset',
+      buttons: {
+        close: 'Close',
+        cancel: 'Cancel',
+        apply: 'Apply',
+        reset: 'Reset',
       refresh: 'Refresh',
       clear: 'Clear',
       goBack: 'Go back',
@@ -162,10 +162,11 @@ const en = {
       retry: 'Retry',
       previous: 'Previous',
       next: 'Next',
-      send: 'Send',
-      enable: 'Enable',
-      disable: 'Disable',
-      today: 'Today'
+        send: 'Send',
+        enable: 'Enable',
+        disable: 'Disable',
+        today: 'Today',
+        remove: 'Remove'
     },
     notifications: {
       info: 'Info',
@@ -197,11 +198,13 @@ const en = {
       highLoad: 'High load',
       highUsage: 'High usage'
     },
-    forms: {
-      required: 'Required',
-      optional: 'Optional',
-      selectOption: 'Select an option'
-    },
+      forms: {
+        required: 'Required',
+        optional: 'Optional',
+        selectOption: 'Select an option',
+        noMatches: 'No matches found',
+        typeMoreCharacters: 'Type at least {count} character(s)'
+      },
     labels: {
       state: 'State',
       user: 'User',

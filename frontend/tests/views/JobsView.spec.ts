@@ -16,7 +16,9 @@ const useClusterDataPoller = vi.hoisted(() => vi.fn())
 const mockGatewayAPI = {
   submit_job: vi.fn(),
   update_job: vi.fn(),
-  cancel_job: vi.fn()
+  cancel_job: vi.fn(),
+  partitions: vi.fn(),
+  qos: vi.fn()
 }
 
 vi.mock('@/composables/DataPoller', () => ({
@@ -75,6 +77,8 @@ describe('JobsView.vue', () => {
     mockClusterDataPoller.initialLoading.value = false
     mockClusterDataPoller.refreshing.value = false
     useClusterDataPoller.mockReturnValue(mockClusterDataPoller)
+    mockGatewayAPI.partitions.mockResolvedValue([{ name: 'normal', node_sets: 'cn[1-4]' }])
+    mockGatewayAPI.qos.mockResolvedValue([{ name: 'normal', description: 'Normal', flags: [], limits: {} }])
     document.body.innerHTML = ''
   })
 

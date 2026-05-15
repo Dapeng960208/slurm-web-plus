@@ -23,6 +23,7 @@
   - 单作业编辑
   - 单作业取消
   - 编辑时可填写 `Memory per CPU (MB)`，正整数会提交为 Slurm REST `memory_per_cpu` 对象；空值不发送
+  - `partition`、`qos` 字段已统一改为可搜索下拉
 - `JobsHistoryView` / `JobHistoryView`
   - 支持从历史作业跳转实时作业详情
   - 使用历史记录中的 Slurm `job_id` 跳转到 `/:cluster/job/:job_id`
@@ -36,6 +37,8 @@
   - 更新
   - 删除
   - 前端表单已补 `groups`、`qos`、`Allowed Partitions`
+  - `node_list`、`allowed_partitions`、`qos` 已统一改为可搜索下拉
+  - `node_list` 现在仅支持从当前集群节点列表多选并回写为逗号分隔字符串，不再保留自由文本 nodeset 表达式输入
   - 创建/编辑前固定校验 `users / groups / accounts / qos / allowed_partitions` 至少一项非空；若全空则在弹窗内直接报错，不发请求
   - reservation create/update payload 会统一走后端 normalization，再映射到 `slurmrestd` reservation 写入契约
 - `AccountsView` / `AccountView`
@@ -43,12 +46,14 @@
   - 账户更新
   - 账户删除
   - account-user association 增加用户、编辑 QOS/default QOS、删除用户关联
+  - 账户和 association 相关的 `username`、`qos`、`default_qos` 已统一改为可搜索下拉
   - `Add user` 现在先确保用户实体存在，再补 association，并在刷新后校验关联真实可见才显示成功
   - `users.update` 写接口现在接受轻量单用户对象，并由后端统一归一化为 `{"users": [...]}` 后再写入 `slurmrestd`
 - `UserView`
   - SlurmDB 用户创建/更新
   - 用户删除
   - 编辑用户默认 QOS 与分配 QOS
+  - `default_qos` 与分配 `qos` 已统一改为可搜索下拉
 - `QosView`
   - QoS 创建
   - QoS 更新
@@ -227,6 +232,10 @@
 - 共享表单统一显示字段 `Required` / `Optional`
 - 编辑类按钮使用橙色语义，删除/取消使用红色警示语义
 - 关键字段与操作按钮补 tooltip / hint，说明行为影响
+- 共享写操作表单中的 `用户名 / 节点名 / QOS / 分区` 优先使用同一套搜索选择器，而不是继续保留分散的文本输入
+- `用户名` 搜索复用现有 `access_users` 分页/用户名过滤接口做真正远程搜索
+- `QOS / 分区 / 节点` 搜索复用现有 `qos / partitions / nodes` 列表接口，先从远端加载，再在下拉框内筛选
+- 多值字段统一以“多选标签 + CSV 序列化回现有 payload”提交，不改后端写接口契约
 - `Dashboard`、`Cluster Analysis`、`Node` 指标统一支持 `hour/day/week` 时间范围切换
 - 按操作语义统一按钮颜色：
   - 创建/提交/主要确认：`ui-button-primary`

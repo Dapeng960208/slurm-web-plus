@@ -7,6 +7,7 @@
 - 为 AI 对话补齐面向集群状态问题的聚合分析上下文，避免模型默认请求大量低价值原始接口
 
 - 在前端落地中英文切换，优先覆盖登录页、共享导航、Settings、通知、分页和前端生成错误提示
+- 把表单中的 `用户名 / 节点名 / QOS / 分区` 文本输入统一收口为可搜索下拉；用户名使用远程搜索，QOS/分区/节点使用远端列表加载后搜索
 
 - 在现有业务页面补单对象管理能力，不做独立全量管理中心
 - 将 `AI`、`Users`、`Cache`、`Access Control` 迁移到 `/:cluster/admin`
@@ -76,6 +77,20 @@
   - AI system prompt 已新增“集群状态/拥塞/容量/等待/控制器健康/热点问题优先调用 `analysis/context`”约束
   - 本轮定向验证已通过：
     - `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/views/test_agent_operations.py slurmweb/tests/views/test_gateway.py slurmweb/tests/apps/test_ai_service.py`
+
+- 表单搜索选择器收口已完成：
+  - 前端新增共享 `RemoteSearchSelect` 与 `searchSelect` 数据源封装，统一承载管理弹窗和筛选区的远程/远端加载搜索
+  - `ActionDialog` 已扩展支持共享搜索单选与多选字段
+  - `JobsView` / `JobView` 的 `partition`、`qos` 已改为搜索下拉
+  - `AccountView` / `AccountsView` / `UserView` 的 `username`、`qos`、`default_qos` 已改为搜索下拉
+  - `ReservationsView` 的 `node_list`、`allowed_partitions`、`qos` 已改为搜索下拉
+  - `JobsHistoryFiltersPanel` 的 `user`、`partition`、`qos` 已改为搜索下拉
+  - `UserFilterSelector` 已从手工输入 + `Add username` 按钮改为远程搜索多选用户名
+  - `Reservations.node_list` 已收口为节点多选并回写 CSV string，不再保留自由文本 nodeset 表达式输入
+  - 本轮没有新增后端 `qos / partition / node` 搜索接口；当前仅 `用户名` 使用真正远程搜索
+  - 本轮前端定向验证已通过：
+    - `npm --prefix frontend run type-check`
+    - `cd frontend && npx vitest run tests/components/forms/RemoteSearchSelect.spec.ts tests/components/operations/ActionDialog.spec.ts tests/components/jobs/UserFilterSelector.spec.ts tests/components/jobs/JobsHistoryFiltersPanel.spec.ts tests/views/JobsView.spec.ts tests/views/JobView.spec.ts tests/views/AccountView.spec.ts tests/views/AccountsView.spec.ts tests/views/UserView.spec.ts tests/views/ReservationsView.spec.ts tests/views/JobsHistoryView.spec.ts`
 
 - Reservations / Dashboard / AI 对话 / Job 详情 / 账户加人收口已完成：
   - `slurmweb.slurmrestd.Slurmrestd` 已补 reservation create/update 共用的 payload normalization，统一接受 `users`、`groups`、`accounts`、`qos` 与 `allowed_partitions/allowedPartitions/AllowedPartitions`
@@ -668,6 +683,7 @@
 ## 5. 已同步文档
 
 - `docs/README.md`
+- `docs/features/management-center/form-search-selectors.md`
 - `docs/features/ldap-cache/verification.md`
 - `docs/features/i18n/requirements.md`
 - `docs/features/i18n/test-plan.md`

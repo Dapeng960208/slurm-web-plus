@@ -39,6 +39,7 @@ import { useRuntimeStore } from '@/stores/runtime'
 import { useAuthStore } from '@/stores/auth'
 import UserAnalyticsPanels from '@/components/user/UserAnalyticsPanels.vue'
 import ActionDialog from '@/components/operations/ActionDialog.vue'
+import { createStaticSearchSource } from '@/composables/searchSelect'
 
 const props = withDefaults(
   defineProps<{
@@ -62,6 +63,13 @@ const editOpen = ref(false)
 const deleteOpen = ref(false)
 const operationBusy = ref(false)
 const operationError = ref<string | null>(null)
+const qosSearchSource = createStaticSearchSource(async () =>
+  (await gateway.qos(props.cluster)).map((qos) => ({
+    value: qos.name,
+    label: qos.name,
+    description: qos.description || qos.name
+  }))
+)
 const viewedUser = computed(() => props.selfView ? authStore.username ?? props.user ?? '' : props.user ?? '')
 const clusterDetails = computed(() => runtimeStore.getCluster(props.cluster))
 const sections = computed(() =>
@@ -573,8 +581,18 @@ async function removeUser() {
       :fields="[
         { key: 'description', label: 'pages.user.dialogs.fields.description', type: 'textarea' },
         { key: 'default_account', label: 'pages.user.dialogs.fields.defaultAccount' },
-        { key: 'default_qos', label: 'pages.user.dialogs.fields.defaultQos' },
-        { key: 'qos', label: 'pages.user.dialogs.fields.assignedQosCsv' },
+        {
+          key: 'default_qos',
+          label: 'pages.user.dialogs.fields.defaultQos',
+          type: 'search-select',
+          source: qosSearchSource
+        },
+        {
+          key: 'qos',
+          label: 'pages.user.dialogs.fields.assignedQosCsv',
+          type: 'search-multi-select',
+          source: qosSearchSource
+        },
         { key: 'default_wckey', label: 'pages.user.dialogs.fields.defaultWckey' },
         { key: 'admin_level', label: 'pages.user.dialogs.fields.adminLevel' }
       ]"

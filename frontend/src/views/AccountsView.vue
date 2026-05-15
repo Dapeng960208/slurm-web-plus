@@ -31,6 +31,7 @@ import {
   type PageSizeOption
 } from '@/composables/Pagination'
 import { useRuntimeStore } from '@/stores/runtime'
+import { createStaticSearchSource } from '@/composables/searchSelect'
 
 const { cluster } = defineProps<{ cluster: string }>()
 const route = useRoute()
@@ -66,6 +67,13 @@ const pageSize = ref(DEFAULT_PAGE_SIZE)
 const createOpen = ref(false)
 const operationBusy = ref(false)
 const operationError = ref<string | null>(null)
+const qosSearchSource = createStaticSearchSource(async () =>
+  (await gateway.qos(cluster)).map((qos) => ({
+    value: qos.name,
+    label: qos.name,
+    description: qos.description || qos.name
+  }))
+)
 
 const canCreateAccount = computed(() => runtimeStore.hasRoutePermission(cluster, 'accounts', 'edit'))
 
@@ -360,7 +368,12 @@ if (route.query.page_size) {
           required: true
         },
         { key: 'parent_account', label: 'pages.accounts.dialogs.create.fields.parentAccount' },
-        { key: 'qos', label: 'pages.accounts.dialogs.create.fields.qos' }
+        {
+          key: 'qos',
+          label: 'pages.accounts.dialogs.create.fields.qos',
+          type: 'search-multi-select',
+          source: qosSearchSource
+        }
       ]"
       @close="createOpen = false"
       @submit="createAccount"

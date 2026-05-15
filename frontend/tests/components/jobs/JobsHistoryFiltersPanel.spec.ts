@@ -9,6 +9,7 @@ describe('JobsHistoryFiltersPanel.vue', () => {
     const wrapper = mount(JobsHistoryFiltersPanel, {
       props: {
         open: true,
+        cluster: 'foo',
         total: 0,
         filters: {
           keyword: '',
@@ -24,6 +25,11 @@ describe('JobsHistoryFiltersPanel.vue', () => {
       },
       global: {
         stubs: {
+          RemoteSearchSelect: {
+            name: 'RemoteSearchSelect',
+            template: '<div class="remote-search-select-stub" />',
+            props: ['modelValue', 'source', 'placeholder', 'minQueryLength']
+          },
           TransitionRoot: { template: '<div><slot /></div>' },
           TransitionChild: { template: '<div><slot /></div>' },
           Dialog: { template: '<div><slot /></div>' },
@@ -47,6 +53,7 @@ describe('JobsHistoryFiltersPanel.vue', () => {
     const wrapper = mount(JobsHistoryFiltersPanel, {
       props: {
         open: true,
+        cluster: 'foo',
         total: 0,
         filters: {
           keyword: '',
@@ -62,6 +69,11 @@ describe('JobsHistoryFiltersPanel.vue', () => {
       },
       global: {
         stubs: {
+          RemoteSearchSelect: {
+            name: 'RemoteSearchSelect',
+            template: '<div class="remote-search-select-stub" />',
+            props: ['modelValue', 'source', 'placeholder', 'minQueryLength']
+          },
           TransitionRoot: { template: '<div><slot /></div>' },
           TransitionChild: { template: '<div><slot /></div>' },
           Dialog: { template: '<div><slot /></div>' },
