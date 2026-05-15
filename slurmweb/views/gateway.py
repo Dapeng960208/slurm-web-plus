@@ -621,6 +621,12 @@ def analysis_diag(cluster: str):
 
 @check_jwt
 @validate_cluster
+def analysis_context(cluster: str):
+    return proxy_agent(cluster, "analysis/context", request.token)
+
+
+@check_jwt
+@validate_cluster
 def analysis_node_hotspots(cluster: str):
     return proxy_agent(cluster, "analysis/node-hotspots", request.token)
 

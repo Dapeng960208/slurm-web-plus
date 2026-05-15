@@ -79,8 +79,8 @@ AI 当前按数据库能力自动启用：
   - 是否为写接口
 - AI 工具层当前以 `query_agent_interface` / `mutate_agent_interface` 作为标准 tool name；若模型错误地直接把接口名（例如 `job/cancel`）当成 tool name，后端会按同名接口做兼容分发，而不是直接返回 `Unsupported tool`
 - 模型可在同一轮问题处理中连续调用多个接口，例如：
-  - 先查 `job`
-  - 再查 `jobs/history`
+  - 先查 `analysis/context`
+  - 再按需查 `job` / `node` / `jobs/history`
   - 最后汇总回答
 - 对单个作业查询，模型必须理解实时 `job` 数据和历史 `jobs/history` 数据的边界：
   - `job` 来自实时 Slurm 作业详情，作业完成后可能不可用或字段不完整
@@ -88,10 +88,12 @@ AI 当前按数据库能力自动启用：
   - 已完成作业的历史记录可保留 `used_memory_gb` 最大内存和 `used_cpu_cores_avg` 平均 CPU 使用核心数
   - 当实时 `job` 查询缺失、不足，或问题明确涉及已完成作业时，应补查 `jobs/history` 或 `jobs/history/detail`
 - 系统提示词不再把“某个问题必须调用某个接口”写死，而是要求模型基于信息缺口自行选择接口
+- 但对于集群状态、拥塞、容量、排队等待、控制器健康和热点问题，系统提示词现在明确要求优先调用 `analysis/context`
 - 模型不得编造集群数据；若现有接口信息不足，必须明确说明不确定性
 
 当前首批对 AI 开放的查询接口包括：
 
+- `analysis/context`
 - `stats`
 - `jobs` / `job`
 - `jobs/history` / `jobs/history/detail`
@@ -105,6 +107,25 @@ AI 当前按数据库能力自动启用：
 - `users` / `user`
 - `user/metrics/history`
 - `user/tools/analysis`
+
+其中 `analysis/context` 是 AI 优先读取的集群分析聚合接口，专门用于回答“当前集群状态如何、哪里拥塞、容量是否紧张、等待时间是否异常、控制器和热点是否有问题”这类问题。
+
+返回内容不是前端 `analysis` 页面依赖的全量原始对象，而是压缩后的核心证据，至少包括：
+
+- `generated_at`
+- `window`
+- `score` / `score_label` / `score_summary`
+- `summary_cards`
+- `capacity_metrics`
+- `wait_stats`
+- `top_pending_reasons`
+- `partition_pressure`
+- `node_hotspots`
+- `controller_health`
+- `scheduler_diag`
+- `recommendations`
+- `data_availability`
+- `warnings`
 
 其中 `user/tools/analysis` 现在明确用于承载用户维度的聚合资源证据，例如：
 
@@ -125,6 +146,23 @@ AI 当前按数据库能力自动启用：
 - AI 提示词与新实现应优先使用 `avg_memory_gb`、`max_memory_gb`、`median_memory_gb`
 
 因此当问题是“某个用户常用工具推荐多少内存/CPU/运行时”这类推荐题时，AI 应优先把它视为直接证据源；只有聚合证据不足时，才继续补查 `jobs/history` 等原始历史接口。
+
+当前默认暴露给模型的只读接口目录已经收口为：
+
+- `analysis/context`
+- `job`
+- `jobs/history`
+- `jobs/history/detail`
+- `node`
+- `node/metrics`
+- `node/metrics/history`
+- `user/tools/analysis`
+
+收口规则：
+
+- `analysis/context` 是集群状态问题的首选入口
+- `job` / `jobs/history` / `node` / `node/metrics*` 只作为后续钻取接口
+- `jobs`、`nodes`、`partitions`、`qos`、`reservations`、`accounts`、`associations`、`users`、`user` 仍保留在 Agent interface 层，但不再出现在默认 AI 查询目录中
 
 边界：
 

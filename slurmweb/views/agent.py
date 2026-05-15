@@ -102,10 +102,161 @@ def _jobs_query_args():
     return query
 
 
+def _number(value, default=0):
+    try:
+        if value in (None, ""):
+            return default
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _safe_int(value, default=0):
+    try:
+        if value in (None, ""):
+            return default
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
 def _normalize_job_history_record(record: dict) -> dict:
     data = dict(record)
     data["exit_code"] = normalize_history_exit_code(data.get("exit_code"))
     return data
+
+
+def _history_wait_stats(records: list[dict]) -> dict:
+    waits = []
+    for record in records:
+        submit_time = record.get("submit_time")
+        start_time = record.get("start_time")
+        if submit_time in (None, "") or start_time in (None, ""):
+            continue
+        try:
+            waits.append(max(int(start_time) - int(submit_time), 0))
+        except (TypeError, ValueError):
+            continue
+    waits.sort()
+    if not waits:
+        return {
+            "samples": 0,
+            "median_seconds": None,
+            "p90_seconds": None,
+            "average_seconds": None,
+        }
+    last_index = len(waits) - 1
+    median_index = last_index // 2
+    p90_index = min(int(last_index * 0.9), last_index)
+    return {
+        "samples": len(waits),
+        "median_seconds": waits[median_index],
+        "p90_seconds": waits[p90_index],
+        "average_seconds": round(sum(waits) / len(waits), 1),
+    }
+
+
+def _top_pending_reasons(jobs: list[dict], limit: int = 5) -> list[dict]:
+    counts = {}
+    pending_total = 0
+    for job in jobs:
+        states = job.get("job_state") or []
+        if isinstance(states, str):
+            states = [states]
+        if "PENDING" not in states:
+            continue
+        pending_total += 1
+        reason = job.get("state_reason") or "Unknown"
+        counts[reason] = counts.get(reason, 0) + 1
+    if pending_total == 0:
+        return []
+    return [
+        {
+            "reason": reason,
+            "count": count,
+            "share": round(count / pending_total, 3),
+        }
+        for reason, count in sorted(counts.items(), key=lambda item: (-item[1], item[0]))[:limit]
+    ]
+
+
+def _node_main_state(state) -> str:
+    values = state if isinstance(state, list) else [state]
+    normalized = {str(value).upper() for value in values if value not in (None, "")}
+    if {"DOWN", "DRAIN", "DRAINED", "FAIL", "FAILING"} & normalized:
+        return "down"
+    if "IDLE" in normalized:
+        return "up"
+    if {"ALLOCATED", "MIXED"} & normalized:
+        return "busy"
+    return "unknown"
+
+
+def _partition_pressure_summary(jobs: list[dict], nodes: list[dict], limit: int = 5) -> list[dict]:
+    partitions = {}
+    for node in nodes:
+        for partition_name in node.get("partitions") or []:
+            entry = partitions.setdefault(
+                partition_name,
+                {
+                    "name": partition_name,
+                    "pending_jobs": 0,
+                    "running_jobs": 0,
+                    "pending_cpu": 0,
+                    "running_cpu": 0,
+                    "schedulable_cpu": 0,
+                    "total_cpu": 0,
+                    "status": "stable",
+                },
+            )
+            cpus = _safe_int(node.get("cpus"), 0)
+            entry["total_cpu"] += cpus
+            if _node_main_state(node.get("state")) == "up":
+                entry["schedulable_cpu"] += cpus
+    for job in jobs:
+        partition_name = str(job.get("partition") or "unknown")
+        entry = partitions.setdefault(
+            partition_name,
+            {
+                "name": partition_name,
+                "pending_jobs": 0,
+                "running_jobs": 0,
+                "pending_cpu": 0,
+                "running_cpu": 0,
+                "schedulable_cpu": 0,
+                "total_cpu": 0,
+                "status": "stable",
+            },
+        )
+        states = job.get("job_state") or []
+        if isinstance(states, str):
+            states = [states]
+        cpus = 0
+        job_cpus = job.get("cpus")
+        if isinstance(job_cpus, dict) and job_cpus.get("set") and not job_cpus.get("infinite"):
+            cpus = _safe_int(job_cpus.get("number"), 0)
+        if "PENDING" in states:
+            entry["pending_jobs"] += 1
+            entry["pending_cpu"] += cpus
+        if "RUNNING" in states or "COMPLETING" in states:
+            entry["running_jobs"] += 1
+            entry["running_cpu"] += cpus
+    result = []
+    for entry in partitions.values():
+        schedulable_cpu = entry["schedulable_cpu"]
+        pending_pressure = (entry["pending_cpu"] / schedulable_cpu) if schedulable_cpu else 0
+        busy_pressure = (entry["running_cpu"] / schedulable_cpu) if schedulable_cpu else 0
+        if entry["pending_jobs"] > 0 and (
+            pending_pressure > 0.4 or entry["pending_jobs"] > entry["running_jobs"]
+        ):
+            entry["status"] = "congested"
+        elif busy_pressure > 0.72 or entry["pending_jobs"] > 0:
+            entry["status"] = "hot"
+        else:
+            entry["status"] = "stable"
+        result.append(entry)
+    result.sort(key=lambda item: (-item["pending_cpu"], -item["pending_jobs"], item["name"]))
+    return result[:limit]
 
 
 def _sorted_strings(values) -> list:
@@ -519,6 +670,315 @@ def analysis_ping():
 @permission_required(("analysis", "view", "*"), legacy_action="view-stats")
 def analysis_diag():
     return jsonify({"statistics": current_app.slurmrestd.diag()})
+
+
+def _analysis_context_payload():
+    jobs = slurmrest("jobs")
+    nodes_getter = getattr(current_app.slurmrestd, "nodes_unfiltered", None)
+    nodes = nodes_getter() if callable(nodes_getter) else slurmrest("nodes")
+    stats_payload = _collect_stats(None)
+
+    availability = {
+        "jobs": True,
+        "nodes": True,
+        "metrics": current_app.metrics_db is not None,
+        "job_history": current_app.jobs_store is not None,
+        "node_hotspots": getattr(current_app, "node_hotspot_store", None) is not None,
+        "analysis_ping": True,
+        "analysis_diag": True,
+    }
+    warnings = []
+
+    jobs_metrics = None
+    core_metrics = None
+    memory_metrics = None
+    gpu_metrics = None
+    if current_app.metrics_db is not None:
+        try:
+            jobs_metrics = current_app.metrics_db.request("jobs", "hour")
+            core_metrics = current_app.metrics_db.request("cores", "hour")
+            memory_metrics = current_app.metrics_db.request("memory", "hour")
+            gpu_metrics = current_app.metrics_db.request("gpus", "hour")
+        except Exception as err:
+            availability["metrics"] = False
+            warnings.append(f"metrics unavailable: {err}")
+
+    history_window = None
+    history_records = []
+    wait_stats = {
+        "samples": 0,
+        "median_seconds": None,
+        "p90_seconds": None,
+        "average_seconds": None,
+    }
+    if current_app.jobs_store is not None:
+        end_time = datetime.now(timezone.utc)
+        start_time = end_time.replace(hour=0, minute=0, second=0, microsecond=0)
+        start_time = start_time.replace(day=max(1, start_time.day - 1))
+        history_window = {
+            "start": start_time.isoformat(),
+            "end": end_time.isoformat(),
+        }
+        try:
+            query_result = current_app.jobs_store.query(
+                {
+                    "start": history_window["start"],
+                    "end": history_window["end"],
+                    "state": "COMPLETED",
+                    "sort": "submit_time",
+                    "order": "desc",
+                    "page": 1,
+                    "page_size": 200,
+                }
+            )
+            history_records = [
+                _normalize_job_history_record(record) for record in query_result.get("jobs", [])
+            ]
+            wait_stats = _history_wait_stats(history_records)
+        except Exception as err:
+            availability["job_history"] = False
+            warnings.append(f"job history unavailable: {err}")
+    else:
+        availability["job_history"] = False
+
+    hotspot_window_start = datetime.now(timezone.utc).timestamp() - 3 * 24 * 60 * 60
+    hotspot_window_end = datetime.now(timezone.utc).timestamp()
+    hotspot_payload = {"window": None, "events": []}
+    hotspot_store = getattr(current_app, "node_hotspot_store", None)
+    if hotspot_store is not None:
+        try:
+            hotspot_result = hotspot_store.cluster_node_hotspots(
+                start_time=datetime.fromtimestamp(hotspot_window_start, tz=timezone.utc),
+                end_time=datetime.fromtimestamp(hotspot_window_end, tz=timezone.utc),
+            )
+            hotspot_payload = {
+                "window": hotspot_result.get("window"),
+                "events": hotspot_result.get("events", [])[:10],
+            }
+        except Exception as err:
+            availability["node_hotspots"] = False
+            warnings.append(f"node hotspots unavailable: {err}")
+    else:
+        availability["node_hotspots"] = False
+
+    ping_cards = [
+        {
+            "controller": ping.get("hostname") or ping.get("host") or ping.get("name"),
+            "mode": ping.get("mode"),
+            "latency_ms": ping.get("latency_ms"),
+            "status": ping.get("status"),
+        }
+        for ping in current_app.slurmrestd.ping_data()[:5]
+    ]
+    diag_statistics = current_app.slurmrestd.diag()
+    scheduler_diag = {
+        key: diag_statistics.get(key)
+        for key in (
+            "jobs_submitted",
+            "jobs_started",
+            "jobs_completed",
+            "jobs_canceled",
+            "schedule_cycle_last",
+            "schedule_cycle_max",
+            "schedule_cycle_mean",
+            "bf_backfilled_jobs",
+            "bf_last_backfilled_jobs",
+            "bf_queue_len",
+        )
+        if key in diag_statistics
+    }
+
+    running_jobs = 0
+    pending_jobs = 0
+    running_cpu = 0
+    pending_cpu = 0
+    schedulable_nodes = 0
+    unavailable_nodes = 0
+    total_nodes = len(nodes)
+    for node in nodes:
+        node_state = _node_main_state(node.get("state"))
+        if node_state == "up":
+            schedulable_nodes += 1
+        elif node_state == "down":
+            unavailable_nodes += 1
+    for job in jobs:
+        states = job.get("job_state") or []
+        if isinstance(states, str):
+            states = [states]
+        job_cpus = job.get("cpus")
+        cpus = 0
+        if isinstance(job_cpus, dict) and job_cpus.get("set") and not job_cpus.get("infinite"):
+            cpus = _safe_int(job_cpus.get("number"), 0)
+        if "RUNNING" in states or "COMPLETING" in states:
+            running_jobs += 1
+            running_cpu += cpus
+        if "PENDING" in states:
+            pending_jobs += 1
+            pending_cpu += cpus
+
+    score = 100
+    if pending_jobs > running_jobs and pending_jobs > 0:
+        score -= 18
+    elif pending_jobs > 0:
+        score -= 8
+    if wait_stats["median_seconds"] is not None:
+        if wait_stats["median_seconds"] >= 3600:
+            score -= 16
+        elif wait_stats["median_seconds"] >= 1200:
+            score -= 8
+    if total_nodes > 0 and unavailable_nodes / total_nodes >= 0.15:
+        score -= 10
+    score = max(0, min(100, score))
+    if score >= 85:
+        score_label = "efficient"
+        score_summary = "Cluster capacity is healthy with low contention."
+    elif score >= 70:
+        score_label = "stable"
+        score_summary = "Cluster is stable but shows moderate scheduling pressure."
+    elif score >= 55:
+        score_label = "pressured"
+        score_summary = "Cluster is under visible pressure from queueing or unavailable capacity."
+    else:
+        score_label = "constrained"
+        score_summary = "Cluster is constrained and likely needs operator attention."
+
+    resources = stats_payload.get("resources", {})
+    cpu_total = _safe_int(resources.get("cores"), 0)
+    memory_total = _number(resources.get("memory"), 0)
+    memory_allocated = _number(resources.get("memory_allocated"), 0)
+    cpu_utilization = round((running_cpu / cpu_total), 3) if cpu_total else None
+    memory_utilization = round((memory_allocated / memory_total), 3) if memory_total else None
+    schedulable_ratio = round((schedulable_nodes / total_nodes), 3) if total_nodes else None
+
+    summary_cards = [
+        {
+            "id": "cpu_occupancy",
+            "label": "CPU occupancy",
+            "value": None if cpu_utilization is None else f"{round(cpu_utilization * 100, 1)}%",
+            "detail": f"Running CPU {running_cpu} / total CPU {cpu_total}",
+            "tone": "warning" if cpu_utilization is not None and cpu_utilization >= 0.8 else "neutral",
+        },
+        {
+            "id": "queue_pressure",
+            "label": "Queue pressure",
+            "value": "low" if pending_jobs == 0 else f"{round((pending_jobs / max(running_jobs, 1)), 1)}x",
+            "detail": f"Pending jobs {pending_jobs}, running jobs {running_jobs}",
+            "tone": "danger" if pending_jobs > running_jobs and pending_jobs > 0 else "neutral",
+        },
+        {
+            "id": "wait_sample",
+            "label": "Wait sample",
+            "value": "--" if wait_stats["median_seconds"] is None else f"{wait_stats['median_seconds']} s",
+            "detail": f"Completed job samples {wait_stats['samples']}",
+            "tone": "warning" if wait_stats["median_seconds"] is not None and wait_stats["median_seconds"] >= 1200 else "neutral",
+        },
+        {
+            "id": "recovery",
+            "label": "Schedulable nodes",
+            "value": f"{schedulable_nodes}/{total_nodes}",
+            "detail": f"Unavailable nodes {unavailable_nodes}",
+            "tone": "warning" if unavailable_nodes > 0 else "success",
+        },
+    ]
+    capacity_metrics = [
+        {
+            "id": "cpu",
+            "label": "CPU",
+            "value": cpu_utilization,
+            "detail": f"{running_cpu} running CPU / {cpu_total} total CPU",
+        },
+        {
+            "id": "memory",
+            "label": "Memory",
+            "value": memory_utilization,
+            "detail": f"{round(memory_allocated / 1024, 1) if memory_allocated else 0} GB allocated / {round(memory_total / 1024, 1) if memory_total else 0} GB total",
+        },
+        {
+            "id": "nodes",
+            "label": "Nodes",
+            "value": schedulable_ratio,
+            "detail": f"{schedulable_nodes} schedulable / {total_nodes} total nodes",
+        },
+    ]
+    recommendations = []
+    if pending_jobs > running_jobs and pending_jobs > 0:
+        recommendations.append(
+            {
+                "id": "queue_backlog",
+                "title": "Investigate queue backlog",
+                "summary": "Pending demand is higher than active throughput.",
+                "evidence": f"Pending jobs {pending_jobs}, running jobs {running_jobs}, pending CPU {pending_cpu}.",
+                "tone": "warning",
+            }
+        )
+    if wait_stats["median_seconds"] is not None and wait_stats["median_seconds"] >= 1200:
+        recommendations.append(
+            {
+                "id": "wait_time",
+                "title": "Review queue wait time",
+                "summary": "Completed jobs show elevated queue delay.",
+                "evidence": f"Median wait {wait_stats['median_seconds']} seconds across {wait_stats['samples']} completed jobs.",
+                "tone": "warning",
+            }
+        )
+    if unavailable_nodes > 0:
+        recommendations.append(
+            {
+                "id": "node_availability",
+                "title": "Recover unavailable nodes",
+                "summary": "Part of the cluster is not schedulable.",
+                "evidence": f"{unavailable_nodes} of {total_nodes} nodes are unavailable.",
+                "tone": "danger",
+            }
+        )
+
+    return {
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "window": {
+            "metrics_range": "hour",
+            "history": history_window,
+            "hotspots": {
+                "start": datetime.fromtimestamp(hotspot_window_start, tz=timezone.utc).isoformat(),
+                "end": datetime.fromtimestamp(hotspot_window_end, tz=timezone.utc).isoformat(),
+            },
+        },
+        "score": score,
+        "score_label": score_label,
+        "score_summary": score_summary,
+        "summary_cards": summary_cards,
+        "capacity_metrics": capacity_metrics,
+        "wait_stats": wait_stats,
+        "top_pending_reasons": _top_pending_reasons(jobs),
+        "partition_pressure": _partition_pressure_summary(jobs, nodes),
+        "node_hotspots": hotspot_payload,
+        "controller_health": ping_cards,
+        "scheduler_diag": scheduler_diag,
+        "recommendations": recommendations,
+        "data_availability": availability,
+        "warnings": warnings,
+        "evidence": {
+            "jobs": {
+                "running": stats_payload.get("jobs", {}).get("running", running_jobs),
+                "total": stats_payload.get("jobs", {}).get("total", len(jobs)),
+                "pending": pending_jobs,
+                "running_cpu": running_cpu,
+                "pending_cpu": pending_cpu,
+            },
+            "resources": resources,
+            "metrics": {
+                "jobs": jobs_metrics,
+                "cores": core_metrics,
+                "memory": memory_metrics,
+                "gpus": gpu_metrics,
+            },
+        },
+    }
+
+
+@handle_slurmrestd_errors
+@permission_required(("analysis", "view", "*"), legacy_action="view-stats")
+def analysis_context():
+    return jsonify(_analysis_context_payload())
 
 
 @permission_required(("analysis", "view", "*"), legacy_action="view-stats")

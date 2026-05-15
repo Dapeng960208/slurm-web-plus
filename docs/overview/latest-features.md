@@ -1,5 +1,45 @@
 # 最新功能
 
+## 本轮：AI 集群状态分析已改为聚合上下文优先
+
+本轮针对 AI 对话在“询问集群状态”场景下容易拉取过多低价值原始接口的问题，补了一条 AI 专用分析上下文链路：
+
+- Agent 新增 `GET /v{version}/analysis/context`，Gateway 新增 `GET /api/agents/<cluster>/analysis/context`
+- 新接口会复用 `analysis` 页面同源的关键证据家族，包括：
+  - `stats`
+  - 实时 `jobs` / `nodes`
+  - `metrics/jobs`、`metrics/cores`、`metrics/memory`、`metrics/gpus`
+  - 已完成作业历史样本
+  - `analysis/ping`
+  - `analysis/diag`
+  - `analysis/node-hotspots`
+- 返回内容不再是全量原始对象，而是 AI 友好的压缩结构，固定聚焦：
+  - 评分与评分摘要
+  - 核心摘要卡片
+  - 容量指标
+  - 等待时间统计
+  - 主要 pending reason
+  - partition pressure
+  - 节点热点
+  - 控制器健康
+  - 调度核心诊断字段
+  - 推荐项与数据可用性
+- AI 默认可见的只读接口目录已收口为：
+  - `analysis/context`
+  - `job`
+  - `jobs/history`
+  - `jobs/history/detail`
+  - `node`
+  - `node/metrics`
+  - `node/metrics/history`
+  - `user/tools/analysis`
+- `jobs`、`nodes`、`partitions`、`qos`、`reservations`、`accounts`、`associations`、`users`、`user` 这些高噪音接口仍保留在 Agent interface 层，但不再出现在默认 AI 查询目录中
+- AI system prompt 已新增硬约束：遇到集群状态、拥塞、容量、排队等待、控制器健康或热点问题时，优先调用 `analysis/context`
+
+本轮新增验证：
+
+- `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/views/test_agent_operations.py slurmweb/tests/views/test_gateway.py slurmweb/tests/apps/test_ai_service.py`
+
 ## 本轮：账户加用户写契约与集群分析平均排队时间独立时间范围已修复
 
 本轮围绕两个已暴露的问题继续收口：

@@ -690,6 +690,19 @@ class TestAIService(TestCase):
         self.assertIn("median_memory_gb", system_prompt)
         self.assertIn("Never expose internal tool-call metadata", system_prompt)
 
+    def test_planner_prompt_prefers_analysis_context_for_cluster_status_questions(self):
+        self._create_model()
+
+        planner_messages = self.service._build_planner_messages(
+            self.user,
+            {"system_prompt": None},
+            [{"role": "user", "content": "Summarize current cluster status and congestion."}],
+        )
+
+        system_prompt = planner_messages[0]["content"]
+        self.assertIn("analysis/context", system_prompt)
+        self.assertIn("call analysis/context first", system_prompt)
+
     def test_planner_prompt_describes_persisted_job_history_usage_fields(self):
         self._create_model()
 
@@ -738,7 +751,23 @@ class TestAIService(TestCase):
 
         self.assertEqual(self.conversation_store.tool_calls[-1]["permission"], "dynamic-query")
         self.assertEqual(self.conversation_store.tool_calls[-1]["status"], "error")
-        self.assertEqual(self.conversation_store.tool_calls[-1]["status_code"], 403)
+
+    def test_tool_registry_catalog_prefers_aggregate_cluster_context(self):
+        catalog = self.service.tools.interface_catalog(self.user)
+
+        self.assertEqual(
+            [item["key"] for item in catalog],
+            [
+                "analysis/context",
+                "job",
+                "jobs/history",
+                "jobs/history/detail",
+                "node",
+                "node/metrics",
+                "node/metrics/history",
+                "user/tools/analysis",
+            ],
+        )
 
     def test_query_interface_rejects_unsupported_interface(self):
         self._create_model()

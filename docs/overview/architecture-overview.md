@@ -118,6 +118,7 @@ AI model
 - `jobs/history` 被明确视为持久化历史存储，字段与实时作业详情接近；实时 `job` 缺失或作业已完成时，AI 可补查历史记录
 - 已完成作业历史记录可保留 `used_memory_gb` 最大内存和 `used_cpu_cores_avg` 平均 CPU 使用核心数
 - 对用户工具资源推荐类问题，优先使用 `user/tools/analysis` 聚合证据，再视情况补查 `jobs/history`
+- 对集群状态、拥塞、容量、排队等待、控制器健康和热点问题，优先使用 `analysis/context` 聚合上下文，再按需钻取 `job`、`node` 或 `jobs/history`
 - 查询接口继续复用 Agent 已有资源规则和 owner-aware 逻辑
 - AI 写接口不再额外走 `super-admin` 总闸，而是复用 Agent 接口层现有权限校验
 - 当接口层拒绝访问时，工具执行会把权限错误与状态码回传给模型和执行轨迹
@@ -129,6 +130,7 @@ AI model
   - 接口只返回 `id`、`display_name`、`model`、`is_default`、`sort_order`
 - 普通会话查询默认过滤 `ai_conversations.deleted_at IS NOT NULL` 的逻辑删除记录
 - 管理员审计查询可列出所有用户会话，并包含逻辑删除记录
+- 默认暴露给模型的只读接口目录已经收口，不再把 `jobs`、`nodes`、`partitions`、`qos`、`reservations`、`accounts`、`associations`、`users`、`user` 放进 AI 默认查询目录
 
 执行轨迹链路同步变为：
 
