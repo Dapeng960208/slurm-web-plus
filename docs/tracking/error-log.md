@@ -11,6 +11,11 @@
 
 ## 条目
 
+### 2026-05-15：管理写操作旧数据残留审查提交推送到 GitHub 时 443 连接失败
+- 时间：2026-05-15
+- 现象：本地已完成 `5cce3e4 fix(management): refresh writes after stale data audit` 后，执行 `powershell -ExecutionPolicy Bypass -File scripts/push-and-watch-github-ci.ps1 -PollIntervalSeconds 30 -TimeoutMinutes 45` 在 `git push origin main` 阶段失败，远端返回 `Failed to connect to github.com port 443 after 21050 ms: Could not connect to server`，因此没有触发新的 GitHub Actions run。
+- 解决办法：保留本地提交并在 `docs/tracking/current-release.md` 记录待推送状态；网络恢复后继续使用同一仓库脚本推送并追踪 CI。
+
 ### 2026-05-15：Reservations 删除旧缓存预留时返回 `Requested reservation is invalid/2053`
 - 时间：2026-05-15
 - 现象：在 `Reservations` 页面删除 `test` 预留时，弹窗显示 `slurmrestd error: Error deleting reservation test (slurm_delete_reservation) [Requested reservation is invalid/2053]`。

@@ -988,3 +988,14 @@
 - 推送结果：
   - 执行 `powershell -ExecutionPolicy Bypass -File scripts/push-and-watch-github-ci.ps1 -PollIntervalSeconds 30 -TimeoutMinutes 45` 在 `git push origin main` 阶段失败，远端返回 `Failed to connect to github.com port 443 after 21101 ms: Could not connect to server`
   - 当前状态：本地 `main` 相对 `origin/main` ahead 6，包含前端 CI 续修与 AI 工具能力/权限修复提交，待网络恢复后重新使用仓库脚本推送并追踪 GitHub Actions
+
+- 2026-05-15：管理写操作旧数据残留同类审查已完成本地提交，但推送 GitHub 被网络阻断。
+- 本轮实现与提交：
+  - `5cce3e4 fix(management): refresh writes after stale data audit`
+- 本轮已验证：
+  - `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/slurmrestd/test_slurmrestd_filtered_cached.py`
+  - `cd frontend && npx vitest run tests/views/QosView.spec.ts tests/views/NodeView.spec.ts tests/views/UserView.spec.ts tests/views/AccountView.spec.ts tests/views/AccountsView.spec.ts`
+  - `npm --prefix frontend run type-check`
+- 推送结果：
+  - 执行 `powershell -ExecutionPolicy Bypass -File scripts/push-and-watch-github-ci.ps1 -PollIntervalSeconds 30 -TimeoutMinutes 45` 在 `git push origin main` 阶段失败，远端返回 `Failed to connect to github.com port 443 after 21050 ms: Could not connect to server`
+  - 当前状态：本地 `main` 包含本次同类审查修复提交，待网络恢复后重新使用仓库脚本推送并追踪 GitHub Actions
