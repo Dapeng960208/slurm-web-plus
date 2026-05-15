@@ -1522,7 +1522,6 @@ const en = {
         aggregationLabel: 'Aggregation',
         aggregationAria: 'Queue wait aggregation {value}',
         aggregationOptions: {
-          minute: 'Minute',
           hour: 'Hour',
           day: 'Day'
         },

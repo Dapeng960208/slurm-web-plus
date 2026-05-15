@@ -11,6 +11,11 @@
 
 ## 条目
 
+### 2026-05-15：移除平均排队时间分钟聚合后默认值和测试断言仍指向旧结构
+- 时间：2026-05-15
+- 现象：执行 `npm --prefix frontend run type-check` 时，`ClusterAnalysisView.vue` 报 `Argument of type '"minute"' is not assignable to parameter of type 'QueueWaitAggregation'`；执行 `cd frontend && npx vitest run tests/composables/queueWaitHistory.spec.ts tests/views/ClusterAnalysisView.spec.ts` 时，视图测试仍按旧 `minute` 默认聚合和未透传 `windowStart/windowEnd` 的字符串结构断言。
+- 解决办法：把 `queueWaitAggregation` 默认值改为 `hour`，删除用户可见的分钟聚合选项；同步更新 `queueWaitHistory` 推断规则和视图测试，让断言覆盖 `hour/day` 聚合、分钟按钮不存在，以及图表组件收到完整时间窗口。
+
 ### 2026-05-15：合并表单远程搜索下拉框后推送 `main` 到 GitHub 失败
 - 时间：2026-05-15
 - 现象：本地已将 `feature/ai-cluster-context` 合并到 `main`，执行 `git push origin main` 时返回 `Failed to connect to github.com port 443 after 21084 ms: Could not connect to server`

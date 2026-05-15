@@ -115,6 +115,9 @@
 - `ClusterAnalysisView` 的平均排队时间卡片切换自身时间范围时，会重新请求 `jobs_history`
 - `ClusterAnalysisView` 的平均排队时间卡片切换自身时间范围时，不会重拉 metrics 与 node hotspots
 - `ClusterAnalysisView` 顶部全局时间范围变化时，不会覆盖卡片已手动选择的独立时间范围
+- `ClusterAnalysisView` 页头右侧不再展示额外时间范围组件；平均排队时间卡片保留自身时间范围按钮
+- `ClusterAnalysisView` 的平均排队时间卡片只展示 `hour/day` 聚合粒度，小时按小时平均排队时间聚合，天按天平均排队时间聚合
+- `ClusterAnalysisView` 的平均排队时间图横轴按卡片当前时间范围展开，单点样本不会再显示为毫秒级 X 轴
 - `QosView` 创建 QOS 弹框预填 `MaxSubmitJobsPerUser=100`、`MaxJobsPerUser=10`、`MaxWallDurationPerJob=1-00:00:00`
 - `QosView` 提交创建 QOS 时把 `MaxWallDurationPerJob` 转换为分钟；非法 walltime 不调用写接口并在弹框显示错误
 - `ReservationsView` 创建/编辑表单会提交 `groups`、`qos`、`allowed_partitions`

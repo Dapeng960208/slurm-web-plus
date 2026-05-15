@@ -38,7 +38,7 @@
 - 压缩用户详情分析区头部与双栏布局，强化时间窗控件可见性并减少 `Submission Activity` 周边空白
 - 收口 `/:cluster/admin/ai`：模型配置改为表格、审计记录改为表格、统一搜索框样式，并将审计详情迁移到独立详情页
 - 集群分析页新增近 3 天节点热点概览、平均排队时长曲线，并把 `diag` 面板收口到 10 条核心字段
-- 修复集群分析页平均排队时间曲线不显示的问题，并把等待时间统一改为 `submit_time -> start_time` 秒级口径，支持 `minute / hour / day` 聚合切换
+- 修复集群分析页平均排队时间曲线不显示的问题，并把等待时间统一改为 `submit_time -> start_time` 秒级口径，支持 `hour / day` 聚合切换
 - 集群分析页平均排队时间曲线已按等待时长强化颜色语义：`60` 秒内保持主题淡绿色，超过后连续过渡到橙色和红色
 - 队列详情页已补 dashboard 实时曲线，作业与历史作业相关页面中的队列字段统一改为可点击队列详情入口
 - 队列详情页已移除下方详情区与顶部摘要卡重复的资源容量字段，仅保留补充信息、节点集合和实时曲线
@@ -57,6 +57,7 @@
 - 修复 `AccountView` 给无关联信息用户加到账户下的假成功：先确保用户实体存在，再补 association，并在刷新后做写后可见性校验
 - 修复 `users.update` 写契约：轻量单用户 payload 现在会由后端统一包装为 `{"users": [...]}`，避免账户加用户与用户编辑继续触发 `Missing required field 'users'`
 - 修复 `ClusterAnalysisView` 平均排队时间图的范围联动错误：卡片时间范围与聚合粒度现在独立于顶部全局时间范围
+- 修复 `ClusterAnalysisView` 页头右侧误展示额外时间组件的问题；平均排队时间图只保留卡片自身时间范围，并按该窗口展开横轴
 
 ## 2. 已完成项
 
@@ -115,7 +116,7 @@
   - `AccountView` 的 `Add user` 仍固定为 `save_user -> save_association -> refreshAssociations() -> 写后校验`，但第一步现在不再因为缺少 `users` 包装而失败
   - `UserView` 编辑用户继续保持轻量 payload 调用方式，不要求页面手工拼接 `{"users": [...]}` 契约
   - `ClusterAnalysisView` 的平均排队时间图现在使用独立 `queueWaitRange / queueWaitCustomStart / queueWaitCustomEnd / queueWaitAggregation`
-  - 卡片时间范围切换会重新请求 `jobs_history`；卡片聚合粒度切换会立即重算 bucket；顶部全局时间范围不再覆盖卡片已经手动选择的独立时间范围
+  - 卡片时间范围切换会重新请求 `jobs_history`；卡片聚合粒度切换会立即重算 `hour / day` bucket；顶部全局时间范围不再覆盖卡片已经手动选择的独立时间范围
   - 本轮定向验证：
     - `.venv\Scripts\python -m pytest slurmweb/tests/slurmrestd/test_slurmrestd_write_operations.py`
     - `cd frontend && npm exec vitest run tests/views/AccountView.spec.ts tests/views/UserView.spec.ts tests/views/ClusterAnalysisView.spec.ts`
@@ -124,7 +125,7 @@
   - `DashboardView` 顶部队列与时间范围筛选区已移除队列选择器和时间范围选择器外层白色胶囊壳，只保留控件本体；队列保留轻量 inline label，时间范围移除额外可见 label
   - `Dashboard` 统计卡与图表区块间距已回归共享 `ui-section-stack` / `ui-stat-grid` 节奏
   - `ClusterAnalysisView` 顶部时间范围控件已与 Dashboard 使用同一套工具条节奏
-  - 平均排队时间聚合切换组件继续保留 `minute / hour / day` 三档，并恢复轻量可见说明；`aria-label` 与 `queue-wait-aggregation-*` 测试锚点保持不变
+  - 平均排队时间聚合切换组件保留卡片内独立控制
   - `SettingsAccessControl`、`SettingsLdapCache`、`SettingsAI` 的搜索区已统一为 inline search bar；原有搜索、重置、刷新与前端即时过滤行为保持不变
   - `SettingsAI` 对话审计筛选区已补齐 `Search / Reset / Refresh` 三类操作；共享 `ui-admin-search-field` 宽度已统一收窄，避免管理页搜索输入框在桌面端撑满整行
   - 本轮没有新增接口、权限或配置项
@@ -134,7 +135,7 @@
 
 - Cluster Analysis 平均等待时间窗口与聚合行为已补一轮功能修复：
   - 历史作业不再固定只读 `jobs_history` 首页 `200` 条；当前会按所选时间窗跨页读取全部历史结果，再做平均等待时间聚合
-  - 解决了 `day / week / 自定义窗口` 下样本被首页截断，导致 `minute / hour / day` 聚合结果看起来不按预期工作的前端问题
+  - 解决了 `day / week / 自定义窗口` 下样本被首页截断，导致 `hour / day` 聚合结果看起来不按预期工作的前端问题
   - 本轮仅修复前端历史数据读取与聚合展示逻辑，未调整后端 `jobs/history` 接口契约
   - 本轮已补定向验证：
     - `cd frontend && npx vitest run tests/views/ClusterAnalysisView.spec.ts tests/composables/queueWaitHistory.spec.ts`

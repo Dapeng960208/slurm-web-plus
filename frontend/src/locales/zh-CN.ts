@@ -1441,7 +1441,6 @@ const zhCN = {
         aggregationLabel: '聚合粒度',
         aggregationAria: '排队时间聚合粒度 {value}',
         aggregationOptions: {
-          minute: '分钟',
           hour: '小时',
           day: '天'
         },

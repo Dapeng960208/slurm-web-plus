@@ -22,9 +22,11 @@ import {
 } from '@/composables/queueWaitColors'
 import type { QueueWaitAggregation } from '@/composables/queueWaitHistory'
 
-const { series, aggregation } = defineProps<{
+const { series, aggregation, windowStart, windowEnd } = defineProps<{
   series: MetricValue[]
   aggregation: QueueWaitAggregation
+  windowStart?: string
+  windowEnd?: string
 }>()
 
 const { t, locale } = useI18n()
@@ -39,6 +41,12 @@ function toPoints(values: MetricValue[]): Point[] {
 
 function formatSeconds(value: number): string {
   return String(Math.round(value))
+}
+
+function parseTimestamp(value?: string): number | null {
+  if (!value) return null
+  const timestamp = new Date(value).getTime()
+  return Number.isFinite(timestamp) ? timestamp : null
 }
 
 function resolveContextValue(context: { parsed?: { y?: number }; raw?: unknown }): number {
@@ -115,6 +123,10 @@ function updateChart() {
   ]
   const xScale = chart.options.scales?.x
   if (xScale && 'time' in xScale) {
+    const min = parseTimestamp(windowStart)
+    const max = parseTimestamp(windowEnd)
+    xScale.min = min ?? undefined
+    xScale.max = max ?? undefined
     xScale.time = {
       ...xScale.time,
       tooltipFormat: aggregation === 'day' ? 'yyyy-LL-dd' : 'yyyy-LL-dd HH:mm'
@@ -203,7 +215,7 @@ onMounted(() => {
 })
 
 watch(
-  () => [series, aggregation],
+  () => [series, aggregation, windowStart, windowEnd],
   () => updateChart(),
   { deep: true }
 )

@@ -247,9 +247,9 @@ describe('ClusterAnalysisView.vue', () => {
               '<a data-testid="analysis-partition-link" :data-cluster="cluster" :data-partition="partition">{{ partition }}</a>'
           },
           QueueWaitHistoryChart: {
-            props: ['series', 'aggregation'],
+            props: ['series', 'aggregation', 'windowStart', 'windowEnd'],
             template:
-              '<div data-testid="queue-wait-chart">{{ aggregation }}|{{ JSON.stringify(series) }}</div>'
+              '<div data-testid="queue-wait-chart">{{ aggregation }}|{{ windowStart }}|{{ windowEnd }}|{{ JSON.stringify(series) }}</div>'
           }
         }
       }
@@ -275,13 +275,15 @@ describe('ClusterAnalysisView.vue', () => {
     expect(wrapper.get('[data-testid="queue-wait-range-selector"]').text()).toContain(
       'Time Range'
     )
+    expect(wrapper.find('[data-testid="queue-wait-aggregation-minute"]').exists()).toBe(false)
     expect(wrapper.text()).toContain('Node Hotspots')
     expect(wrapper.text()).toContain('Node cn1')
     expect(wrapper.text()).toContain('Jobs Submitted')
     expect(wrapper.text()).not.toContain('extra_field')
     expect(wrapper.get('[data-testid="queue-wait-chart"]').text()).toContain(
-      'minute|[[1777021800000,600]]'
+      `[[${new Date('2026-04-24T09:00:00Z').getTime()},600]]`
     )
+    expect(wrapper.get('[data-testid="queue-wait-chart"]').text()).toContain('T')
     expect(mockGatewayAPI.jobs_history).toHaveBeenCalledWith(
       'foo',
       expect.objectContaining({
@@ -318,9 +320,9 @@ describe('ClusterAnalysisView.vue', () => {
               '<a data-testid="analysis-partition-link" :data-cluster="cluster" :data-partition="partition">{{ partition }}</a>'
           },
           QueueWaitHistoryChart: {
-            props: ['series', 'aggregation'],
+            props: ['series', 'aggregation', 'windowStart', 'windowEnd'],
             template:
-              '<div data-testid="queue-wait-chart">{{ aggregation }}|{{ JSON.stringify(series) }}</div>'
+              '<div data-testid="queue-wait-chart">{{ aggregation }}|{{ windowStart }}|{{ windowEnd }}|{{ JSON.stringify(series) }}</div>'
           }
         }
       }
@@ -329,13 +331,13 @@ describe('ClusterAnalysisView.vue', () => {
     await flushPromises()
 
     expect(wrapper.get('[data-testid="queue-wait-chart"]').text()).toContain(
-      `hour|[[${new Date('2026-04-24T09:00:00Z').getTime()},600]]`
+      `[[${new Date('2026-04-24T09:00:00Z').getTime()},600]]`
     )
 
     await wrapper.get('[data-testid="queue-wait-aggregation-day"]').trigger('click')
 
     expect(wrapper.get('[data-testid="queue-wait-chart"]').text()).toContain(
-      `day|[[${new Date('2026-04-24T00:00:00Z').getTime()},600]]`
+      `[[${new Date('2026-04-24T00:00:00Z').getTime()},600]]`
     )
   })
 
@@ -440,9 +442,9 @@ describe('ClusterAnalysisView.vue', () => {
               '<a data-testid="analysis-partition-link" :data-cluster="cluster" :data-partition="partition">{{ partition }}</a>'
           },
           QueueWaitHistoryChart: {
-            props: ['series', 'aggregation'],
+            props: ['series', 'aggregation', 'windowStart', 'windowEnd'],
             template:
-              '<div data-testid="queue-wait-chart">{{ aggregation }}|{{ JSON.stringify(series) }}</div>'
+              '<div data-testid="queue-wait-chart">{{ aggregation }}|{{ windowStart }}|{{ windowEnd }}|{{ JSON.stringify(series) }}</div>'
           }
         }
       }
@@ -467,7 +469,10 @@ describe('ClusterAnalysisView.vue', () => {
       })
     )
     expect(wrapper.get('[data-testid="queue-wait-chart"]').text()).toContain(
-      `minute|[[${new Date('2026-04-24T09:10:00Z').getTime()},600],[${new Date('2026-04-24T10:20:00Z').getTime()},1200]]`
+      `[[${new Date('2026-04-24T09:00:00Z').getTime()},600]`
+    )
+    expect(wrapper.get('[data-testid="queue-wait-chart"]').text()).toContain(
+      `${new Date('2026-04-24T10:00:00Z').getTime()},1200`
     )
   })
 
@@ -484,9 +489,9 @@ describe('ClusterAnalysisView.vue', () => {
               '<a data-testid="analysis-partition-link" :data-cluster="cluster" :data-partition="partition">{{ partition }}</a>'
           },
           QueueWaitHistoryChart: {
-            props: ['series', 'aggregation'],
+            props: ['series', 'aggregation', 'windowStart', 'windowEnd'],
             template:
-              '<div data-testid="queue-wait-chart">{{ aggregation }}|{{ JSON.stringify(series) }}</div>'
+              '<div data-testid="queue-wait-chart">{{ aggregation }}|{{ windowStart }}|{{ windowEnd }}|{{ JSON.stringify(series) }}</div>'
           }
         }
       }
@@ -547,9 +552,9 @@ describe('ClusterAnalysisView.vue', () => {
               '<a data-testid="analysis-partition-link" :data-cluster="cluster" :data-partition="partition">{{ partition }}</a>'
           },
           QueueWaitHistoryChart: {
-            props: ['series', 'aggregation'],
+            props: ['series', 'aggregation', 'windowStart', 'windowEnd'],
             template:
-              '<div data-testid="queue-wait-chart">{{ aggregation }}|{{ JSON.stringify(series) }}</div>'
+              '<div data-testid="queue-wait-chart">{{ aggregation }}|{{ windowStart }}|{{ windowEnd }}|{{ JSON.stringify(series) }}</div>'
           }
         }
       }

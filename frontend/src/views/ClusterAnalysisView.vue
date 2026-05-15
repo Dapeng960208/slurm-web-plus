@@ -8,8 +8,7 @@
 
 <script setup lang="ts">
 import { computed, onUnmounted, ref, watch } from 'vue'
-import { RouterLink, useRoute, useRouter } from 'vue-router'
-import type { LocationQueryRaw } from 'vue-router'
+import { RouterLink, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import ClusterMainLayout from '@/components/ClusterMainLayout.vue'
 import ErrorAlert from '@/components/ErrorAlert.vue'
@@ -47,7 +46,6 @@ import { useRuntimeStore } from '@/stores/runtime'
 
 const { cluster } = defineProps<{ cluster: string }>()
 
-const router = useRouter()
 const route = useRoute()
 const gateway = useGatewayAPI()
 const runtimeStore = useRuntimeStore()
@@ -60,7 +58,7 @@ const customEnd = ref('')
 const queueWaitRange = ref<MetricRange>('hour')
 const queueWaitCustomStart = ref('')
 const queueWaitCustomEnd = ref('')
-const queueWaitAggregation = ref<QueueWaitAggregation>('minute')
+const queueWaitAggregation = ref<QueueWaitAggregation>('hour')
 const queueWaitRangeInitialized = ref(false)
 const loading = ref(true)
 const refreshing = ref(false)
@@ -75,6 +73,7 @@ const coreMetrics = ref<Partial<Record<MetricResourceState, MetricValue[]>> | nu
 const memoryMetrics = ref<Partial<Record<MetricMemoryState, MetricValue[]>> | null>(null)
 const gpuMetrics = ref<Partial<Record<MetricResourceState, MetricValue[]>> | null>(null)
 const historyJobs = ref<JobHistoryRecord[]>([])
+const queueWaitChartWindow = ref<DateTimeWindowQuery | null>(null)
 const pingDetails = ref<unknown>(null)
 const diagDetails = ref<unknown>(null)
 const nodeHotspots = ref<AnalysisNodeHotspots | null>(null)
@@ -165,13 +164,6 @@ const queueWaitAggregationOptions = computed<
   Array<{ value: QueueWaitAggregation; label: string; ariaLabel: string }>
 >(() => [
   {
-    value: 'minute',
-    label: t('pages.analysis.historical.aggregationOptions.minute'),
-    ariaLabel: t('pages.analysis.historical.aggregationAria', {
-      value: t('pages.analysis.historical.aggregationOptions.minute')
-    })
-  },
-  {
     value: 'hour',
     label: t('pages.analysis.historical.aggregationOptions.hour'),
     ariaLabel: t('pages.analysis.historical.aggregationAria', {
@@ -190,6 +182,8 @@ const queueWaitAggregationOptions = computed<
 const queueWaitSeries = computed<MetricValue[]>(() =>
   buildQueueWaitSeries(historyJobs.value, queueWaitAggregation.value)
 )
+const queueWaitChartWindowStart = computed(() => queueWaitChartWindow.value?.start)
+const queueWaitChartWindowEnd = computed(() => queueWaitChartWindow.value?.end)
 
 const historicalCards = computed(() => {
   const busyCoresDetail =
@@ -241,36 +235,6 @@ function renderNumber(value: number | null, suffix = ''): string {
   return suffix ? `${rounded} ${suffix}` : String(rounded)
 }
 
-function renderRange(range: MetricRange) {
-  selectedRange.value = range
-  customStart.value = ''
-  customEnd.value = ''
-  router.push({
-    name: 'analysis',
-    params: { cluster },
-    query: { range } as LocationQueryRaw
-  })
-}
-
-function applyCustomWindow(window: DateTimeWindowQuery) {
-  customStart.value = window.start
-  customEnd.value = window.end
-  router.push({
-    name: 'analysis',
-    params: { cluster },
-    query: {
-      start: window.start,
-      end: window.end
-    } as LocationQueryRaw
-  })
-}
-
-function resetCustomWindow() {
-  customStart.value = ''
-  customEnd.value = ''
-  renderRange('hour')
-}
-
 function renderQueueWaitRange(range: MetricRange) {
   queueWaitRange.value = range
   queueWaitCustomStart.value = ''
@@ -285,7 +249,7 @@ function applyQueueWaitCustomWindow(window: DateTimeWindowQuery) {
 function resetQueueWaitCustomWindow() {
   queueWaitCustomStart.value = ''
   queueWaitCustomEnd.value = ''
-  renderQueueWaitRange('hour')
+  queueWaitRange.value = 'hour'
 }
 
 function setQueueWaitAggregation(nextAggregation: QueueWaitAggregation) {
@@ -343,6 +307,7 @@ function hotspotWindowQuery(): DateTimeWindowQuery {
 
 async function loadCompletedHistoryJobs(): Promise<JobHistoryRecord[]> {
   const window = resolvedHistoryWindowQuery()
+  queueWaitChartWindow.value = window
   const firstPage = await gateway.jobs_history(cluster, {
     state: 'COMPLETED',
     sort: 'submit_time',
@@ -669,19 +634,6 @@ onUnmounted(() => {
               </span>
               <span v-if="refreshing" class="ui-chip">{{ t('pages.analysis.status.refreshing') }}</span>
             </div>
-
-            <MetricRangeSelector
-              :model-value="selectedRange"
-              :aria-label="t('pages.analysis.toolbar.selectRange')"
-              enable-custom-window
-              :start-value="customStart"
-              :end-value="customEnd"
-              custom-button-label="common.labels.timeRange"
-              reset-label="common.metricRanges.lastHour"
-              @update:model-value="renderRange"
-              @apply-window="applyCustomWindow"
-              @reset-window="resetCustomWindow"
-            />
           </div>
 
           <div class="ui-summary-strip">
@@ -919,6 +871,8 @@ onUnmounted(() => {
                     <QueueWaitHistoryChart
                       :series="queueWaitSeries"
                       :aggregation="queueWaitAggregation"
+                      :window-start="queueWaitChartWindowStart"
+                      :window-end="queueWaitChartWindowEnd"
                     />
                   </div>
                   <div v-else class="mt-2 text-sm text-[var(--color-brand-muted)]">
