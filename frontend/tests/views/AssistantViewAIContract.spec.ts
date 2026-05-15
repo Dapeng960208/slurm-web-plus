@@ -12,8 +12,9 @@ describe('AI chat view contract', () => {
     expect(source).not.toContain('AI Assistant')
   })
 
-  test('loads model configs and conversation data from the new AI APIs', () => {
-    expect(source).toContain('ai_configs')
+  test('loads model summaries and conversation data from the new AI APIs', () => {
+    expect(source).toContain('ai_models')
+    expect(source).not.toContain('ai_configs')
     expect(source).toContain('ai_conversations')
     expect(source).toContain('ai_conversation')
     expect(source).toContain('stream_ai_chat')
@@ -21,6 +22,7 @@ describe('AI chat view contract', () => {
 
   test('renders model selection and SSE event handling affordances', () => {
     expect(source).toContain('model_config_id')
+    expect(source).toContain('data-testid="assistant-model-picker"')
     expect(source).toContain('onToolStart')
     expect(source).toContain('onToolEnd')
     expect(source).toContain('interface_key')

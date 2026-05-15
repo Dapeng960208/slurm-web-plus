@@ -16,7 +16,7 @@ import type {
   AIConversation,
   AIConversationMessage,
   AIConversationSummary,
-  AIModelConfig,
+  AIModelSummary,
   AIToolCallRecord,
   ClusterDescription
 } from '@/composables/GatewayAPI'
@@ -53,7 +53,7 @@ const gateway = useGatewayAPI()
 const runtimeStore = useRuntimeStore()
 const { t } = useI18n()
 
-const configs = ref<AIModelConfig[]>([])
+const configs = ref<AIModelSummary[]>([])
 const configsLoading = ref(false)
 const configsError = ref<string | null>(null)
 
@@ -84,13 +84,11 @@ const clusterDetails = computed<ClusterDescription | undefined>(() =>
 )
 const aiAvailable = computed(() => hasClusterAIAssistant(clusterDetails.value))
 const canView = computed(() => runtimeStore.hasRoutePermission(cluster, 'ai', 'view'))
-const canInspectModels = computed(() => runtimeStore.hasRoutePermission(cluster, 'admin/ai', 'view'))
 const canManage = computed(
   () => runtimeStore.hasRoutePermission(cluster, 'admin/ai', 'edit')
 )
 const enabledModels = computed(() =>
   [...configs.value]
-    .filter((config) => config.enabled)
     .sort((left, right) => {
       if (left.is_default !== right.is_default) return left.is_default ? -1 : 1
       if (left.sort_order !== right.sort_order) return left.sort_order - right.sort_order
@@ -104,33 +102,7 @@ const hasUsableModel = computed(() => {
   if (enabledModels.value.length > 0) return true
   return clusterDetails.value?.ai?.default_model_id != null
 })
-const canSwitchModels = computed(() => canInspectModels.value && enabledModels.value.length > 0)
-const activeModelLabel = computed(() => {
-  if (selectedModelConfig.value) return selectedModelConfig.value.display_name || selectedModelConfig.value.model
-  if (selectedConversation.value?.model_config_id) {
-    return t('pages.assistant.composer.currentModelId', {
-      id: selectedConversation.value.model_config_id
-    })
-  }
-  if (clusterDetails.value?.ai?.default_model_id) {
-    return t('pages.assistant.composer.defaultModelId', {
-      id: clusterDetails.value.ai.default_model_id
-    })
-  }
-  return t('pages.assistant.composer.noModelSelected')
-})
-const modelStatusText = computed(() => {
-  if (selectedModelConfig.value?.is_default) {
-    return t('pages.assistant.composer.modelDefault')
-  }
-  if (selectedConversation.value?.model_config_id) {
-    return t('pages.assistant.composer.modelFromConversation')
-  }
-  if (clusterDetails.value?.ai?.default_model_id) {
-    return t('pages.assistant.composer.modelFromClusterDefault')
-  }
-  return t('pages.assistant.composer.modelUnavailable')
-})
+const canSwitchModels = computed(() => enabledModels.value.length > 1)
 const renderedMessages = computed<AIConversationMessage[]>(() => {
   const messages = [...(selectedConversation.value?.messages ?? [])]
   if (pendingUserMessage.value) {
@@ -163,12 +135,10 @@ const displayToolRuns = computed<ToolRun[]>(() =>
 const tokenLimit = computed(() => readTokenLimit(selectedModelConfig.value) ?? DEFAULT_TOKEN_LIMIT)
 const draftTokenCount = computed(() => estimateTokens(draft.value.trim()))
 const conversationTokenCount = computed(() => {
-  const systemPromptTokens = estimateTokens(selectedModelConfig.value?.system_prompt ?? '')
-  const messageTokens = (selectedConversation.value?.messages ?? []).reduce(
+  return (selectedConversation.value?.messages ?? []).reduce(
     (total, message) => total + estimateTokens(message.content) + 4,
     0
   )
-  return systemPromptTokens + messageTokens
 })
 const estimatedTokenCount = computed(() => conversationTokenCount.value + draftTokenCount.value)
 const tokenLimitExceeded = computed(() => estimatedTokenCount.value > tokenLimit.value)
@@ -189,13 +159,20 @@ function estimateTokens(value: string): number {
   return Math.ceil(cjkChars * 1.5 + nonCjkChars / 4)
 }
 
-function readTokenLimit(config: AIModelConfig | null): number | null {
-  if (!config) return null
+function readTokenLimit(config: AIModelSummary | null): number | null {
+  if (!config || typeof config !== 'object') return null
+  const extras = (config as AIModelSummary & { extra_options?: Record<string, unknown> }).extra_options
+  if (!extras || typeof extras !== 'object') return null
   for (const key of TOKEN_LIMIT_OPTION_KEYS) {
-    const rawValue = config.extra_options?.[key]
-    const value = typeof rawValue === 'string' ? Number(rawValue) : rawValue
+    const value = extras[key]
     if (typeof value === 'number' && Number.isFinite(value) && value > 0) {
-      return Math.floor(value)
+      return value
+    }
+    if (typeof value === 'string') {
+      const parsed = Number(value)
+      if (Number.isFinite(parsed) && parsed > 0) {
+        return parsed
+      }
     }
   }
   return null
@@ -290,10 +267,6 @@ function startNewConversation() {
 }
 
 function ensureSelectedModel() {
-  if (!canInspectModels.value) {
-    selectedModelId.value = null
-    return
-  }
   const preferred =
     selectedConversation.value?.model_config_id ??
     clusterDetails.value?.ai?.default_model_id ??
@@ -307,7 +280,7 @@ function ensureSelectedModel() {
 }
 
 async function loadConfigs() {
-  if (!aiAvailable.value || !canView.value || !canInspectModels.value) {
+  if (!aiAvailable.value || !canView.value) {
     configs.value = []
     configsError.value = null
     ensureSelectedModel()
@@ -316,7 +289,7 @@ async function loadConfigs() {
   configsLoading.value = true
   configsError.value = null
   try {
-    configs.value = await gateway.ai_configs(cluster)
+    configs.value = await gateway.ai_models(cluster)
     ensureSelectedModel()
   } catch (error: unknown) {
     configs.value = []
@@ -333,11 +306,7 @@ async function loadConversation(conversationId: number) {
     const conversation = await gateway.ai_conversation(cluster, conversationId)
     selectedConversationId.value = conversation.id
     selectedConversation.value = conversation
-    if (
-      canInspectModels.value &&
-      conversation.model_config_id &&
-      enabledModels.value.some((config) => config.id === conversation.model_config_id)
-    ) {
+    if (conversation.model_config_id && enabledModels.value.some((config) => config.id === conversation.model_config_id)) {
       selectedModelId.value = conversation.model_config_id
     }
   } catch (error: unknown) {
@@ -462,7 +431,7 @@ async function submitMessage() {
     selectedConversation.value?.model_config_id ??
     clusterDetails.value?.ai?.default_model_id ??
     null
-  if (!sessionModelId && canInspectModels.value) {
+  if (!sessionModelId) {
     sendError.value = t('pages.assistant.errors.noEnabledModel')
     return
   }
@@ -791,33 +760,20 @@ watch(
                   <div
                     class="assistant-composer-toolbar rounded-[24px] border border-[rgba(80,105,127,0.12)] bg-[rgba(255,255,255,0.86)] px-4 py-3 shadow-[var(--shadow-soft)]"
                   >
-                    <div class="assistant-composer-model" data-testid="assistant-model-picker">
-                      <div class="assistant-composer-model-copy">
-                        <span class="assistant-composer-model-label">
-                          {{ t('pages.assistant.composer.modelLabel') }}
-                        </span>
-                        <p class="assistant-composer-model-name">
-                          {{ activeModelLabel }}
-                        </p>
-                        <p class="assistant-composer-model-meta">
-                          {{ modelStatusText }}
-                        </p>
-                      </div>
+                    <div class="assistant-composer-toolbar-start" data-testid="assistant-model-picker">
                       <select
-                        v-if="canSwitchModels"
+                        v-if="enabledModels.length > 0"
                         v-model.number="selectedModelId"
                         class="ui-select-field assistant-composer-model-select"
                         :aria-label="t('pages.assistant.composer.modelSelectAria')"
-                        :disabled="sending"
+                        :disabled="sending || !canSwitchModels"
                       >
                         <option v-for="config in enabledModels" :key="config.id" :value="config.id">
                           {{ config.display_name || config.model }}
                         </option>
                       </select>
                     </div>
-                  </div>
-                  <div class="flex flex-wrap items-center justify-between gap-3">
-                    <div class="text-sm text-[var(--color-brand-muted)]">
+                    <div class="text-sm text-[var(--color-brand-muted)] assistant-composer-token-meta">
                       <span
                         class="font-semibold"
                         :class="tokenLimitExceeded ? 'text-red-600' : 'text-[var(--color-brand-ink-strong)]'"
@@ -828,7 +784,7 @@ watch(
                         {{ t('pages.assistant.composer.tokenExceededHint') }}
                       </p>
                     </div>
-                    <div class="flex flex-wrap gap-2">
+                    <div class="flex flex-wrap gap-2 assistant-composer-actions">
                       <button type="button" class="ui-button-secondary" :disabled="sending" @click="draft = ''">
                         {{ t('common.buttons.clear') }}
                       </button>
@@ -895,9 +851,6 @@ watch(
                         <p class="text-xs text-[var(--color-brand-muted)]">
                           {{ formatTimestamp(tool.created_at) }}
                         </p>
-                        <p class="text-xs text-[var(--color-brand-muted)]">
-                          {{ t('pages.assistant.toolTrace.tool', { value: tool.tool_name }) }}
-                        </p>
                         <pre class="max-h-48 overflow-auto whitespace-pre-wrap break-words rounded-[14px] bg-[rgba(32,42,53,0.04)] px-3 py-2 font-mono text-xs leading-5 text-[var(--color-brand-muted)]">{{ formatJson(tool.arguments) }}</pre>
                         <p v-if="tool.result_summary" class="break-words text-sm leading-6 text-[var(--color-brand-muted)]">
                           {{ tool.result_summary }}
@@ -941,56 +894,39 @@ watch(
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.9rem;
-}
-
-.assistant-composer-model {
-  display: flex;
-  width: 100%;
+  gap: 0.75rem;
   flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.85rem;
 }
 
-.assistant-composer-model-copy {
+.assistant-composer-toolbar-start {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.assistant-composer-token-meta {
   min-width: 0;
   flex: 1 1 14rem;
 }
 
-.assistant-composer-model-label {
-  color: var(--color-brand-muted);
-  font-size: 0.74rem;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-
-.assistant-composer-model-name {
-  margin-top: 0.28rem;
-  color: var(--color-brand-ink-strong);
-  font-size: 0.96rem;
-  font-weight: 700;
-  line-height: 1.35;
-  overflow-wrap: anywhere;
-  word-break: break-word;
-}
-
-.assistant-composer-model-meta {
-  margin-top: 0.2rem;
-  color: var(--color-brand-muted);
-  font-size: 0.82rem;
-  line-height: 1.45;
+.assistant-composer-actions {
+  margin-left: auto;
 }
 
 .assistant-composer-model-select {
-  width: min(100%, 19rem);
-  min-width: 12rem;
+  width: min(100%, 15rem);
+  min-width: 10rem;
 }
 
 @media (max-width: 767px) {
+  .assistant-composer-token-meta,
+  .assistant-composer-actions,
   .assistant-composer-model-select {
     width: 100%;
+  }
+
+  .assistant-composer-actions {
+    margin-left: 0;
   }
 }
 </style>

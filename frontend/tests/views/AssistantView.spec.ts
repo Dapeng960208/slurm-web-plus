@@ -6,7 +6,7 @@ import { useRuntimeStore } from '@/stores/runtime'
 import { i18n } from '@/plugins/i18n'
 
 const mockGatewayAPI = {
-  ai_configs: vi.fn(),
+  ai_models: vi.fn(),
   ai_conversations: vi.fn(),
   ai_conversation: vi.fn(),
   delete_ai_conversation: vi.fn(),
@@ -44,7 +44,7 @@ describe('views/AssistantView.vue', () => {
     useRuntimeStore().availableClusters = [
       {
         name: 'foo',
-        permissions: { roles: [], actions: [], rules: ['ai:view:*', 'admin/ai:view:*', 'admin/ai:edit:*'] },
+        permissions: { roles: [], actions: [], rules: ['ai:view:*', 'admin/ai:edit:*'] },
         capabilities: {
           ai: {
             enabled: true,
@@ -52,6 +52,12 @@ describe('views/AssistantView.vue', () => {
             persistence: true,
             default_model_id: 1
           }
+        },
+        ai: {
+          enabled: true,
+          streaming: true,
+          persistence: true,
+          default_model_id: 1
         },
         racksdb: true,
         infrastructure: 'foo',
@@ -61,29 +67,14 @@ describe('views/AssistantView.vue', () => {
     ]
   })
 
-  test('loads AI model configs and conversations', async () => {
-    mockGatewayAPI.ai_configs.mockResolvedValue([
+  test('loads AI model summaries and conversations', async () => {
+    mockGatewayAPI.ai_models.mockResolvedValue([
       {
         id: 1,
-        name: 'qwen-prod',
-        provider: 'qwen',
-        provider_label: 'Qwen',
-        model: 'qwen3-coder',
         display_name: 'Qwen Prod',
-        enabled: true,
+        model: 'qwen3-coder',
         is_default: true,
-        sort_order: 10,
-        base_url: null,
-        deployment: null,
-        api_version: null,
-        request_timeout: null,
-        temperature: null,
-        system_prompt: null,
-        extra_options: {},
-        secret_configured: true,
-        secret_mask: '***1234',
-        last_validated_at: null,
-        last_validation_error: null
+        sort_order: 10
       }
     ])
     mockGatewayAPI.ai_conversations.mockResolvedValue([
@@ -138,17 +129,14 @@ describe('views/AssistantView.vue', () => {
 
     await flushPromises()
 
-    expect(mockGatewayAPI.ai_configs).toHaveBeenCalledWith('foo')
+    expect(mockGatewayAPI.ai_models).toHaveBeenCalledWith('foo')
     expect(mockGatewayAPI.ai_conversations).toHaveBeenCalledWith('foo')
     expect(mockGatewayAPI.ai_conversation).toHaveBeenCalledWith('foo', 9)
     expect(wrapper.text()).toContain('Queue pressure')
     expect(wrapper.text()).toContain('GPU partition is saturated.')
-    expect(wrapper.text()).toContain('Current Model')
-    expect(wrapper.text()).toContain('Qwen Prod')
-    expect(wrapper.get('[data-testid="assistant-model-picker"]').text()).toContain(
-      'Using the default enabled model for this conversation.'
-    )
-    expect(wrapper.find('select[aria-label="Select AI chat model"]').exists()).toBe(true)
+    expect(wrapper.text()).not.toContain('Current Model')
+    expect(wrapper.find('[data-testid="assistant-model-picker"]').exists()).toBe(true)
+    expect(wrapper.get('select[aria-label="Select AI chat model"]').text()).toContain('Qwen Prod')
     expect(wrapper.text()).toContain('HTTP 200')
     expect(wrapper.text()).not.toContain('{"limit":10}')
     expect(wrapper.text()).not.toContain('10 jobs')
@@ -161,7 +149,7 @@ describe('views/AssistantView.vue', () => {
     expect(wrapper.text()).toContain('Tool: query_agent_interface')
   })
 
-  test('ordinary users do not request admin AI configs before loading conversations', async () => {
+  test('ordinary users use ai_models and can switch when multiple models are enabled', async () => {
     useRuntimeStore().availableClusters = [
       {
         name: 'foo',
@@ -171,9 +159,16 @@ describe('views/AssistantView.vue', () => {
             enabled: true,
             streaming: true,
             persistence: true,
-            available_models_count: 1,
+            available_models_count: 2,
             default_model_id: 9
           }
+        },
+        ai: {
+          enabled: true,
+          streaming: true,
+          persistence: true,
+          available_models_count: 2,
+          default_model_id: 9
         },
         racksdb: true,
         infrastructure: 'foo',
@@ -181,6 +176,22 @@ describe('views/AssistantView.vue', () => {
         cache: true
       }
     ]
+    mockGatewayAPI.ai_models.mockResolvedValue([
+      {
+        id: 9,
+        display_name: 'General',
+        model: 'qwen-general',
+        is_default: true,
+        sort_order: 10
+      },
+      {
+        id: 10,
+        display_name: 'Coder',
+        model: 'qwen-coder',
+        is_default: false,
+        sort_order: 20
+      }
+    ])
     mockGatewayAPI.ai_conversations.mockResolvedValue([
       {
         id: 9,
@@ -214,40 +225,24 @@ describe('views/AssistantView.vue', () => {
 
     await flushPromises()
 
-    expect(mockGatewayAPI.ai_configs).not.toHaveBeenCalled()
-    expect(mockGatewayAPI.ai_conversations).toHaveBeenCalledWith('foo')
-    expect(mockGatewayAPI.ai_conversation).toHaveBeenCalledWith('foo', 9)
-    expect(wrapper.text()).toContain('Queue pressure')
-    expect(wrapper.text()).toContain('Current Model')
-    expect(wrapper.text()).toContain('Conversation model #9')
-    expect(wrapper.text()).toContain('Using the model stored on the current conversation.')
-    expect(wrapper.find('select[aria-label="Select AI chat model"]').exists()).toBe(false)
+    expect(mockGatewayAPI.ai_models).toHaveBeenCalledWith('foo')
+    const select = wrapper.get('select[aria-label="Select AI chat model"]')
+    expect((select.element as HTMLSelectElement).value).toBe('9')
+    expect(select.attributes('disabled')).toBeUndefined()
+
+    await select.setValue('10')
+    expect((select.element as HTMLSelectElement).value).toBe('10')
     expect(wrapper.text()).not.toContain('Request failed with status code 403')
   })
 
   test('renders markdown safely for user and assistant messages', async () => {
-    mockGatewayAPI.ai_configs.mockResolvedValue([
+    mockGatewayAPI.ai_models.mockResolvedValue([
       {
         id: 1,
-        name: 'qwen-prod',
-        provider: 'qwen',
-        provider_label: 'Qwen',
-        model: 'qwen3-coder',
         display_name: 'Qwen Prod',
-        enabled: true,
+        model: 'qwen3-coder',
         is_default: true,
-        sort_order: 10,
-        base_url: null,
-        deployment: null,
-        api_version: null,
-        request_timeout: null,
-        temperature: null,
-        system_prompt: null,
-        extra_options: {},
-        secret_configured: true,
-        secret_mask: '***1234',
-        last_validated_at: null,
-        last_validation_error: null
+        sort_order: 10
       }
     ])
     mockGatewayAPI.ai_conversations.mockResolvedValue([
@@ -312,28 +307,13 @@ describe('views/AssistantView.vue', () => {
   })
 
   test('streams a reply with the selected model', async () => {
-    mockGatewayAPI.ai_configs.mockResolvedValue([
+    mockGatewayAPI.ai_models.mockResolvedValue([
       {
         id: 1,
-        name: 'qwen-prod',
-        provider: 'qwen',
-        provider_label: 'Qwen',
-        model: 'qwen3-coder',
         display_name: 'Qwen Prod',
-        enabled: true,
+        model: 'qwen3-coder',
         is_default: true,
-        sort_order: 10,
-        base_url: null,
-        deployment: null,
-        api_version: null,
-        request_timeout: null,
-        temperature: null,
-        system_prompt: null,
-        extra_options: {},
-        secret_configured: true,
-        secret_mask: '***1234',
-        last_validated_at: null,
-        last_validation_error: null
+        sort_order: 10
       }
     ])
     mockGatewayAPI.ai_conversations
@@ -433,28 +413,14 @@ describe('views/AssistantView.vue', () => {
   })
 
   test('shows token usage and blocks prompts that exceed the configured limit', async () => {
-    mockGatewayAPI.ai_configs.mockResolvedValue([
+    mockGatewayAPI.ai_models.mockResolvedValue([
       {
         id: 1,
-        name: 'qwen-prod',
-        provider: 'qwen',
-        provider_label: 'Qwen',
-        model: 'qwen3-coder',
         display_name: 'Qwen Prod',
-        enabled: true,
+        model: 'qwen3-coder',
         is_default: true,
         sort_order: 10,
-        base_url: null,
-        deployment: null,
-        api_version: null,
-        request_timeout: null,
-        temperature: null,
-        system_prompt: null,
-        extra_options: { context_limit: 10 },
-        secret_configured: true,
-        secret_mask: '***1234',
-        last_validated_at: null,
-        last_validation_error: null
+        extra_options: { context_limit: 10 }
       }
     ])
     mockGatewayAPI.ai_conversations.mockResolvedValue([])
@@ -479,29 +445,14 @@ describe('views/AssistantView.vue', () => {
     expect(wrapper.text()).toContain('Estimated token usage exceeds the current limit')
   })
 
-  test('keeps the composer inside the left chat column', async () => {
-    mockGatewayAPI.ai_configs.mockResolvedValue([
+  test('keeps the composer inside the left chat column with model picker on the left', async () => {
+    mockGatewayAPI.ai_models.mockResolvedValue([
       {
         id: 1,
-        name: 'qwen-prod',
-        provider: 'qwen',
-        provider_label: 'Qwen',
-        model: 'qwen3-coder',
         display_name: 'Qwen Prod',
-        enabled: true,
+        model: 'qwen3-coder',
         is_default: true,
-        sort_order: 10,
-        base_url: null,
-        deployment: null,
-        api_version: null,
-        request_timeout: null,
-        temperature: null,
-        system_prompt: null,
-        extra_options: {},
-        secret_configured: true,
-        secret_mask: '***1234',
-        last_validated_at: null,
-        last_validation_error: null
+        sort_order: 10
       }
     ])
     mockGatewayAPI.ai_conversations.mockResolvedValue([])
@@ -514,6 +465,7 @@ describe('views/AssistantView.vue', () => {
     const workspace = wrapper.get('[data-testid="assistant-workspace"]')
     const messageScroller = wrapper.get('[data-testid="assistant-message-scroller"]')
     const composer = wrapper.get('[data-testid="assistant-composer"]')
+    const modelPicker = wrapper.get('[data-testid="assistant-model-picker"]')
 
     expect(workspace.classes()).toContain('ui-assistant-workspace')
     expect(workspace.classes()).toEqual(expect.arrayContaining(['min-h-0', 'flex-1']))
@@ -524,31 +476,18 @@ describe('views/AssistantView.vue', () => {
     expect(composer.classes()).toContain('shrink-0')
     expect(composer.element.parentElement).toBe(chatColumn.element)
     expect(messageScroller.element.parentElement).toBe(chatColumn.element)
+    expect(modelPicker.element.closest('.assistant-composer-toolbar')).not.toBeNull()
+    expect(modelPicker.find('select').exists()).toBe(true)
   })
 
   test('shows conversation history without message preview text', async () => {
-    mockGatewayAPI.ai_configs.mockResolvedValue([
+    mockGatewayAPI.ai_models.mockResolvedValue([
       {
         id: 1,
-        name: 'qwen-prod',
-        provider: 'qwen',
-        provider_label: 'Qwen',
-        model: 'qwen3-coder',
         display_name: 'Qwen Prod',
-        enabled: true,
+        model: 'qwen3-coder',
         is_default: true,
-        sort_order: 10,
-        base_url: null,
-        deployment: null,
-        api_version: null,
-        request_timeout: null,
-        temperature: null,
-        system_prompt: null,
-        extra_options: {},
-        secret_configured: true,
-        secret_mask: '***1234',
-        last_validated_at: null,
-        last_validation_error: null
+        sort_order: 10
       }
     ])
     mockGatewayAPI.ai_conversations.mockResolvedValue([
@@ -580,28 +519,13 @@ describe('views/AssistantView.vue', () => {
   })
 
   test('shows only the latest five tool calls in execution trace', async () => {
-    mockGatewayAPI.ai_configs.mockResolvedValue([
+    mockGatewayAPI.ai_models.mockResolvedValue([
       {
         id: 1,
-        name: 'qwen-prod',
-        provider: 'qwen',
-        provider_label: 'Qwen',
-        model: 'qwen3-coder',
         display_name: 'Qwen Prod',
-        enabled: true,
+        model: 'qwen3-coder',
         is_default: true,
-        sort_order: 10,
-        base_url: null,
-        deployment: null,
-        api_version: null,
-        request_timeout: null,
-        temperature: null,
-        system_prompt: null,
-        extra_options: {},
-        secret_configured: true,
-        secret_mask: '***1234',
-        last_validated_at: null,
-        last_validation_error: null
+        sort_order: 10
       }
     ])
     mockGatewayAPI.ai_conversations.mockResolvedValue([
