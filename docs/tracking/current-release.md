@@ -63,8 +63,17 @@
 - 修复 AI 默认接口目录缺少 `nodes` 的问题：模型现在能先获取节点列表，再按需用 `node/metrics` 钻取具体节点负载
 - AI 默认接口目录改为按当前用户权限过滤；`user/tools/analysis` 工具分析能力保持默认可见并按当前用户自助查询，跨用户仍需全局分析权限
 - AI planner system message 已注入当前 `user.login` 与 cluster，第一人称请求默认绑定当前用户，不再要求用户额外说明用户名
+- 修复 `Reservations` 删除旧缓存预留时报 `Requested reservation is invalid/2053` 的问题：reservation 写操作会清理 `reservations` 缓存，前端写后立即刷新列表，删除已不存在预留按幂等结果处理
 
 ## 2. 已完成项
+
+- Reservations 删除旧缓存错误已完成：
+  - `SlurmrestdFilteredCached` 已补 `reservation_create/update/delete` 缓存失效，写操作后清理 `CacheKey("reservations")`
+  - `ReservationsView` 创建、更新、删除成功后会调用当前 poller 的 `refresh()`，避免页面继续展示旧 reservation
+  - `Slurmrestd.reservation_delete()` 遇到 Slurm `Requested reservation is invalid/2053` 时返回 `deleted: false` 与 warning，表示目标已不存在，不再抛出 500
+  - 本轮定向验证已通过：
+    - `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/slurmrestd/test_slurmrestd_write_operations.py slurmweb/tests/slurmrestd/test_slurmrestd_filtered_cached.py`
+    - `cd frontend && npx vitest run tests/views/ReservationsView.spec.ts`
 
 - 前端输入与弹窗交互性能优化已完成：
   - `frontend/src/style.css` 已降低 `--shadow-panel` / `--shadow-soft` 成本，并新增 `--shadow-modal` 供弹窗使用

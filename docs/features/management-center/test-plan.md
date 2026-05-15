@@ -57,6 +57,8 @@
 - reservation create/update payload normalization 统一覆盖创建与更新路径
 - `allowed_partitions` / `allowedPartitions` / `AllowedPartitions` 会映射到 reservation 写入字段 `partition`
 - reservation 的 `users/groups/accounts/qos` 数组别名会转换为 `slurmrestd` 所需 CSV string
+- reservation create/update/delete 会清理 `reservations` 缓存
+- reservation delete 遇到 Slurm `Requested reservation is invalid/2053` 时按幂等删除结果返回，不继续包装为 500
 - QOS 轻量 payload 会被包装为 `{ qos: [...] }`
 - QOS 写入缺少常用限制时，后端默认补 `MaxSubmitJobsPerUser=100`、`MaxJobsPerUser=10`、`MaxWallDurationPerJob=1440`
 - QOS 写入显式传入常用限制时，不被后端默认值覆盖
@@ -127,6 +129,7 @@
 - `QosView` 提交创建 QOS 时把 `MaxWallDurationPerJob` 转换为分钟；非法 walltime 不调用写接口并在弹框显示错误
 - `ReservationsView` 创建/编辑表单会提交 `groups`、`qos`、`allowed_partitions`
 - `ReservationsView` 在 `users / groups / accounts / qos / allowed_partitions` 全空时，只显示本地校验错误且不调用写接口
+- `ReservationsView` 创建、编辑、删除成功后会主动刷新列表，避免继续展示旧 reservation
 - 触达页面的按钮样式按操作语义区分：创建/提交 primary，编辑 warning，删除/取消 danger，查看/返回/筛选 secondary
 - 默认 `admin` 用户可见编辑入口，但删除入口仍继续受 `delete` 权限控制
 - 页面无批量取消入口

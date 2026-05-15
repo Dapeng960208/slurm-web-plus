@@ -162,6 +162,7 @@ describe('ReservationsView.vue', () => {
         number: Math.floor(new Date('2026-05-14T12:00').getTime() / 1000)
       }
     })
+    expect(mockClusterDataPoller.refresh).toHaveBeenCalledOnce()
   })
 
   test('shows local validation error when all access control fields are empty', async () => {
@@ -249,5 +250,30 @@ describe('ReservationsView.vue', () => {
     expect(wrapper.findAllComponents(ActionDialog)[0].props('error')).toBe(
       i18n.global.t('pages.reservations.errors.invalidTimeRange')
     )
+  })
+
+  test('refreshes reservations after delete succeeds', async () => {
+    mockGatewayAPI.delete_reservation.mockResolvedValue({ result: 'ok' })
+    const wrapper = mount(ReservationsView, {
+      props: {
+        cluster: 'foo'
+      }
+    })
+
+    const deleteButton = wrapper
+      .findAll('button')
+      .find((button) => button.text() === i18n.global.t('pages.reservations.actions.delete'))
+    expect(deleteButton).toBeTruthy()
+    await deleteButton!.trigger('click')
+    await nextTick()
+    const deleteDialog = wrapper.findAllComponents(ActionDialog)[2]
+    expect(deleteDialog.props('open')).toBe(true)
+
+    deleteDialog.vm.$emit('submit', {})
+    await flushPromises()
+
+    expect(mockGatewayAPI.delete_reservation).toHaveBeenCalledWith('foo', reservations[0].name)
+    expect(mockClusterDataPoller.refresh).toHaveBeenCalledOnce()
+    expect(wrapper.findAllComponents(ActionDialog)[2].props('open')).toBe(false)
   })
 })

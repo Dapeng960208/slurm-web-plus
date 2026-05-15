@@ -1,5 +1,18 @@
 # 最新功能
 
+## 本轮：Reservations 删除旧缓存错误已修复
+
+本轮修复 `Reservations` 页面删除预留时可能出现 `Requested reservation is invalid/2053` 的问题：
+
+- reservation 创建、更新、删除成功后会清理 `reservations` 缓存，避免页面继续展示旧预留。
+- `ReservationsView` 在创建、更新、删除成功后会立即刷新当前列表，不再只等待下一轮轮询。
+- 当 Slurm 返回 `Requested reservation is invalid/2053` 时，删除路径按“目标已不存在”处理为幂等成功结果，并通过 warning 保留底层信息，不再把该场景直接包装成 500 弹窗错误。
+
+本轮新增验证：
+
+- `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/slurmrestd/test_slurmrestd_write_operations.py slurmweb/tests/slurmrestd/test_slurmrestd_filtered_cached.py`
+- `cd frontend && npx vitest run tests/views/ReservationsView.spec.ts`
+
 ## 本轮：前端输入与弹窗交互性能已优化
 
 本轮针对部署环境中“输入框输入文字卡顿、按钮打开表单卡顿”的前端问题做了渲染路径收口：

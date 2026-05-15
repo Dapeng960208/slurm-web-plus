@@ -11,6 +11,7 @@ import requests
 import pytest
 
 from slurmweb.slurmrestd import Slurmrestd
+from slurmweb.slurmrestd.errors import SlurmrestdInternalError
 
 from ..lib.slurmrestd import TestSlurmrestdBase, basic_authentifier
 
@@ -476,3 +477,38 @@ class TestSlurmrestdWriteOperations(TestSlurmrestdBase):
             },
             params=None,
         )
+
+    def test_reservation_delete_treats_missing_reservation_as_idempotent(self):
+        self.setup_slurmrestd("25.11.0", "0.0.44")
+        self.slurmrestd.request_json = mock.Mock(
+            side_effect=SlurmrestdInternalError(
+                "Requested reservation is invalid",
+                2053,
+                "Error deleting reservation test (slurm_delete_reservation)",
+                "_delete_reservation",
+            )
+        )
+
+        result = self.slurmrestd.reservation_delete("test")
+
+        self.assertEqual(result["errors"], [])
+        self.assertEqual(result["reservation"], "test")
+        self.assertFalse(result["deleted"])
+        self.assertEqual(
+            result["warnings"][0]["message"],
+            "Requested reservation is invalid",
+        )
+
+    def test_reservation_delete_keeps_unexpected_slurmrestd_errors(self):
+        self.setup_slurmrestd("25.11.0", "0.0.44")
+        self.slurmrestd.request_json = mock.Mock(
+            side_effect=SlurmrestdInternalError(
+                "Unexpected error",
+                9999,
+                "Unexpected reservation delete failure",
+                "_delete_reservation",
+            )
+        )
+
+        with pytest.raises(SlurmrestdInternalError):
+            self.slurmrestd.reservation_delete("test")

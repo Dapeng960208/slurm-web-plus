@@ -11,6 +11,11 @@
 
 ## 条目
 
+### 2026-05-15：Reservations 删除旧缓存预留时返回 `Requested reservation is invalid/2053`
+- 时间：2026-05-15
+- 现象：在 `Reservations` 页面删除 `test` 预留时，弹窗显示 `slurmrestd error: Error deleting reservation test (slurm_delete_reservation) [Requested reservation is invalid/2053]`。
+- 解决办法：补齐 reservation create/update/delete 对 `CacheKey("reservations")` 的缓存失效；前端创建、更新、删除成功后立即刷新列表；删除路径遇到 Slurm `Requested reservation is invalid/2053` 时按“目标已不存在”的幂等结果返回 warning，不再包装成 500。
+
 ### 2026-05-15：AI 工具能力与权限修复提交推送到 GitHub 时 443 连接失败
 - 时间：2026-05-15
 - 现象：本地 `main` 已包含 AI `nodes` 默认目录、工具目录权限过滤、当前用户上下文注入和空通用工具调用内部重试等修复提交后，执行 `powershell -ExecutionPolicy Bypass -File scripts/push-and-watch-github-ci.ps1 -PollIntervalSeconds 30 -TimeoutMinutes 45` 在 `git push origin main` 阶段失败，远端返回 `Failed to connect to github.com port 443 after 21101 ms: Could not connect to server`，因此没有触发新的 GitHub Actions run。

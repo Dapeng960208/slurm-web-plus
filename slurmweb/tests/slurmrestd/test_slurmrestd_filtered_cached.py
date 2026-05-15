@@ -153,3 +153,23 @@ class TestSlurmrestdFilteredCached(TestSlurmrestdBase):
         self.slurmrestd.service.get.assert_called_once_with(CacheKey("jobs"))
         self.slurmrestd.service.put.assert_not_called()
         self.slurmrestd.service.count_hit.assert_called_once_with(CacheKey("jobs"))
+
+    def test_reservation_write_operations_invalidate_reservations_cache(self):
+        self.setup_slurmrestd("25.11.0", "0.0.44")
+        self.slurmrestd.service.delete = mock.Mock()
+        self.slurmrestd.request_json = mock.Mock(
+            return_value={"warnings": [], "errors": [], "reservations": []}
+        )
+
+        self.slurmrestd.reservation_create({"name": "maint"})
+        self.slurmrestd.reservation_update("maint", {"users": ["alice"]})
+        self.slurmrestd.reservation_delete("maint")
+
+        self.assertEqual(
+            self.slurmrestd.service.delete.mock_calls,
+            [
+                mock.call(CacheKey("reservations")),
+                mock.call(CacheKey("reservations")),
+                mock.call(CacheKey("reservations")),
+            ],
+        )

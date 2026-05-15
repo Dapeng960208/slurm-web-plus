@@ -41,7 +41,7 @@ const gateway = useGatewayAPI()
 const runtimeStore = useRuntimeStore()
 const { t } = useI18n()
 
-const { data, unable, loaded, setCluster } = useClusterDataPoller<ClusterReservation[]>(
+const { data, unable, loaded, refresh, setCluster } = useClusterDataPoller<ClusterReservation[]>(
   cluster,
   'reservations',
   10000
@@ -213,6 +213,7 @@ async function createReservation(payload: Record<string, string>) {
     runtimeStore.reportInfo(
       t('pages.reservations.notifications.createRequested', { name: payload.name || '' })
     )
+    await refresh()
     createOpen.value = false
   } catch (error: unknown) {
     operationError.value = error instanceof Error ? error.message : String(error)
@@ -240,6 +241,7 @@ async function updateReservation(payload: Record<string, string>) {
         name: selectedReservation.value.name
       })
     )
+    await refresh()
     editOpen.value = false
   } catch (error: unknown) {
     operationError.value = error instanceof Error ? error.message : String(error)
@@ -259,6 +261,7 @@ async function deleteReservation() {
         name: selectedReservation.value.name
       })
     )
+    await refresh()
     deleteOpen.value = false
   } catch (error: unknown) {
     operationError.value = error instanceof Error ? error.message : String(error)

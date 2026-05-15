@@ -829,8 +829,28 @@ class Slurmrestd:
             payload=self._normalize_reservation_payload(payload),
         )
 
+    @staticmethod
+    def _is_missing_reservation_error(err: SlurmrestdInternalError) -> bool:
+        return err.error == 2053 and "reservation is invalid" in err.message.lower()
+
     def reservation_delete(self, reservation_name: str):
-        return self.request_json("DELETE", "slurm", f"reservation/{reservation_name}")
+        try:
+            return self.request_json("DELETE", "slurm", f"reservation/{reservation_name}")
+        except SlurmrestdInternalError as err:
+            if not self._is_missing_reservation_error(err):
+                raise
+            return {
+                "warnings": [
+                    {
+                        "message": err.message,
+                        "description": err.description,
+                        "source": err.source,
+                    }
+                ],
+                "errors": [],
+                "reservation": reservation_name,
+                "deleted": False,
+            }
 
     def qos(self: str, **kwargs):
         return self._request("slurmdb", "qos", "qos", **kwargs)
@@ -1325,4 +1345,21 @@ class SlurmrestdFilteredCached(SlurmrestdFiltered):
     def qos_delete(self, qos_name: str):
         result = super().qos_delete(qos_name)
         self._invalidate_cached_keys(CacheKey("qos"), CacheKey("associations"))
+        return result
+
+    def reservation_create(self, payload: t.Dict[str, t.Any]):
+        result = super().reservation_create(payload)
+        self._invalidate_cached_keys(CacheKey("reservations"))
+        return result
+
+    def reservation_update(
+        self, reservation_name: str, payload: t.Dict[str, t.Any]
+    ):
+        result = super().reservation_update(reservation_name, payload)
+        self._invalidate_cached_keys(CacheKey("reservations"))
+        return result
+
+    def reservation_delete(self, reservation_name: str):
+        result = super().reservation_delete(reservation_name)
+        self._invalidate_cached_keys(CacheKey("reservations"))
         return result

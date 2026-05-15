@@ -36,6 +36,8 @@
   - 创建
   - 更新
   - 删除
+  - 创建、更新、删除成功后必须刷新当前列表，并清理后端 `reservations` 缓存，避免旧 reservation 继续留在页面上
+  - 删除已不存在或已失效的 reservation 时，Slurm `Requested reservation is invalid/2053` 按幂等删除结果处理，不再向用户显示 500 错误
   - 前端表单已补 `groups`、`qos`、`Allowed Partitions`
   - `node_list`、`allowed_partitions`、`qos` 已统一改为可搜索下拉
   - `node_list` 现在仅支持从当前集群节点列表多选并回写为逗号分隔字符串，不再保留自由文本 nodeset 表达式输入
