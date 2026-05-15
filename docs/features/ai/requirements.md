@@ -89,6 +89,7 @@ AI 当前按数据库能力自动启用：
   - 当实时 `job` 查询缺失、不足，或问题明确涉及已完成作业时，应补查 `jobs/history` 或 `jobs/history/detail`
 - 系统提示词不再把“某个问题必须调用某个接口”写死，而是要求模型基于信息缺口自行选择接口
 - 但对于集群状态、拥塞、容量、排队等待、控制器健康和热点问题，系统提示词现在明确要求优先调用 `analysis/context`
+- 对“所有节点对比”“哪个节点负载较低”这类问题，系统提示词要求先调用 `nodes` 获取候选节点，再按需对具体节点调用 `node/metrics` 或 `node/metrics/history`
 - 模型不得编造集群数据；若现有接口信息不足，必须明确说明不确定性
 
 当前首批对 AI 开放的查询接口包括：
@@ -153,6 +154,7 @@ AI 当前按数据库能力自动启用：
 - `job`
 - `jobs/history`
 - `jobs/history/detail`
+- `nodes`
 - `node`
 - `node/metrics`
 - `node/metrics/history`
@@ -161,8 +163,9 @@ AI 当前按数据库能力自动启用：
 收口规则：
 
 - `analysis/context` 是集群状态问题的首选入口
+- `nodes` 用于回答需要横向比较节点或选择候选节点的问题，并接受 `limit`
 - `job` / `jobs/history` / `node` / `node/metrics*` 只作为后续钻取接口
-- `jobs`、`nodes`、`partitions`、`qos`、`reservations`、`accounts`、`associations`、`users`、`user` 仍保留在 Agent interface 层，但不再出现在默认 AI 查询目录中
+- `jobs`、`partitions`、`qos`、`reservations`、`accounts`、`associations`、`users`、`user` 仍保留在 Agent interface 层，但不再出现在默认 AI 查询目录中
 
 边界：
 

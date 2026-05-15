@@ -78,6 +78,7 @@ class AIAgentInterfaceRegistry:
         "job",
         "jobs/history",
         "jobs/history/detail",
+        "nodes",
         "node",
         "node/metrics",
         "node/metrics/history",

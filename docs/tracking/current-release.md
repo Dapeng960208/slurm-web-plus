@@ -60,6 +60,7 @@
 - 修复 `ClusterAnalysisView` 平均排队时间图的范围联动错误：卡片时间范围与聚合粒度现在独立于顶部全局时间范围
 - 修复 `ClusterAnalysisView` 页头右侧误展示额外时间组件的问题；平均排队时间图只保留卡片自身时间范围，并按该窗口展开横轴
 - 前端输入与弹窗交互性能优化：降低共享 surface 阴影和模糊成本，移除主要布局与弹窗遮罩的 `backdrop-blur`，`ActionDialog` 改为打开时锁定字段快照，`Admin > AI` 模型配置弹窗拆为独立表单组件；第二轮补充云桌面优化，降低轮询、图表和 Canvas 动画导致的持续重绘；GitHub CI 暴露的 Resources `v-memo` lint 回归已修复
+- 修复 AI 默认接口目录缺少 `nodes` 的问题：模型现在能先获取节点列表，再按需用 `node/metrics` 钻取具体节点负载
 
 ## 2. 已完成项
 
@@ -109,12 +110,13 @@
     - `job`
     - `jobs/history`
     - `jobs/history/detail`
+    - `nodes`
     - `node`
     - `node/metrics`
     - `node/metrics/history`
     - `user/tools/analysis`
-  - `jobs`、`nodes`、`partitions`、`qos`、`reservations`、`accounts`、`associations`、`users`、`user` 仍保留在 Agent interface 层，但不再出现在默认 AI 查询目录中
-  - AI system prompt 已新增“集群状态/拥塞/容量/等待/控制器健康/热点问题优先调用 `analysis/context`”约束
+  - `nodes` 已用于需要横向比较候选节点的问题；`jobs`、`partitions`、`qos`、`reservations`、`accounts`、`associations`、`users`、`user` 仍保留在 Agent interface 层，但不再出现在默认 AI 查询目录中
+  - AI system prompt 已新增“集群状态/拥塞/容量/等待/控制器健康/热点问题优先调用 `analysis/context`”约束，并补充“比较所有节点/哪个节点负载低时先调用 `nodes`”的提示
   - 本轮定向验证已通过：
     - `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/views/test_agent_operations.py slurmweb/tests/views/test_gateway.py slurmweb/tests/apps/test_ai_service.py`
 

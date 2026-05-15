@@ -765,6 +765,7 @@ class TestAIService(TestCase):
                 "node",
                 "node/metrics",
                 "node/metrics/history",
+                "nodes",
                 "user/tools/analysis",
             ],
         )

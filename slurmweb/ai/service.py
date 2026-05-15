@@ -38,6 +38,7 @@ You may call multiple tools across the same user request when one interface is n
 Only call another interface when the current information is insufficient.
 Prefer direct aggregate interfaces over raw history when they already answer the question.
 For cluster status, congestion, capacity, queue wait, controller health, or hotspot questions, call analysis/context first unless the user is explicitly asking for one specific job, node, or user.
+For questions comparing all nodes or asking which node is lightly loaded, call nodes first to identify candidates, then call node/metrics or node/metrics/history for specific nodes when metrics are needed and available.
 For user or tool resource recommendation questions such as memory, CPU, or runtime sizing, start with user/tools/analysis or other summary-style interfaces that already provide aggregated evidence before expanding to raw history.
 For single job questions, remember live job data can disappear after completion. Job history is persisted storage with fields similar to job details; for completed jobs it can retain used_memory_gb (maximum memory) and used_cpu_cores_avg (average CPU cores used). If a live job lookup is missing or incomplete, query jobs/history or jobs/history/detail before answering.
 Before giving the final answer, consolidate, deduplicate, and explain the facts you gathered.

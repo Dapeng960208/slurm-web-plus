@@ -90,7 +90,7 @@ npm --prefix frontend run test:unit
 - 有 `ai:view:*` 但无底层权限时不能通过 AI 绕过：
   - 无 `jobs:view:*|self`：不能通过 AI 读不允许访问的 live jobs
   - 无 `jobs-history:view:*`：不能通过 AI 读历史作业
-  - 无 `resources:view:*`：不能通过 AI 读 node detail / node metrics
+  - 无 `resources:view:*`：不能通过 AI 读 nodes list / node detail / node metrics
 - 有写权限的用户可通过 AI 调对应写接口：
   - 例如 `admin` 默认 `*:edit:*` 可执行 `edit` 类 AI 写接口
   - `delete` 仍需显式 `*:delete:*` 或对应资源删除权限

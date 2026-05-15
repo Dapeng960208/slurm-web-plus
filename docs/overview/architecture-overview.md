@@ -130,7 +130,7 @@ AI model
   - 接口只返回 `id`、`display_name`、`model`、`is_default`、`sort_order`
 - 普通会话查询默认过滤 `ai_conversations.deleted_at IS NOT NULL` 的逻辑删除记录
 - 管理员审计查询可列出所有用户会话，并包含逻辑删除记录
-- 默认暴露给模型的只读接口目录已经收口，不再把 `jobs`、`nodes`、`partitions`、`qos`、`reservations`、`accounts`、`associations`、`users`、`user` 放进 AI 默认查询目录
+- 默认暴露给模型的只读接口目录已经收口，但保留 `nodes` 用于横向比较节点；`jobs`、`partitions`、`qos`、`reservations`、`accounts`、`associations`、`users`、`user` 不放进 AI 默认查询目录
 
 执行轨迹链路同步变为：
 
