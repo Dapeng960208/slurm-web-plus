@@ -35,11 +35,15 @@
   - 创建
   - 更新
   - 删除
+  - 前端表单已补 `groups`、`qos`、`Allowed Partitions`
+  - 创建/编辑前固定校验 `users / groups / accounts / qos / allowed_partitions` 至少一项非空；若全空则在弹窗内直接报错，不发请求
+  - reservation create/update payload 会统一走后端 normalization，再映射到 `slurmrestd` reservation 写入契约
 - `AccountsView` / `AccountView`
   - 账户创建
   - 账户更新
   - 账户删除
   - account-user association 增加用户、编辑 QOS/default QOS、删除用户关联
+  - `Add user` 现在先确保用户实体存在，再补 association，并在刷新后校验关联真实可见才显示成功
 - `UserView`
   - SlurmDB 用户创建/更新
   - 用户删除
@@ -53,6 +57,14 @@
   - `Slurm diag`
   - `hour/day/week` 时间范围切换
   - 内存容量详情按 GB 展示，评分与百分比仍使用原始 MB 数值
+- `DashboardView`
+  - 删除顶部工具条左侧“实时指标”局部标题、副标题和说明文案
+  - 工具条、统计卡、图表区的垂直节奏统一回到页面级共享 spacing
+- `JobView` / `JobHistoryView`
+  - 左侧继续保留 `JobProgress` / timeline
+  - 右侧详情统一参考 `NodeView` 改成单页连续详情列表
+  - 不再保留 `DetailSummaryStrip`、碎片字段卡、长字段卡片堆叠与冗余小标题
+  - `partition / user / account` 仍保持可点击入口；长字段保持自动换行
 - `/:cluster/admin`
   - `AI`
   - `Users`
@@ -237,6 +249,7 @@
 
 - `admin/ldap-users:edit:*` 当前表示 LDAP 用户缓存维护动作，例如刷新、重建或失效缓存；不表示修改 LDAP 源数据
 - `accounts/users/qos/reservation` 当前前端使用轻量结构化表单，不覆盖全部官方 JSON 细节
+- reservation 轻量表单当前额外接受 `groups`、`qos`、`allowed_partitions` 三类访问控制字段别名；最终仍由后端归一化为 `slurmrestd` 实际写入字段
 - 全量后端回归仍需 Linux 环境补充
 
 ## 10. 相关实现与验证入口

@@ -1391,7 +1391,10 @@ const en = {
         defaultQos: 'Default: {qos}'
       },
       errors: {
-        unableToRetrieve: 'Unable to retrieve associations for cluster {cluster}'
+        unableToRetrieve: 'Unable to retrieve associations for cluster {cluster}',
+        addUserFailed: 'Unable to add the user to this account.',
+        addUserAssociationMissing:
+          'The user {user} is still not visible under account {account} after refresh.'
       },
       dialogs: {
         edit: {
@@ -1580,9 +1583,11 @@ const en = {
           nodeList: 'Node list',
           startTime: 'Start time',
           endTime: 'End time',
-          partition: 'Partition',
+          allowedPartitions: 'Allowed Partitions (comma separated)',
           users: 'Users (comma separated)',
-          accounts: 'Accounts (comma separated)'
+          groups: 'Groups (comma separated)',
+          accounts: 'Accounts (comma separated)',
+          qos: 'QOS (comma separated)'
         },
         hints: {
           startTime: 'Required by Slurm when creating or updating a reservation.',
@@ -1593,7 +1598,9 @@ const en = {
       errors: {
         startTimeRequired: 'A reservation start time is required.',
         endTimeRequired: 'A reservation end time is required for creation.',
-        invalidTimeRange: 'Reservation end time must be later than the start time.'
+        invalidTimeRange: 'Reservation end time must be later than the start time.',
+        accessControlRequired:
+          'Provide at least one access control field: users, groups, accounts, QOS, or allowed partitions.'
       },
       notifications: {
         createRequested: 'Reservation {name} creation requested.',
@@ -1930,15 +1937,7 @@ const en = {
       composer: {
         placeholder:
           'Ask about a job, node resources, partitions, or another read-only cluster question.',
-        modelLabel: 'Current Model',
         modelSelectAria: 'Select AI chat model',
-        currentModelId: 'Conversation model #{id}',
-        defaultModelId: 'Cluster default model #{id}',
-        noModelSelected: 'No model selected',
-        modelDefault: 'Using the default enabled model for this conversation.',
-        modelFromConversation: 'Using the model stored on the current conversation.',
-        modelFromClusterDefault: 'Using the cluster default model for new requests.',
-        modelUnavailable: 'No readable model metadata is currently available.',
         estimatedTokens: 'Estimated tokens {current} / {limit}',
         tokenExceededHint:
           'Token estimate exceeds the current limit. Shorten the prompt or start a new chat.'

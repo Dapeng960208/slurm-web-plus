@@ -23,7 +23,7 @@
 - AI 审计与指标时间窗
   - [需求说明](./features/ai-audit-and-metrics-time-range/requirements.md)
   - [测试计划](./features/ai-audit-and-metrics-time-range/test-plan.md)
-- Dashboard 分区筛选
+- Dashboard 队列筛选
   - [需求说明](./features/dashboard-partition-filter/requirements.md)
   - [测试计划](./features/dashboard-partition-filter/test-plan.md)
   - [后端说明](./features/dashboard-partition-filter/backend.md)
@@ -84,8 +84,12 @@
 
 - GitHub Actions 已切到 `main` 分支自动测试，并补结构化 CI 结果 artifact 与手工 triage 入口。
 - AI 管理页新增所有用户会话审计；普通 AI 会话支持逻辑删除和消息复制。
+- 普通 AI 对话页已改为使用 `ai/models` 只读模型摘要接口；发送区左侧提供紧凑模型下拉框，普通用户不再依赖管理员模型配置接口。
 - AI 单作业查询已强化历史作业认知：实时 `job` 不足或作业完成后，可补查持久化 `jobs/history`，并识别 `used_memory_gb` 与 `used_cpu_cores_avg`。
 - 历史作业页新增跳转实时作业详情入口；作业编辑新增 `Memory per CPU (MB)`。
+- `Reservations` 创建/编辑已补 `groups`、`qos`、`Allowed Partitions`，并在前端本地拦截访问控制字段全空的非法提交。
+- `Job` 与 `Job History` 详情页已统一为连续详情列表；`Dashboard` 首屏已删除“实时指标”局部文案并收紧图区留白。
+- `AccountView` 给账户加用户已改为“先建用户实体、再建 association、刷新后写后校验”的链路，不再把“接口表面成功但页面无关联”当成成功。
 - 用户和 account-user association 管理支持默认 QOS、分配 QOS、增加用户关联与删除关联。
 - 页面按钮颜色按语义区分：创建/提交、编辑/保存、删除/取消、查看/筛选分别使用不同样式。
 - 节点 `Real Metrics` 与用户工具分析页统一为按钮触发的起止时间弹框。

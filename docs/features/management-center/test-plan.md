@@ -51,6 +51,9 @@
 - `DELETE` 带 body
 - `supports_write_operations()` 对 `0.41-0.44` 返回 true
 - `supports_write_operations()` 对 `0.39-0.40` 返回 false
+- reservation create/update payload normalization 统一覆盖创建与更新路径
+- `allowed_partitions` / `allowedPartitions` / `AllowedPartitions` 会映射到 reservation 写入字段 `partition`
+- reservation 的 `users/groups/accounts/qos` 数组别名会转换为 `slurmrestd` 所需 CSV string
 - QOS 轻量 payload 会被包装为 `{ qos: [...] }`
 - QOS 写入缺少常用限制时，后端默认补 `MaxSubmitJobsPerUser=100`、`MaxJobsPerUser=10`、`MaxWallDurationPerJob=1440`
 - QOS 写入显式传入常用限制时，不被后端默认值覆盖
@@ -98,17 +101,23 @@
 - `JobsHistoryView` / `JobHistoryView` 的实时作业入口使用 Slurm `job_id` 跳转到 `job` 路由
 - `JobsHistoryView` / `JobHistoryView` 不直接提供历史记录 Edit/Cancel 写操作
 - `AccountView` 可增加 account-user association、编辑 association QOS/default QOS、删除 association，payload 复用现有 associations 写接口
+- `AccountView` 的 `Add user` 必须先调用 `save_user`，再调用 `save_association`
+- `AccountView` 在 `refreshAssociations()` 后若仍看不到目标 `{ account, user }`，必须提示失败且不能显示成功 toast
 - `AccountView` 删除 association 时只提交选中 `account` 与 `user`，不携带空 `qos/default` 字段
 - `UserView` 编辑用户时提交 `default_qos` 和逗号分隔解析后的 `qos`
 - `QosView` 创建 QOS 弹框预填 `MaxSubmitJobsPerUser=100`、`MaxJobsPerUser=10`、`MaxWallDurationPerJob=1-00:00:00`
 - `QosView` 提交创建 QOS 时把 `MaxWallDurationPerJob` 转换为分钟；非法 walltime 不调用写接口并在弹框显示错误
+- `ReservationsView` 创建/编辑表单会提交 `groups`、`qos`、`allowed_partitions`
+- `ReservationsView` 在 `users / groups / accounts / qos / allowed_partitions` 全空时，只显示本地校验错误且不调用写接口
 - 触达页面的按钮样式按操作语义区分：创建/提交 primary，编辑 warning，删除/取消 danger，查看/返回/筛选 secondary
 - 默认 `admin` 用户可见编辑入口，但删除入口仍继续受 `delete` 权限控制
 - 页面无批量取消入口
+- `DashboardView` 不再渲染“实时指标”局部文案块；图表组件不再输出旧的顶部 `pt-16/pb-5/mt-4`
 - `JobsView`、`JobsHistoryView`、`ResourcesView`、`QosView`、`ReservationsView` 结果区存在独立 `.ui-table-scroll`，分页节点位于 `.ui-results-dock .ui-results-pagination`，而不再留在 `.ui-table-shell` 内部
 - `AccountsView` 账户树列表存在独立 `.ui-tree-scroll`，分页固定在工作区底部
 - `ClusterMainLayout` 的 `main.ui-content-scroll` 具备显式 `flex-1` 与 `min-h-0`，作为浏览器可视区内框，而不是随子内容增长的普通文档流容器
 - `UserView`、`AccountView`、`JobView`、`JobHistoryView`、`NodeView`、`UserAnalysisView` 详情页正文存在独立 `.ui-scroll-region`，返回按钮保留在工作区顶部，非表格详情内容可以在固定 shell 内继续下滚
+- `JobView` / `JobHistoryView` 右侧详情区应为连续列表，不再存在 `detail-summary-strip` 或卡片网格
 - `DashboardView` 与 `ClusterAnalysisView` 页面正文存在独立 `.ui-scroll-region`，页头保留在工作区顶部，非表格内容区可以在固定 shell 内继续下滚
 - `AdminLayoutView` 会在 `RouterView` 外层提供 `.ui-scroll-region`，保证 `admin/ai`、`admin/access-control`、`admin/cache`、`admin/ldap-users` 与管理员详情子页面在固定 shell 中仍可滚动
 - `ResourcesView` 不再渲染节点行尾 `Manage` / `Delete` 按钮，节点名称仍可跳转详情
@@ -120,10 +129,12 @@
 - `frontend/tests/views/JobsView.spec.ts`
 - `frontend/tests/views/JobView.spec.ts`
 - `frontend/tests/views/JobsHistoryView.spec.ts`
+- `frontend/tests/views/JobHistoryView.spec.ts`
 - `frontend/tests/views/resources/ResourcesView.spec.ts`
 - `frontend/tests/views/QosView.spec.ts`
 - `frontend/tests/views/ReservationsView.spec.ts`
 - `frontend/tests/views/AccountsView.spec.ts`
+- `frontend/tests/views/AccountView.spec.ts`
 - `frontend/tests/components/PaginationControls.spec.ts`
 
 ### 3.3 Gateway API 契约
@@ -156,7 +167,9 @@
 
 - `cd frontend && npx vitest run tests/views/QosView.spec.ts tests/views/AccountView.spec.ts tests/composables/GatewayAPI.spec.ts`
 - `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/slurmrestd/test_slurmrestd_write_operations.py`
+- `.venv\Scripts\python -m pytest slurmweb/tests/slurmrestd/test_slurmrestd_write_operations.py slurmweb/tests/views/test_agent_ai.py slurmweb/tests/views/test_gateway_ai.py`
 - `cd frontend && npx vitest run tests/views/JobsView.spec.ts tests/views/JobView.spec.ts tests/views/JobsHistoryView.spec.ts tests/views/JobHistoryView.spec.ts tests/views/AccountView.spec.ts tests/views/UserView.spec.ts tests/composables/GatewayAPI.spec.ts tests/composables/ClusterAnalysis.spec.ts tests/components/operations/ActionDialog.spec.ts`
+- `cd frontend && npm exec vitest run tests/views/ReservationsView.spec.ts tests/views/AccountView.spec.ts tests/views/JobView.spec.ts tests/views/JobHistoryView.spec.ts tests/views/DashboardView.spec.ts tests/components/dashboard/ChartResourcesHistory.spec.ts tests/components/dashboard/ChartJobsHistory.spec.ts tests/views/AssistantView.spec.ts tests/views/AssistantViewAIContract.spec.ts`
 - `cd frontend && npx vitest run tests/views/resources/ResourcesView.spec.ts tests/views/NodeView.spec.ts tests/components/operations/ActionDialog.spec.ts tests/components/jobs/UserFilterSelector.spec.ts`
 - `cd frontend && npx vitest run tests/views/UserView.spec.ts tests/views/JobView.spec.ts tests/views/NodeView.spec.ts tests/views/UserAnalysisView.spec.ts`
 - `cd frontend && npx vitest run tests/views/DashboardView.spec.ts tests/views/ClusterAnalysisView.spec.ts tests/views/AdminLayoutView.spec.ts tests/views/settings/SettingsAI.spec.ts tests/views/settings/SettingsAccessControl.spec.ts tests/views/settings/SettingsCache.spec.ts tests/views/settings/SettingsLdapCache.spec.ts tests/views/settings/SettingsAIConversationDetail.spec.ts`

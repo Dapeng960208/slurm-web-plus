@@ -42,6 +42,8 @@ AI 当前按数据库能力自动启用：
 | 页面/接口 | 新规则 |
 |---|---|
 | `/:cluster/ai` | `ai:view:*` |
+| `GET /v{version}/ai/models` | `ai:view:*` |
+| `GET /api/agents/<cluster>/ai/models` | `ai:view:*` |
 | `/:cluster/admin/ai` 查看 | `admin/ai:view:*` |
 | `/:cluster/admin/ai` 新增/修改 | `admin/ai:edit:*` |
 | `/:cluster/admin/ai` 删除 | `admin/ai:delete:*` |
@@ -138,12 +140,17 @@ AI 当前按数据库能力自动启用：
   - 后端对缺失字段的默认补值仅保留为兼容旧调用方或历史轻量 payload 的兜底，不视为 AI 主写链路契约
 - 密钥只返回掩码和配置状态
 - 会话默认仅允许当前用户读取自己的记录
-- 普通对话页不展示模型、stream、persistence 等运行配置；模型配置查看与维护统一收口到 `/:cluster/admin/ai`
-- 普通对话页发送请求时继续使用后端默认模型或当前会话已有模型，不把配置项作为页面主控件暴露给用户
-- 普通对话页初始化时不应依赖 `admin/ai:view:*` 的模型配置列表接口：
-  - 普通用户页面只读取 `ai:view:*` 可访问的会话与流式对话接口
-  - 默认模型能力通过 cluster `capabilities.ai.default_model_id` 暴露
-  - 只有具备 `admin/ai:view:*` 的用户才额外读取 `ai/configs`
+- 普通对话页不展示模型 provider、stream、persistence 等运行配置；这些配置查看与维护统一收口到 `/:cluster/admin/ai`
+- 普通对话页允许把“已启用模型选择”作为轻量主控件暴露在发送区工具栏左侧，但只读取只读模型摘要，不暴露管理员配置细节
+- 普通对话页初始化与模型切换统一使用 `ai:view:*` 可访问的只读模型摘要接口：
+  - Agent：`GET /v{version}/ai/models`
+  - Gateway：`GET /api/agents/<cluster>/ai/models`
+  - 返回字段固定为 `id`、`display_name`、`model`、`is_default`、`sort_order`
+  - 普通用户和管理员都走同一接口；普通用户不再请求 `ai/configs`
+- 普通对话页默认模型选择顺序固定为：
+  1. 当前会话 `model_config_id`
+  2. cluster `capabilities.ai.default_model_id`
+  3. 已启用模型列表首项
 - 普通用户会话列表和详情只返回本人且未逻辑删除的会话
 - 管理员审计接口返回所有用户会话，包含已逻辑删除会话
 - 用户逻辑删除会话后只写入删除状态，不物理删除会话、消息或工具调用记录
@@ -173,6 +180,7 @@ AI 当前按数据库能力自动启用：
 - 用户消息与 assistant 回复都提供复制按钮，复制内容为原始消息正文。
 - 用户可逻辑删除自己的会话；删除后普通列表与普通详情不再展示该会话，管理员审计仍可查看。
 - 输入区显示当前估算 token 用量；超过限制时显示提示、禁用发送按钮，并阻止提交流式请求。
+- 发送区底部工具栏固定为单行布局：左侧模型下拉框，中部/右侧 token 信息，最右 `Clear` / `Send`。
 - 消息滚动区与输入框固定在左侧同一列，输入框不跨越右侧 `Execution trace` 栏。
 - 消息滚动区使用稳定高度容器；流式回复、空态切换和右侧 trace 更新不应把左侧对话面板整体向下挤动。
 

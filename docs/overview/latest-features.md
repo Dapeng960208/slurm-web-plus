@@ -1,10 +1,47 @@
 # 最新功能
 
+## 本轮：Reservations / Dashboard / AI 对话 / Job 详情 / 账户加人已统一收口
+
+本轮围绕 5 个已暴露的问题做了一次集中修复，覆盖 reservation 写入契约、dashboard 留白、AI 对话模型选择、作业详情样式，以及 account 下加用户的假成功问题：
+
+- `Reservations`
+  - reservation create/update 现在统一经过后端 payload normalization，再写入 `slurmrestd`
+  - 支持把 `users`、`groups`、`accounts`、`qos` 的数组别名统一转换成 `slurmrestd` 需要的 CSV string
+  - `allowed_partitions`、`allowedPartitions`、`AllowedPartitions` 会统一映射为 reservation 写入字段 `partition`
+  - 前端创建/编辑表单已补 `groups`、`qos` 和 `Allowed Partitions` 字段，并在本地拦截 `users / groups / accounts / qos / allowed_partitions` 全空的非法提交
+- `Dashboard`
+  - 顶部工具条左侧已删除“实时指标”局部标题、副标题和说明文案
+  - 工具条到统计卡、统计卡到图表、图表到下一区块的垂直留白已回到全局 `ui-section-stack` 节奏
+  - `ChartResourcesHistogram` 与 `ChartJobsHistogram` 已去掉内部遗留的 `pt-16`、`pb-5`、`mt-4` 等局部节奏硬编码
+- `AI`
+  - 新增只读模型摘要接口：Agent `GET /v{version}/ai/models`，Gateway `GET /api/agents/<cluster>/ai/models`
+  - 普通用户和管理员现在都通过 `ai:view:*` 可访问的模型摘要接口读取已启用模型；普通用户不再依赖 `admin/ai:view:*` 的 `ai/configs`
+  - `AssistantView` 已删除独立“当前模型”说明块，改为在发送区底部工具栏左侧放置简洁下拉框；右侧继续保留 token 信息与 `Clear / Send`
+- `Job` / `Job History`
+  - 两个详情页已统一参考 `NodeView` 改成单页连续详情列表
+  - 右侧正文不再保留 `DetailSummaryStrip`、碎片字段卡、长字段堆叠卡与冗余小标题
+  - 长字段保持自动换行，`partition / user / account` 仍可点击跳转
+- `Account`
+  - “Add user” 现在固定执行 `save_user -> save_association -> refreshAssociations() -> 写后校验`
+  - 如果任一步返回 `errors`、接口抛错，或刷新后仍看不到 `{ account, user }` 关联，前端都会判定失败并拒绝显示成功提示
+
+本轮新增验证：
+
+- `.venv\Scripts\python -m pytest slurmweb/tests/slurmrestd/test_slurmrestd_write_operations.py slurmweb/tests/views/test_agent_ai.py slurmweb/tests/views/test_gateway_ai.py`
+- `npm --prefix frontend run type-check`
+- `cd frontend && npm exec vitest run tests/views/ReservationsView.spec.ts tests/views/AccountView.spec.ts tests/views/JobView.spec.ts tests/views/JobHistoryView.spec.ts tests/views/DashboardView.spec.ts tests/components/dashboard/ChartResourcesHistory.spec.ts tests/components/dashboard/ChartJobsHistory.spec.ts tests/views/AssistantView.spec.ts tests/views/AssistantViewAIContract.spec.ts`
+
+补充说明：
+
+- Reservation payload normalization 同时覆盖前端页面、Gateway 转发、Agent 写接口与 AI 工具调用，不再要求调用方自己拼接 `slurmrestd` 原始字段名。
+- `JobView` / `JobHistoryView` 的 hash 高亮逻辑仍保留，但高亮目标已从旧卡片结构切到连续详情行。
+- 本轮定向前端验证全部通过，但 `JobView` 测试运行过程中仍会看到既有的 Vue `inject()` warning；当前未阻断测试结果。
+
 ## 本轮：Dashboard / Analysis 工具条与 Admin 搜索区已统一收口
 
 本轮只处理前端页面结构与样式收口，不涉及接口、配置或状态逻辑变更：
 
-- `Dashboard` 顶部筛选区已去掉分区选择器和时间范围选择器外层的白色胶囊包裹，只保留控件本体；分区保留轻量 inline label，时间范围不再显示额外可见 label。
+- `Dashboard` 顶部筛选区已去掉队列选择器和时间范围选择器外层的白色胶囊包裹，只保留控件本体；队列保留轻量 inline label，时间范围不再显示额外可见 label。
 - `Cluster Analysis` 顶部时间范围控件已与 `Dashboard` 使用同一套工具条节奏；平均排队时间聚合切换继续保留 `minute / hour / day` 三档，并改为轻量 inline 说明。
 - `Dashboard` 统计卡与区块间距已按全局节奏收紧，不再额外放大工具条到统计卡之间的间距。
 - `Admin > Access Control`、`Admin > Users`、`Admin > AI` 的搜索/筛选区已统一为 inline search bar，输入框、按钮尺寸、圆角和间距保持一致。
@@ -29,17 +66,18 @@
 
 ## 本轮：作业详情页与历史作业详情页字段展示已统一重构
 
-本轮对 `Job` 和 `Job History` 两个详情页做了同一套字段展示重构，并继续收口分区详情页冗余信息：
+本轮对 `Job` 和 `Job History` 两个详情页做了同一套字段展示重构，并继续收口队列详情页冗余信息：
 
 - 实时作业详情和历史作业详情不再混用“上方 card + 下方表格/列表”的字段结构，统一改为“摘要条 + 分组详情清单”。
 - 字段区按“身份归属 / 调度执行 / 资源记录 / 命令上下文”分段展示，长命令、脚本、工作目录等字段改为可换行代码面板，避免内容溢出显示区域。
 - 备注字段改为结构化块展示，保持长文本可读性和复制友好性。
-- 分区详情页已删除顶部摘要下方重复的“分区详情 / 节点集合”块，并把“已分配节点 / 空闲节点”并入顶部摘要卡片。
+- 队列详情页已删除顶部摘要下方重复的“队列详情 / 节点集合”块，并把“已分配节点 / 空闲节点”并入顶部摘要卡片。
 
 补充收口：
 
 - `Job` 与 `Job History` 详情正文已进一步改成“短字段 2-3 列并排 + 长字段整行展开”的连续信息面板，不再保留“作业身份 / 归档信息 / 详细资源与命令”等冗余小标题。
 - 资源、备注、命令、脚本、工作目录等长内容字段会自动在整行块内换行，避免窄屏和长字符串挤出显示区域。
+- `Partition` 实时曲线区已继续收口，删除局部“队列活动”标题与说明文案，只保留时间范围控件和图表本体，避免与页面主标题形成重复层级。
 
 本轮新增验证：
 
@@ -79,13 +117,13 @@
 - `cd frontend && npx vitest run tests/components/jobs/UserFilterSelector.spec.ts tests/components/jobs/JobsFiltersPanel.spec.ts tests/views/JobsView.spec.ts tests/composables/GatewayAPI.spec.ts tests/composables/DataPoller.spec.ts`
 - `npm --prefix frontend run type-check`
 
-## 本轮：分区详情页移除重复资源展示
+## 本轮：队列详情页移除重复资源展示
 
 本轮针对 `/:cluster/partitions/:partition` 页面做了信息层级优化：
 
 - 顶部摘要卡片继续展示节点数、总 CPU、已分配 CPU、总内存和 GPU。
-- 下方“分区详情”不再重复展示已在摘要卡出现的资源容量字段，只保留名称、已分配节点和空闲节点等补充信息。
-- 节点集合与分区实时曲线保持不变。
+- 下方“队列详情”不再重复展示已在摘要卡出现的资源容量字段，只保留名称、已分配节点和空闲节点等补充信息。
+- 节点集合与队列实时曲线保持不变。
 
 本轮新增验证：
 
@@ -126,14 +164,14 @@
 - `cd frontend && npx vitest run tests/composables/queueWaitHistory.spec.ts tests/views/ClusterAnalysisView.spec.ts`
 - `npm --prefix frontend run type-check`
 
-## 本轮：分区详情页已补实时曲线，作业相关分区字段统一为可点击入口
+## 本轮：队列详情页已补实时曲线，作业相关队列字段统一为可点击入口
 
-本轮继续把分区详情链路补齐到完整工作流：
+本轮继续把队列详情链路补齐到完整工作流：
 
-- `/:cluster/partitions/:partition` 现在除核心摘要外，还复用 dashboard 的实时资源与作业曲线，并固定按当前分区过滤。
-- 分区详情页沿用 dashboard 的时间范围状态，但图表切换资源类型时会继续停留在当前分区详情页，不再错误跳回 `dashboard`。
-- `Job`、`Job History`、`Jobs`、`Jobs History` 中的分区字段已统一改成芯片式可点击入口，直接跳转分区详情页。
-- `Cluster Analysis` 的 `Partition Hotspots` 模块中，分区名称现在也使用同一套芯片式入口，可直接跳转到分区详情页。
+- `/:cluster/partitions/:partition` 现在除核心摘要外，还复用 dashboard 的实时资源与作业曲线，并固定按当前队列过滤。
+- 队列详情页沿用 dashboard 的时间范围状态，但图表切换资源类型时会继续停留在当前队列详情页，不再错误跳回 `dashboard`。
+- `Job`、`Job History`、`Jobs`、`Jobs History` 中的队列字段已统一改成芯片式可点击入口，直接跳转队列详情页。
+- `Cluster Analysis` 的 `Partition Hotspots` 模块中，队列名称现在也使用同一套芯片式入口，可直接跳转到队列详情页。
 
 本轮新增验证：
 
@@ -141,15 +179,15 @@
 
 补充收口：
 
-- 分区详情页实时曲线区的副标题已改成面向用户的“分区活动”说明，不再使用“复用 dashboard 曲线”的实现口径。
-- 分区页实时曲线工作区已改为更紧凑的单页布局：压缩了摘要到图表、图表标题到画布之间的留白，并为分区场景单独降低图表高度，减少首屏溢出和深滚动。
+- 队列详情页实时曲线区的副标题已改成面向用户的“队列活动”说明，不再使用“复用 dashboard 曲线”的实现口径。
+- 队列页实时曲线工作区已改为更紧凑的单页布局：压缩了摘要到图表、图表标题到画布之间的留白，并为队列场景单独降低图表高度，减少首屏溢出和深滚动。
 
-## 本轮：Dashboard 分区统计、Admin 门禁与 AI 管理页样式已继续收口
+## 本轮：Dashboard 队列统计、Admin 门禁与 AI 管理页样式已继续收口
 
 本轮继续修正一组已经在真实页面上暴露出的前端问题：
 
 - `Dashboard`
-  - 选择具体分区后，顶部统计卡现在会优先按当前分区的节点与作业数据本地重算，不再继续误显整集群资源总量。
+  - 选择具体队列后，顶部统计卡现在会优先按当前队列的节点与作业数据本地重算，不再继续误显整集群资源总量。
   - `Partition / Queue` 下拉框已去掉与外层 pill 容器重叠的双层描边，聚焦态改为统一光环样式。
 - `Admin`
   - 普通用户即使直接访问 `/:cluster/admin`，现在也会先命中 `admin/*:view:*` 门禁；没有任何管理权限时不再被静默重定向到 `analysis`。
@@ -190,9 +228,9 @@
 - `AI` 对话页发送区附近已新增当前模型显示。
 - 具备 `admin/ai:view:*` 的用户可直接在发送区旁切换启用模型；普通用户保持不请求管理员模型配置接口，但仍会看到当前对话模型或集群默认模型状态。
 
-## 本轮：集群分析、用户分析、资源与分区页面补齐分析视图增强
+## 本轮：集群分析、用户分析、资源与队列页面补齐分析视图增强
 
-本轮围绕 `Cluster Analysis`、`User Analysis`、`Resources` 和新的分区详情页补了一组前端与接口增强，并同步补齐中英文文案：
+本轮围绕 `Cluster Analysis`、`User Analysis`、`Resources` 和新的队列详情页补了一组前端与接口增强，并同步补齐中英文文案：
 
 - `Cluster Analysis`
   - 新增平均排队时长曲线，单位为秒。
@@ -205,7 +243,7 @@
 - `Resources`
   - 节点列表新增 `Rack` 列。
   - 资源页头部按钮已整理到同一行。
-  - 分区标签可直接跳转分区详情页。
+  - 队列标签可直接跳转队列详情页。
 - `Partition`
   - 新增 `/:cluster/partitions/:partition` 页面。
   - 展示节点数、已分配节点、空闲节点、CPU、内存、GPU 与节点集合表达式等核心信息。
@@ -251,7 +289,7 @@
 - 共享显示组件已统一按“翻译 key 或原始值”安全渲染，避免把后端原始值、实体名或状态码误送进 `t()` 触发 missing-key 告警。
 - 当前仍不翻译：
   - 后端直接返回的原始错误消息
-  - 集群名、用户名、QOS 名、分区名、节点名等业务实体值
+  - 集群名、用户名、QOS 名、队列名、节点名等业务实体值
   - 后端原始业务字段值
 
 本轮新增验证：
@@ -314,11 +352,11 @@
 
 本轮对几处仍依赖旧 `actions[]` 的共享权限判断做了收口，避免菜单、路由和页内局部控件继续出现不同步的授权口径：
 
-- `DashboardView` 的分区筛选改为按 `jobs/filter-partitions:view:*` 或 `resources/filter-partitions:view:*` 判断
+- `DashboardView` 的队列筛选改为按 `jobs/filter-partitions:view:*` 或 `resources/filter-partitions:view:*` 判断
 - `NodeView` 的节点作业轮询改为按 `jobs:view:*` 判断
 - `JobsFiltersPanel` 的 `Accounts / QOS / Partitions` 筛选区改为按对应 filter resource 判断
 - `DashboardCharts` 的图表显示改为按 `resources:view:*` 与 `jobs:view:*` 判断
-- `ResourcesFiltersPanel` 的分区筛选改为按 `resources/filter-partitions:view:*` 判断
+- `ResourcesFiltersPanel` 的队列筛选改为按 `resources/filter-partitions:view:*` 判断
 - `userWorkspace` 继续保留必要的 legacy fallback，但默认调用口径已与现有 route-rule 测试夹具对齐
 
 本轮新增验证：
@@ -423,7 +461,7 @@
 - 表格共享滚动样式已去掉各视图里零散的负边距横向滚动写法，表格左右 gutter 与内边距恢复统一，列内容不再紧贴容器边缘。
 - `Users` 页面已删除重复的页头卡片与集群标题，搜索和结果区统一合并为单个内容卡片，减少无效留白和重复说明。
 - `Users` 作为多 cluster 特例，继续按 cluster 卡片独立滚动与分页；分页固定在各自卡片底部，不固定到浏览器底部，避免同页多分页器互相覆盖。
-- `Cluster Analysis` 中同栏目并列卡片已统一复用共享 surface，避免 `Packing Signal`、分区热点卡、历史压力卡在同一块内容里出现无语义依据的背景和边框差异。
+- `Cluster Analysis` 中同栏目并列卡片已统一复用共享 surface，避免 `Packing Signal`、队列热点卡、历史压力卡在同一块内容里出现无语义依据的背景和边框差异。
 - `SettingsHeader` 与 `AdminHeader` 的固定套话已删除，页面标题继续按“唯一主标题 + 必要说明”收口，减少重复说明和冗余头部文本。
 - `Add filters` 现已统一为共享次级按钮样式；`Jobs` 页面中的 `Submit job` 与 `Add filters` 已整理到同一操作区，同排、同高、同对齐。
 - AI 对话页已改为固定高度工作区：左侧历史、中间消息区、右侧执行 trace 分别独立滚动，底部输入框固定在工作区底部；消息区内容增多时只在消息区内部滚动，不再把输入框向下挤走；历史列表仅显示会话标题与更新时间，不再显示消息摘要。
@@ -441,7 +479,7 @@
 - `Open analysis` 已与头部 `Total Jobs` 摘要收敛到同一行，首屏操作和关键指标不再分散。
 - `Partition / Queue` 与 `Time Range` 已收口到同一组横向工具栏，标签左对齐，控件间距和垂直对齐统一。
 - 筛选区容器与顶部统计卡片已统一为同一套 surface 样式，避免不同区块背景、边框和层次语言不一致。
-- 本轮只调整 Dashboard 视图内的局部布局和样式，不改变分区筛选、统计数据和图表请求行为。
+- 本轮只调整 Dashboard 视图内的局部布局和样式，不改变队列筛选、统计数据和图表请求行为。
 
 本轮新增验证：
 
@@ -467,7 +505,7 @@
 
 本轮在不改动 collector、metrics DB 核心实现和 `slurmrestd` 核心实现的前提下，补齐了 Dashboard 相关接口对 `partition` query 的契约支持：
 
-- Agent `GET /v<agent-version>/stats` 现在会读取 `partition` query，并基于该分区返回的作业和节点重新聚合：
+- Agent `GET /v<agent-version>/stats` 现在会读取 `partition` query，并基于该队列返回的作业和节点重新聚合：
   - `jobs.running`
   - `jobs.total`
   - `resources.nodes`

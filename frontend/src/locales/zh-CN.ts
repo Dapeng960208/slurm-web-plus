@@ -71,7 +71,7 @@ const zhCN = {
       },
       fragmentation: {
         title: '缓解单节点作业的 CPU 碎片化',
-        summary: '可通过回填小作业、减少过大单节点请求或重平衡分区，将空闲核心转化为可接纳作业。',
+        summary: '可通过回填小作业、减少过大单节点请求或重平衡队列，将空闲核心转化为可接纳作业。',
         evidence: '有 {count} 个待处理作业在全局空闲 CPU 足够时，仍无法落到任何单个可调度节点上。'
       },
       expandBusy: {
@@ -96,7 +96,7 @@ const zhCN = {
       },
       balance: {
         title: '在不同作业规模之间保持接纳平衡',
-        summary: '持续跟踪分区压力，并释放更小的回填窗口，让集群保持满载同时不饿死大作业。',
+        summary: '持续跟踪队列压力，并释放更小的回填窗口，让集群保持满载同时不饿死大作业。',
         evidence: '当前有 {pending} 个待处理作业、{running} 个活跃作业，以及 {cpu} 个可调度空闲 CPU 参与调度。'
       }
     },
@@ -123,7 +123,7 @@ const zhCN = {
   common: {
     navigation: {
       back: '返回',
-      openPartition: '打开分区 {partition}'
+      openPartition: '打开队列 {partition}'
     },
     locale: {
       en: 'English',
@@ -195,7 +195,7 @@ const zhCN = {
       user: '用户',
       group: '组',
       account: '账户',
-      partition: '分区',
+      partition: '队列',
       qos: 'QOS',
       priority: '优先级',
       reason: '原因',
@@ -210,7 +210,7 @@ const zhCN = {
       duration: '持续时间',
       users: '用户',
       accounts: '账户',
-      partitions: '分区',
+      partitions: '队列',
       name: '名称',
       description: '说明',
       organization: '组织',
@@ -833,7 +833,7 @@ const zhCN = {
     add: '添加筛选',
     closeMenu: '关闭菜单',
     remove: '移除筛选 {group}:{value}',
-    partitions: '分区',
+    partitions: '队列',
     users: {
       usernamePlaceholder: '输入用户名...',
       addUsername: '添加用户名'
@@ -849,7 +849,7 @@ const zhCN = {
       keywordPlaceholder: '搜索工作目录 / 命令',
       userPlaceholder: '用户名',
       accountPlaceholder: '账户名',
-      partitionPlaceholder: '分区名',
+      partitionPlaceholder: '队列名',
       qosPlaceholder: 'QOS 名称',
       jobId: '作业 ID',
       timeRange: '时间范围',
@@ -870,7 +870,7 @@ const zhCN = {
         state: '状态',
         userAccount: '用户（账户）',
         resources: '资源',
-        partition: '分区',
+        partition: '队列',
         qos: 'QOS',
         priority: '优先级',
         reason: '原因',
@@ -897,7 +897,7 @@ const zhCN = {
         cpu: 'CPU',
         memory: '内存',
         gpu: 'GPU',
-        partitions: '分区'
+        partitions: '队列'
       }
     },
     qos: {
@@ -945,7 +945,7 @@ const zhCN = {
         kicker: '实时控制',
         title: '实时指标',
         description: '在同一工具栏中按队列筛选概览统计，并调整实时观察窗口。',
-        partitionQueue: '分区 / 队列',
+        partitionQueue: '队列 / 队列',
         selectMetricsRange: '选择概览指标时间范围'
       },
       errors: {
@@ -975,7 +975,7 @@ const zhCN = {
           fields: {
             name: '作业名称',
             script: '脚本',
-            partition: '分区',
+            partition: '队列',
             account: '账户',
             qos: 'QOS'
           }
@@ -985,7 +985,7 @@ const zhCN = {
           description: '更新 {cluster} 上的作业 {jobId}。',
           submit: '保存更改',
           fields: {
-            partition: '分区',
+            partition: '队列',
             qos: 'QOS',
             priority: '优先级',
             memoryPerCpuMb: '每 CPU 内存（MB）',
@@ -1033,7 +1033,7 @@ const zhCN = {
       summary: {
         user: '用户',
         account: '账户',
-        partition: '分区',
+        partition: '队列',
         nodes: '节点',
         requested: '请求资源',
         requestedSubtle: '请求了 {count} 个 GPU',
@@ -1051,7 +1051,7 @@ const zhCN = {
         wckeys: 'Wckeys',
         priority: '优先级',
         nodes: '节点',
-        partition: '分区',
+        partition: '队列',
         qos: 'QOS',
         exitCode: '退出码',
         name: '名称',
@@ -1106,7 +1106,7 @@ const zhCN = {
     },
     resources: {
       title: '节点',
-      description: '查看整个集群中的节点当前状态、分配压力和分区可见性。',
+      description: '查看整个集群中的节点当前状态、分配压力和队列可见性。',
       metricLabel: '个节点',
       metricLabelPlural: '个节点',
       rack: '机架',
@@ -1120,19 +1120,19 @@ const zhCN = {
       }
     },
     partition: {
-      description: '查看所选分区的拓扑、节点覆盖范围和核心容量。',
-      detailTitle: '分区详情',
-      detailDescription: '查看该分区的节点集合定义以及当前工作区可见的容量情况。',
+      description: '查看所选队列的拓扑、节点覆盖范围和核心容量。',
+      detailTitle: '队列详情',
+      detailDescription: '查看该队列的节点集合定义以及当前工作区可见的容量情况。',
       metrics: {
         kicker: '实时指标',
-        title: '分区活动',
-        description: '在一个紧凑工作区内查看分区 {partition} 的实时资源压力和队列变化。',
-        selectRange: '选择分区指标时间范围'
+        title: '队列活动',
+        description: '在一个工作区内查看队列 {partition} 的实时资源压力和队列变化。',
+        selectRange: '选择队列指标时间范围'
       },
       nodeSets: '节点集合',
-      nodeSetsDescription: '节点集合表达式用于说明该分区由哪些主机提供容量。',
-      nodeSetsEmpty: '该分区当前没有可展示的节点集合表达式。',
-      notFound: '当前集群中不存在分区 {partition}。',
+      nodeSetsDescription: '节点集合表达式用于说明该队列由哪些主机提供容量。',
+      nodeSetsEmpty: '该队列当前没有可展示的节点集合表达式。',
+      notFound: '当前集群中不存在队列 {partition}。',
       summary: {
         nodes: '节点数',
         allocatedNodes: '已分配节点',
@@ -1148,7 +1148,7 @@ const zhCN = {
       title: '节点 {nodeName}',
       description: '查看所选节点的实时分配状态、硬件配置和工作负载占用情况。',
       overviewTitle: '节点概览',
-      overviewDescription: '调度状态、硬件布局、所属分区以及当前运行作业。',
+      overviewDescription: '调度状态、硬件布局、所属队列以及当前运行作业。',
       realtimeTitle: '实时指标',
       realtimeDescription: '该节点由 Prometheus 支持的实时与历史使用情况指标。',
       usageHistoryTitle: '使用历史',
@@ -1173,7 +1173,7 @@ const zhCN = {
         architecture: '架构',
         memory: '内存',
         gpu: 'GPU',
-        partitions: '分区',
+        partitions: '队列',
         osKernel: '操作系统内核',
         reboot: '重启时间',
         lastBusy: '最近繁忙时间',
@@ -1320,7 +1320,9 @@ const zhCN = {
         defaultQos: '默认：{qos}'
       },
       errors: {
-        unableToRetrieve: '无法获取集群 {cluster} 的关联信息'
+        unableToRetrieve: '无法获取集群 {cluster} 的关联信息',
+        addUserFailed: '无法将该用户添加到账户下。',
+        addUserAssociationMissing: '刷新后仍未在账户 {account} 下看到用户 {user} 的关联。'
       },
       dialogs: {
         edit: {
@@ -1398,8 +1400,8 @@ const zhCN = {
         capacityDescription: '查看整个集群当前利用率以及可调度冗余空间。',
         blockersTitle: '队列阻塞因素',
         blockersDescription: '查看作业为何等待，以及队列是被容量、策略还是装箱方式阻塞。',
-        partitionTitle: '分区热点',
-        partitionDescription: '分区级压力有助于判断是扩容、重平衡作业还是调整 QOS。',
+        partitionTitle: '队列热点',
+        partitionDescription: '队列级压力有助于判断是扩容、重平衡作业还是调整 QOS。',
         historicalTitle: '历史压力',
         historicalDescription: '快速历史快照可帮助判断容量压力是持续、突发还是策略驱动。',
         nodeHotspotsTitle: '节点热点',
@@ -1419,8 +1421,8 @@ const zhCN = {
           '{count} 个待处理单节点作业似乎受碎片化影响而被阻塞，同时仍有 {cpu} 个可调度 CPU 空闲。'
       },
       partition: {
-        noPermission: '分析分区压力同时需要作业和节点可见权限。',
-        none: '当前未观察到分区级压力。',
+        noPermission: '分析队列压力同时需要作业和节点可见权限。',
+        none: '当前未观察到队列级压力。',
         pendingActive: '{pending} 个待处理，{running} 个活跃',
         cpuChip: 'CPU {running}/{total}',
         pendingCpu: '待处理 CPU：{value}',
@@ -1499,9 +1501,11 @@ const zhCN = {
           nodeList: '节点列表',
           startTime: '开始时间',
           endTime: '结束时间',
-          partition: '分区',
+          allowedPartitions: '允许分区（逗号分隔）',
           users: '用户（逗号分隔）',
-          accounts: '账户（逗号分隔）'
+          groups: '用户组（逗号分隔）',
+          accounts: '账户（逗号分隔）',
+          qos: 'QOS（逗号分隔）'
         },
         hints: {
           startTime: 'Slurm 创建或更新预留时必须提供开始时间。',
@@ -1512,7 +1516,8 @@ const zhCN = {
       errors: {
         startTimeRequired: '创建或更新预留时必须提供开始时间。',
         endTimeRequired: '创建预留时必须提供结束时间。',
-        invalidTimeRange: '结束时间必须晚于开始时间。'
+        invalidTimeRange: '结束时间必须晚于开始时间。',
+        accessControlRequired: '至少填写一项访问控制字段：用户、用户组、账户、QOS 或允许分区。'
       },
       notifications: {
         createRequested: '已请求创建预留 {name}。',
@@ -1813,7 +1818,7 @@ const zhCN = {
       },
       ready: {
         kicker: '就绪',
-        title: '询问此集群中的作业、节点、分区或指标',
+        title: '询问此集群中的作业、节点、队列或指标',
         description: '例如作业状态分析、空闲节点排序、集群资源摘要等主题。'
       },
       prompts: {
@@ -1832,16 +1837,8 @@ const zhCN = {
         assistant: '助手'
       },
       composer: {
-        placeholder: '可以询问作业、节点资源、分区或其他只读型集群问题。',
-        modelLabel: '当前模型',
+        placeholder: '可以询问作业、节点资源、队列或其他只读型集群问题。',
         modelSelectAria: '选择 AI 对话模型',
-        currentModelId: '当前对话模型 #{id}',
-        defaultModelId: '集群默认模型 #{id}',
-        noModelSelected: '当前没有可用模型',
-        modelDefault: '当前对话使用默认启用模型。',
-        modelFromConversation: '当前使用该对话已绑定的模型。',
-        modelFromClusterDefault: '当前新请求使用集群默认模型。',
-        modelUnavailable: '暂时无法读取可展示的模型元数据。',
         estimatedTokens: '预计 tokens {current} / {limit}',
         tokenExceededHint: '当前预计 token 数已超过限制。请缩短问题，或开启新对话。'
       },
@@ -1887,7 +1884,7 @@ const zhCN = {
         identityTitle: '身份与归档信息',
         identityDescription: '历史记录中的作业编号、用户与账户归属。',
         schedulingTitle: '调度结果',
-        schedulingDescription: '历史状态原因、分区、优先级和完成结果。',
+        schedulingDescription: '历史状态原因、队列、优先级和完成结果。',
         resourcesTitle: '资源记录',
         resourcesDescription: '历史账本中的资源请求、分配和使用情况。',
         payloadTitle: '命令与执行上下文',
@@ -1905,7 +1902,7 @@ const zhCN = {
         jobId: '作业 ID',
         user: '用户',
         account: '账户',
-        partition: '分区',
+        partition: '队列',
         nodes: '节点',
         maxMemory: '最大内存',
         avgCpuCores: '平均 CPU 核数',
@@ -1919,7 +1916,7 @@ const zhCN = {
         user: '用户',
         group: '组',
         account: '账户',
-        partition: '分区',
+        partition: '队列',
         qos: 'QOS',
         priority: '优先级',
         nodes: '节点',

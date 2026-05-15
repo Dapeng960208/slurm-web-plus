@@ -39,13 +39,15 @@ npm --prefix frontend run test:unit
 重点覆盖：
 
 - `GatewayAPI` 的 `/ai/*` 方法、`tool_calls` 详情结构与 SSE 客户端
+- `GatewayAPI.ai_models(cluster)` 的只读模型摘要契约
 - `MainMenu` 的 AI 导航门控（capability + `ai:view:*`）
 - `SettingsTabs` 的 AI tab 门控（capability + `admin/ai:view:*` / `admin/ai:edit:*`）
 - `SettingsAI` 的配置管理流程
 - `AssistantView` 的普通对话、流式渲染、安全 Markdown 消息展示、历史 trace 回放、折叠式工具轨迹展示、消息复制与逻辑删除
 - `AssistantView` 的 token 估算展示、模型配置限制读取和超限阻止发送
 - `AssistantView` 的左侧聊天列布局稳定性：消息区需撑满左侧工作区，输入框保持在同列内，流式更新时不发生整体下移
-- 普通对话页不展示模型、stream、persistence 等运行配置；相关配置只在 `/:cluster/admin/ai` 查看和维护
+- 普通对话页不展示模型 provider、stream、persistence 等运行配置；相关配置只在 `/:cluster/admin/ai` 查看和维护
+- 普通对话页模型选择改为发送区左侧的简洁下拉框，并通过 `ai/models` 只读接口拉取已启用模型摘要
 - `SettingsAI` 的弹窗式配置管理、模型表格列表和配置删除
 - `SettingsAI` 的 Conversation Audit 表格、用户名/标题过滤与独立详情页入口
 - `SettingsAIConversationDetail` 的独立消息与工具调用详情页
@@ -75,10 +77,15 @@ npm --prefix frontend run test:unit
 
 - 无 `ai:view:*`：不能对话、不能读取会话
 - 无 `admin/ai:view:*`：不能读取模型配置列表
+- 无 `ai:view:*`：也不能读取 `ai/models`
 - 仅有 `ai:view:*` 的普通用户打开 `/:cluster/ai` 时：
   - 可以读取自己的会话列表和详情
+  - 会请求 `ai/models`
   - 不会额外请求 `ai/configs`
-  - 页面不应因为 `ai/configs` 的 `403` 初始化失败
+  - 页面不应因为管理员接口缺权而初始化失败
+- 同时存在多个 enabled 模型时：
+  - 普通用户可以通过发送区左侧下拉框切换模型
+  - 管理员也通过同一位置切换，而不是通过独立“当前模型”说明块
 - 无 `admin/ai:edit:*` / `admin/ai:delete:*`：不能创建、更新、删除 configs，也不能 validate
 - 有 `ai:view:*` 但无底层权限时不能通过 AI 绕过：
   - 无 `jobs:view:*|self`：不能通过 AI 读不允许访问的 live jobs
@@ -181,14 +188,22 @@ npm --prefix frontend run test:unit
 - 超限时显示提示、禁用发送按钮，并阻止 `stream_ai_chat` 请求
 - 当前测试只验证前端估算与阻止发送，不验证 provider 真实 usage
 
-### 3.11 `association/update` 写入
+### 3.11 只读模型摘要接口
+
+- Agent `GET /v{version}/ai/models` 返回仅启用模型的摘要列表
+- Gateway `GET /api/agents/<cluster>/ai/models` 透传同一摘要结构
+- 摘要字段固定为 `id`、`display_name`、`model`、`is_default`、`sort_order`
+- 权限要求固定为 `ai:view:*`
+- disabled 模型不应出现在普通对话页可选列表中
+
+### 3.12 `association/update` 写入
 
 - AI 调用 `association/update` 时仍要求底层 `accounts:edit:*` 权限
 - payload 缺少 association `cluster` 时，适配层按当前集群补齐
 - 写入 account/user/association/qos 后，应失效相关 `accounts` / `associations` 缓存
 - 后续账户页或 association 查询应重新读取底层状态，不能继续展示旧缓存
 
-### 3.12 AI 写 payload 与前端表单契约一致性
+### 3.13 AI 写 payload 与前端表单契约一致性
 
 - `account/update`
   - 缺少 `organization` 时，AI 工具调用返回 `400`
@@ -208,6 +223,7 @@ npm --prefix frontend run test:unit
 - 检查执行轨迹默认仅展示接口名 / 状态码 / 耗时，点击后才显示参数和摘要
 - 让模型返回 Markdown 列表、引用、代码块和链接，确认页面按安全 Markdown 正常显示
 - 在普通 AI 页面确认不展示模型、stream、persistence 等配置块
+- 在普通 AI 页面确认发送区左侧显示模型下拉框，且普通用户在多模型场景可直接切换
 - 删除一个普通用户会话，确认普通用户不可见、管理员审计可见
 - 让 AI 执行“给 `ip-user` 添加用户 `guojianpeng`”，确认接口返回、账户页和集群管理端结果一致
 - 让 AI 执行 account 或 qos 写操作时，故意省略前端必填字段，确认 AI 直接收到 400，而不是由后端静默补默认值

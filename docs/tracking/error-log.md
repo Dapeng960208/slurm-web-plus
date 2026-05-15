@@ -11,6 +11,11 @@
 
 ## 条目
 
+### 2026-05-14：给无关联信息用户加到账户下时可能出现“接口成功但页面无关联”
+- 时间：2026-05-14
+- 现象：在 `AccountView` 给一个此前没有任何 association、甚至没有 SlurmDB 用户实体信息的用户加到账户下时，前端和接口都可能显示成功，但刷新后的 `associations` 里仍看不到目标 `{ account, user }` 关系，页面上也不会真实挂到账户节点下
+- 解决办法：前端固定改为双写链路 `save_user -> save_association -> refreshAssociations()`，并在刷新后显式校验目标关联是否真实出现；任一步抛错、返回 `errors`，或写后校验失败，都直接按失败处理并禁止显示成功 toast
+
 ### 2026-05-14：AD 域根做 LDAP 用户枚举时触发 `Size limit exceeded`
 - 时间：2026-05-14
 - 现象：`slurm-web ldap-check --debug --debug-flags rfl` 在服务账号 bind 成功后，继续对 `DC=...` 域根执行用户枚举时抛 `ldap.SIZELIMIT_EXCEEDED`；而现场目录结构同时把用户分散在多个并列 OU 下，单一 `user_base` 又不足以覆盖全部登录入口
@@ -21,10 +26,10 @@
 - 现象：执行 `powershell -ExecutionPolicy Bypass -File scripts/continue-from-github-ci.ps1 -RunId 25776927006` 时，内部二次调用 `fetch-github-ci-result.ps1` 下载同一成功 run 的 artifact，`gh run download` 报 `error extracting "failure-context.json": ... The file exists`
 - 解决办法：`scripts/fetch-github-ci-result.ps1` 在 `-DownloadArtifacts` 分支先清空当前 run 目录下所有已有 artifact 子目录，再执行 `gh run download`，避免仅按最新 artifact 名单局部删除时遗漏旧残留文件
 
-### 2026-05-12：Dashboard 分区切换后统计卡仍可能显示整集群资源，且队列下拉框与外层描边重叠
+### 2026-05-12：Dashboard 队列切换后统计卡仍可能显示整集群资源，且队列下拉框与外层描边重叠
 - 时间：2026-05-12
-- 现象：在 `/:cluster/dashboard` 选择具体分区后，下方统计卡仍可能继续显示整集群的节点、CPU、内存和作业总量；同时分区下拉框的内层描边与外层 pill 容器边缘叠在一起，视觉上像“双层挤压”
-- 解决办法：Dashboard 视图在选中分区且具备 `jobs/resources` 可见性时，优先按当前分区的节点和作业数据在前端重算统计卡，避免继续误显全局资源；同时收紧下拉框内边距、去掉额外外框并改为聚焦光环，消除与外层 toolbar 容器的描边重叠
+- 现象：在 `/:cluster/dashboard` 选择具体队列后，下方统计卡仍可能继续显示整集群的节点、CPU、内存和作业总量；同时队列下拉框的内层描边与外层 pill 容器边缘叠在一起，视觉上像“双层挤压”
+- 解决办法：Dashboard 视图在选中队列且具备 `jobs/resources` 可见性时，优先按当前队列的节点和作业数据在前端重算统计卡，避免继续误显全局资源；同时收紧下拉框内边距、去掉额外外框并改为聚焦光环，消除与外层 toolbar 容器的描边重叠
 
 ### 2026-05-12：普通用户可直接访问 `/:cluster/admin` 顶层入口
 - 时间：2026-05-12
@@ -78,8 +83,8 @@
 
 ### 2026-05-12：远端 CI 在前端国际化提交后暴露出 lint 回归和后端旧测试夹具不匹配
 - 时间：2026-05-12
-- 现象：GitHub Actions 中 `Frontend Static Analysis` 的 `Frontend ESLint` 失败，`ClusterAnalysisView.vue` 和 `UserView.vue` 用 `locale.value` 作为无副作用表达式建立响应依赖，被 `@typescript-eslint/no-unused-expressions` 拦截；同一提交的 `Backend Tests` 中，`slurmweb/tests/views/test_agent_metrics_collector.py` 仍按旧行为只 mock `nodes/jobs`，但当前 `SlurmWebMetricsCollector` 已无条件追加分区级指标请求，导致 `/metrics` 视图测试在 CI 中耗尽 mocked slurmrestd 响应并抛 `RuntimeError: generator raised StopIteration`
-- 解决办法：前端把 `ClusterAnalysisView` 的 locale 依赖改为显式传参给 `analyzeCluster()`，移除 `UserView` 中多余的 `locale` 访问，并清理 `SettingsLdapCache.vue` 的未使用导入；后端保持 collector 当前分区指标实现不变，只把 `test_agent_metrics_collector.py` 调整为显式 mock `self.app.slurmrestd.partitions = []`，让该视图层测试继续只验证 `/metrics` 端点基础行为，分区级指标细节仍由 `slurmweb/tests/metrics/test_collector.py` 覆盖
+- 现象：GitHub Actions 中 `Frontend Static Analysis` 的 `Frontend ESLint` 失败，`ClusterAnalysisView.vue` 和 `UserView.vue` 用 `locale.value` 作为无副作用表达式建立响应依赖，被 `@typescript-eslint/no-unused-expressions` 拦截；同一提交的 `Backend Tests` 中，`slurmweb/tests/views/test_agent_metrics_collector.py` 仍按旧行为只 mock `nodes/jobs`，但当前 `SlurmWebMetricsCollector` 已无条件追加队列级指标请求，导致 `/metrics` 视图测试在 CI 中耗尽 mocked slurmrestd 响应并抛 `RuntimeError: generator raised StopIteration`
+- 解决办法：前端把 `ClusterAnalysisView` 的 locale 依赖改为显式传参给 `analyzeCluster()`，移除 `UserView` 中多余的 `locale` 访问，并清理 `SettingsLdapCache.vue` 的未使用导入；后端保持 collector 当前队列指标实现不变，只把 `test_agent_metrics_collector.py` 调整为显式 mock `self.app.slurmrestd.partitions = []`，让该视图层测试继续只验证 `/metrics` 端点基础行为，队列级指标细节仍由 `slurmweb/tests/metrics/test_collector.py` 覆盖
 
 ### 2026-05-12：`watch-github-ci.ps1` 用字符串数组转发参数时会把 `-OutputRoot` 误绑到 `-Conclusion`
 - 时间：2026-05-12

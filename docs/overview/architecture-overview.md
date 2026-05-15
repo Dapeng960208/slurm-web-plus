@@ -123,6 +123,10 @@ AI model
 - 当接口层拒绝访问时，工具执行会把权限错误与状态码回传给模型和执行轨迹
 - 若模型错误回显内部 `tool_request` / `interface_key` / `arguments` envelope，AIService 不会把它透传为最终消息，而是继续要求模型输出合法 `final`
 - 普通对话页不展示模型、stream、persistence 等配置块；这些配置集中在 `/:cluster/admin/ai`
+- 普通对话页允许通过 `ai:view:*` 可访问的只读模型摘要接口显示和切换已启用模型：
+  - Agent `GET /v{version}/ai/models`
+  - Gateway `GET /api/agents/<cluster>/ai/models`
+  - 接口只返回 `id`、`display_name`、`model`、`is_default`、`sort_order`
 - 普通会话查询默认过滤 `ai_conversations.deleted_at IS NOT NULL` 的逻辑删除记录
 - 管理员审计查询可列出所有用户会话，并包含逻辑删除记录
 
@@ -153,6 +157,8 @@ Vue 页面
 - `analysis/ping`、`analysis/diag` 走集群级系统接口
 - account/user/association/qos 写入或删除后，过滤缓存层会失效相关 `accounts` 与 `associations` key
 - association 写入 payload 缺少 `cluster` 时，会按当前集群补齐后再发给 SlurmDB
+- reservation create/update 写入会先统一归一化 `users/groups/accounts/qos/allowed_partitions` 等前端别名，再映射到 `slurmrestd` reservation schema
+- 账户页“Add user”前端写链路固定为“先创建或更新用户实体，再写 association，最后刷新并校验关联可见性”
 
 典型写路径包括：
 
@@ -169,7 +175,7 @@ Vue 页面
 - `users`
 - `qos`
 
-## 5.1 集群分析热点与分区详情读链路
+## 5.1 集群分析热点与队列详情读链路
 
 本轮新增两条只读聚合链路：
 
@@ -182,7 +188,7 @@ Vue 页面
   - 结果外层继续受 Redis `cache.analysis` 控制，不再回退到 Prometheus 实时热点查询
 - `GET /:cluster/partitions/:partition`
   - 前端复用现有 `partitions` 与 `nodes` 数据源
-  - 当前展示现有接口可稳定提供的分区核心信息，并复用 dashboard 曲线组件显示该分区的实时资源与作业趋势
+  - 当前展示现有接口可稳定提供的队列核心信息，并复用 dashboard 曲线组件显示该队列的实时资源与作业趋势
   - 图表 query 继续沿用 dashboard `range / start / end` 机制，但固定附带当前 `partition`
   - 作业与历史作业页面中的 `partition` 字段统一跳转到该详情页
 

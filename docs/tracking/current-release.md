@@ -37,21 +37,43 @@
 - 集群分析页新增近 3 天节点热点概览、平均排队时长曲线，并把 `diag` 面板收口到 10 条核心字段
 - 修复集群分析页平均排队时间曲线不显示的问题，并把等待时间统一改为 `submit_time -> start_time` 秒级口径，支持 `minute / hour / day` 聚合切换
 - 集群分析页平均排队时间曲线已按等待时长强化颜色语义：`60` 秒内保持主题淡绿色，超过后连续过渡到橙色和红色
-- 分区详情页已补 dashboard 实时曲线，作业与历史作业相关页面中的分区字段统一改为可点击分区详情入口
-- 分区详情页已移除下方详情区与顶部摘要卡重复的资源容量字段，仅保留补充信息、节点集合和实时曲线
-- 集群分析页 `Partition Hotspots` 模块中的分区名称已统一改为可点击分区详情入口
+- 队列详情页已补 dashboard 实时曲线，作业与历史作业相关页面中的队列字段统一改为可点击队列详情入口
+- 队列详情页已移除下方详情区与顶部摘要卡重复的资源容量字段，仅保留补充信息、节点集合和实时曲线
+- 集群分析页 `Partition Hotspots` 模块中的队列名称已统一改为可点击队列详情入口
 - 用户分析页新增运行/排队/失败/取消状态统计与曲线数据，移除冗余分析标题
-- 资源页新增 `Rack` 列与分区详情跳转，补 `/:cluster/partitions/:partition` 分区详情页
+- 资源页新增 `Rack` 列与队列详情跳转，补 `/:cluster/partitions/:partition` 队列详情页
 - 修复 AI 取消作业兼容性：当模型直接输出 `job/cancel` 作为 tool name 时，后端会兼容映射到同名写接口，不再返回 `Unsupported tool`
 - 修复普通用户 AI 页面初始化权限口径：仅具备 `ai:view:*` 的用户不再首屏请求 `admin/ai:view:*` 才能访问的 `ai/configs`
 - 实时作业与 Dashboard/Analysis 性能优化：Jobs 用户筛选改为手输用户名，`/jobs` query 可透传到 Agent 并优先复用 Redis 全量作业缓存，`stats` 与 `analysis/node-hotspots` 新增默认 `60s` Redis 缓存，前端轮询在后台标签页暂停并降低高开销页面刷新频率
-- 重构实时作业详情页与历史作业详情页字段展示，统一为分组详情清单，修复长命令、脚本、路径字段溢出；同时移除分区详情页顶部摘要下方的重复详情块，并将已分配节点/空闲节点并入摘要卡片
+- 重构实时作业详情页与历史作业详情页字段展示，统一为分组详情清单，修复长命令、脚本、路径字段溢出；同时移除队列详情页顶部摘要下方的重复详情块，并将已分配节点/空闲节点并入摘要卡片
 - 收口 `Dashboard / Analysis` 工具条与 `Admin` 搜索区：Dashboard/Analysis 去掉多余工具条外层卡片，Dashboard 统计卡间距按全局规范收紧，`Access Control`、`Users`、`AI Audit` 搜索区统一为 inline search bar
+- 修复 reservation create/update 写入契约：后端统一归一化 `users/groups/accounts/qos/allowed_partitions` 等别名，前端本地拦截访问控制字段全空的非法提交
+- 收口普通 AI 对话页模型选择：新增 `ai/models` 只读摘要接口，普通用户不再依赖 `ai/configs`，发送区左侧改为紧凑模型下拉框
+- 继续压缩 Dashboard 首屏冗余信息与留白，删除“实时指标”局部标题块，并统一图表组件内部顶部/底部节奏
+- 重构 `JobView` / `JobHistoryView` 为参考 `NodeView` 的连续详情列表，移除摘要条、碎片卡片和冗余小标题
+- 修复 `AccountView` 给无关联信息用户加到账户下的假成功：先确保用户实体存在，再补 association，并在刷新后做写后可见性校验
 
 ## 2. 已完成项
 
+- Reservations / Dashboard / AI 对话 / Job 详情 / 账户加人收口已完成：
+  - `slurmweb.slurmrestd.Slurmrestd` 已补 reservation create/update 共用的 payload normalization，统一接受 `users`、`groups`、`accounts`、`qos` 与 `allowed_partitions/allowedPartitions/AllowedPartitions`
+  - reservation 写入时，上述数组字段会归一化为 `slurmrestd` 所需 CSV string；`allowed_partitions` 系列别名统一落到写入字段 `partition`
+  - `ReservationsView` 创建/编辑表单已补 `groups`、`qos` 与 `Allowed Partitions`，并在前端固定执行“`users / groups / accounts / qos / allowed_partitions` 至少一项非空”的本地校验
+  - `DashboardView` 已删除顶部工具条左侧“实时指标”文案块；`DashboardCharts`、`ChartResourcesHistogram`、`ChartJobsHistogram` 的局部 `pt/pb/mt` 留白已回退到页面级统一节奏
+  - Agent `GET /v{version}/ai/models` 与 Gateway `GET /api/agents/<cluster>/ai/models` 已上线，只返回已启用模型的只读摘要；权限要求固定为 `ai:view:*`
+  - `AssistantView` 普通用户与管理员统一改走 `ai/models`，不再以 `ai/configs` 作为首屏模型来源；发送区底部工具栏改为“左侧模型下拉、右侧 token 信息、最右 `Clear / Send`”
+  - `JobView` 与 `JobHistoryView` 已统一为连续 `ui-detail-list` 风格，移除 `DetailSummaryStrip`、碎片字段卡和冗余摘要块；左侧 `JobProgress` / timeline、长字段换行与可点击入口保持不变
+  - `AccountView` “Add user” 已改成 `save_user -> save_association -> refreshAssociations() -> 写后校验` 固定链路；若刷新后未看到 `{ account, user }` 关联则直接判定失败，不再显示成功 toast
+  - 本轮后端定向验证已通过：
+    - `.venv\Scripts\python -m pytest slurmweb/tests/slurmrestd/test_slurmrestd_write_operations.py slurmweb/tests/views/test_agent_ai.py slurmweb/tests/views/test_gateway_ai.py`
+  - 本轮前端定向验证已通过：
+    - `npm --prefix frontend run type-check`
+    - `cd frontend && npm exec vitest run tests/views/ReservationsView.spec.ts tests/views/AccountView.spec.ts tests/views/JobView.spec.ts tests/views/JobHistoryView.spec.ts tests/views/DashboardView.spec.ts tests/components/dashboard/ChartResourcesHistory.spec.ts tests/components/dashboard/ChartJobsHistory.spec.ts tests/views/AssistantView.spec.ts tests/views/AssistantViewAIContract.spec.ts`
+  - 残留说明：
+    - `JobView` 相关 Vitest 运行时仍会输出既有 Vue `inject()` warning，但当前不影响断言通过
+
 - Dashboard / Analysis 工具条与 Admin 搜索区统一收口已完成：
-  - `DashboardView` 顶部分区与时间范围筛选区已移除分区选择器和时间范围选择器外层白色胶囊壳，只保留控件本体；分区保留轻量 inline label，时间范围移除额外可见 label
+  - `DashboardView` 顶部队列与时间范围筛选区已移除队列选择器和时间范围选择器外层白色胶囊壳，只保留控件本体；队列保留轻量 inline label，时间范围移除额外可见 label
   - `Dashboard` 统计卡与图表区块间距已回归共享 `ui-section-stack` / `ui-stat-grid` 节奏
   - `ClusterAnalysisView` 顶部时间范围控件已与 Dashboard 使用同一套工具条节奏
   - 平均排队时间聚合切换组件继续保留 `minute / hour / day` 三档，并恢复轻量可见说明；`aria-label` 与 `queue-wait-aggregation-*` 测试锚点保持不变
@@ -83,19 +105,19 @@
 - 实时作业与 Dashboard/Analysis 性能优化已落地：
   - `Jobs` 用户筛选不再请求 gateway `/users`，避免实时作业筛选面板触发 LDAP 全量枚举
   - `GET /api/agents/<cluster>/jobs` 支持 `users/states/accounts/qos/partitions/node` query 透传；Agent 对 `users/states/accounts/qos/partitions` 优先复用 Redis `jobs` 全量缓存并在内存中过滤
-  - `GET /stats` 通过 `cache.stats` 缓存统计摘要，默认 `60` 秒；无分区使用 `stats` key，有分区使用 `stats-partition-<partition>` 并归类为 `stats`
+  - `GET /stats` 通过 `cache.stats` 缓存统计摘要，默认 `60` 秒；无队列使用 `stats` key，有队列使用 `stats-partition-<partition>` 并归类为 `stats`
   - `GET /analysis/node-hotspots` 通过 `cache.analysis` 缓存节点热点，默认 `60` 秒；缓存 key 包含 `start/end` 时间窗，接口内部只查询持久化节点样本
   - 作业 submit/update/cancel 完成后会失效 `jobs`、兼容 `jobs-unfiltered` 与对应 `job-<id>` 缓存，降低写后 stale 风险
   - `useClusterDataPoller` 已支持手动 `refresh()`，页面隐藏时暂停轮询，恢复可见时立即刷新一次
   - `JobsView` 默认轮询从 `5s` 调整为 `30s` 并新增手动刷新；Dashboard stats 与 dashboard 图表轮询调整为 `60s`
-- 作业详情与分区详情展示已继续收口：
+- 作业详情与队列详情展示已继续收口：
   - `JobView` 与 `JobHistoryView` 字段正文已统一为“摘要条 + 分组详情清单”，不再混用上方卡片网格和下方明细列表
   - 长字段如 `submit line`、`script`、`working directory`、`command` 已改为可换行代码块式展示，避免内容顶出容器
   - `JobFieldComment` 改为结构化备注块展示，长文本仍保持可读
   - `JobView` 与 `JobHistoryView` 详情正文已进一步改成“短字段 2-3 列并排 + 长字段整行展开”，并删除冗余小标题如“作业身份与归档信息”“详细资源与命令”
   - `PartitionView` 已删除顶部摘要下方重复的 `Partition Details` / `Node Sets` 区块
-  - `Allocated Nodes` 与 `Idle Nodes` 已并入分区顶部摘要卡片区
-  - `PartitionView` 实时曲线区已改成更紧凑的单页工作区：副标题从实现口径改为用户可读说明，并压缩了图表上下留白与分区场景图表高度
+  - `Allocated Nodes` 与 `Idle Nodes` 已并入队列顶部摘要卡片区
+  - `PartitionView` 实时曲线区已继续收口：删除局部“队列活动”标题与副标题，只保留时间范围控件和图表本体，并保持紧凑图表高度
 - 本轮性能优化定向验证已通过：
   - `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/slurmrestd/test_slurmrestd_filtered_cached.py slurmweb/tests/views/test_agent.py slurmweb/tests/views/test_agent_operations.py slurmweb/tests/views/test_gateway.py`
   - `cd frontend && npx vitest run tests/components/jobs/UserFilterSelector.spec.ts tests/components/jobs/JobsFiltersPanel.spec.ts tests/views/JobsView.spec.ts tests/composables/GatewayAPI.spec.ts tests/composables/DataPoller.spec.ts`
@@ -118,8 +140,8 @@
     - `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/apps/test_gateway.py`
 
 - Dashboard / Admin 前端缺陷已继续收口：
-  - `DashboardView` 选择分区后，统计卡会优先按当前分区节点与作业数据本地聚合，避免继续显示整集群资源总量
-  - Dashboard 分区下拉框已移除与外层 toolbar pill 重叠的双层描边
+  - `DashboardView` 选择队列后，统计卡会优先按当前队列节点与作业数据本地聚合，避免继续显示整集群资源总量
+  - Dashboard 队列下拉框已移除与外层 toolbar pill 重叠的双层描边
   - `/:cluster/admin` 顶层默认入口已补权限判定；普通用户没有任何 `admin/*` 权限时，直接访问该入口也会返回 `forbidden`
   - `Admin > AI` 页面已把页头和两块主内容收口为更轻的单工作区层级，减少多张大卡片纵向堆叠
   - `AssistantView` 发送区附近已新增当前模型显示；具备 `admin/ai:view:*` 的用户可直接切换启用模型，普通用户保持无 `403` 前提下的只读模型状态展示
@@ -158,11 +180,11 @@
   - `docs/overview/project-overview.md` 与 `architecture-overview.md` 已同步说明 `/:cluster/admin/*` 是主管理入口，`/settings/*` 相关管理页仅为兼容重定向
 
 - 前端共享权限消费点已继续向 `resource:operation:scope` 收口：
-  - `DashboardView` 的分区筛选改为按 `jobs/filter-partitions:view:*` 或 `resources/filter-partitions:view:*` 判断
+  - `DashboardView` 的队列筛选改为按 `jobs/filter-partitions:view:*` 或 `resources/filter-partitions:view:*` 判断
   - `NodeView` 的节点作业轮询改为按 `jobs:view:*` 判断
   - `JobsFiltersPanel` 的 `Accounts / QOS / Partitions` 筛选区改为按对应 filter resource 判断
   - `DashboardCharts` 的图表显示改为按 `resources:view:*` 与 `jobs:view:*` 判断
-  - `ResourcesFiltersPanel` 的分区筛选改为按 `resources/filter-partitions:view:*` 判断
+  - `ResourcesFiltersPanel` 的队列筛选改为按 `resources/filter-partitions:view:*` 判断
   - `userWorkspace` 保留必要的 legacy fallback，但默认参数已与现有 route-rule 调用方式对齐
 - 本轮前端权限收口定向验证已通过：
   - `npm --prefix frontend run type-check`
@@ -189,7 +211,7 @@
   - 前端生成的认证错误、权限错误、服务端错误和普通错误通知
 - 国际化边界保持为“前端静态文案和前端生成消息”：
   - 后端直接返回的原始错误消息不翻译
-  - 集群名、用户名、QOS 名、分区名、节点名等实体值不翻译
+  - 集群名、用户名、QOS 名、队列名、节点名等实体值不翻译
 - 本轮新增国际化专题文档：
   - `docs/features/i18n/requirements.md`
   - `docs/features/i18n/test-plan.md`
@@ -202,7 +224,7 @@
 - 国际化首轮推送后的远端 CI 回归缺口已收口：
   - `ClusterAnalysisView.vue` 与 `UserView.vue` 中用于建立 i18n 响应依赖的裸 `locale.value` 表达式已改掉，`Frontend ESLint` 不再因 `@typescript-eslint/no-unused-expressions` 失败
   - `SettingsLdapCache.vue` 已清理未使用导入，避免远端静态检查继续报 `no-unused-vars`
-  - `slurmweb/tests/views/test_agent_metrics_collector.py` 已按当前 collector 行为更新，显式 mock 空分区列表，避免 `/metrics` 视图测试继续因 collector 新增分区级指标请求耗尽 mocked slurmrestd 响应
+  - `slurmweb/tests/views/test_agent_metrics_collector.py` 已按当前 collector 行为更新，显式 mock 空队列列表，避免 `/metrics` 视图测试继续因 collector 新增队列级指标请求耗尽 mocked slurmrestd 响应
   - 本轮远端失败项对应的本地复核已通过：
     - `cd frontend && npx eslint src/views/ClusterAnalysisView.vue src/views/UserView.vue src/views/settings/SettingsLdapCache.vue`
     - `npm --prefix frontend run type-check`
@@ -281,8 +303,8 @@
 - 已补充多需求输入处理规则：
   - 用户一次提出多个需求、问题或 bug 时，AI 必须先整理并分类，再按主题分别处理
   - 提交前必须检查工作区并区分当前主题改动与其他未确认改动；确认后的当前主题改动按规范拆分提交，并至少完成一次本地提交
-- Dashboard 分区筛选接口契约已补齐：
-  - Agent `stats` 现在读取 `partition` query，并对作业数、运行数、节点数、核数、内存和 GPU 按分区结果重新聚合
+- Dashboard 队列筛选接口契约已补齐：
+  - Agent `stats` 现在读取 `partition` query，并对作业数、运行数、节点数、核数、内存和 GPU 按队列结果重新聚合
   - Agent `metrics/<metric>` 现在会在底层签名支持时把 `partition` 继续传给 `metrics_db.request`
   - 若底层 `metrics_db.request` 仍是旧两参签名，Agent 会兼容回退到旧调用，避免多 Agent 合并顺序不同导致接口直接报错
   - Gateway 继续复用统一 query string 透传逻辑，本轮只补 `/stats` 与 `/metrics/<metric>` 的透传回归测试
