@@ -122,6 +122,7 @@
   - 默认目录现在按当前用户权限过滤；`user/tools/analysis` 作为放开的工具分析能力始终保留在 AI 目录中，不传 `username` 时默认查询当前登录用户，查询其他用户仍需要 `user/analysis:view:*` 或既有全局分析权限
   - `query_agent_interface` 只能调用只读接口，`mutate_agent_interface` 只能调用写接口，避免模型通过通用工具名混用读写能力
   - planner system message 会包含当前用户 login 与当前 cluster；该上下文仅用于 self 语义和默认参数，不改变接口权限
+  - 空的 `query_agent_interface` / `mutate_agent_interface` 调用会作为内部重试提示处理，不写入工具审计，也不向前端发送执行轨迹事件
   - 本轮定向验证已通过：
     - `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/views/test_agent_operations.py slurmweb/tests/views/test_gateway.py slurmweb/tests/apps/test_ai_service.py`
 

@@ -61,6 +61,10 @@ class AIProviderValidationError(ValueError):
     pass
 
 
+class AIInvalidToolRequestError(ValueError):
+    pass
+
+
 def _raise_model_config_store_error(err: Exception):
     if getattr(err, "pgcode", None) == "23505":
         message = str(err)
@@ -94,6 +98,21 @@ def _user_context_prompt(user, cluster: str) -> str:
         "- Treat first-person user requests as referring to this current user unless the user explicitly names someone else.\n"
         "- For self-service user interfaces such as user/tools/analysis, omit username or use the current user login."
     )
+
+
+def _validate_tool_action(action: dict):
+    tool_name = str(action.get("tool") or "").strip()
+    arguments = action.get("arguments") or {}
+    if not tool_name:
+        raise AIInvalidToolRequestError("tool is required for tool_call")
+    if tool_name in {"query_agent_interface", "mutate_agent_interface"}:
+        interface_key = str(arguments.get("interface_key") or "").strip()
+        if not interface_key:
+            raise AIInvalidToolRequestError(
+                f"{tool_name} requires arguments.interface_key. "
+                'Use {"type":"tool_call","tool":"query_agent_interface",'
+                '"arguments":{"interface_key":"nodes","arguments":{}}} or call a direct interface tool such as nodes.'
+            )
 
 
 def normalize_model_config_payload(payload: dict, partial=False) -> dict:
@@ -579,6 +598,20 @@ class AIService:
                         )
                         continue
                     if action["type"] == "tool_call":
+                        try:
+                            _validate_tool_action(action)
+                        except AIInvalidToolRequestError as err:
+                            working_messages.append(
+                                {
+                                    "role": "user",
+                                    "content": (
+                                        f"Invalid tool call: {err} "
+                                        "Do not emit empty tool calls. Retry with strict tool_call JSON using a valid interface_key, "
+                                        "or answer with strict final JSON if no tool is needed."
+                                    ),
+                                }
+                            )
+                            continue
                         tool_name = str(action.get("tool") or "").strip()
                         arguments = action.get("arguments") or {}
                         yield self.sse_event(

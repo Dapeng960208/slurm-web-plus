@@ -73,6 +73,7 @@
 - AI 默认接口目录现在会按当前用户权限过滤；`user/tools/analysis` 作为工具分析能力对 AI 用户保持可见，不传 `username` 时只查当前登录用户，跨用户仍需全局分析权限
 - `query_agent_interface` 与 `mutate_agent_interface` 已按只读/写入分流，不能混用读写接口
 - AI planner system message 会注入当前 `user.login` 与 cluster，因此“我是谁”“我的工具分析”等第一人称请求不再需要用户额外提供用户名
+- 空的通用工具调用会被服务端拦截为内部重试提示，不再生成红色执行轨迹卡片或 `ai_tool_calls` 噪音记录
 
 本轮新增验证：
 

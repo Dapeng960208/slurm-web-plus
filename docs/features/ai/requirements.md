@@ -175,6 +175,7 @@ AI 当前按数据库能力自动启用：
 - 不向 AI 暴露 `/ai/*` 自身、`/permissions`、登录、静态资源、二进制绘图等递归或无意义接口
 - 当前用户上下文只用于识别 self 语义和默认参数，不会提升权限或绕过接口层校验
 - 查询接口权限继续复用 Agent 现有规则与 owner-aware 逻辑
+- 模型输出空的通用工具调用（例如 `query_agent_interface` 缺少 `interface_key`）时，服务端只把错误作为内部反馈要求模型重试，不写入 `ai_tool_calls`，也不向前端发送执行轨迹事件
 - 写接口也走 Agent 接口层的实时权限校验：
   - `admin` 默认的 `*:edit:*` 可通过 AI 执行对应 `edit` 类写接口
   - `delete`、`self` 等边界继续按当前用户实际规则与 owner-aware 逻辑判断

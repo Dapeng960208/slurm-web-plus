@@ -701,6 +701,29 @@ class TestAIService(TestCase):
             ["job", "jobs/history"],
         )
 
+    def test_stream_chat_retries_empty_generic_tool_call_without_audit_noise(self):
+        self._create_model()
+        provider = mock.Mock()
+        provider.complete.side_effect = [
+            '{"type":"tool_call","tool":"query_agent_interface","arguments":{}}',
+            '{"type":"tool_call","tool":"nodes","arguments":{"limit":1}}',
+            '{"type":"final","content":"The lightest candidate is cn01."}',
+        ]
+
+        with mock.patch("slurmweb.ai.service.get_provider_client", return_value=provider):
+            generator = self.service.stream_chat(
+                self.user,
+                {"message": "Which node is lightly loaded?"},
+            )
+            output = "".join(list(generator()))
+
+        self.assertEqual(provider.complete.call_count, 3)
+        self.assertIn("The lightest candidate is cn01.", output)
+        self.assertEqual(len(self.conversation_store.tool_calls), 1)
+        self.assertEqual(self.conversation_store.tool_calls[0]["tool_name"], "nodes")
+        self.assertEqual(self.conversation_store.tool_calls[0]["interface_key"], "nodes")
+        self.assertNotIn("interface_key is required", output)
+
     def test_planner_prompt_prefers_summary_interfaces_for_resource_recommendations(self):
         self._create_model()
 
