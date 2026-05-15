@@ -290,3 +290,78 @@ class TestSlurmrestdWriteOperations(TestSlurmrestdBase):
                 ]
             },
         )
+
+    def test_reservation_create_normalizes_payload_aliases(self):
+        self.setup_slurmrestd("25.11.0", "0.0.44")
+        response = mock.create_autospec(requests.Response)
+        response.url = "/mocked/query"
+        response.status_code = 200
+        response.headers = {"content-type": "application/json"}
+        response.json.return_value = {
+            "warnings": [],
+            "errors": [],
+            "reservations": [],
+        }
+        self.slurmrestd.session.request = mock.Mock(return_value=response)
+
+        self.slurmrestd.reservation_create(
+            {
+                "name": "night-window",
+                "users": ["alice", "bob"],
+                "groups": ["research"],
+                "accounts": ["science"],
+                "qos": ["high"],
+                "allowed_partitions": ["debug", "batch"],
+                "start_time": {"set": True, "number": 1710000000},
+                "end_time": {"set": True, "number": 1710003600},
+            }
+        )
+
+        self.slurmrestd.session.request.assert_called_once_with(
+            "POST",
+            "http+unix://slurmrestd/slurm/v0.0.44/reservation",
+            headers=mock.ANY,
+            json={
+                "name": "night-window",
+                "users": "alice,bob",
+                "groups": "research",
+                "accounts": "science",
+                "qos": "high",
+                "partition": "debug,batch",
+                "start_time": {"set": True, "number": 1710000000},
+                "end_time": {"set": True, "number": 1710003600},
+            },
+            params=None,
+        )
+
+    def test_reservation_update_normalizes_allowed_partitions_alias(self):
+        self.setup_slurmrestd("25.11.0", "0.0.44")
+        response = mock.create_autospec(requests.Response)
+        response.url = "/mocked/query"
+        response.status_code = 200
+        response.headers = {"content-type": "application/json"}
+        response.json.return_value = {
+            "warnings": [],
+            "errors": [],
+            "reservations": [],
+        }
+        self.slurmrestd.session.request = mock.Mock(return_value=response)
+
+        self.slurmrestd.reservation_update(
+            "night-window",
+            {
+                "AllowedPartitions": "debug,batch",
+                "Users": "alice",
+            },
+        )
+
+        self.slurmrestd.session.request.assert_called_once_with(
+            "POST",
+            "http+unix://slurmrestd/slurm/v0.0.44/reservation/night-window",
+            headers=mock.ANY,
+            json={
+                "partition": "debug,batch",
+                "users": "alice",
+            },
+            params=None,
+        )

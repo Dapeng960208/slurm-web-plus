@@ -519,6 +519,12 @@ def ai_configs(cluster: str):
 
 @check_jwt
 @validate_cluster
+def ai_models(cluster: str):
+    return proxy_agent(cluster, "ai/models", request.token)
+
+
+@check_jwt
+@validate_cluster
 def create_ai_config(cluster: str):
     return proxy_agent(cluster, "ai/configs", request.token)
 

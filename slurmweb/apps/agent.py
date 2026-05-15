@@ -176,6 +176,7 @@ class SlurmwebAppAgent(SlurmwebWebApp, RFLTokenizedRBACWebApp):
             methods=["PUT"],
         ),
         SlurmwebAppRoute(f"/v{get_version()}/ai/configs", views.ai_configs),
+        SlurmwebAppRoute(f"/v{get_version()}/ai/models", views.ai_models),
         SlurmwebAppRoute(
             f"/v{get_version()}/ai/configs",
             views.create_ai_config,

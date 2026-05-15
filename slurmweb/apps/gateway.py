@@ -177,6 +177,7 @@ class SlurmwebAppGateway(SlurmwebWebApp, RFLTokenizedWebApp):
             methods=["PUT"],
         ),
         SlurmwebAppRoute("/api/agents/<cluster>/ai/configs", views.ai_configs),
+        SlurmwebAppRoute("/api/agents/<cluster>/ai/models", views.ai_models),
         SlurmwebAppRoute(
             "/api/agents/<cluster>/ai/configs",
             views.create_ai_config,

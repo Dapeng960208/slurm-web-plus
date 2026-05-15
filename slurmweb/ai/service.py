@@ -261,6 +261,29 @@ class AIService:
         cluster = self.app.settings.service.cluster
         return [summarize_provider_config(item) for item in self.config_store.list_configs(cluster)]
 
+    def list_model_summaries(self):
+        configs = self.list_configs()
+        enabled = [config for config in configs if config.get("enabled")]
+        enabled.sort(
+            key=lambda config: (
+                0 if config.get("is_default") else 1,
+                config.get("sort_order", 0),
+                str(config.get("display_name") or config.get("model") or ""),
+            )
+        )
+        return {
+            "items": [
+                {
+                    "id": config["id"],
+                    "display_name": config.get("display_name") or config.get("model"),
+                    "model": config["model"],
+                    "is_default": bool(config.get("is_default")),
+                    "sort_order": int(config.get("sort_order", 0) or 0),
+                }
+                for config in enabled
+            ]
+        }
+
     def get_model_config(self, config_id: int, include_secret=False):
         cluster = self.app.settings.service.cluster
         config = self.config_store.get_config(cluster, config_id)

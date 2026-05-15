@@ -276,6 +276,10 @@ export interface AIModelConfigListResponse {
   items: AIModelConfig[]
 }
 
+export interface AIModelSummaryListResponse {
+  items: AIModelSummary[]
+}
+
 export interface AIChatRequest {
   message: string
   conversation_id?: number | null
@@ -419,6 +423,14 @@ export interface CustomRole {
   permissions: PermissionRule[]
   created_at?: string | null
   updated_at?: string | null
+}
+
+export interface AIModelSummary {
+  id: number
+  display_name: string
+  model: string
+  is_default: boolean
+  sort_order: number
 }
 
 export interface CustomRolePayload {
@@ -1145,9 +1157,12 @@ export interface ClusterReservation {
   accounts: string
   end_time: ClusterOptionalNumber
   flags: string[]
+  groups?: string
   name: string
   node_count: number
   node_list: string
+  partition?: string
+  qos?: string
   start_time: ClusterOptionalNumber
   users: string
 }
@@ -1256,8 +1271,11 @@ export interface ReservationPayload extends Record<string, unknown> {
   name?: string
   node_list?: string
   partition?: string
+  allowed_partitions?: string[]
   users?: string[]
+  groups?: string[]
   accounts?: string[]
+  qos?: string[]
   start_time?: {
     set: boolean
     number: number
@@ -1272,6 +1290,9 @@ export interface SlurmdbObjectPayload extends Record<string, unknown> {
   name?: string
   description?: string | null
   organization?: string | null
+  default_account?: string
+  default_qos?: string | null
+  qos?: string[]
 }
 
 type CachedLdapUsersAPIResponse = CachedLdapUser[] | CachedLdapUsersResponse
@@ -2105,6 +2126,17 @@ export function useGatewayAPI() {
     return (result.items ?? []).map((config) => normalizeAIModelConfig(config))
   }
 
+  async function ai_models(cluster: string): Promise<AIModelSummary[]> {
+    const result = await restAPI.get<AIModelSummaryListResponse>(`/agents/${cluster}/ai/models`)
+    return (result.items ?? []).map((config) => ({
+      id: config.id,
+      display_name: config.display_name ?? '',
+      model: config.model ?? '',
+      is_default: config.is_default ?? false,
+      sort_order: config.sort_order ?? 0
+    }))
+  }
+
   async function create_ai_config(
     cluster: string,
     payload: AIModelConfigPayload
@@ -2511,6 +2543,7 @@ export function useGatewayAPI() {
     ldap_cache_users,
     cache_reset,
     ai_configs,
+    ai_models,
     create_ai_config,
     update_ai_config,
     delete_ai_config,

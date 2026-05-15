@@ -386,6 +386,83 @@ class Slurmrestd:
             )
         return normalized
 
+    @staticmethod
+    def _reservation_csv(value: t.Any) -> t.Optional[str]:
+        if value in (None, ""):
+            return None
+        if isinstance(value, str):
+            values = [item.strip() for item in value.split(",") if item.strip()]
+        elif isinstance(value, (list, tuple, set)):
+            values = [str(item).strip() for item in value if str(item).strip()]
+        else:
+            item = str(value).strip()
+            values = [item] if item else []
+        if not values:
+            return None
+        return ",".join(values)
+
+    @staticmethod
+    def _reservation_time(value: t.Any) -> t.Any:
+        if not isinstance(value, dict):
+            return value
+        if "set" in value and "number" in value:
+            return {
+                "set": bool(value.get("set")),
+                "number": value.get("number"),
+            }
+        return value
+
+    def _normalize_reservation_payload(
+        self, payload: t.Dict[str, t.Any]
+    ) -> t.Dict[str, t.Any]:
+        if not isinstance(payload, dict):
+            return payload
+
+        normalized = dict(payload)
+
+        def pop_aliases(*aliases: str) -> t.Any:
+            for alias in aliases:
+                if alias in normalized:
+                    return normalized.pop(alias)
+            return None
+
+        users = pop_aliases("users", "Users")
+        groups = pop_aliases("groups", "Groups")
+        accounts = pop_aliases("accounts", "Accounts")
+        qos = pop_aliases("qos", "QOS", "Qos")
+        partition = pop_aliases(
+            "partition",
+            "Partition",
+            "allowed_partitions",
+            "allowedPartitions",
+            "AllowedPartitions",
+        )
+        start_time = pop_aliases("start_time", "StartTime")
+        end_time = pop_aliases("end_time", "EndTime")
+
+        normalized_users = self._reservation_csv(users)
+        normalized_groups = self._reservation_csv(groups)
+        normalized_accounts = self._reservation_csv(accounts)
+        normalized_qos = self._reservation_csv(qos)
+        normalized_partition = self._reservation_csv(partition)
+
+        if normalized_users is not None:
+            normalized["users"] = normalized_users
+        if normalized_groups is not None:
+            normalized["groups"] = normalized_groups
+        if normalized_accounts is not None:
+            normalized["accounts"] = normalized_accounts
+        if normalized_qos is not None:
+            normalized["qos"] = normalized_qos
+        if normalized_partition is not None:
+            normalized["partition"] = normalized_partition
+        if start_time is not None:
+            normalized["start_time"] = self._reservation_time(start_time)
+        if end_time is not None:
+            normalized["end_time"] = self._reservation_time(end_time)
+
+        return normalized
+
     def _association_delete_query(self, payload: t.Dict[str, t.Any]) -> t.Dict[str, str]:
         normalized = self._normalize_associations_payload(payload)
         if not isinstance(normalized, dict):
@@ -713,7 +790,12 @@ class Slurmrestd:
         return self._request("slurm", "reservations", "reservations", **kwargs)
 
     def reservation_create(self, payload: t.Dict[str, t.Any]):
-        return self.request_json("POST", "slurm", "reservation", payload=payload)
+        return self.request_json(
+            "POST",
+            "slurm",
+            "reservation",
+            payload=self._normalize_reservation_payload(payload),
+        )
 
     def reservation_update(
         self, reservation_name: str, payload: t.Dict[str, t.Any]
@@ -722,7 +804,7 @@ class Slurmrestd:
             "POST",
             "slurm",
             f"reservation/{reservation_name}",
-            payload=payload,
+            payload=self._normalize_reservation_payload(payload),
         )
 
     def reservation_delete(self, reservation_name: str):

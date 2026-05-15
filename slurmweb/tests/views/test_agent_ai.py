@@ -9,7 +9,7 @@ from unittest import mock
 from slurmweb.ai.service import AIProviderValidationError
 from slurmweb.version import get_version
 
-from ..lib.agent import TestAgentBase
+from ..lib.agent import RemoveActionInPolicy, TestAgentBase
 
 
 class TestAgentAIViews(TestAgentBase):
@@ -87,6 +87,35 @@ class TestAgentAIViews(TestAgentBase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json["items"][0]["name"], "qwen-prod")
         self.app.ai_service.list_configs.assert_called_once_with()
+
+    def test_ai_models(self):
+        self._enable_ai()
+        self._enable_rules("ai:view:*")
+        self.app.ai_service.list_model_summaries.return_value = {
+            "items": [
+                {
+                    "id": 3,
+                    "display_name": "Qwen Prod",
+                    "model": "qwen3-coder",
+                    "is_default": True,
+                    "sort_order": 10,
+                }
+            ]
+        }
+
+        response = self.client.get(f"/v{get_version()}/ai/models")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json["items"][0]["display_name"], "Qwen Prod")
+        self.app.ai_service.list_model_summaries.assert_called_once_with()
+
+    def test_ai_models_require_view_permission(self):
+        self._enable_ai()
+        self._enable_rules()
+        with RemoveActionInPolicy(self.app.policy, "user", "view-ai"):
+            response = self.client.get(f"/v{get_version()}/ai/models")
+
+            self.assertEqual(response.status_code, 403)
 
     def test_ai_configs_require_view_ai_permission(self):
         self._enable_ai()

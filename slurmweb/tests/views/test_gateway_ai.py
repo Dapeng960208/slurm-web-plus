@@ -57,6 +57,24 @@ class TestGatewayAIViews(TestGatewayBase):
         self.assertEqual(mock_proxy_agent.call_args.args[:2], ("foo", "ai/configs"))
 
     @mock.patch("slurmweb.views.gateway.proxy_agent")
+    def test_ai_models_proxy(self, mock_proxy_agent):
+        self.app_set_agents({"foo": fake_slurmweb_agent("foo")})
+        mock_proxy_agent.return_value = (
+            self.app.response_class(
+                response='{"items":[{"id":1,"display_name":"Qwen Prod","model":"qwen3-coder","is_default":true,"sort_order":10}]}',
+                status=200,
+                mimetype="application/json",
+            ),
+            200,
+        )
+
+        response = self.client.get("/api/agents/foo/ai/models")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json["items"][0]["display_name"], "Qwen Prod")
+        self.assertEqual(mock_proxy_agent.call_args.args[:2], ("foo", "ai/models"))
+
+    @mock.patch("slurmweb.views.gateway.proxy_agent")
     def test_validate_ai_config_proxy(self, mock_proxy_agent):
         self.app_set_agents({"foo": fake_slurmweb_agent("foo")})
         mock_proxy_agent.return_value = (

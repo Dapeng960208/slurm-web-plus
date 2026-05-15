@@ -1266,6 +1266,16 @@ def ai_configs():
     return jsonify({"items": current_app.ai_service.list_configs()})
 
 
+@permission_required(("ai", "view", "*"))
+def ai_models():
+    _require_ai()
+    try:
+        return jsonify(current_app.ai_service.list_model_summaries())
+    except Exception as err:
+        logger.warning("Unable to list AI model summaries: %s", err)
+        abort(500, str(err))
+
+
 @permission_required(("admin/ai", "edit", "*"))
 def create_ai_config():
     _require_ai()

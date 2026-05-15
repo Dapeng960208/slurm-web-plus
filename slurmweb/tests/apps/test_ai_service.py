@@ -513,6 +513,68 @@ class TestAIService(TestCase):
                 {"api_key": "", "clear_secret": True},
             )
 
+    def test_list_model_summaries_returns_enabled_models_only_in_expected_order(self):
+        self._create_model(
+            name="default",
+            display_name="Default Model",
+            model="qwen-default",
+            is_default=True,
+            sort_order=30,
+        )
+        self._create_model(
+            name="disabled",
+            display_name="Disabled Model",
+            model="qwen-disabled",
+            is_default=False,
+            enabled=False,
+            sort_order=5,
+        )
+        self._create_model(
+            name="lower-sort",
+            display_name="A Lower Sort",
+            model="qwen-lower",
+            is_default=False,
+            sort_order=10,
+        )
+        self._create_model(
+            name="higher-sort",
+            display_name="Z Higher Sort",
+            model="qwen-higher",
+            is_default=False,
+            sort_order=20,
+        )
+
+        result = self.service.list_model_summaries()
+
+        self.assertEqual(
+            result,
+            {
+                "items": [
+                    {
+                        "id": 1,
+                        "display_name": "Default Model",
+                        "model": "qwen-default",
+                        "is_default": True,
+                        "sort_order": 30,
+                    },
+                    {
+                        "id": 3,
+                        "display_name": "A Lower Sort",
+                        "model": "qwen-lower",
+                        "is_default": False,
+                        "sort_order": 10,
+                    },
+                    {
+                        "id": 4,
+                        "display_name": "Z Higher Sort",
+                        "model": "qwen-higher",
+                        "is_default": False,
+                        "sort_order": 20,
+                    },
+                ]
+            },
+        )
+
     def test_stream_chat_persists_messages_and_tool_audit(self):
         self._create_model()
         provider = mock.Mock()
