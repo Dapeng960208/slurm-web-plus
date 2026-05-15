@@ -12,12 +12,14 @@ import ErrorAlert from '@/components/ErrorAlert.vue'
 import InfoAlert from '@/components/InfoAlert.vue'
 import AccountBreadcrumb from '@/components/accounts/AccountBreadcrumb.vue'
 import PanelSkeleton from '@/components/PanelSkeleton.vue'
+import { i18n } from '@/plugins/i18n'
 
 const mockClusterDataPoller = getMockClusterDataPoller<ClusterAssociation[]>()
 const mockGatewayAPI = {
   account: vi.fn(),
   save_account: vi.fn(),
   delete_account: vi.fn(),
+  save_user: vi.fn(),
   save_association: vi.fn(),
   delete_association: vi.fn()
 }
@@ -99,7 +101,6 @@ describe('AccountView.vue', () => {
     })
 
     const accountDefinition = wrapper.get('dl')
-
     expect(accountDefinition.get('div#parents dt').text()).toBe('Parent accounts')
     accountDefinition.getComponent(AccountBreadcrumb)
 
@@ -252,7 +253,312 @@ describe('AccountView.vue', () => {
     expect(infoAlert.text()).toContain('has no end-user associations')
   })
 
-  test('adds, edits QOS, and deletes account user associations', async () => {
+  test('adds user by saving user first, then association', async () => {
+    useRuntimeStore().availableClusters = [
+      {
+        name: 'foo',
+        permissions: {
+          roles: [],
+          actions: [],
+          rules: ['accounts:view:*', 'accounts:edit:*', 'accounts:delete:*']
+        },
+        racksdb: true,
+        infrastructure: 'foo',
+        metrics: true,
+        cache: true
+      }
+    ]
+    mockGatewayAPI.save_user.mockResolvedValue({ operation: 'users.update', errors: [] })
+    mockGatewayAPI.save_association.mockResolvedValue({ operation: 'accounts.associations.update', errors: [] })
+    mockClusterDataPoller.loaded.value = true
+    mockClusterDataPoller.initialLoading.value = false
+    mockClusterDataPoller.data.value = [
+      {
+        ...(associations as ClusterAssociation[])[0],
+        account: 'root',
+        user: '',
+        qos: ['normal']
+      },
+      {
+        ...(associations as ClusterAssociation[])[0],
+        account: 'root',
+        user: 'alice',
+        qos: ['normal'],
+        default: { qos: 'normal' }
+      }
+    ] as ClusterAssociation[]
+
+    mockClusterDataPoller.refresh.mockImplementation(async () => {
+      mockClusterDataPoller.data.value = [
+        ...(mockClusterDataPoller.data.value ?? []),
+        {
+          ...(associations as ClusterAssociation[])[0],
+          account: 'root',
+          user: 'bob',
+          qos: ['normal', 'study'],
+          default: { qos: 'study' }
+        }
+      ] as ClusterAssociation[]
+    })
+
+    const wrapper = mount(AccountView, {
+      attachTo: document.body,
+      props: {
+        cluster: 'foo',
+        account: 'root'
+      }
+    })
+
+    await flushPromises()
+
+    await wrapper.findAll('button').find((button) => button.text() === 'Add user')!.trigger('click')
+    await nextTick()
+    wrapper
+      .findAllComponents(ActionDialog)
+      .find((dialog) => dialog.props('title') === 'pages.account.dialogs.addUserAssociation.title')!
+      .vm.$emit('submit', {
+        user: 'bob',
+        qos: 'normal, study',
+        default_qos: 'study'
+      })
+    await flushPromises()
+
+    expect(mockGatewayAPI.save_user).toHaveBeenCalledWith('foo', {
+      name: 'bob',
+      default_account: 'root',
+      default_qos: 'study',
+      qos: ['normal', 'study']
+    })
+    expect(mockGatewayAPI.save_association).toHaveBeenCalledWith('foo', {
+      associations: [
+        {
+          account: 'root',
+          user: 'bob',
+          qos: ['normal', 'study'],
+          default: { qos: 'study' }
+        }
+      ]
+    })
+    expect(mockGatewayAPI.save_user.mock.invocationCallOrder[0]).toBeLessThan(
+      mockGatewayAPI.save_association.mock.invocationCallOrder[0]
+    )
+    expect(mockClusterDataPoller.refresh).toHaveBeenCalledTimes(1)
+    expect(wrapper.findAllComponents(ActionDialog)[0].props('open')).toBe(false)
+    wrapper.unmount()
+  })
+
+  test('fails add user when refreshed associations do not include the new relation', async () => {
+    useRuntimeStore().availableClusters = [
+      {
+        name: 'foo',
+        permissions: {
+          roles: [],
+          actions: [],
+          rules: ['accounts:view:*', 'accounts:edit:*']
+        },
+        racksdb: true,
+        infrastructure: 'foo',
+        metrics: true,
+        cache: true
+      }
+    ]
+    mockGatewayAPI.save_user.mockResolvedValue({ operation: 'users.update', errors: [] })
+    mockGatewayAPI.save_association.mockResolvedValue({ operation: 'accounts.associations.update', errors: [] })
+    mockClusterDataPoller.loaded.value = true
+    mockClusterDataPoller.initialLoading.value = false
+    mockClusterDataPoller.data.value = [] as ClusterAssociation[]
+    mockGatewayAPI.account.mockResolvedValue({
+      name: 'science',
+      description: 'Science',
+      organization: 'Science'
+    })
+    mockClusterDataPoller.refresh.mockResolvedValue(undefined)
+
+    const wrapper = mount(AccountView, {
+      attachTo: document.body,
+      props: {
+        cluster: 'foo',
+        account: 'science'
+      }
+    })
+    await flushPromises()
+
+    await wrapper.findAll('button').find((button) => button.text() === 'Add user')!.trigger('click')
+    await nextTick()
+    wrapper
+      .findAllComponents(ActionDialog)
+      .find((dialog) => dialog.props('title') === 'pages.account.dialogs.addUserAssociation.title')!
+      .vm.$emit('submit', {
+        user: 'bob',
+        qos: '',
+        default_qos: ''
+      })
+    await flushPromises()
+
+    expect(mockGatewayAPI.save_user).toHaveBeenCalledWith('foo', {
+      name: 'bob',
+      default_account: 'science',
+      default_qos: null,
+      qos: undefined
+    })
+    expect(mockGatewayAPI.save_association).toHaveBeenCalledWith('foo', {
+      associations: [
+        {
+          account: 'science',
+          user: 'bob'
+        }
+      ]
+    })
+    const addUserDialog = wrapper
+      .findAllComponents(ActionDialog)
+      .find((dialog) => dialog.props('title') === 'pages.account.dialogs.addUserAssociation.title')!
+    expect(addUserDialog.props('open')).toBe(true)
+    expect(addUserDialog.props('error')).toBe(
+      i18n.global.t('pages.account.errors.addUserAssociationMissing', {
+        user: 'bob',
+        account: 'science'
+      })
+    )
+    wrapper.unmount()
+  })
+
+  test('fails add user when save_user reports errors', async () => {
+    useRuntimeStore().availableClusters = [
+      {
+        name: 'foo',
+        permissions: {
+          roles: [],
+          actions: [],
+          rules: ['accounts:view:*', 'accounts:edit:*']
+        },
+        racksdb: true,
+        infrastructure: 'foo',
+        metrics: true,
+        cache: true
+      }
+    ]
+    mockGatewayAPI.save_user.mockResolvedValue({
+      operation: 'users.update',
+      errors: [{ description: 'user save failed' }]
+    })
+    mockClusterDataPoller.loaded.value = true
+    mockClusterDataPoller.initialLoading.value = false
+    mockClusterDataPoller.data.value = [] as ClusterAssociation[]
+    mockGatewayAPI.account.mockResolvedValue({
+      name: 'science',
+      description: 'Science',
+      organization: 'Science'
+    })
+
+    const wrapper = mount(AccountView, {
+      attachTo: document.body,
+      props: {
+        cluster: 'foo',
+        account: 'science'
+      }
+    })
+    await flushPromises()
+
+    await wrapper.findAll('button').find((button) => button.text() === 'Add user')!.trigger('click')
+    await nextTick()
+    wrapper
+      .findAllComponents(ActionDialog)
+      .find((dialog) => dialog.props('title') === 'pages.account.dialogs.addUserAssociation.title')!
+      .vm.$emit('submit', {
+        user: 'bob',
+        qos: '',
+        default_qos: ''
+      })
+    await flushPromises()
+
+    expect(mockGatewayAPI.save_user).toHaveBeenCalledWith('foo', {
+      name: 'bob',
+      default_account: 'science',
+      default_qos: null,
+      qos: undefined
+    })
+    expect(mockGatewayAPI.save_association).not.toHaveBeenCalled()
+    expect(mockClusterDataPoller.refresh).not.toHaveBeenCalled()
+    const addUserDialog = wrapper
+      .findAllComponents(ActionDialog)
+      .find((dialog) => dialog.props('title') === 'pages.account.dialogs.addUserAssociation.title')!
+    expect(addUserDialog.props('open')).toBe(true)
+    expect(addUserDialog.props('error')).toBe(i18n.global.t('pages.account.errors.addUserFailed'))
+    wrapper.unmount()
+  })
+
+  test('fails add user when save_association reports errors', async () => {
+    useRuntimeStore().availableClusters = [
+      {
+        name: 'foo',
+        permissions: {
+          roles: [],
+          actions: [],
+          rules: ['accounts:view:*', 'accounts:edit:*']
+        },
+        racksdb: true,
+        infrastructure: 'foo',
+        metrics: true,
+        cache: true
+      }
+    ]
+    mockGatewayAPI.save_user.mockResolvedValue({
+      operation: 'users.update',
+      errors: []
+    })
+    mockGatewayAPI.save_association.mockResolvedValue({
+      operation: 'accounts.associations.update',
+      errors: [{ description: 'association save failed' }]
+    })
+    mockClusterDataPoller.loaded.value = true
+    mockClusterDataPoller.initialLoading.value = false
+    mockClusterDataPoller.data.value = [] as ClusterAssociation[]
+    mockGatewayAPI.account.mockResolvedValue({
+      name: 'science',
+      description: 'Science',
+      organization: 'Science'
+    })
+
+    const wrapper = mount(AccountView, {
+      attachTo: document.body,
+      props: {
+        cluster: 'foo',
+        account: 'science'
+      }
+    })
+    await flushPromises()
+
+    await wrapper.findAll('button').find((button) => button.text() === 'Add user')!.trigger('click')
+    await nextTick()
+    wrapper
+      .findAllComponents(ActionDialog)
+      .find((dialog) => dialog.props('title') === 'pages.account.dialogs.addUserAssociation.title')!
+      .vm.$emit('submit', {
+        user: 'bob',
+        qos: '',
+        default_qos: ''
+      })
+    await flushPromises()
+
+    expect(mockGatewayAPI.save_user).toHaveBeenCalledTimes(1)
+    expect(mockGatewayAPI.save_association).toHaveBeenCalledWith('foo', {
+      associations: [
+        {
+          account: 'science',
+          user: 'bob'
+        }
+      ]
+    })
+    expect(mockClusterDataPoller.refresh).not.toHaveBeenCalled()
+    const addUserDialog = wrapper
+      .findAllComponents(ActionDialog)
+      .find((dialog) => dialog.props('title') === 'pages.account.dialogs.addUserAssociation.title')!
+    expect(addUserDialog.props('open')).toBe(true)
+    expect(addUserDialog.props('error')).toBe(i18n.global.t('pages.account.errors.addUserFailed'))
+    wrapper.unmount()
+  })
+
+  test('edits QOS and deletes account user associations', async () => {
     useRuntimeStore().availableClusters = [
       {
         name: 'foo',
@@ -297,30 +603,6 @@ describe('AccountView.vue', () => {
 
     await flushPromises()
 
-    await wrapper.findAll('button').find((button) => button.text() === 'Add user')!.trigger('click')
-    await nextTick()
-    wrapper
-      .findAllComponents(ActionDialog)
-      .find((dialog) => dialog.props('title') === 'pages.account.dialogs.addUserAssociation.title')!
-      .vm.$emit('submit', {
-        user: 'bob',
-        qos: 'normal, study',
-        default_qos: 'study'
-      })
-    await flushPromises()
-
-    expect(mockGatewayAPI.save_association).toHaveBeenCalledWith('foo', {
-      associations: [
-        {
-          account: 'root',
-          user: 'bob',
-          qos: ['normal', 'study'],
-          default: { qos: 'study' }
-        }
-      ]
-    })
-    expect(mockClusterDataPoller.refresh).toHaveBeenCalledTimes(1)
-
     await wrapper.findAll('button').find((button) => button.text() === 'Edit QOS')!.trigger('click')
     await nextTick()
     wrapper
@@ -342,7 +624,7 @@ describe('AccountView.vue', () => {
         }
       ]
     })
-    expect(mockClusterDataPoller.refresh).toHaveBeenCalledTimes(2)
+    expect(mockClusterDataPoller.refresh).toHaveBeenCalledTimes(1)
 
     await wrapper.findAll('button').find((button) => button.text() === 'Delete')!.trigger('click')
     await nextTick()
@@ -360,65 +642,7 @@ describe('AccountView.vue', () => {
         }
       ]
     })
-    expect(mockClusterDataPoller.refresh).toHaveBeenCalledTimes(3)
-    wrapper.unmount()
-  })
-
-  test('adds user for account without account-level association row', async () => {
-    useRuntimeStore().availableClusters = [
-      {
-        name: 'foo',
-        permissions: {
-          roles: [],
-          actions: [],
-          rules: ['accounts:view:*', 'accounts:edit:*']
-        },
-        racksdb: true,
-        infrastructure: 'foo',
-        metrics: true,
-        cache: true
-      }
-    ]
-    mockGatewayAPI.account.mockResolvedValue({
-      name: 'science',
-      description: 'Science',
-      organization: 'Science'
-    })
-    mockGatewayAPI.save_association.mockResolvedValue({ operation: 'accounts.associations.update' })
-    mockClusterDataPoller.loaded.value = true
-    mockClusterDataPoller.initialLoading.value = false
-    mockClusterDataPoller.data.value = [] as ClusterAssociation[]
-
-    const wrapper = mount(AccountView, {
-      attachTo: document.body,
-      props: {
-        cluster: 'foo',
-        account: 'science'
-      }
-    })
-    await flushPromises()
-
-    await wrapper.findAll('button').find((button) => button.text() === 'Add user')!.trigger('click')
-    await nextTick()
-    wrapper
-      .findAllComponents(ActionDialog)
-      .find((dialog) => dialog.props('title') === 'pages.account.dialogs.addUserAssociation.title')!
-      .vm.$emit('submit', {
-        user: 'bob',
-        qos: '',
-        default_qos: ''
-      })
-    await flushPromises()
-
-    expect(mockGatewayAPI.save_association).toHaveBeenCalledWith('foo', {
-      associations: [
-        {
-          account: 'science',
-          user: 'bob'
-        }
-      ]
-    })
-    expect(mockClusterDataPoller.refresh).toHaveBeenCalledTimes(1)
+    expect(mockClusterDataPoller.refresh).toHaveBeenCalledTimes(2)
     wrapper.unmount()
   })
 

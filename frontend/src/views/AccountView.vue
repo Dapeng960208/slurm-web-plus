@@ -171,6 +171,10 @@ function associationPayload(association: {
   }
 }
 
+function hasOperationErrors(result: { errors?: unknown[] } | null | undefined): boolean {
+  return Array.isArray(result?.errors) && result.errors.length > 0
+}
+
 async function saveAccount(payload: Record<string, string>) {
   operationBusy.value = true
   operationError.value = null
@@ -197,7 +201,17 @@ async function addUserAssociation(payload: Record<string, string>) {
   operationBusy.value = true
   operationError.value = null
   try {
-    await gateway.save_association(
+    const saveUserResult = await gateway.save_user(cluster, {
+      name: payload.user,
+      default_account: account,
+      default_qos: payload.default_qos || null,
+      qos: parseOptionalCsvList(payload.qos)
+    })
+    if (hasOperationErrors(saveUserResult)) {
+      throw new Error(t('pages.account.errors.addUserFailed'))
+    }
+
+    const saveAssociationResult = await gateway.save_association(
       cluster,
       associationPayload({
         account,
@@ -206,7 +220,21 @@ async function addUserAssociation(payload: Record<string, string>) {
         default_qos: payload.default_qos
       })
     )
+    if (hasOperationErrors(saveAssociationResult)) {
+      throw new Error(t('pages.account.errors.addUserFailed'))
+    }
     await refreshAssociations()
+    const associationVisible = (data.value ?? []).some(
+      (association) => association.account === account && association.user === payload.user
+    )
+    if (!associationVisible) {
+      throw new Error(
+        t('pages.account.errors.addUserAssociationMissing', {
+          user: payload.user,
+          account
+        })
+      )
+    }
     runtimeStore.reportInfo(
       t('pages.account.notifications.addUserRequested', { user: payload.user, account })
     )
