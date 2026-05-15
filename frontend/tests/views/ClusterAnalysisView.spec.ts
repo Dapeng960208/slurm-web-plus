@@ -494,6 +494,18 @@ describe('ClusterAnalysisView.vue', () => {
 
     await flushPromises()
     mockGatewayAPI.jobs_history.mockClear()
+    mockGatewayAPI.metrics_jobs.mockClear()
+    mockGatewayAPI.metrics_cores.mockClear()
+    mockGatewayAPI.metrics_memory.mockClear()
+    mockGatewayAPI.metrics_gpus.mockClear()
+    mockGatewayAPI.analysis_node_hotspots.mockClear()
+
+    expect(
+      wrapper.find('[data-testid="queue-wait-range-selector"] button').text()
+    ).toContain('Time Range')
+    expect(wrapper.find('[data-testid="queue-wait-range-selector"]').text()).not.toContain('Week')
+    expect(wrapper.find('[data-testid="queue-wait-range-selector"]').text()).not.toContain('Day')
+    expect(wrapper.find('[data-testid="queue-wait-range-selector"]').text()).not.toContain('Hour')
 
     await wrapper
       .get('[data-testid="queue-wait-range-selector"] [data-testid="metric-range-custom-button"]')
@@ -515,5 +527,10 @@ describe('ClusterAnalysisView.vue', () => {
         end: expect.stringMatching(/T/)
       })
     )
+    expect(mockGatewayAPI.metrics_jobs).not.toHaveBeenCalled()
+    expect(mockGatewayAPI.metrics_cores).not.toHaveBeenCalled()
+    expect(mockGatewayAPI.metrics_memory).not.toHaveBeenCalled()
+    expect(mockGatewayAPI.metrics_gpus).not.toHaveBeenCalled()
+    expect(mockGatewayAPI.analysis_node_hotspots).not.toHaveBeenCalled()
   })
 })

@@ -160,13 +160,6 @@ function resetMetricsWindow() {
 
             <section class="ui-panel ui-section partition-metrics-panel" data-testid="partition-dashboard-charts">
               <div class="partition-metrics-toolbar">
-                <div class="partition-metrics-copy min-w-0">
-                  <p class="ui-page-kicker">{{ t('pages.partition.metrics.kicker') }}</p>
-                  <h2 class="ui-panel-title">{{ t('pages.partition.metrics.title') }}</h2>
-                  <p class="ui-panel-description mt-1.5">
-                    {{ t('pages.partition.metrics.description', { partition }) }}
-                  </p>
-                </div>
                 <MetricRangeSelector
                   class="partition-metrics-range"
                   :model-value="runtimeStore.dashboard.range"
@@ -211,13 +204,8 @@ function resetMetricsWindow() {
 .partition-metrics-toolbar {
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-start;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 0.85rem;
-}
-
-.partition-metrics-copy {
-  max-width: 34rem;
 }
 
 .partition-metrics-range {

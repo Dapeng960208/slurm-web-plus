@@ -57,6 +57,9 @@ const HISTORY_PAGE_SIZE = 500
 const selectedRange = ref<MetricRange>('hour')
 const customStart = ref('')
 const customEnd = ref('')
+const queueWaitRange = ref<MetricRange>('hour')
+const queueWaitCustomStart = ref('')
+const queueWaitCustomEnd = ref('')
 const queueWaitAggregation = ref<QueueWaitAggregation>('minute')
 const loading = ref(true)
 const refreshing = ref(false)
@@ -267,6 +270,23 @@ function resetCustomWindow() {
   renderRange('hour')
 }
 
+function renderQueueWaitRange(range: MetricRange) {
+  queueWaitRange.value = range
+  queueWaitCustomStart.value = ''
+  queueWaitCustomEnd.value = ''
+}
+
+function applyQueueWaitCustomWindow(window: DateTimeWindowQuery) {
+  queueWaitCustomStart.value = window.start
+  queueWaitCustomEnd.value = window.end
+}
+
+function resetQueueWaitCustomWindow() {
+  queueWaitCustomStart.value = ''
+  queueWaitCustomEnd.value = ''
+  renderQueueWaitRange('hour')
+}
+
 function setQueueWaitAggregation(nextAggregation: QueueWaitAggregation) {
   queueWaitAggregation.value = nextAggregation
 }
@@ -282,7 +302,7 @@ function rangeStartISO(range: MetricRange): string {
 }
 
 function resolvedHistoryWindowQuery(): DateTimeWindowQuery {
-  const customWindow = historyWindowQuery()
+  const customWindow = queueWaitHistoryWindowQuery()
   if (customWindow) {
     return {
       start: new Date(customWindow.start).toISOString(),
@@ -290,7 +310,7 @@ function resolvedHistoryWindowQuery(): DateTimeWindowQuery {
     }
   }
   return {
-    start: rangeStartISO(selectedRange.value),
+    start: rangeStartISO(queueWaitRange.value),
     end: new Date().toISOString()
   }
 }
@@ -300,6 +320,14 @@ function historyWindowQuery(): DateTimeWindowQuery | null {
   return {
     start: new Date(customStart.value).toISOString(),
     end: new Date(customEnd.value).toISOString()
+  }
+}
+
+function queueWaitHistoryWindowQuery(): DateTimeWindowQuery | null {
+  if (!queueWaitCustomStart.value || !queueWaitCustomEnd.value) return null
+  return {
+    start: new Date(queueWaitCustomStart.value).toISOString(),
+    end: new Date(queueWaitCustomEnd.value).toISOString()
   }
 }
 
@@ -522,17 +550,20 @@ watch(
       customStart.value = route.query.start
       customEnd.value = route.query.end
     }
+    queueWaitRange.value = selectedRange.value
+    queueWaitCustomStart.value = customStart.value
+    queueWaitCustomEnd.value = customEnd.value
   },
   { immediate: true }
 )
 
 watch(
-  () => `${selectedRange.value}/${customStart.value}/${customEnd.value}`,
+  () => `${queueWaitRange.value}/${queueWaitCustomStart.value}/${queueWaitCustomEnd.value}`,
   () => {
     queueWaitAggregation.value = inferQueueWaitAggregation({
-      range: selectedRange.value,
-      start: customStart.value,
-      end: customEnd.value
+      range: queueWaitRange.value,
+      start: queueWaitCustomStart.value,
+      end: queueWaitCustomEnd.value
     })
   },
   { immediate: true }
@@ -546,6 +577,23 @@ watch(
     startPolling()
   },
   { immediate: true }
+)
+
+watch(
+  () => `${cluster}/${queueWaitRange.value}/${queueWaitCustomStart.value}/${queueWaitCustomEnd.value}`,
+  () => {
+    if (!loading.value) {
+      waitSamplesUnavailable.value = false
+      loadCompletedHistoryJobs()
+        .then((payload) => {
+          historyJobs.value = payload
+        })
+        .catch(() => {
+          historyJobs.value = []
+          waitSamplesUnavailable.value = true
+        })
+    }
+  }
 )
 
 onUnmounted(() => {
@@ -818,16 +866,17 @@ onUnmounted(() => {
                     <div class="flex flex-wrap items-center justify-end gap-2">
                       <div data-testid="queue-wait-range-selector">
                         <MetricRangeSelector
-                          :model-value="selectedRange"
+                          :model-value="queueWaitRange"
                           :aria-label="t('pages.analysis.historical.selectRange')"
                           enable-custom-window
-                          :start-value="customStart"
-                          :end-value="customEnd"
+                          :start-value="queueWaitCustomStart"
+                          :end-value="queueWaitCustomEnd"
+                          :show-preset-buttons="false"
                           custom-button-label="common.labels.timeRange"
                           reset-label="common.metricRanges.lastHour"
-                          @update:model-value="renderRange"
-                          @apply-window="applyCustomWindow"
-                          @reset-window="resetCustomWindow"
+                          @update:model-value="renderQueueWaitRange"
+                          @apply-window="applyQueueWaitCustomWindow"
+                          @reset-window="resetQueueWaitCustomWindow"
                         />
                       </div>
                       <span class="ui-inline-field-label">

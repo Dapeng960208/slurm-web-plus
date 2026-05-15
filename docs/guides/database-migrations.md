@@ -34,12 +34,12 @@
 
 > revision 名称以 `slurmweb/alembic/versions/*.py` 为准；下述内容直接对应当前脚本行为。
 
-### 3.1 `20260420_0001`：基础表与作业快照分区
+### 3.1 `20260420_0001`：基础表与作业快照队列
 
 主要引入：
 
 - `users`（缓存 LDAP 用户信息与后续权限快照）
-- `job_snapshots`（历史作业快照，按 `submit_time` 做 RANGE 分区）
+- `job_snapshots`（历史作业快照，按 `submit_time` 做 RANGE 队列）
 - 索引：`idx_js_job_submit`、`idx_js_last_seen`、`idx_js_user_id` 等
 
 ### 3.2 `20260420_0002`：历史作业详情增强字段

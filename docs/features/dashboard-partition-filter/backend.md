@@ -1,4 +1,4 @@
-# Dashboard 分区筛选后端实现说明
+# Dashboard 队列筛选后端实现说明
 
 ## 1. 设计原则
 
@@ -70,7 +70,7 @@ metrics_db.request(metric, metric_range)
 
 ### 3.3 兼容目的
 
-这样做的目的不是掩盖底层未实现分区过滤，而是保证在多 Agent 并行开发、合并顺序不固定的情况下：
+这样做的目的不是掩盖底层未实现队列过滤，而是保证在多 Agent 并行开发、合并顺序不固定的情况下：
 
 - 新视图层可先合并。
 - 旧 metrics DB 实现不会因此报 `TypeError`。
@@ -83,8 +83,8 @@ metrics_db.request(metric, metric_range)
 
 ## 5. 风险与边界
 
-- 当前 `stats` 的分区过滤依赖底层 `slurmrestd.jobs(query=...)` 与 `nodes_unfiltered(query=...)` 返回的就是分区结果。
-- 当前 `metrics` 的分区过滤只在底层 `metrics_db.request` 真正支持该参数时才能生效。
+- 当前 `stats` 的队列过滤依赖底层 `slurmrestd.jobs(query=...)` 与 `nodes_unfiltered(query=...)` 返回的就是队列结果。
+- 当前 `metrics` 的队列过滤只在底层 `metrics_db.request` 真正支持该参数时才能生效。
 - 因为本轮不允许修改 metrics DB 核心实现，所以这里明确区分：
   - 接口契约已支持
   - 底层指标源是否已完整实现，需依赖后续或并行改动

@@ -65,7 +65,7 @@ Agent 缓存用于降低高频页面对 `slurmrestd` 和 metrics 数据库的重
 |---|---|---:|---|
 | `GET /jobs` | `jobs` | `cache.jobs=30` | 不带 query 时缓存全量实时作业；带 `users/states/accounts/qos/partitions` 时优先复用全量缓存并在 Agent 内存中过滤 |
 | `GET /stats` | `stats` | `cache.stats=60` | Dashboard / Analysis 统计摘要 |
-| `GET /stats?partition=<name>` | `stats-partition-<name>`，归类为 `stats` | `cache.stats=60` | 按分区独立缓存统计摘要 |
+| `GET /stats?partition=<name>` | `stats-partition-<name>`，归类为 `stats` | `cache.stats=60` | 按队列独立缓存统计摘要 |
 | `GET /analysis/node-hotspots?start=<start>&end=<end>` | `analysis-node-hotspots-<start>-<end>`，归类为 `analysis` | `cache.analysis=60` | 按时间窗独立缓存节点热点结果；接口内部只从持久化节点样本重建，不再回退到实时 Prometheus 查询 |
 
 新增配置项：

@@ -33,11 +33,11 @@
 
 已修复：
 
-- `DashboardView` 分区筛选改为按 `jobs/filter-partitions:view:*` 或 `resources/filter-partitions:view:*`
+- `DashboardView` 队列筛选改为按 `jobs/filter-partitions:view:*` 或 `resources/filter-partitions:view:*`
 - `NodeView` 节点作业轮询改为按 `jobs:view:*`
 - `JobsFiltersPanel` 的 `Accounts / QOS / Partitions` 筛选改为按对应 filter resource
 - `DashboardCharts` 改为按 `resources:view:*` 与 `jobs:view:*`
-- `ResourcesFiltersPanel` 的分区筛选改为按 `resources/filter-partitions:view:*`
+- `ResourcesFiltersPanel` 的队列筛选改为按 `resources/filter-partitions:view:*`
 
 影响：
 

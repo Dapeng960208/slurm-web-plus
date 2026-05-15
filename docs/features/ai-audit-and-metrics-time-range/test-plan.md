@@ -145,7 +145,7 @@ cd frontend
 npx vitest run tests/components/MetricRangeSelector.spec.ts tests/views/AssistantView.spec.ts tests/views/settings/SettingsAI.spec.ts tests/views/NodeView.spec.ts tests/views/UserAnalysisView.spec.ts tests/components/user/UserToolAnalysisChart.spec.ts tests/composables/GatewayAPI.spec.ts
 ```
 
-本轮集群分析、资源和分区详情定向验证：
+本轮集群分析、资源和队列详情定向验证：
 
 ```powershell
 cd frontend

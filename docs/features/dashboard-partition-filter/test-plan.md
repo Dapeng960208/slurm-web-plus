@@ -1,14 +1,14 @@
-# Dashboard 分区筛选接口测试计划
+# Dashboard 队列筛选接口测试计划
 
 ## 1. 测试目标
 
 验证 Dashboard 相关 Agent/Gateway 接口对 `partition` query 的契约行为：
 
-- Agent `stats` 按分区聚合。
-- Agent `metrics` 透传分区并保持旧签名兼容。
+- Agent `stats` 按队列聚合。
+- Agent `metrics` 透传队列并保持旧签名兼容。
 - Gateway 对 `stats` 与 `metrics` 原样透传 query。
-- 分区详情页图表复用同一套分区 query。
-- 作业与历史作业页面中的分区字段作为分区详情入口。
+- 队列详情页图表复用同一套队列 query。
+- 作业与历史作业页面中的队列字段作为队列详情入口。
 - 现有默认行为、权限和错误路径不回归。
 
 ## 2. Agent 测试点
@@ -19,7 +19,7 @@
 - `partition=debug` 时：
   - `slurmrestd.jobs(query={"partition": "debug"})` 被调用。
   - `slurmrestd.nodes_unfiltered(query={"partition": "debug"})` 被调用。
-  - 返回值使用分区结果重新计算 `jobs` 与 `resources`。
+  - 返回值使用队列结果重新计算 `jobs` 与 `resources`。
 
 ### 2.2 `metrics`
 
@@ -56,21 +56,20 @@
 
 ## 4. 前端测试点
 
-### 4.1 分区详情页
+### 4.1 队列详情页
 
 - `/:cluster/partitions/:partition` 页面显示实时图表区块。
 - 传给 dashboard 图表的 query 固定带当前 `partition`。
-- 分区详情页切换资源图表类型时，路由仍保持在 `partition`，不跳回 `dashboard`。
+- 队列详情页切换资源图表类型时，路由仍保持在 `partition`，不跳回 `dashboard`。
 - 顶部摘要卡片展示资源容量字段后，下方详情区不再重复展示节点数、总 CPU、已分配 CPU、总内存和 GPU。
 
-### 4.2 分区跳转入口
+### 4.2 队列跳转入口
 
-- `JobView` 的 summary strip 中 `partition` 可点击跳转到分区详情页。
-- `JobView` 的详情区 `partition` 字段使用统一分区芯片入口。
-- `JobHistoryView` 的 summary strip 中 `partition` 可点击跳转到分区详情页。
-- `JobsView` 列表中的 `partition` 列渲染为分区详情入口。
-- `JobsHistoryView` 列表中的 `partition` 列渲染为分区详情入口。
-- `ClusterAnalysisView` 的 `Partition Hotspots` 分区名称渲染为分区详情入口。
+- `JobView` 的连续详情列表中，`partition` 字段可点击跳转到队列详情页。
+- `JobHistoryView` 的连续详情列表中，`partition` 字段可点击跳转到队列详情页。
+- `JobsView` 列表中的 `partition` 列渲染为队列详情入口。
+- `JobsHistoryView` 列表中的 `partition` 列渲染为队列详情入口。
+- `ClusterAnalysisView` 的 `Partition Hotspots` 队列名称渲染为队列详情入口。
 
 ## 5. 自动化命令
 
@@ -87,4 +86,4 @@ npx vitest run tests/views/PartitionView.spec.ts tests/views/JobView.spec.ts tes
 
 ## 6. 手工关注点
 
-- 如果后续核心 `metrics_db.request` 真正升级为支持 `partition`，需要补充更低层测试验证指标源是否按分区过滤，而不仅是视图层透传。
+- 如果后续核心 `metrics_db.request` 真正升级为支持 `partition`，需要补充更低层测试验证指标源是否按队列过滤，而不仅是视图层透传。
