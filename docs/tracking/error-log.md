@@ -16,6 +16,11 @@
 - 现象：推送 `71fad74` 后，GitHub Actions `Frontend Static Analysis` 的 `Frontend ESLint` 失败，日志显示 `frontend/src/views/resources/ResourcesView.vue:305:23 error 'v-memo' directive does not work inside 'v-for' vue/valid-v-memo`。
 - 解决办法：按 CI 日志移除 Resources 节点表格这处不符合 `vue/valid-v-memo` 规则的行级 memo 写法，保留低动效样式、轮询让路和其他已通过 lint 的表格优化；同步更新发布跟踪，避免文档继续宣称 Resources 已启用该 memo。
 
+### 2026-05-15：前端性能 CI 续修提交推送到 GitHub 时 443 连接失败
+- 时间：2026-05-15
+- 现象：本地已完成 `92b414f fix(frontend): satisfy resources memo lint` 后，执行 `powershell -ExecutionPolicy Bypass -File scripts/push-and-watch-github-ci.ps1 -PollIntervalSeconds 30 -TimeoutMinutes 45` 在 `git push origin main` 阶段失败，远端返回 `Failed to connect to github.com port 443 after 21076 ms: Could not connect to server`，因此没有触发新的 GitHub Actions run。
+- 解决办法：保留本地提交并在 `docs/tracking/current-release.md` 记录 ahead 状态；网络恢复后继续使用同一仓库脚本推送并追踪 CI，不改用 ad hoc GitHub Actions 流程。
+
 ### 2026-05-15：shallowMount 自定义 RouterLink 插槽和 RouterLinkStub 断言限制
 - 时间：2026-05-15
 - 现象：为 `ClustersView` 增加“登出按钮不含 `backdrop-blur`”断言时，`shallowMount` 下 `RouterLink custom v-slot` 被 `RouterLinkStub` 替换，内部 `<button role="link">` 不会出现在 DOM；继续用 `getComponent(RouterLinkStub)` 也因当前 stub 以原生 `<router-link-stub>` 标签渲染而拿不到组件实例。

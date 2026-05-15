@@ -931,3 +931,17 @@
 - 推送结果：
   - 执行 `git push origin main` 失败，远端返回 `Failed to connect to github.com port 443 after 21084 ms: Could not connect to server`
   - 当前状态：本地 `main` 已包含本次合并结果，待网络恢复后重新推送到 `origin/main`
+
+- 2026-05-15：前端云桌面性能优化已推送首个提交，但 CI 续修提交推送被网络阻断。
+- 本轮实现与提交：
+  - `71fad74 fix(frontend): improve cloud desktop input performance` 已成功推送到 `origin/main`
+  - GitHub `Frontend Static Analysis` run `25918191705` 失败点为 `ResourcesView.vue` 中不合法的 `v-memo` 用法
+  - 已完成本地修复提交 `92b414f fix(frontend): satisfy resources memo lint`
+- 本轮已验证：
+  - `cd frontend && npx eslint src/views/resources/ResourcesView.vue`
+  - `cd frontend && npx eslint .`（仅既有 unused warning，退出码 0）
+  - `npm --prefix frontend run type-check`
+  - `cd frontend && npx vitest run tests/views/resources/ResourcesView.spec.ts`
+- 推送结果：
+  - 二次执行 `powershell -ExecutionPolicy Bypass -File scripts/push-and-watch-github-ci.ps1 -PollIntervalSeconds 30 -TimeoutMinutes 45` 在 `git push origin main` 阶段失败，远端返回 `Failed to connect to github.com port 443 after 21076 ms: Could not connect to server`
+  - 当前状态：本地 `main` 相对 `origin/main` ahead 1，包含 CI 续修提交 `92b414f`，待网络恢复后重新用仓库脚本推送并追踪 GitHub Actions
