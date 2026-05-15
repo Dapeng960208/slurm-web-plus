@@ -73,6 +73,17 @@ def _filter_jobs_for_owner(jobs: Iterable[dict], owner: str) -> list:
 
 
 class AIAgentInterfaceRegistry:
+    DEFAULT_QUERY_CATALOG_KEYS = (
+        "analysis/context",
+        "job",
+        "jobs/history",
+        "jobs/history/detail",
+        "node",
+        "node/metrics",
+        "node/metrics/history",
+        "user/tools/analysis",
+    )
+
     def __init__(self, app):
         self.app = app
         self._definitions: Dict[str, AIAgentInterfaceDefinition] = {}
@@ -80,6 +91,14 @@ class AIAgentInterfaceRegistry:
 
     def _register_definitions(self):
         for definition in (
+            AIAgentInterfaceDefinition(
+                key="analysis/context",
+                method="GET",
+                description="Get a compact AI-oriented cluster analysis context derived from the same evidence family used by the analysis workspace. Use this first for cluster status, congestion, capacity, wait-time, controller-health, and hotspot questions.",
+                arguments_description="No arguments.",
+                write=False,
+                handler=self._analysis_context,
+            ),
             AIAgentInterfaceDefinition(
                 key="stats",
                 method="GET",
@@ -581,6 +600,11 @@ class AIAgentInterfaceRegistry:
             },
         )
 
+    def _analysis_context(self, user, arguments: dict):
+        self._require_any(user, (("analysis", "view", "*"),))
+        payload = self.app.view_functions["analysis_context"]()
+        return self._result("analysis/context", payload.json)
+
     def _jobs(self, user, arguments: dict):
         scope = self._require_permission_scope(user, "jobs", "view")
         node = arguments.get("node")
@@ -962,7 +986,10 @@ class AIAgentInterfaceRegistry:
 
     def catalog(self, user) -> list[dict]:
         catalog = []
-        for definition in self._definitions.values():
+        for key in self.DEFAULT_QUERY_CATALOG_KEYS:
+            definition = self._definitions.get(key)
+            if definition is None:
+                continue
             catalog.append(
                 {
                     "key": definition.key,

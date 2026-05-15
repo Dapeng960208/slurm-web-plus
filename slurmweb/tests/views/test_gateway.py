@@ -610,6 +610,24 @@ class TestGatewayViews(TestGatewayBase):
         self.assertEqual(response.json, {"ok": True})
         self.assertEqual(mock_proxy_agent.call_args.args[:2], ("foo", "analysis/ping"))
 
+    @mock.patch("slurmweb.views.gateway.proxy_agent")
+    def test_analysis_context(self, mock_proxy_agent):
+        self.app_set_agents({"foo": fake_slurmweb_agent("foo")})
+        mock_proxy_agent.return_value = (
+            self.app.response_class(
+                response='{"score":72,"score_label":"stable","summary_cards":[]}',
+                status=200,
+                mimetype="application/json",
+            ),
+            200,
+        )
+
+        response = self.client.get("/api/agents/foo/analysis/context")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json["score_label"], "stable")
+        self.assertEqual(mock_proxy_agent.call_args.args[:2], ("foo", "analysis/context"))
+
     @mock.patch("slurmweb.views.gateway.aiohttp.ClientSession.get")
     def test_analysis_node_hotspots_forwards_window_to_agent(self, mock_get):
         foo = fake_slurmweb_agent("foo")

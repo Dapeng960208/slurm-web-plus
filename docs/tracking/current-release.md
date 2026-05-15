@@ -4,6 +4,8 @@
 
 本轮发布聚焦以下目标：
 
+- 为 AI 对话补齐面向集群状态问题的聚合分析上下文，避免模型默认请求大量低价值原始接口
+
 - 在前端落地中英文切换，优先覆盖登录页、共享导航、Settings、通知、分页和前端生成错误提示
 
 - 在现有业务页面补单对象管理能力，不做独立全量管理中心
@@ -56,6 +58,24 @@
 - 修复 `ClusterAnalysisView` 平均排队时间图的范围联动错误：卡片时间范围与聚合粒度现在独立于顶部全局时间范围
 
 ## 2. 已完成项
+
+- AI 集群状态分析聚合上下文已落地：
+  - Agent 新增 `GET /v{version}/analysis/context`
+  - Gateway 新增 `GET /api/agents/<cluster>/analysis/context`
+  - 新接口复用 `analysis` 页面同源的数据证据家族，但返回 AI 友好的压缩结构，只保留评分、摘要卡、容量、等待时间、pending reason、partition pressure、节点热点、控制器健康、调度核心诊断和推荐项
+  - `slurmweb.ai.agent_interfaces.AIAgentInterfaceRegistry` 默认查询目录已收口为：
+    - `analysis/context`
+    - `job`
+    - `jobs/history`
+    - `jobs/history/detail`
+    - `node`
+    - `node/metrics`
+    - `node/metrics/history`
+    - `user/tools/analysis`
+  - `jobs`、`nodes`、`partitions`、`qos`、`reservations`、`accounts`、`associations`、`users`、`user` 仍保留在 Agent interface 层，但不再出现在默认 AI 查询目录中
+  - AI system prompt 已新增“集群状态/拥塞/容量/等待/控制器健康/热点问题优先调用 `analysis/context`”约束
+  - 本轮定向验证已通过：
+    - `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/views/test_agent_operations.py slurmweb/tests/views/test_gateway.py slurmweb/tests/apps/test_ai_service.py`
 
 - Reservations / Dashboard / AI 对话 / Job 详情 / 账户加人收口已完成：
   - `slurmweb.slurmrestd.Slurmrestd` 已补 reservation create/update 共用的 payload normalization，统一接受 `users`、`groups`、`accounts`、`qos` 与 `allowed_partitions/allowedPartitions/AllowedPartitions`
