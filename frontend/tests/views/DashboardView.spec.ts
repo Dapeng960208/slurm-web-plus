@@ -84,6 +84,7 @@ describe('DashboardView.vue', () => {
     runtimeStore.currentCluster = runtimeStore.availableClusters[0]
     runtimeStore.dashboard.reset()
   })
+
   test('should display dashboard with metrics', () => {
     const wrapper = mount(DashboardView, {
       props: {
@@ -95,7 +96,6 @@ describe('DashboardView.vue', () => {
         }
       }
     })
-    // Check presence of metrics and values.
     expect(wrapper.findAll('.ui-stat-label').map((element) => element.text())).toStrictEqual([
       'Nodes',
       'Cores',
@@ -119,7 +119,8 @@ describe('DashboardView.vue', () => {
     )
     expect(wrapper.html()).toContain('dashboard-charts-stub')
   })
-  test('restores partition query and shows partition selector', async () => {
+
+  test('restores partition query and shows partition selector without redundant toolbar copy', async () => {
     await router.setQuery({ partition: 'gpu' })
 
     const wrapper = mount(DashboardView, {
@@ -137,7 +138,8 @@ describe('DashboardView.vue', () => {
 
     expect(runtimeStore.dashboard.partition).toBe('gpu')
     expect((wrapper.get('#dashboard-partition').element as HTMLSelectElement).value).toBe('gpu')
-    expect(wrapper.text()).toContain('Realtime Metrics')
+    expect(wrapper.text()).not.toContain('Realtime Metrics')
+    expect(wrapper.find('.ui-toolbar-copy').exists()).toBe(false)
     expect(wrapper.findAll('.ui-toolbar-field-label').map((node) => node.text())).toEqual([
       'Partition / Queue'
     ])
@@ -292,7 +294,6 @@ describe('DashboardView.vue', () => {
   })
 
   test('should not display charts when metrics are disabled', () => {
-    // Disable metrics on cluster foo
     runtimeStore.availableClusters[0].metrics = false
     const wrapper = mount(DashboardView, {
       props: {
@@ -304,9 +305,9 @@ describe('DashboardView.vue', () => {
         }
       }
     })
-    // Check absence of charts component
     expect(wrapper.html()).not.toContain('dashboard-charts-stub')
   })
+
   test('should display error when unable to get cluster stats', () => {
     mockClusterDataPoller.unable.value = true
     const wrapper = mount(DashboardView, {
@@ -319,7 +320,6 @@ describe('DashboardView.vue', () => {
         }
       }
     })
-    // Check error is displayed when data poller is unable to retrieved data.
     expect(wrapper.getComponent(ErrorAlert).text()).toContain(
       'Unable to retrieve statistics from cluster foo'
     )

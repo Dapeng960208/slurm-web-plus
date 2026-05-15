@@ -181,14 +181,9 @@ onBeforeMount(() => {
 </script>
 
 <template>
-  <div
-    :class="[
-      'border-b border-gray-200 sm:flex sm:items-center sm:justify-between dark:border-gray-700',
-      props.compact ? 'pb-3 pt-2' : 'pb-5 pt-16'
-    ]"
-  >
+  <div class="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 pb-3 dark:border-gray-700">
     <h3 class="text-base font-semibold text-gray-900 dark:text-gray-200">Resources Status</h3>
-    <div :class="[props.compact ? 'mt-2 text-right sm:mt-0' : 'mt-3 text-right sm:mt-0']">
+    <div class="text-right">
       <span class="ui-segmented-control">
         <button
           type="button"
@@ -234,7 +229,7 @@ onBeforeMount(() => {
       </span>
     </div>
   </div>
-  <ErrorAlert v-if="liveChart.metrics.unable.value" class="mt-4"
+  <ErrorAlert v-if="liveChart.metrics.unable.value"
     >Unable to retrieve resource metrics.</ErrorAlert
   >
   <div v-else :class="['ui-chart-shell', props.compact ? 'partition-chart-shell' : '']">

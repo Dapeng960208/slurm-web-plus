@@ -263,14 +263,6 @@ watch(
       <div class="ui-scroll-region min-h-0 flex-1 pr-1">
         <div class="ui-section-stack pb-2">
           <div class="ui-toolbar-strip">
-            <div class="ui-toolbar-copy min-w-0">
-              <p class="ui-toolbar-kicker">{{ t('pages.dashboard.toolbar.kicker') }}</p>
-              <h2 class="ui-panel-title">{{ t('pages.dashboard.toolbar.title') }}</h2>
-              <p class="ui-panel-description">
-                {{ t('pages.dashboard.toolbar.description') }}
-              </p>
-            </div>
-
             <div data-testid="dashboard-toolbar" class="ui-toolbar-fields">
               <label
                 v-if="canSelectPartition"

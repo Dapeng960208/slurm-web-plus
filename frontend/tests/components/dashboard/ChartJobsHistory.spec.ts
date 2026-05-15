@@ -32,6 +32,10 @@ describe('ChartJobsHistogram.vue', () => {
         cluster: 'foo'
       }
     })
+    expect(wrapper.text()).toContain('Jobs Queue')
+    expect(wrapper.classes()).not.toContain('pt-16')
+    expect(wrapper.classes()).not.toContain('pb-5')
+    expect(wrapper.classes()).not.toContain('mt-4')
     const placeholder = wrapper.get('.ui-chart-skeleton')
     const canvas = wrapper.get({ ref: 'chartCanvas' })
 
@@ -102,5 +106,17 @@ describe('ChartJobsHistogram.vue', () => {
     await flushPromises()
 
     expect(chart?.data.datasets).toHaveLength(0)
+  })
+
+  test('does not render legacy spacing utility classes', () => {
+    const wrapper = mount(ChartJobsHistogram, {
+      props: {
+        cluster: 'foo'
+      }
+    })
+
+    expect(wrapper.html()).not.toContain('pt-16')
+    expect(wrapper.html()).not.toContain('pb-5')
+    expect(wrapper.html()).not.toContain('mt-4')
   })
 })

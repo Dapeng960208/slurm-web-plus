@@ -37,6 +37,10 @@ describe('ChartJobsHistogram.vue', () => {
         cluster: 'foo'
       }
     })
+    expect(wrapper.text()).toContain('Resources Status')
+    expect(wrapper.classes()).not.toContain('pt-16')
+    expect(wrapper.classes()).not.toContain('pb-5')
+    expect(wrapper.classes()).not.toContain('mt-4')
     const placeholder = wrapper.get('.ui-chart-skeleton')
     const canvas = wrapper.get({ ref: 'chartCanvas' })
 
@@ -135,6 +139,21 @@ describe('ChartJobsHistogram.vue', () => {
 
     expect(useRuntimeStore().dashboard.chartResourcesType).toBe('memory')
     expect(mockClusterDataPoller.setCallback).toHaveBeenCalledWith('metrics_memory')
+  })
+
+  test('keeps resource type switch working without legacy spacing classes', async () => {
+    const wrapper = mount(ChartResourcesHistogram, {
+      props: {
+        cluster: 'foo'
+      }
+    })
+
+    await wrapper.findAll('button').find((button) => button.text() === 'Memory')!.trigger('click')
+    await flushPromises()
+
+    expect(mockClusterDataPoller.setCallback).toHaveBeenCalledWith('metrics_memory')
+    expect(wrapper.html()).not.toContain('pt-16')
+    expect(wrapper.html()).not.toContain('pb-5')
   })
 
   test('passes structured range and partition query on partition changes', async () => {
