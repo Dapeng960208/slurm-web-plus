@@ -211,8 +211,8 @@ describe('AccountsView.vue', () => {
     expect(mockGatewayAPI.save_account.mock.invocationCallOrder[0]).toBeLessThan(
       mockGatewayAPI.save_association.mock.invocationCallOrder[0]
     )
-    expect(mockAccountsPoller.setCallback).toHaveBeenCalledWith('accounts')
-    expect(mockAssociationsPoller.setCallback).toHaveBeenCalledWith('associations')
+    expect(mockAccountsPoller.refresh).toHaveBeenCalledOnce()
+    expect(mockAssociationsPoller.refresh).toHaveBeenCalledOnce()
     wrapper.unmount()
   })
 

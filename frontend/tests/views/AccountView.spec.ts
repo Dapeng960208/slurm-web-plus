@@ -848,4 +848,56 @@ describe('AccountView.vue', () => {
     expect(mockClusterDataPoller.refresh).toHaveBeenCalledTimes(1)
     wrapper.unmount()
   })
+
+  test('returns to accounts list after account delete succeeds', async () => {
+    useRuntimeStore().availableClusters = [
+      {
+        name: 'foo',
+        permissions: {
+          roles: [],
+          actions: [],
+          rules: ['accounts:view:*', 'accounts:delete:*']
+        },
+        racksdb: true,
+        infrastructure: 'foo',
+        metrics: true,
+        cache: true
+      }
+    ]
+    mockGatewayAPI.delete_account.mockResolvedValue({ operation: 'accounts.delete' })
+    mockClusterDataPoller.loaded.value = true
+    mockClusterDataPoller.initialLoading.value = false
+    mockClusterDataPoller.data.value = [
+      {
+        ...(associations as ClusterAssociation[])[0],
+        account: 'root',
+        user: '',
+        qos: ['normal']
+      }
+    ] as ClusterAssociation[]
+
+    const wrapper = mount(AccountView, {
+      attachTo: document.body,
+      props: {
+        cluster: 'foo',
+        account: 'root'
+      }
+    })
+    await flushPromises()
+
+    await wrapper.findAll('button').find((button) => button.text() === 'Delete')!.trigger('click')
+    await nextTick()
+    wrapper
+      .findAllComponents(ActionDialog)
+      .find((dialog) => dialog.props('title') === 'pages.account.dialogs.delete.title')!
+      .vm.$emit('submit', {})
+    await flushPromises()
+
+    expect(mockGatewayAPI.delete_account).toHaveBeenCalledWith('foo', 'root')
+    expect(wrapper.vm.$router.push).toHaveBeenCalledWith({
+      name: 'accounts',
+      params: { cluster: 'foo' }
+    })
+    wrapper.unmount()
+  })
 })

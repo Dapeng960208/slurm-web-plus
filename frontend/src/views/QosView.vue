@@ -47,7 +47,7 @@ const gateway = useGatewayAPI()
 const runtimeStore = useRuntimeStore()
 const { t } = useI18n()
 
-const { data, unable, loaded, setCluster } = useClusterDataPoller<ClusterQos[]>(
+const { data, unable, loaded, refresh, setCluster } = useClusterDataPoller<ClusterQos[]>(
   cluster,
   'qos',
   10000
@@ -184,6 +184,7 @@ async function createQos(payload: Record<string, string>) {
       ...qosLimitPayload(payload)
     })
     runtimeStore.reportInfo(t('pages.qos.notifications.createRequested', { name: payload.name || '' }))
+    await refresh()
     createOpen.value = false
   } catch (error: unknown) {
     operationError.value = error instanceof Error ? error.message : String(error)
@@ -206,6 +207,7 @@ async function updateQos(payload: Record<string, string>) {
     runtimeStore.reportInfo(
       t('pages.qos.notifications.updateRequested', { name: selectedQos.value.name })
     )
+    await refresh()
     editOpen.value = false
   } catch (error: unknown) {
     operationError.value = error instanceof Error ? error.message : String(error)
@@ -223,6 +225,7 @@ async function removeQos() {
     runtimeStore.reportInfo(
       t('pages.qos.notifications.deleteRequested', { name: selectedQos.value.name })
     )
+    await refresh()
     deleteOpen.value = false
   } catch (error: unknown) {
     operationError.value = error instanceof Error ? error.message : String(error)

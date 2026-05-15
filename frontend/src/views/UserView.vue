@@ -82,7 +82,7 @@ const sections = computed(() =>
   )
 )
 
-const { data, unable, loaded, initialLoading, setCluster } = useClusterDataPoller<ClusterAssociation[]>(
+const { data, unable, loaded, initialLoading, refresh, setCluster } = useClusterDataPoller<ClusterAssociation[]>(
   props.cluster,
   'associations',
   120000
@@ -199,6 +199,7 @@ async function saveUser(payload: Record<string, string>) {
       admin_level: payload.admin_level || undefined
     })
     runtimeStore.reportInfo(t('pages.user.notifications.updateRequested', { user: viewedUser.value }))
+    await refresh()
     editOpen.value = false
   } catch (error: unknown) {
     operationError.value = error instanceof Error ? error.message : String(error)
@@ -214,7 +215,9 @@ async function removeUser() {
   try {
     await gateway.delete_user(props.cluster, viewedUser.value)
     runtimeStore.reportInfo(t('pages.user.notifications.deleteRequested', { user: viewedUser.value }))
+    await refresh()
     deleteOpen.value = false
+    goBack()
   } catch (error: unknown) {
     operationError.value = error instanceof Error ? error.message : String(error)
   } finally {

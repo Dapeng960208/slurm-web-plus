@@ -45,7 +45,7 @@ const {
   unable: associationsUnable,
   loaded: associationsLoaded,
   initialLoading: associationsInitialLoading,
-  setCallback: refreshAssociations
+  refresh: refreshAssociations
 } = useClusterDataPoller<ClusterAssociation[]>(
   cluster,
   'associations',
@@ -56,7 +56,7 @@ const {
   unable: accountsUnable,
   loaded: accountsLoaded,
   initialLoading: accountsInitialLoading,
-  setCallback: refreshAccounts
+  refresh: refreshAccounts
 } = useClusterDataPoller<AccountDescription[]>(cluster, 'accounts', 120000)
 
 const expandedAccounts = ref<Set<string>>(new Set())
@@ -257,8 +257,7 @@ async function createAccount(payload: Record<string, string>) {
         throw new Error(t('pages.accounts.errors.createAssociationFailed'))
       }
     }
-    refreshAccounts('accounts')
-    refreshAssociations('associations')
+    await Promise.all([refreshAccounts(), refreshAssociations()])
     runtimeStore.reportInfo(
       t('pages.accounts.notifications.createRequested', { name: payload.name || '' })
     )

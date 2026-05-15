@@ -64,8 +64,21 @@
 - AI 默认接口目录改为按当前用户权限过滤；`user/tools/analysis` 工具分析能力保持默认可见并按当前用户自助查询，跨用户仍需全局分析权限
 - AI planner system message 已注入当前 `user.login` 与 cluster，第一人称请求默认绑定当前用户，不再要求用户额外说明用户名
 - 修复 `Reservations` 删除旧缓存预留时报 `Requested reservation is invalid/2053` 的问题：reservation 写操作会清理 `reservations` 缓存，前端写后立即刷新列表，删除已不存在预留按幂等结果处理
+- 审查并收口同类旧数据残留问题：节点写操作清理节点缓存，QOS/Accounts/User/Node 写后立即刷新或返回列表页
 
 ## 2. 已完成项
+
+- 管理写操作旧数据残留审查已完成：
+  - `SlurmrestdFilteredCached.node_update/node_delete` 已清理 `nodes`、`nodes-unfiltered` 与单节点缓存
+  - `QosView` 创建、编辑、删除成功后会立即刷新当前 QOS 列表
+  - `AccountsView` 创建账户后改为调用真实 `refresh()` 刷新 `/accounts` 与 `/associations`
+  - `NodeView` 更新节点成功后刷新当前节点详情
+  - `UserView` 编辑后刷新 associations，删除后刷新并返回上一级页面
+  - `AccountView` 删除账户成功后返回 `Accounts` 列表
+  - 本轮定向验证已通过：
+    - `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/slurmrestd/test_slurmrestd_filtered_cached.py`
+    - `cd frontend && npx vitest run tests/views/QosView.spec.ts tests/views/NodeView.spec.ts tests/views/UserView.spec.ts tests/views/AccountView.spec.ts tests/views/AccountsView.spec.ts`
+    - `npm --prefix frontend run type-check`
 
 - Reservations 删除旧缓存错误已完成：
   - `SlurmrestdFilteredCached` 已补 `reservation_create/update/delete` 缓存失效，写操作后清理 `CacheKey("reservations")`

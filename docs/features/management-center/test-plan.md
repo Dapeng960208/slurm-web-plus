@@ -59,6 +59,7 @@
 - reservation 的 `users/groups/accounts/qos` 数组别名会转换为 `slurmrestd` 所需 CSV string
 - reservation create/update/delete 会清理 `reservations` 缓存
 - reservation delete 遇到 Slurm `Requested reservation is invalid/2053` 时按幂等删除结果返回，不继续包装为 500
+- node update/delete 会清理 `nodes`、`nodes-unfiltered` 与单节点缓存
 - QOS 轻量 payload 会被包装为 `{ qos: [...] }`
 - QOS 写入缺少常用限制时，后端默认补 `MaxSubmitJobsPerUser=100`、`MaxJobsPerUser=10`、`MaxWallDurationPerJob=1440`
 - QOS 写入显式传入常用限制时，不被后端默认值覆盖
@@ -113,7 +114,10 @@
 - `AccountsView` 当 `/accounts` 已返回 `{ name, parent_account }` 但 `/associations` 暂无该账户的 account-level row 时，账户树仍应把子账户展示在父账户下
 - `AccountView` 当 `account/<name>` 已返回 `parent_account` 但 `/associations` 暂无当前账户的 account-level row 时，仍应识别该账户存在并展示父账户链路
 - `AccountView` 给子账户添加用户时，刷新后只要 `/associations` 出现目标 `{ account, user }` 即判定成功并关闭弹框
+- `AccountsView` 创建账户成功后调用真实 `refresh()` 刷新 `/accounts` 与 `/associations`
+- `AccountView` 删除账户成功后返回 `Accounts` 列表
 - `UserView` 编辑用户时提交 `default_qos` 和逗号分隔解析后的 `qos`
+- `UserView` 编辑用户成功后刷新 associations；删除用户成功后刷新并返回上一级页面
 - `ActionDialog` 支持共享搜索单选/多选字段，初始值可回填，并在提交时保持 CSV 序列化
 - `RemoteSearchSelect` 支持：
   - 用户远程搜索
@@ -127,6 +131,7 @@
 - `ClusterAnalysisView` 的平均排队时间图横轴按卡片当前时间范围展开，单点样本不会再显示为毫秒级 X 轴
 - `QosView` 创建 QOS 弹框预填 `MaxSubmitJobsPerUser=100`、`MaxJobsPerUser=10`、`MaxWallDurationPerJob=1-00:00:00`
 - `QosView` 提交创建 QOS 时把 `MaxWallDurationPerJob` 转换为分钟；非法 walltime 不调用写接口并在弹框显示错误
+- `QosView` 创建、编辑、删除 QOS 成功后主动刷新列表
 - `ReservationsView` 创建/编辑表单会提交 `groups`、`qos`、`allowed_partitions`
 - `ReservationsView` 在 `users / groups / accounts / qos / allowed_partitions` 全空时，只显示本地校验错误且不调用写接口
 - `ReservationsView` 创建、编辑、删除成功后会主动刷新列表，避免继续展示旧 reservation
@@ -143,6 +148,7 @@
 - `AdminLayoutView` 会在 `RouterView` 外层提供 `.ui-scroll-region`，保证 `admin/ai`、`admin/access-control`、`admin/cache`、`admin/ldap-users` 与管理员详情子页面在固定 shell 中仍可滚动
 - `ResourcesView` 不再渲染节点行尾 `Manage` / `Delete` 按钮，节点名称仍可跳转详情
 - `NodeView` 的 Edit Node 中 `state` 渲染为下拉框，并按所选状态提交 `update_node`
+- `NodeView` 更新节点成功后主动刷新当前节点详情
 
 对应重点：
 

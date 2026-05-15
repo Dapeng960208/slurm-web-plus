@@ -197,6 +197,7 @@ describe('QosView.vue', () => {
       max_jobs_per_user: 10,
       max_wall_duration_per_job: 8640
     })
+    expect(mockClusterDataPoller.refresh).toHaveBeenCalledOnce()
     wrapper.unmount()
   })
 
@@ -261,6 +262,46 @@ describe('QosView.vue', () => {
       max_jobs_per_user: 12,
       max_wall_duration_per_job: 8640
     })
+    expect(mockClusterDataPoller.refresh).toHaveBeenCalledOnce()
+    wrapper.unmount()
+  })
+
+  test('refreshes qos list after delete succeeds', async () => {
+    useRuntimeStore().availableClusters = [
+      {
+        name: 'foo',
+        permissions: {
+          roles: [],
+          actions: [],
+          rules: ['qos:view:*', 'qos:delete:*']
+        },
+        racksdb: true,
+        infrastructure: 'foo',
+        metrics: true,
+        cache: true
+      }
+    ]
+    mockGatewayAPI.delete_qos.mockResolvedValue({ operation: 'qos.delete' })
+    const wrapper = mount(QosView, {
+      attachTo: document.body,
+      props: {
+        cluster: 'foo'
+      }
+    })
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === i18n.global.t('pages.qos.actions.delete'))!
+      .trigger('click')
+    const dialog = wrapper
+      .findAllComponents(ActionDialog)
+      .find((component) => component.props('title') === 'pages.qos.dialogs.delete.title')!
+    dialog.vm.$emit('submit', {})
+    await flushPromises()
+
+    expect(mockGatewayAPI.delete_qos).toHaveBeenCalledWith('foo', qos[0].name)
+    expect(mockClusterDataPoller.refresh).toHaveBeenCalledOnce()
+    expect(dialog.props('open')).toBe(false)
     wrapper.unmount()
   })
 

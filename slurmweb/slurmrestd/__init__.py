@@ -1307,6 +1307,24 @@ class SlurmrestdFilteredCached(SlurmrestdFiltered):
         )
         return result
 
+    def node_update(self, node_name: str, payload: t.Dict[str, t.Any]):
+        result = super().node_update(node_name, payload)
+        self._invalidate_cached_keys(
+            CacheKey("nodes"),
+            CacheKey("nodes-unfiltered", "nodes"),
+            CacheKey(f"node-{node_name}", "individual-node"),
+        )
+        return result
+
+    def node_delete(self, node_name: str):
+        result = super().node_delete(node_name)
+        self._invalidate_cached_keys(
+            CacheKey("nodes"),
+            CacheKey("nodes-unfiltered", "nodes"),
+            CacheKey(f"node-{node_name}", "individual-node"),
+        )
+        return result
+
     def accounts_update(self, payload: t.Dict[str, t.Any]):
         result = super().accounts_update(payload)
         self._invalidate_cached_keys(CacheKey("accounts"), CacheKey("associations"))

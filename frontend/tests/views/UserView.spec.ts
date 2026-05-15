@@ -11,6 +11,7 @@ import InfoAlert from '@/components/InfoAlert.vue'
 import AccountBreadcrumb from '@/components/accounts/AccountBreadcrumb.vue'
 import PanelSkeleton from '@/components/PanelSkeleton.vue'
 import ActionDialog from '@/components/operations/ActionDialog.vue'
+import { i18n } from '@/plugins/i18n'
 
 const mockClusterDataPoller = getMockClusterDataPoller<ClusterAssociation[]>()
 const mockGatewayAPI = {
@@ -327,6 +328,65 @@ describe('UserView.vue', () => {
         qos: ['normal', 'debug']
       })
     )
+    expect(mockClusterDataPoller.refresh).toHaveBeenCalledOnce()
+    wrapper.unmount()
+  })
+
+  test('refreshes associations and leaves user detail after delete succeeds', async () => {
+    useRuntimeStore().availableClusters = [
+      {
+        name: 'foo',
+        permissions: {
+          roles: [],
+          actions: [],
+          rules: ['accounts:view:*', 'users-admin:delete:*', 'user/profile:view:*']
+        },
+        racksdb: true,
+        infrastructure: 'foo',
+        metrics: true,
+        cache: true,
+        user_metrics: false
+      }
+    ]
+    mockGatewayAPI.delete_user.mockResolvedValue({ operation: 'users.delete' })
+    mockClusterDataPoller.loaded.value = true
+    mockClusterDataPoller.data.value = [
+      {
+        ...(associations as ClusterAssociation[])[0],
+        account: 'root',
+        user: 'root'
+      }
+    ] as ClusterAssociation[]
+    const wrapper = mount(UserView, {
+      props: {
+        cluster: 'foo',
+        user: 'root'
+      },
+      global: {
+        stubs: {
+          UserAnalyticsPanels: analyticsPanelsStub
+        }
+      }
+    })
+    await flushPromises()
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === i18n.global.t('pages.user.actions.deleteUser'))!
+      .trigger('click')
+    await nextTick()
+    wrapper
+      .findAllComponents(ActionDialog)
+      .find((dialog) => dialog.props('title') === 'pages.user.dialogs.delete.title')!
+      .vm.$emit('submit', {})
+    await flushPromises()
+
+    expect(mockGatewayAPI.delete_user).toHaveBeenCalledWith('foo', 'root')
+    expect(mockClusterDataPoller.refresh).toHaveBeenCalledOnce()
+    expect(wrapper.vm.$router.push).toHaveBeenCalledWith({
+      name: 'accounts',
+      params: { cluster: 'foo' }
+    })
     wrapper.unmount()
   })
 })

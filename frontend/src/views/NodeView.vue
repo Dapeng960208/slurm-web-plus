@@ -307,6 +307,7 @@ async function saveNode(payload: Record<string, string>) {
       reason: payload.reason || undefined
     })
     runtimeStore.reportInfo(t('pages.node.notifications.updateRequested', { nodeName }))
+    await node.refresh()
     editOpen.value = false
   } catch (error: unknown) {
     operationError.value = error instanceof Error ? error.message : String(error)

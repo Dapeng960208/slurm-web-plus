@@ -385,6 +385,7 @@ describe('NodeView.vue', () => {
       state: 'UNDRAIN',
       reason: 'back online'
     })
+    expect(mockNodeDataPoller.refresh).toHaveBeenCalledOnce()
   })
 
   test('preserves mixed node status in edit dialog without turning it into a writable action', async () => {

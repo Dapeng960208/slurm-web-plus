@@ -32,6 +32,7 @@
   - `ResourcesView` 列表页只保留节点名称详情跳转，不在行尾显示 `Manage` / `Delete`
   - `NodeView` 详情页保留单节点更新和删除入口
   - `NodeView` 编辑节点时，`state` 使用下拉框选择：`DRAIN`、`RESUME`、`UNDRAIN`、`DOWN`、`IDLE`、`FAIL`、`FUTURE`
+  - 节点更新/删除后必须清理节点列表、未过滤节点列表和单节点缓存；节点更新成功后详情页立即刷新当前节点
 - `ReservationsView`
   - 创建
   - 更新
@@ -54,15 +55,18 @@
   - `AccountView` 在 account-level association 暂未刷新返回时，会使用 `account/<name>` 返回的 `parent_account` 与 `qos` 作为账户级信息兜底，避免刚创建的子账户被误判为无法添加用户
   - `Add user` 现在先确保用户实体存在，再补 association，并在刷新后校验关联真实可见才显示成功
   - `users.update` 写接口现在接受轻量单用户对象，并由后端统一归一化为 `{"users": [...]}` 后再写入 `slurmrestd`
+  - `AccountsView` 创建账户后必须刷新 `/accounts` 与 `/associations`；`AccountView` 删除账户成功后返回账户列表
 - `UserView`
   - SlurmDB 用户创建/更新
   - 用户删除
   - 编辑用户默认 QOS 与分配 QOS
   - `default_qos` 与分配 `qos` 已统一改为可搜索下拉
+  - 编辑用户成功后刷新 associations；删除用户成功后刷新并返回上一级页面
 - `QosView`
   - QoS 创建
   - QoS 更新
   - QoS 删除
+  - QOS 创建、更新、删除成功后立即刷新列表
 - `ClusterAnalysisView`
   - `Slurm ping`
   - `Slurm diag`

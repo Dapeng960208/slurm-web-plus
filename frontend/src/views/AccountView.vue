@@ -376,6 +376,7 @@ async function removeAccount() {
     await gateway.delete_account(cluster, account)
     runtimeStore.reportInfo(t('pages.account.notifications.deleteRequested', { account }))
     deleteOpen.value = false
+    router.push({ name: 'accounts', params: { cluster } })
   } catch (error: unknown) {
     operationError.value = error instanceof Error ? error.message : String(error)
   } finally {

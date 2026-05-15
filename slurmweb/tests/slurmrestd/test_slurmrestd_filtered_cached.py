@@ -173,3 +173,25 @@ class TestSlurmrestdFilteredCached(TestSlurmrestdBase):
                 mock.call(CacheKey("reservations")),
             ],
         )
+
+    def test_node_write_operations_invalidate_node_caches(self):
+        self.setup_slurmrestd("25.11.0", "0.0.44")
+        self.slurmrestd.service.delete = mock.Mock()
+        self.slurmrestd.request_json = mock.Mock(
+            return_value={"warnings": [], "errors": [], "nodes": []}
+        )
+
+        self.slurmrestd.node_update("cn1", {"state": "DRAIN"})
+        self.slurmrestd.node_delete("cn1")
+
+        self.assertEqual(
+            self.slurmrestd.service.delete.mock_calls,
+            [
+                mock.call(CacheKey("nodes")),
+                mock.call(CacheKey("nodes-unfiltered", "nodes")),
+                mock.call(CacheKey("node-cn1", "individual-node")),
+                mock.call(CacheKey("nodes")),
+                mock.call(CacheKey("nodes-unfiltered", "nodes")),
+                mock.call(CacheKey("node-cn1", "individual-node")),
+            ],
+        )

@@ -1,5 +1,21 @@
 # 最新功能
 
+## 本轮：管理写操作旧数据残留已继续收口
+
+本轮按 `Reservations` 删除旧缓存问题继续审查同类链路，重点覆盖写后缓存失效与前端写后刷新：
+
+- `NodeView` 更新节点状态后会立即刷新当前节点详情；后端 `node_update/node_delete` 会清理 `nodes`、`nodes-unfiltered` 和单节点缓存。
+- `QosView` 创建、编辑、删除 QOS 成功后会立即刷新列表，避免继续展示旧 QOS。
+- `AccountsView` 创建账户后改为调用真实 `refresh()` 同步刷新 `/accounts` 与 `/associations`，不再误用 `setCallback()` 触发异步重启。
+- `AccountView` 删除账户成功后返回账户列表，避免继续停留在已删除账户详情页。
+- `UserView` 编辑用户后刷新 associations；删除用户成功后刷新并返回上一级页面，避免旧用户详情继续可操作。
+
+本轮新增验证：
+
+- `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/slurmrestd/test_slurmrestd_filtered_cached.py`
+- `cd frontend && npx vitest run tests/views/QosView.spec.ts tests/views/NodeView.spec.ts tests/views/UserView.spec.ts tests/views/AccountView.spec.ts tests/views/AccountsView.spec.ts`
+- `npm --prefix frontend run type-check`
+
 ## 本轮：Reservations 删除旧缓存错误已修复
 
 本轮修复 `Reservations` 页面删除预留时可能出现 `Requested reservation is invalid/2053` 的问题：
