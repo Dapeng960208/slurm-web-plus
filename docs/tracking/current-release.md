@@ -953,3 +953,16 @@
 - 推送结果：
   - 二次执行 `powershell -ExecutionPolicy Bypass -File scripts/push-and-watch-github-ci.ps1 -PollIntervalSeconds 30 -TimeoutMinutes 45` 在 `git push origin main` 阶段失败，远端返回 `Failed to connect to github.com port 443 after 21076 ms: Could not connect to server`
   - 当前状态：本地 `main` 相对 `origin/main` ahead 1，包含 CI 续修提交 `92b414f`，待网络恢复后重新用仓库脚本推送并追踪 GitHub Actions
+
+- 2026-05-15：AI 工具能力与权限修复已完成本地提交，但推送 GitHub 仍被网络阻断。
+- 本轮实现与提交：
+  - `e171f99 fix(ai): expose nodes in default query catalog`
+  - `a75efb2 fix(ai): filter tool catalog by permissions`
+  - `076a6cf fix(ai): include current user context in planner`
+  - `a62fb0d fix(ai): retry empty generic tool calls internally`
+- 本轮已验证：
+  - `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/apps/test_ai_service.py`
+  - `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/views/test_agent_ai.py slurmweb/tests/views/test_gateway_ai.py`
+- 推送结果：
+  - 执行 `powershell -ExecutionPolicy Bypass -File scripts/push-and-watch-github-ci.ps1 -PollIntervalSeconds 30 -TimeoutMinutes 45` 在 `git push origin main` 阶段失败，远端返回 `Failed to connect to github.com port 443 after 21101 ms: Could not connect to server`
+  - 当前状态：本地 `main` 相对 `origin/main` ahead 6，包含前端 CI 续修与 AI 工具能力/权限修复提交，待网络恢复后重新使用仓库脚本推送并追踪 GitHub Actions

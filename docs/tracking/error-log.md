@@ -11,6 +11,11 @@
 
 ## 条目
 
+### 2026-05-15：AI 工具能力与权限修复提交推送到 GitHub 时 443 连接失败
+- 时间：2026-05-15
+- 现象：本地 `main` 已包含 AI `nodes` 默认目录、工具目录权限过滤、当前用户上下文注入和空通用工具调用内部重试等修复提交后，执行 `powershell -ExecutionPolicy Bypass -File scripts/push-and-watch-github-ci.ps1 -PollIntervalSeconds 30 -TimeoutMinutes 45` 在 `git push origin main` 阶段失败，远端返回 `Failed to connect to github.com port 443 after 21101 ms: Could not connect to server`，因此没有触发新的 GitHub Actions run。
+- 解决办法：保留本地提交并在 `docs/tracking/current-release.md` 记录 `main` 相对 `origin/main` ahead 6 的待推送状态；网络恢复后继续使用同一仓库脚本推送并追踪 CI，不改用临时 GitHub Actions 流程。
+
 ### 2026-05-15：Resources 表格在 `v-for` 内部节点使用 `v-memo` 被 GitHub Frontend Static Analysis 拦截
 - 时间：2026-05-15
 - 现象：推送 `71fad74` 后，GitHub Actions `Frontend Static Analysis` 的 `Frontend ESLint` 失败，日志显示 `frontend/src/views/resources/ResourcesView.vue:305:23 error 'v-memo' directive does not work inside 'v-for' vue/valid-v-memo`。
