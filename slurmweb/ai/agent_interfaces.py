@@ -768,6 +768,11 @@ class AIAgentInterfaceRegistry:
             return True
         return self._allowed(user, "jobs", "view", "*")
 
+    def _user_tools_analysis_allowed(self, user, username: str) -> bool:
+        if username == self._user_login(user):
+            return True
+        return self._user_analysis_allowed(user, username)
+
     def _user_metrics_history(self, user, arguments: dict):
         username = self._string_argument(arguments, "username")
         if not self._user_analysis_allowed(user, username):
@@ -787,8 +792,11 @@ class AIAgentInterfaceRegistry:
         )
 
     def _user_tools_analysis(self, user, arguments: dict):
-        username = self._string_argument(arguments, "username")
-        if not self._user_analysis_allowed(user, username):
+        username = arguments.get("username") or self._user_login(user)
+        if not username:
+            raise AIAgentInterfaceError(400, "username is required")
+        username = str(username)
+        if not self._user_tools_analysis_allowed(user, username):
             raise AIAgentInterfaceError(403, "Access not permitted")
         if not getattr(self.app, "user_metrics_enabled", False) or self.app.user_metrics_store is None:
             raise AIAgentInterfaceError(501, "User metrics is disabled")
@@ -985,11 +993,27 @@ class AIAgentInterfaceRegistry:
         )
         return self._result("qos/delete", payload, status_code=status_code)
 
+    def _catalog_visible(self, user, definition: AIAgentInterfaceDefinition) -> bool:
+        key = definition.key
+        if key == "analysis/context":
+            return self._allowed(user, "analysis", "view", "*")
+        if key == "job":
+            return self._allowed(user, "jobs", "view", "*") or self._allowed(user, "jobs", "view", "self")
+        if key in {"jobs/history", "jobs/history/detail"}:
+            return self._allowed(user, "jobs-history", "view", "*")
+        if key in {"nodes", "node", "node/metrics", "node/metrics/history"}:
+            return self._allowed(user, "resources", "view", "*")
+        if key == "user/tools/analysis":
+            return True
+        return False
+
     def catalog(self, user) -> list[dict]:
         catalog = []
         for key in self.DEFAULT_QUERY_CATALOG_KEYS:
             definition = self._definitions.get(key)
             if definition is None:
+                continue
+            if not self._catalog_visible(user, definition):
                 continue
             catalog.append(
                 {

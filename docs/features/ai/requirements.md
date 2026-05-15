@@ -90,6 +90,7 @@ AI 当前按数据库能力自动启用：
 - 系统提示词不再把“某个问题必须调用某个接口”写死，而是要求模型基于信息缺口自行选择接口
 - 但对于集群状态、拥塞、容量、排队等待、控制器健康和热点问题，系统提示词现在明确要求优先调用 `analysis/context`
 - 对“所有节点对比”“哪个节点负载较低”这类问题，系统提示词要求先调用 `nodes` 获取候选节点，再按需对具体节点调用 `node/metrics` 或 `node/metrics/history`
+- 默认接口目录会按当前用户权限过滤，避免模型看到当前用户不能执行的集群读接口；`user/tools/analysis` 作为自助工具分析能力保留可见，默认查询当前登录用户
 - 模型不得编造集群数据；若现有接口信息不足，必须明确说明不确定性
 
 当前首批对 AI 开放的查询接口包括：
@@ -164,6 +165,7 @@ AI 当前按数据库能力自动启用：
 
 - `analysis/context` 是集群状态问题的首选入口
 - `nodes` 用于回答需要横向比较节点或选择候选节点的问题，并接受 `limit`
+- `user/tools/analysis` 对 AI 用户默认可见；不传 `username` 时按当前登录用户查询，跨用户查询仍要求 `user/analysis:view:*` 或其他既有全局分析权限
 - `job` / `jobs/history` / `node` / `node/metrics*` 只作为后续钻取接口
 - `jobs`、`partitions`、`qos`、`reservations`、`accounts`、`associations`、`users`、`user` 仍保留在 Agent interface 层，但不再出现在默认 AI 查询目录中
 
@@ -175,6 +177,7 @@ AI 当前按数据库能力自动启用：
   - `admin` 默认的 `*:edit:*` 可通过 AI 执行对应 `edit` 类写接口
   - `delete`、`self` 等边界继续按当前用户实际规则与 owner-aware 逻辑判断
   - 普通用户若没有对应接口权限，AI 调用会收到拒绝响应，不能绕过接口层限制
+- `query_agent_interface` 只能调用只读接口，`mutate_agent_interface` 只能调用写接口；模型不能通过换 tool name 混用读写能力
 - AI 写接口的 payload 契约也必须与前端主表单保持一致，不能依赖 `slurmrestd` 适配层的隐藏默认值作为主流程：
   - `account/update` 的每个 account entry 必须显式提交 `name` 和 `organization`
   - `qos/update` 的每个 qos entry 必须显式提交 `name`、`max_submit_jobs_per_user`、`max_jobs_per_user`、`max_wall_duration_per_job`

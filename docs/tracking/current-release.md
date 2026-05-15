@@ -61,6 +61,7 @@
 - 修复 `ClusterAnalysisView` 页头右侧误展示额外时间组件的问题；平均排队时间图只保留卡片自身时间范围，并按该窗口展开横轴
 - 前端输入与弹窗交互性能优化：降低共享 surface 阴影和模糊成本，移除主要布局与弹窗遮罩的 `backdrop-blur`，`ActionDialog` 改为打开时锁定字段快照，`Admin > AI` 模型配置弹窗拆为独立表单组件；第二轮补充云桌面优化，降低轮询、图表和 Canvas 动画导致的持续重绘；GitHub CI 暴露的 Resources `v-memo` lint 回归已修复
 - 修复 AI 默认接口目录缺少 `nodes` 的问题：模型现在能先获取节点列表，再按需用 `node/metrics` 钻取具体节点负载
+- AI 默认接口目录改为按当前用户权限过滤；`user/tools/analysis` 工具分析能力保持默认可见并按当前用户自助查询，跨用户仍需全局分析权限
 
 ## 2. 已完成项
 
@@ -117,6 +118,8 @@
     - `user/tools/analysis`
   - `nodes` 已用于需要横向比较候选节点的问题；`jobs`、`partitions`、`qos`、`reservations`、`accounts`、`associations`、`users`、`user` 仍保留在 Agent interface 层，但不再出现在默认 AI 查询目录中
   - AI system prompt 已新增“集群状态/拥塞/容量/等待/控制器健康/热点问题优先调用 `analysis/context`”约束，并补充“比较所有节点/哪个节点负载低时先调用 `nodes`”的提示
+  - 默认目录现在按当前用户权限过滤；`user/tools/analysis` 作为放开的工具分析能力始终保留在 AI 目录中，不传 `username` 时默认查询当前登录用户，查询其他用户仍需要 `user/analysis:view:*` 或既有全局分析权限
+  - `query_agent_interface` 只能调用只读接口，`mutate_agent_interface` 只能调用写接口，避免模型通过通用工具名混用读写能力
   - 本轮定向验证已通过：
     - `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/views/test_agent_operations.py slurmweb/tests/views/test_gateway.py slurmweb/tests/apps/test_ai_service.py`
 

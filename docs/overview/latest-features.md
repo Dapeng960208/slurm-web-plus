@@ -70,6 +70,8 @@
   - `user/tools/analysis`
 - `nodes` 已重新放回 AI 默认目录，用于回答“哪个节点负载较低”等需要横向比较候选节点的问题；`jobs`、`partitions`、`qos`、`reservations`、`accounts`、`associations`、`users`、`user` 这些高噪音接口仍保留在 Agent interface 层，但不再出现在默认 AI 查询目录中
 - AI system prompt 已新增硬约束：遇到集群状态、拥塞、容量、排队等待、控制器健康或热点问题时，优先调用 `analysis/context`
+- AI 默认接口目录现在会按当前用户权限过滤；`user/tools/analysis` 作为工具分析能力对 AI 用户保持可见，不传 `username` 时只查当前登录用户，跨用户仍需全局分析权限
+- `query_agent_interface` 与 `mutate_agent_interface` 已按只读/写入分流，不能混用读写接口
 
 本轮新增验证：
 

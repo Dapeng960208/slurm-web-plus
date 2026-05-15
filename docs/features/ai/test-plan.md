@@ -91,6 +91,11 @@ npm --prefix frontend run test:unit
   - 无 `jobs:view:*|self`：不能通过 AI 读不允许访问的 live jobs
   - 无 `jobs-history:view:*`：不能通过 AI 读历史作业
   - 无 `resources:view:*`：不能通过 AI 读 nodes list / node detail / node metrics
+- 工具分析能力放开为自助分析：
+  - 有 `ai:view:*` 时，AI 默认目录仍应展示 `user/tools/analysis`
+  - 不传 `username` 时只能查询当前登录用户
+  - 查询其他用户仍需要 `user/analysis:view:*` 或既有全局分析权限
+- `query_agent_interface` 不能调用写接口，`mutate_agent_interface` 不能调用只读接口
 - 有写权限的用户可通过 AI 调对应写接口：
   - 例如 `admin` 默认 `*:edit:*` 可执行 `edit` 类 AI 写接口
   - `delete` 仍需显式 `*:delete:*` 或对应资源删除权限

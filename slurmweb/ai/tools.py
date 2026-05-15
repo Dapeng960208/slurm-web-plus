@@ -57,15 +57,27 @@ class AIToolRegistry:
         tool_name = str(tool_name or "").strip()
         arguments = arguments or {}
         if tool_name == "query_agent_interface":
+            interface_key = str(arguments.get("interface_key") or "").strip()
+            definition = self.interfaces.definition(interface_key)
+            if definition is not None and definition.write:
+                raise AIToolExecutionError(
+                    f"Interface {interface_key} is write-capable and must use mutate_agent_interface"
+                )
             return {
                 "permission": "dynamic-query",
-                "interface_key": str(arguments.get("interface_key") or "").strip(),
+                "interface_key": interface_key,
                 "interface_arguments": arguments.get("arguments") or {},
             }
         if tool_name == "mutate_agent_interface":
+            interface_key = str(arguments.get("interface_key") or "").strip()
+            definition = self.interfaces.definition(interface_key)
+            if definition is not None and not definition.write:
+                raise AIToolExecutionError(
+                    f"Interface {interface_key} is read-only and must use query_agent_interface"
+                )
             return {
                 "permission": "dynamic-mutate",
-                "interface_key": str(arguments.get("interface_key") or "").strip(),
+                "interface_key": interface_key,
                 "interface_arguments": arguments.get("arguments") or {},
             }
 

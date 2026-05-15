@@ -119,8 +119,9 @@ AI model
 - 已完成作业历史记录可保留 `used_memory_gb` 最大内存和 `used_cpu_cores_avg` 平均 CPU 使用核心数
 - 对用户工具资源推荐类问题，优先使用 `user/tools/analysis` 聚合证据，再视情况补查 `jobs/history`
 - 对集群状态、拥塞、容量、排队等待、控制器健康和热点问题，优先使用 `analysis/context` 聚合上下文，再按需钻取 `job`、`node` 或 `jobs/history`
-- 查询接口继续复用 Agent 已有资源规则和 owner-aware 逻辑
+- 查询接口继续复用 Agent 已有资源规则和 owner-aware 逻辑，默认目录按当前用户权限过滤；`user/tools/analysis` 作为自助工具分析能力对 AI 用户保持可见，但默认只查当前登录用户
 - AI 写接口不再额外走 `super-admin` 总闸，而是复用 Agent 接口层现有权限校验
+- AI 工具入口按读写分流：`query_agent_interface` 只能调用只读接口，`mutate_agent_interface` 只能调用写接口
 - 当接口层拒绝访问时，工具执行会把权限错误与状态码回传给模型和执行轨迹
 - 若模型错误回显内部 `tool_request` / `interface_key` / `arguments` envelope，AIService 不会把它透传为最终消息，而是继续要求模型输出合法 `final`
 - 普通对话页不展示模型、stream、persistence 等配置块；这些配置集中在 `/:cluster/admin/ai`
@@ -130,7 +131,7 @@ AI model
   - 接口只返回 `id`、`display_name`、`model`、`is_default`、`sort_order`
 - 普通会话查询默认过滤 `ai_conversations.deleted_at IS NOT NULL` 的逻辑删除记录
 - 管理员审计查询可列出所有用户会话，并包含逻辑删除记录
-- 默认暴露给模型的只读接口目录已经收口，但保留 `nodes` 用于横向比较节点；`jobs`、`partitions`、`qos`、`reservations`、`accounts`、`associations`、`users`、`user` 不放进 AI 默认查询目录
+- 默认暴露给模型的只读接口目录已经收口并按权限过滤，但保留 `nodes` 用于有 `resources:view:*` 用户横向比较节点；`user/tools/analysis` 默认可见并走当前用户自助查询；`jobs`、`partitions`、`qos`、`reservations`、`accounts`、`associations`、`users`、`user` 不放进 AI 默认查询目录
 
 执行轨迹链路同步变为：
 

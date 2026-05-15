@@ -397,6 +397,33 @@ class DummySlurmrestd:
         return 0
 
 
+class DummyUserMetricsStore:
+    def __init__(self):
+        self.tool_analysis_calls = []
+
+    def user_tool_analysis(self, username: str, start_time=None, end_time=None):
+        self.tool_analysis_calls.append(
+            {
+                "username": username,
+                "start_time": start_time,
+                "end_time": end_time,
+            }
+        )
+        return {
+            "window": {"start": start_time, "end": end_time},
+            "totals": {"completed_jobs": 1},
+            "tool_breakdown": [
+                {
+                    "tool": "python",
+                    "jobs": 1,
+                    "avg_memory_gb": 2.5,
+                    "avg_cpu_cores": 4,
+                    "avg_runtime_seconds": 60,
+                }
+            ],
+        }
+
+
 class TestAIService(TestCase):
     def setUp(self):
         self.config_store = InMemoryConfigStore()
@@ -425,6 +452,8 @@ class TestAIService(TestCase):
             slurmrestd=DummySlurmrestd(),
             node_metrics_db=None,
             jobs_store=mock.Mock(query=mock.Mock(return_value={"jobs": [], "total": 0})),
+            user_metrics_enabled=True,
+            user_metrics_store=DummyUserMetricsStore(),
         )
         self.user = SimpleNamespace(login="alice")
         self.service = AIService(
@@ -770,6 +799,67 @@ class TestAIService(TestCase):
             ],
         )
 
+    def test_tool_registry_catalog_filters_by_current_user_permissions_but_keeps_tool_analysis(self):
+        self.app.policy = DummyPolicy({"ai:view:*"})
+        self.service.tools.app = self.app
+
+        catalog = self.service.tools.interface_catalog(self.user)
+
+        self.assertEqual([item["key"] for item in catalog], ["user/tools/analysis"])
+
+    def test_user_tools_analysis_is_self_service_but_not_cross_user_without_permission(self):
+        self._create_model()
+        self.app.policy = DummyPolicy({"ai:view:*"})
+        self.service.tools.app = self.app
+
+        result = self.service.tools.execute(
+            self.user,
+            conversation_id=1,
+            tool_name="query_agent_interface",
+            arguments={"interface_key": "user/tools/analysis", "arguments": {}},
+            message_id=1,
+        )
+
+        self.assertEqual(result["interface_key"], "user/tools/analysis")
+        self.assertEqual(self.app.user_metrics_store.tool_analysis_calls[-1]["username"], "alice")
+
+        with self.assertRaises(AIToolPermissionError):
+            self.service.tools.execute(
+                self.user,
+                conversation_id=1,
+                tool_name="query_agent_interface",
+                arguments={"interface_key": "user/tools/analysis", "arguments": {"username": "bob"}},
+                message_id=1,
+            )
+
+        self.app.policy = DummyPolicy({"ai:view:*", "user/analysis:view:*"})
+        self.service.tools.app = self.app
+
+        result = self.service.tools.execute(
+            self.user,
+            conversation_id=1,
+            tool_name="query_agent_interface",
+            arguments={"interface_key": "user/tools/analysis", "arguments": {"username": "bob"}},
+            message_id=1,
+        )
+
+        self.assertEqual(result["interface_key"], "user/tools/analysis")
+        self.assertEqual(self.app.user_metrics_store.tool_analysis_calls[-1]["username"], "bob")
+
+    def test_user_metrics_history_still_requires_user_analysis_permission(self):
+        self._create_model()
+        self.app.policy = DummyPolicy({"ai:view:*"})
+        self.service.tools.app = self.app
+
+        with self.assertRaises(AIToolPermissionError):
+            self.service.tools.execute(
+                self.user,
+                conversation_id=1,
+                tool_name="query_agent_interface",
+                arguments={"interface_key": "user/metrics/history", "arguments": {"username": "alice"}},
+                message_id=1,
+            )
+
     def test_query_interface_rejects_unsupported_interface(self):
         self._create_model()
 
@@ -785,6 +875,31 @@ class TestAIService(TestCase):
         self.assertEqual(self.conversation_store.tool_calls[-1]["tool_name"], "query_agent_interface")
         self.assertEqual(self.conversation_store.tool_calls[-1]["interface_key"], "unsupported")
         self.assertEqual(self.conversation_store.tool_calls[-1]["status"], "error")
+
+    def test_tool_registry_rejects_read_write_tool_mismatch(self):
+        self._create_model()
+
+        with self.assertRaises(AIToolExecutionError) as query_ctx:
+            self.service.tools.execute(
+                self.user,
+                conversation_id=1,
+                tool_name="query_agent_interface",
+                arguments={"interface_key": "job/cancel", "arguments": {"job_id": 123}},
+                message_id=1,
+            )
+
+        self.assertIn("must use mutate_agent_interface", str(query_ctx.exception))
+
+        with self.assertRaises(AIToolExecutionError) as mutate_ctx:
+            self.service.tools.execute(
+                self.user,
+                conversation_id=1,
+                tool_name="mutate_agent_interface",
+                arguments={"interface_key": "nodes", "arguments": {}},
+                message_id=1,
+            )
+
+        self.assertIn("must use query_agent_interface", str(mutate_ctx.exception))
 
     def test_write_interface_requires_matching_user_permission(self):
         self._create_model()
