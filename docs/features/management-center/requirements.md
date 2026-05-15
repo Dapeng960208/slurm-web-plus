@@ -44,6 +44,7 @@
   - 账户删除
   - account-user association 增加用户、编辑 QOS/default QOS、删除用户关联
   - `Add user` 现在先确保用户实体存在，再补 association，并在刷新后校验关联真实可见才显示成功
+  - `users.update` 写接口现在接受轻量单用户对象，并由后端统一归一化为 `{"users": [...]}` 后再写入 `slurmrestd`
 - `UserView`
   - SlurmDB 用户创建/更新
   - 用户删除
@@ -56,6 +57,7 @@
   - `Slurm ping`
   - `Slurm diag`
   - `hour/day/week` 时间范围切换
+  - 平均排队时间图使用独立时间范围与独立聚合粒度，不再跟顶部全局时间范围绑定
   - 内存容量详情按 GB 展示，评分与百分比仍使用原始 MB 数值
 - `DashboardView`
   - 删除顶部工具条左侧“实时指标”局部标题、副标题和说明文案

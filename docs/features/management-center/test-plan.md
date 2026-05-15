@@ -51,6 +51,8 @@
 - `DELETE` 带 body
 - `supports_write_operations()` 对 `0.41-0.44` 返回 true
 - `supports_write_operations()` 对 `0.39-0.40` 返回 false
+- user 轻量 payload 会被包装为 `{ users: [...] }`
+- user 写入中的空字符串字段会在后端归一化时剔除，避免直接透传到 `slurmrestd`
 - reservation create/update payload normalization 统一覆盖创建与更新路径
 - `allowed_partitions` / `allowedPartitions` / `AllowedPartitions` 会映射到 reservation 写入字段 `partition`
 - reservation 的 `users/groups/accounts/qos` 数组别名会转换为 `slurmrestd` 所需 CSV string
@@ -105,6 +107,9 @@
 - `AccountView` 在 `refreshAssociations()` 后若仍看不到目标 `{ account, user }`，必须提示失败且不能显示成功 toast
 - `AccountView` 删除 association 时只提交选中 `account` 与 `user`，不携带空 `qos/default` 字段
 - `UserView` 编辑用户时提交 `default_qos` 和逗号分隔解析后的 `qos`
+- `ClusterAnalysisView` 的平均排队时间卡片切换自身时间范围时，会重新请求 `jobs_history`
+- `ClusterAnalysisView` 的平均排队时间卡片切换自身时间范围时，不会重拉 metrics 与 node hotspots
+- `ClusterAnalysisView` 顶部全局时间范围变化时，不会覆盖卡片已手动选择的独立时间范围
 - `QosView` 创建 QOS 弹框预填 `MaxSubmitJobsPerUser=100`、`MaxJobsPerUser=10`、`MaxWallDurationPerJob=1-00:00:00`
 - `QosView` 提交创建 QOS 时把 `MaxWallDurationPerJob` 转换为分钟；非法 walltime 不调用写接口并在弹框显示错误
 - `ReservationsView` 创建/编辑表单会提交 `groups`、`qos`、`allowed_partitions`

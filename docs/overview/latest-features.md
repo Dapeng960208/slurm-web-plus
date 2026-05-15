@@ -1,5 +1,25 @@
 # 最新功能
 
+## 本轮：账户加用户写契约与集群分析平均排队时间独立时间范围已修复
+
+本轮围绕两个已暴露的问题继续收口：
+
+- `Account / User`
+  - `slurmweb.slurmrestd.Slurmrestd.users_update()` 现在会把轻量单用户对象统一归一化为 `{"users": [...]}` 再写入 `slurmrestd`
+  - 空字符串字段会在归一化阶段剔除，避免把空 `default_account/default_qos/description` 继续透传到底层 schema
+  - `AccountView` 的 `Add user` 固定链路保持不变：`save_user -> save_association -> refreshAssociations() -> 写后校验`
+  - `UserView` 编辑用户仍继续提交轻量 payload，但不再依赖调用方自己手工拼 `users` 包装结构
+- `Cluster Analysis`
+  - 平均排队时间图的时间范围与聚合粒度现在完全由卡片自身控制，不再跟顶部全局时间范围绑定
+  - 卡片时间范围切换时会重新请求 `jobs_history`
+  - 卡片聚合粒度切换时会基于当前历史样本立即重算 `minute / hour / day` bucket
+  - 顶部全局时间范围仍只影响 metrics / node hotspots / 页面级分析摘要，不会回写覆盖卡片已经手动选择的独立时间范围
+
+本轮新增验证：
+
+- `.venv\Scripts\python -m pytest slurmweb/tests/slurmrestd/test_slurmrestd_write_operations.py`
+- `cd frontend && npm exec vitest run tests/views/AccountView.spec.ts tests/views/UserView.spec.ts tests/views/ClusterAnalysisView.spec.ts`
+
 ## 本轮：Reservations / Dashboard / AI 对话 / Job 详情 / 账户加人已统一收口
 
 本轮围绕 5 个已暴露的问题做了一次集中修复，覆盖 reservation 写入契约、dashboard 留白、AI 对话模型选择、作业详情样式，以及 account 下加用户的假成功问题：

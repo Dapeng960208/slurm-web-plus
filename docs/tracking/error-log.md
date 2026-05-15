@@ -11,6 +11,11 @@
 
 ## 条目
 
+### 2026-05-15：账户下添加用户时 `/users` 写接口会因缺少 `users` 包装字段被 slurmrestd 拒绝
+- 时间：2026-05-15
+- 现象：在 `AccountView` 向账户下添加用户时，前端已经先调用 `save_user` 再调用 `save_association`，但 `slurmrestd` 返回 `Missing required field 'users' in dictionary`，导致第一步写用户实体直接失败
+- 解决办法：在 `slurmweb.slurmrestd.Slurmrestd.users_update()` 增加和 `accounts/qos/reservations/associations` 同级的 payload normalization，统一接受轻量单用户对象并归一化为 `{"users": [...]}`；同时剔除空字符串字段，避免把无效空值继续透传到底层 schema
+
 ### 2026-05-14：给无关联信息用户加到账户下时可能出现“接口成功但页面无关联”
 - 时间：2026-05-14
 - 现象：在 `AccountView` 给一个此前没有任何 association、甚至没有 SlurmDB 用户实体信息的用户加到账户下时，前端和接口都可能显示成功，但刷新后的 `associations` 里仍看不到目标 `{ account, user }` 关系，页面上也不会真实挂到账户节点下
