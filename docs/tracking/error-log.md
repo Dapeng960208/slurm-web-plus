@@ -11,6 +11,11 @@
 
 ## 条目
 
+### 2026-05-15：Resources 表格在 `v-for` 内部节点使用 `v-memo` 被 GitHub Frontend Static Analysis 拦截
+- 时间：2026-05-15
+- 现象：推送 `71fad74` 后，GitHub Actions `Frontend Static Analysis` 的 `Frontend ESLint` 失败，日志显示 `frontend/src/views/resources/ResourcesView.vue:305:23 error 'v-memo' directive does not work inside 'v-for' vue/valid-v-memo`。
+- 解决办法：按 CI 日志移除 Resources 节点表格这处不符合 `vue/valid-v-memo` 规则的行级 memo 写法，保留低动效样式、轮询让路和其他已通过 lint 的表格优化；同步更新发布跟踪，避免文档继续宣称 Resources 已启用该 memo。
+
 ### 2026-05-15：shallowMount 自定义 RouterLink 插槽和 RouterLinkStub 断言限制
 - 时间：2026-05-15
 - 现象：为 `ClustersView` 增加“登出按钮不含 `backdrop-blur`”断言时，`shallowMount` 下 `RouterLink custom v-slot` 被 `RouterLinkStub` 替换，内部 `<button role="link">` 不会出现在 DOM；继续用 `getComponent(RouterLinkStub)` 也因当前 stub 以原生 `<router-link-stub>` 标签渲染而拿不到组件实例。

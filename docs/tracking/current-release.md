@@ -59,7 +59,7 @@
 - 修复创建 `test` 等子账户后父子展示和添加用户关联不一致的问题：创建时补 account-level association，账户树与详情页在 association 暂未刷新时使用 `/accounts` 的 `parent_account` 兜底
 - 修复 `ClusterAnalysisView` 平均排队时间图的范围联动错误：卡片时间范围与聚合粒度现在独立于顶部全局时间范围
 - 修复 `ClusterAnalysisView` 页头右侧误展示额外时间组件的问题；平均排队时间图只保留卡片自身时间范围，并按该窗口展开横轴
-- 前端输入与弹窗交互性能优化：降低共享 surface 阴影和模糊成本，移除主要布局与弹窗遮罩的 `backdrop-blur`，`ActionDialog` 改为打开时锁定字段快照，`Admin > AI` 模型配置弹窗拆为独立表单组件；第二轮补充云桌面优化，降低轮询、图表和 Canvas 动画导致的持续重绘
+- 前端输入与弹窗交互性能优化：降低共享 surface 阴影和模糊成本，移除主要布局与弹窗遮罩的 `backdrop-blur`，`ActionDialog` 改为打开时锁定字段快照，`Admin > AI` 模型配置弹窗拆为独立表单组件；第二轮补充云桌面优化，降低轮询、图表和 Canvas 动画导致的持续重绘；GitHub CI 暴露的 Resources `v-memo` lint 回归已修复
 
 ## 2. 已完成项
 
@@ -76,7 +76,7 @@
     - `ResourcesCanvas` 移除 loading shimmer 的 `requestAnimationFrame` 循环，资源拓扑加载后保持静态绘制
     - 全局 CSS 增加 `prefers-reduced-motion: reduce` 降级，禁用骨架屏动画、长 transition 和 transform 动效
   - 第三轮大表与剩余视觉热点优化已完成：
-    - Jobs、Resources、QOS、Admin AI 配置表与审计表行级增加 `v-memo`，父页面输入、刷新状态或过滤状态变化时可跳过未变行 patch
+    - Jobs、QOS、Admin AI 配置表与审计表行级增加 `v-memo`，父页面输入、刷新状态或过滤状态变化时可跳过未变行 patch；Resources 列表保持低动效样式和展开区 hover 位移收敛，但取消会触发 `vue/valid-v-memo` 的表格行 memo 写法
     - 通知条与 Jobs 历史排序下拉移除剩余 `backdrop-blur`，并降低阴影成本
     - 常用链接、用户菜单项、详情卡、资源展开节点卡片不再使用 hover 位移或 scale，保留颜色、边框和阴影反馈
     - 集群入口页右上角操作按钮移除残留 `backdrop-blur`，账户树展开图标取消旋转过渡
@@ -92,6 +92,11 @@
     - `cd frontend && npx vitest run tests/views/ClustersView.spec.ts tests/components/accounts/AccountTreeNode.spec.ts`
     - `cd frontend && npx vitest run tests/composables/DataPoller.spec.ts`
     - `npm --prefix frontend run type-check`
+    - `powershell -ExecutionPolicy Bypass -File scripts/push-and-watch-github-ci.ps1 -PollIntervalSeconds 30 -TimeoutMinutes 45` 已成功推送 `71fad74`，但首次 GitHub `Frontend Static Analysis` 在 `ResourcesView.vue` 的 `vue/valid-v-memo` 上失败；本地已按 CI 日志修正
+    - `cd frontend && npx eslint src/views/resources/ResourcesView.vue`
+    - `cd frontend && npx eslint .`（仅既有 unused warning，退出码 0）
+    - `npm --prefix frontend run type-check`
+    - `cd frontend && npx vitest run tests/views/resources/ResourcesView.spec.ts`
   - 残留说明：
     - `JobsView` 定向测试仍会输出既有 Vue `inject()` warning，当前不影响断言通过
 

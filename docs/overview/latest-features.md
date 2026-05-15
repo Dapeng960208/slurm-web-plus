@@ -10,7 +10,7 @@
 - `ActionDialog` 打开时会锁定字段快照，输入期间不再因父页面内联 `fields` 数组反复创建而重置或重算字段结构。
 - `Admin > AI` 模型配置弹窗已拆成独立 `SettingsAIConfigModal` 组件，表单输入状态与配置表、审计表隔离，提交 payload 与原有接口契约保持不变。
 - 面向云桌面浏览器继续降低实时页面成本：轮询返回内容未变化时不再替换响应式数据引用，Chart.js 更新统一走无动画路径，资源拓扑 Canvas 移除 loading shimmer 帧循环，并在系统 `prefers-reduced-motion` 下禁用骨架屏和交互动效。
-- 第三轮继续收敛大表渲染和剩余视觉热点：Jobs、Resources、QOS、Admin AI 表格行增加 `v-memo`，通知和历史排序浮层移除剩余 `backdrop-blur`，常用链接、菜单项和详情卡不再使用 hover 位移动效。
+- 第三轮继续收敛大表渲染和剩余视觉热点：Jobs、QOS、Admin AI 表格行增加 `v-memo`，通知和历史排序浮层移除剩余 `backdrop-blur`，常用链接、菜单项和详情卡不再使用 hover 位移动效；Resources 列表保留低动效样式，但未启用会被 ESLint 拦截的表格行 `v-memo` 写法。
 - 第三轮补充收尾：云桌面入口页按钮移除残留 `backdrop-blur`，账户树展开图标取消旋转动效，仅保留颜色和层级反馈。
 - 第四轮继续降低输入期间的后台干扰：自动轮询在文本输入聚焦时会短暂让路，避免焦点输入时被后台刷新打断，手动刷新仍保持立即执行。
 

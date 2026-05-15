@@ -302,7 +302,7 @@ watch(totalPages, (newLastPage) => {
                 class="divide-y divide-gray-200 text-sm text-gray-500 dark:divide-gray-700 dark:text-gray-300"
               >
                 <template v-for="node in pagedFoldedNodes" :key="node.name">
-                  <tr v-memo="[node, foldedNodesShow[node.name]]">
+                  <tr>
                     <td class="w-4">
                       <button
                         v-if="node.number > 1"
