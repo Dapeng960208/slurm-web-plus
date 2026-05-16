@@ -1008,3 +1008,13 @@
 - 推送结果：
   - 执行 `powershell -ExecutionPolicy Bypass -File scripts/push-and-watch-github-ci.ps1 -PollIntervalSeconds 30 -TimeoutMinutes 45` 在 `git push origin main` 阶段失败，远端返回 `Failed to connect to github.com port 443 after 21050 ms: Could not connect to server`
   - 当前状态：本地 `main` 包含本次同类审查修复提交，待网络恢复后重新使用仓库脚本推送并追踪 GitHub Actions
+
+- 2026-05-16：图表加载占位视觉优化已完成本地提交，但推送 GitHub 仍被网络阻断。
+- 本轮实现与提交：
+  - `13d0391 fix(frontend): refine chart loading skeleton`
+- 本轮已验证：
+  - `cd frontend && npx vitest run tests/components/ChartSkeleton.spec.ts tests/components/dashboard/ChartResourcesHistory.spec.ts tests/components/dashboard/ChartJobsHistory.spec.ts tests/components/settings/SettingsCacheMetrics.spec.ts`
+  - `npm --prefix frontend run type-check`
+- 推送结果：
+  - 执行 `powershell -ExecutionPolicy Bypass -File scripts/push-and-watch-github-ci.ps1 -PollIntervalSeconds 30 -TimeoutMinutes 45` 在 `git push origin main` 阶段失败，远端返回 `Failed to connect to github.com port 443 after 21318 ms: Could not connect to server`
+  - 当前状态：本地 `main` 相对 `origin/main` ahead 3，包含 `5cce3e4`、`cf3e522`、`13d0391`，待网络恢复后重新使用仓库脚本推送并追踪 GitHub Actions

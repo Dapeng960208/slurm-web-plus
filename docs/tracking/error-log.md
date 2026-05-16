@@ -516,6 +516,16 @@
 - 现象：排查缓存命中率时执行包含 `config` 路径的 `rg` 命令，当前仓库没有该目录，PowerShell 返回 `rg: config: 系统找不到指定的文件。 (os error 2)` 并使命令整体失败。
 - 解决办法：后续跨路径搜索前先用 `rg --files` 或 `Test-Path` 确认目录存在，或者只列出已确认存在的 `conf`、`docs`、`slurmweb` 等路径。
 
+### 2026-05-16：读取 `github-ci-autofix` skill 时误用 `.system` 路径
+- 时间：2026-05-16
+- 现象：执行 `Get-Content C:\Users\guojianpeng\.codex\skills\.system\github-ci-autofix\SKILL.md` 失败，提示路径不存在。
+- 解决办法：按会话给出的实际 skill 路径读取 `C:\Users\guojianpeng\.codex\skills\github-ci-autofix\SKILL.md`；后续先以 skills 列表中的路径为准，不手工补 `.system` 段。
+
+### 2026-05-16：通过 `push-and-watch-github-ci.ps1` 推送图表 skeleton 修复时 HTTPS 连接失败
+- 时间：2026-05-16
+- 现象：执行 `powershell -ExecutionPolicy Bypass -File scripts\push-and-watch-github-ci.ps1 -PollIntervalSeconds 30 -TimeoutMinutes 45` 时，脚本在 `git push origin main` 阶段失败，返回 `Failed to connect to github.com port 443 after 21318 ms: Could not connect to server`。
+- 解决办法：本地图表 skeleton 修复提交 `13d0391` 已完成；由于失败发生在 push 阶段，远端未触发 GitHub Actions run。待网络恢复后继续使用同一仓库脚本推送并追踪 CI。
+
 ### 2026-05-06：AI 对话页输入框脱离左侧聊天列，流式对话时面板整体下移
 - 时间：2026-05-06
 - 现象：左侧聊天区没有完整撑满工作区宽度，输入框脱离左侧列；流式回复和 trace 更新时，对话面板会整体下移
