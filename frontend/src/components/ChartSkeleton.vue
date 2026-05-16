@@ -23,17 +23,18 @@ const { t } = useI18n()
 
 <template>
   <div class="ui-chart-skeleton" role="img" :aria-label="t(label)">
-    <span class="ui-chart-skeleton-bar ui-chart-skeleton-bar-1"></span>
-    <span class="ui-chart-skeleton-bar ui-chart-skeleton-bar-2"></span>
-    <span class="ui-chart-skeleton-bar ui-chart-skeleton-bar-3"></span>
-    <span class="ui-chart-skeleton-bar ui-chart-skeleton-bar-4"></span>
-    <span class="ui-chart-skeleton-bar ui-chart-skeleton-bar-5"></span>
-    <span class="ui-chart-skeleton-bar ui-chart-skeleton-bar-6"></span>
-    <span class="ui-chart-skeleton-bar ui-chart-skeleton-bar-7"></span>
-    <span class="ui-chart-skeleton-bar ui-chart-skeleton-bar-8"></span>
-    <span class="ui-chart-skeleton-bar ui-chart-skeleton-bar-9"></span>
-    <span class="ui-chart-skeleton-bar ui-chart-skeleton-bar-10"></span>
-    <span class="ui-chart-skeleton-bar ui-chart-skeleton-bar-11"></span>
-    <span class="ui-chart-skeleton-bar ui-chart-skeleton-bar-12"></span>
+    <span class="ui-chart-skeleton-line ui-chart-skeleton-line-1"></span>
+    <span class="ui-chart-skeleton-line ui-chart-skeleton-line-2"></span>
+    <span class="ui-chart-skeleton-line ui-chart-skeleton-line-3"></span>
+    <span class="ui-chart-skeleton-line ui-chart-skeleton-line-4"></span>
+    <span class="ui-chart-skeleton-axis"></span>
+    <span class="ui-chart-skeleton-plot">
+      <span class="ui-chart-skeleton-point ui-chart-skeleton-point-1"></span>
+      <span class="ui-chart-skeleton-point ui-chart-skeleton-point-2"></span>
+      <span class="ui-chart-skeleton-point ui-chart-skeleton-point-3"></span>
+      <span class="ui-chart-skeleton-point ui-chart-skeleton-point-4"></span>
+      <span class="ui-chart-skeleton-point ui-chart-skeleton-point-5"></span>
+      <span class="ui-chart-skeleton-point ui-chart-skeleton-point-6"></span>
+    </span>
   </div>
 </template>

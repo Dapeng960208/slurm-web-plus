@@ -1,5 +1,18 @@
 # 最新功能
 
+## 本轮：图表加载占位视觉已收口
+
+本轮针对 Dashboard 图表加载态“粗大渐变柱状图过重、观感粗糙”的问题做了共享组件优化：
+
+- `ChartSkeleton` 从 12 个粗柱状占位改为轻量图表骨架，保留坐标轴、网格线、趋势线与节点占位。
+- 共享 `.ui-chart-skeleton` 降低高饱和渐变和大面积填充，加载态更接近真实图表结构。
+- Dashboard `Resources Status`、`Jobs Queue` 与 Settings Cache metrics 会同步使用新的加载占位。
+
+本轮新增验证：
+
+- `cd frontend && npx vitest run tests/components/ChartSkeleton.spec.ts tests/components/dashboard/ChartResourcesHistory.spec.ts tests/components/dashboard/ChartJobsHistory.spec.ts tests/components/settings/SettingsCacheMetrics.spec.ts`
+- `npm --prefix frontend run type-check`
+
 ## 本轮：管理写操作旧数据残留已继续收口
 
 本轮按 `Reservations` 删除旧缓存问题继续审查同类链路，重点覆盖写后缓存失效与前端写后刷新：

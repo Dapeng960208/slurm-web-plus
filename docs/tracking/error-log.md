@@ -511,6 +511,11 @@
 - 现象：验证 `.github/scripts/run-ci-command.mjs` 的 JUnit 解析时，使用 `--command "node -e \"process.exit(0)\""` 会在 PowerShell 传参后变成非法 JS，Node 报 `SyntaxError: Unexpected number`
 - 解决办法：验证 CI wrapper 时优先使用无需嵌套引号的命令，例如 `--command "node --version"`；如必须使用 `node -e`，需要单独处理 PowerShell 的嵌套引号
 
+### 2026-05-16：`rg` 同时搜索不存在路径导致命令返回错误码
+- 时间：2026-05-16
+- 现象：排查缓存命中率时执行包含 `config` 路径的 `rg` 命令，当前仓库没有该目录，PowerShell 返回 `rg: config: 系统找不到指定的文件。 (os error 2)` 并使命令整体失败。
+- 解决办法：后续跨路径搜索前先用 `rg --files` 或 `Test-Path` 确认目录存在，或者只列出已确认存在的 `conf`、`docs`、`slurmweb` 等路径。
+
 ### 2026-05-06：AI 对话页输入框脱离左侧聊天列，流式对话时面板整体下移
 - 时间：2026-05-06
 - 现象：左侧聊天区没有完整撑满工作区宽度，输入框脱离左侧列；流式回复和 trace 更新时，对话面板会整体下移

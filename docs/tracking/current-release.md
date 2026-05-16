@@ -65,8 +65,17 @@
 - AI planner system message 已注入当前 `user.login` 与 cluster，第一人称请求默认绑定当前用户，不再要求用户额外说明用户名
 - 修复 `Reservations` 删除旧缓存预留时报 `Requested reservation is invalid/2053` 的问题：reservation 写操作会清理 `reservations` 缓存，前端写后立即刷新列表，删除已不存在预留按幂等结果处理
 - 审查并收口同类旧数据残留问题：节点写操作清理节点缓存，QOS/Accounts/User/Node 写后立即刷新或返回列表页
+- 收口图表加载占位视觉：`ChartSkeleton` 改为轻量图表骨架，Dashboard `Resources Status`、`Jobs Queue` 与 Settings Cache metrics 不再显示粗大渐变柱状加载图
 
 ## 2. 已完成项
+
+- 图表加载占位视觉优化已完成：
+  - `ChartSkeleton` 已从粗柱状 skeleton 改为坐标轴、网格线、趋势线和节点组成的轻量图表骨架
+  - `.ui-chart-skeleton` 已降低高饱和渐变、重填充和柱状跳动动画
+  - 新增 `frontend/tests/components/ChartSkeleton.spec.ts` 固定共享占位结构
+  - 本轮定向验证已通过：
+    - `cd frontend && npx vitest run tests/components/ChartSkeleton.spec.ts tests/components/dashboard/ChartResourcesHistory.spec.ts tests/components/dashboard/ChartJobsHistory.spec.ts tests/components/settings/SettingsCacheMetrics.spec.ts`
+    - `npm --prefix frontend run type-check`
 
 - 管理写操作旧数据残留审查已完成：
   - `SlurmrestdFilteredCached.node_update/node_delete` 已清理 `nodes`、`nodes-unfiltered` 与单节点缓存
