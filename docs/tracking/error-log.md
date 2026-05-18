@@ -11,6 +11,11 @@
 
 ## 条目
 
+### 2026-05-18：节点热点持久化未启用时前端仍请求 `analysis/node-hotspots`
+- 时间：2026-05-18
+- 现象：在 `Cluster Analysis` 页面，浏览器网络面板出现 `analysis/node-hotspots?...` 返回 `501`，响应为 `Node hotspot persistence is unavailable`。现场集群启用了作业历史 persistence，但节点热点持久化采样链路未启用，前端只按 `persistence` 粗略判断，仍发起了预期会失败的请求。
+- 解决办法：Agent `/info` 增加 `capabilities.node_hotspots`，由 `node_hotspot_store` 是否初始化决定；`ClusterAnalysisView` 仅在该能力为 `true` 时请求 `analysis/node-hotspots`，能力不可用时直接保留节点热点空态。
+
 ### 2026-05-15：管理写操作旧数据残留审查提交推送到 GitHub 时 443 连接失败
 - 时间：2026-05-15
 - 现象：本地已完成 `5cce3e4 fix(management): refresh writes after stale data audit` 后，执行 `powershell -ExecutionPolicy Bypass -File scripts/push-and-watch-github-ci.ps1 -PollIntervalSeconds 30 -TimeoutMinutes 45` 在 `git push origin main` 阶段失败，远端返回 `Failed to connect to github.com port 443 after 21050 ms: Could not connect to server`，因此没有触发新的 GitHub Actions run。

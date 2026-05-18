@@ -154,6 +154,7 @@
   - Agent 在数据库与 node metrics 同时可用时，按 `persistence.snapshot_interval` 采样节点 CPU / memory 使用率
   - 样本按 `cluster + node + sampled_at` 入库
   - 查询 `analysis/node-hotspots` 时只从持久化样本重建热点事件；当前时间窗无事件时直接返回空结果
+  - Agent `/info` 的 `capabilities.node_hotspots` 表示该链路是否可用，前端必须按该能力决定是否请求 `analysis/node-hotspots`
 - 逻辑删除在 `ai_conversations` 记录：
   - `deleted_at`
   - `deleted_by`
@@ -165,7 +166,7 @@
 ## 7. 降级行为与边界
 
 - 数据库不可用时 AI 会话、审计与逻辑删除不可用。
-- 数据库不可用或 node metrics 不可用时，节点热点持久化不会启用；此时 `analysis/node-hotspots` 接口不可用。
+- 数据库不可用或 node metrics 不可用时，节点热点持久化不会启用；此时 `analysis/node-hotspots` 接口不可用，`Cluster Analysis` 前端不应主动请求该接口。
 - 管理员没有 `admin/ai:view:*` 时不能进入审计视图。
 - 普通用户删除会话后不再看到该会话，但管理员审计仍可看到。
 - Conversation Audit 搜索当前只过滤已加载的会话摘要；若未来需要搜索全部消息正文，应扩展管理员审计接口的查询参数与后端检索能力。

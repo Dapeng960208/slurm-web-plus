@@ -82,9 +82,11 @@ class TestAgentViews(TestAgentBase):
         self.assertIn("ldap_cache", response.json["capabilities"])
         self.assertIn("access_control", response.json["capabilities"])
         self.assertIn("node_metrics", response.json["capabilities"])
+        self.assertIn("node_hotspots", response.json["capabilities"])
         self.assertIn("user_metrics", response.json["capabilities"])
         self.assertFalse(response.json["access_control"])
         self.assertFalse(response.json["capabilities"]["access_control"])
+        self.assertFalse(response.json["capabilities"]["node_hotspots"])
         self.assertEqual(
             response.json["capabilities"]["user_metrics"],
             {
@@ -107,6 +109,7 @@ class TestAgentViews(TestAgentBase):
         self.app.users_store = mock.Mock()
         self.app.jobs_store = mock.Mock()
         self.app.node_metrics_db = mock.Mock()
+        self.app.node_hotspot_store = mock.Mock()
         self.app.user_metrics_enabled = True
         self.app.access_control_enabled = True
         self.app.settings.node_metrics.enabled = True
@@ -126,6 +129,7 @@ class TestAgentViews(TestAgentBase):
                 "ldap_cache": True,
                 "access_control": True,
                 "node_metrics": True,
+                "node_hotspots": True,
                 "ai": {
                     "enabled": False,
                     "configurable": False,

@@ -82,6 +82,7 @@ export interface ClusterCapabilities {
   ai?: ClusterAICapability
   job_history?: boolean
   ldap_cache?: boolean
+  node_hotspots?: boolean
   node_metrics?: boolean
   user_metrics?: boolean | Record<string, unknown>
   user_analytics?: Record<string, unknown>

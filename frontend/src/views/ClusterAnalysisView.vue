@@ -90,6 +90,7 @@ let refreshTimer: ReturnType<typeof setInterval> | null = null
 const clusterDetails = computed(() => runtimeStore.getCluster(cluster))
 const metricsEnabled = computed(() => Boolean(clusterDetails.value?.metrics))
 const persistenceEnabled = computed(() => Boolean(clusterDetails.value?.persistence))
+const nodeHotspotsEnabled = computed(() => clusterDetails.value?.capabilities?.node_hotspots === true)
 const canViewJobs = computed(() => runtimeStore.hasRoutePermission(cluster, 'jobs', 'view'))
 const canViewNodes = computed(() => runtimeStore.hasRoutePermission(cluster, 'resources', 'view'))
 const canViewHistory = computed(
@@ -477,16 +478,20 @@ async function loadAnalysis() {
       })
   )
 
-  tasks.push(
-    gateway
-      .analysis_node_hotspots(cluster, hotspotWindowQuery())
-      .then((payload) => {
-        nodeHotspots.value = payload
-      })
-      .catch(() => {
-        nodeHotspots.value = null
-      })
-  )
+  if (nodeHotspotsEnabled.value) {
+    tasks.push(
+      gateway
+        .analysis_node_hotspots(cluster, hotspotWindowQuery())
+        .then((payload) => {
+          nodeHotspots.value = payload
+        })
+        .catch(() => {
+          nodeHotspots.value = null
+        })
+    )
+  } else {
+    nodeHotspots.value = null
+  }
 
   await Promise.all(tasks)
   updatedAt.value = new Date().toISOString()

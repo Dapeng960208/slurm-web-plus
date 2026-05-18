@@ -1,5 +1,13 @@
 # 最新功能
 
+## 本轮：节点热点能力不可用时不再发起无效请求
+
+本轮修复 `Cluster Analysis` 在节点热点持久化未启用时仍请求 `analysis/node-hotspots` 的问题：
+
+- Agent `/info` 新增 `capabilities.node_hotspots`，用于准确表示节点热点持久化采样链路是否可用。
+- 前端仅在该能力为 `true` 时请求 `analysis/node-hotspots`，避免浏览器网络面板持续出现 `501 Node hotspot persistence is unavailable`。
+- 节点热点不可用时页面继续展示空态，不影响 `stats`、`jobs`、`metrics`、平均排队时间等其他分析数据。
+
 ## 本轮：集群分析内存术语已校正
 
 本轮仅调整中文文案，不改变统计口径：

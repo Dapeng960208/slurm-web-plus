@@ -45,7 +45,10 @@ describe('ClusterAnalysisView.vue', () => {
         infrastructure: 'foo',
         metrics: true,
         cache: true,
-        persistence: true
+        persistence: true,
+        capabilities: {
+          node_hotspots: true
+        }
       }
     ]
 
@@ -582,5 +585,49 @@ describe('ClusterAnalysisView.vue', () => {
     expect(
       wrapper.find('[data-testid="queue-wait-range-selector"] [data-testid="metric-range-custom-button"]').text()
     ).not.toContain('Time Range')
+  })
+
+  test('does not request node hotspots when the cluster capability is unavailable', async () => {
+    useRuntimeStore().availableClusters = [
+      {
+        name: 'foo',
+        permissions: {
+          roles: [],
+          actions: ['view-stats', 'view-jobs', 'view-nodes', 'view-history-jobs']
+        },
+        racksdb: true,
+        infrastructure: 'foo',
+        metrics: true,
+        cache: true,
+        persistence: true,
+        capabilities: {
+          node_hotspots: false
+        }
+      }
+    ]
+
+    mount(ClusterAnalysisView, {
+      props: { cluster: 'foo' },
+      global: {
+        stubs: {
+          ClusterMainLayout: { template: '<div><slot /></div>' },
+          RouterLink: { template: '<a><slot /></a>' },
+          PartitionLinkChip: {
+            props: ['cluster', 'partition'],
+            template:
+              '<a data-testid="analysis-partition-link" :data-cluster="cluster" :data-partition="partition">{{ partition }}</a>'
+          },
+          QueueWaitHistoryChart: {
+            props: ['series', 'aggregation', 'windowStart', 'windowEnd'],
+            template:
+              '<div data-testid="queue-wait-chart">{{ aggregation }}|{{ windowStart }}|{{ windowEnd }}|{{ JSON.stringify(series) }}</div>'
+          }
+        }
+      }
+    })
+
+    await flushPromises()
+
+    expect(mockGatewayAPI.analysis_node_hotspots).not.toHaveBeenCalled()
   })
 })

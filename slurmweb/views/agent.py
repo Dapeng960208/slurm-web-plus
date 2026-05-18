@@ -572,6 +572,7 @@ def info():
             "ldap_cache": current_app.users_store is not None,
             "access_control": bool(getattr(current_app, "access_control_enabled", False)),
             "node_metrics": current_app.node_metrics_db is not None,
+            "node_hotspots": getattr(current_app, "node_hotspot_store", None) is not None,
             "ai": (
                 current_app.ai_service.capabilities()
                 if getattr(current_app, "ai_enabled", False) and current_app.ai_service is not None

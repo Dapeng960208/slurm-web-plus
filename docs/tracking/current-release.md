@@ -38,6 +38,7 @@
 - 压缩用户详情分析区头部与双栏布局，强化时间窗控件可见性并减少 `Submission Activity` 周边空白
 - 收口 `/:cluster/admin/ai`：模型配置改为表格、审计记录改为表格、统一搜索框样式，并将审计详情迁移到独立详情页
 - 集群分析页新增近 3 天节点热点概览、平均排队时长曲线，并把 `diag` 面板收口到 10 条核心字段
+- 集群分析页现在按 `capabilities.node_hotspots` 判断是否请求 `analysis/node-hotspots`，节点热点持久化不可用时不再产生预期内的 501 网络请求
 - 修复集群分析页平均排队时间曲线不显示的问题，并把等待时间统一改为 `submit_time -> start_time` 秒级口径，支持 `hour / day` 聚合切换
 - 集群分析页平均排队时间曲线已按等待时长强化颜色语义：`60` 秒内保持主题淡绿色，超过后连续过渡到橙色和红色
 - 集群分析页中文内存术语已校正：`memory_allocated` 展示为“内存分配量”，避免与 Slurm reservation 的“预留”语义混淆
@@ -90,6 +91,14 @@
   - `analysis.capacity.memory` 中文文案改为“内存分配量 / 已分配”，对应 `resources.memory_allocated`
   - 本轮定向验证已通过：
     - `cd frontend && npx vitest run tests/composables/ClusterAnalysis.spec.ts`
+
+- 集群分析页节点热点能力门控已完成：
+  - Agent `/info` 新增 `capabilities.node_hotspots`，由 `node_hotspot_store` 是否初始化决定
+  - `ClusterAnalysisView` 仅在该能力为 `true` 时请求 `analysis/node-hotspots`
+  - 本轮定向验证已通过：
+    - `.venv\Scripts\python.exe -m pytest -q slurmweb/tests/views/test_agent.py`
+    - `cd frontend && npx vitest run tests/views/ClusterAnalysisView.spec.ts`
+    - `npm --prefix frontend run type-check`
 
 - 管理写操作旧数据残留审查已完成：
   - `SlurmrestdFilteredCached.node_update/node_delete` 已清理 `nodes`、`nodes-unfiltered` 与单节点缓存
