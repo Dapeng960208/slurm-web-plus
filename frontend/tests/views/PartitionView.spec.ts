@@ -58,6 +58,16 @@ vi.mock('@/composables/GatewayAPI', async (importOriginal) => {
   }
 })
 
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  let reject!: (reason?: unknown) => void
+  const promise = new Promise<T>((promiseResolve, promiseReject) => {
+    resolve = promiseResolve
+    reject = promiseReject
+  })
+  return { promise, resolve, reject }
+}
+
 const historyJob = (
   id: number,
   submitTime: string,
@@ -229,6 +239,32 @@ describe('PartitionView.vue', () => {
         end: new Date('2026-04-24T12:00').toISOString()
       })
     )
+  })
+
+  test('shows a queue wait chart skeleton while the shared window is loading', async () => {
+    const wrapper = mountPartitionView()
+    await flushPromises()
+
+    const pendingHistory = deferred<Awaited<ReturnType<typeof mockGatewayAPI.jobs_history>>>()
+    mockGatewayAPI.jobs_history.mockImplementationOnce(() => pendingHistory.promise)
+
+    await wrapper.get('[data-testid="metric-range-custom-button"]').trigger('click')
+    await wrapper.get('[data-testid="metric-range-quick-7d"]').trigger('click')
+    await wrapper.get('[data-testid="metric-range-apply"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="partition-queue-wait-loading"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="partition-queue-wait-chart"]').exists()).toBe(false)
+
+    pendingHistory.resolve({
+      total: 0,
+      page: 1,
+      page_size: 500,
+      jobs: []
+    })
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="partition-queue-wait-loading"]').exists()).toBe(false)
   })
 
   test('resetting the shared time selector sets an explicit last-hour history window', async () => {

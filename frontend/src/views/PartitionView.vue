@@ -14,6 +14,7 @@ import ClusterMainLayout from '@/components/ClusterMainLayout.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import InfoAlert from '@/components/InfoAlert.vue'
 import MetricRangeSelector from '@/components/MetricRangeSelector.vue'
+import ChartSkeleton from '@/components/ChartSkeleton.vue'
 import DashboardCharts from '@/components/dashboard/DashboardCharts.vue'
 import QueueWaitHistoryChart from '@/components/analysis/QueueWaitHistoryChart.vue'
 import { useClusterDataGetter } from '@/composables/DataGetter'
@@ -170,7 +171,6 @@ function resolvedQueueWaitWindow(): DateTimeWindowQuery {
 async function loadQueueWaitHistory() {
   const requestId = ++queueWaitRequestId
   if (!partitionRecord.value || !canViewHistory.value) {
-    historyJobs.value = []
     queueWaitChartWindow.value = null
     queueWaitLoading.value = false
     queueWaitUnavailable.value = false
@@ -333,7 +333,12 @@ watch(
                     </div>
                   </div>
                 </div>
-                <div v-if="queueWaitSeries.length" class="partition-queue-wait-chart">
+                <div v-if="queueWaitLoading" class="partition-queue-wait-chart" data-testid="partition-queue-wait-loading">
+                  <div class="ui-chart-shell h-[15rem] partition-chart-shell">
+                    <ChartSkeleton />
+                  </div>
+                </div>
+                <div v-else-if="queueWaitSeries.length" class="partition-queue-wait-chart">
                   <QueueWaitHistoryChart
                     :series="queueWaitSeries"
                     :aggregation="queueWaitAggregation"

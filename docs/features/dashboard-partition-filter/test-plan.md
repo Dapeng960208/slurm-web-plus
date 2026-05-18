@@ -64,6 +64,7 @@
 - 平均排队时间曲线会请求 `jobs/history`，请求固定携带当前 `partition`、`state=COMPLETED`、`sort=submit_time`、`order=desc`。
 - 平均排队时间曲线复用队列详情页时间组件；切换 `range` 或自定义 `start/end` 后，历史请求使用同一窗口。
 - 平均排队时间曲线固定按小时聚合，展示当前队列每小时平均排队时间，不随集群分析页默认分钟聚合变化。
+- 切换共享时间组件后，在新的历史请求返回前显示图表加载骨架，旧窗口曲线不再显示。
 - `jobs/history` 多页返回时，前端会拉取全部页面后再按 `submit_time -> start_time` 聚合为秒级平均排队时间。
 - 当前用户无 `jobs-history:view:*` / `view-history-jobs` 权限，或历史接口失败、无样本时，实时图表仍显示，平均排队时间区域展示空态。
 - 队列详情页切换资源图表类型时，路由仍保持在 `partition`，不跳回 `dashboard`。

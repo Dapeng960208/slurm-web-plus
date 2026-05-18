@@ -15,6 +15,7 @@ import ErrorAlert from '@/components/ErrorAlert.vue'
 import InfoAlert from '@/components/InfoAlert.vue'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
 import PageHeader from '@/components/PageHeader.vue'
+import ChartSkeleton from '@/components/ChartSkeleton.vue'
 import PartitionLinkChip from '@/components/PartitionLinkChip.vue'
 import PercentMetric from '@/components/PercentMetric.vue'
 import MetricRangeSelector from '@/components/MetricRangeSelector.vue'
@@ -74,6 +75,7 @@ const memoryMetrics = ref<Partial<Record<MetricMemoryState, MetricValue[]>> | nu
 const gpuMetrics = ref<Partial<Record<MetricResourceState, MetricValue[]>> | null>(null)
 const historyJobs = ref<JobHistoryRecord[]>([])
 const queueWaitChartWindow = ref<DateTimeWindowQuery | null>(null)
+const queueWaitLoading = ref(false)
 const pingDetails = ref<unknown>(null)
 const diagDetails = ref<unknown>(null)
 const nodeHotspots = ref<AnalysisNodeHotspots | null>(null)
@@ -86,6 +88,7 @@ const pingUnavailable = ref(false)
 const diagUnavailable = ref(false)
 
 let refreshTimer: ReturnType<typeof setInterval> | null = null
+let queueWaitRequestId = 0
 
 const clusterDetails = computed(() => runtimeStore.getCluster(cluster))
 const metricsEnabled = computed(() => Boolean(clusterDetails.value?.metrics))
@@ -357,6 +360,34 @@ async function loadCompletedHistoryJobs(): Promise<JobHistoryRecord[]> {
   return jobs
 }
 
+async function refreshQueueWaitHistory() {
+  const requestId = ++queueWaitRequestId
+  if (!canViewHistory.value) {
+    historyJobs.value = []
+    queueWaitChartWindow.value = null
+    queueWaitLoading.value = false
+    waitSamplesUnavailable.value = false
+    return
+  }
+
+  queueWaitLoading.value = true
+  waitSamplesUnavailable.value = false
+
+  try {
+    const payload = await loadCompletedHistoryJobs()
+    if (requestId !== queueWaitRequestId) return
+    historyJobs.value = payload
+  } catch {
+    if (requestId !== queueWaitRequestId) return
+    historyJobs.value = []
+    waitSamplesUnavailable.value = true
+  } finally {
+    if (requestId === queueWaitRequestId) {
+      queueWaitLoading.value = false
+    }
+  }
+}
+
 async function loadAnalysis() {
   const initialAnalysisLoad = updatedAt.value === null
   const queueWaitWindowMatchesGlobal =
@@ -459,18 +490,11 @@ async function loadAnalysis() {
   }
 
   if (canViewHistory.value && (initialAnalysisLoad || queueWaitWindowMatchesGlobal)) {
-    tasks.push(
-      loadCompletedHistoryJobs()
-        .then((payload) => {
-          historyJobs.value = payload
-        })
-        .catch(() => {
-          historyJobs.value = []
-          waitSamplesUnavailable.value = true
-        })
-    )
+    tasks.push(refreshQueueWaitHistory())
   } else if (!canViewHistory.value) {
     historyJobs.value = []
+    queueWaitChartWindow.value = null
+    queueWaitLoading.value = false
   }
 
   tasks.push(
@@ -582,15 +606,7 @@ watch(
   () => `${cluster}/${queueWaitRange.value}/${queueWaitCustomStart.value}/${queueWaitCustomEnd.value}`,
   () => {
     if (!loading.value) {
-      waitSamplesUnavailable.value = false
-      loadCompletedHistoryJobs()
-        .then((payload) => {
-          historyJobs.value = payload
-        })
-        .catch(() => {
-          historyJobs.value = []
-          waitSamplesUnavailable.value = true
-        })
+      void refreshQueueWaitHistory()
     }
   }
 )
@@ -891,7 +907,12 @@ onUnmounted(() => {
                       </span>
                     </div>
                   </div>
-                  <div v-if="queueWaitSeries.length" class="mt-3">
+                  <div v-if="queueWaitLoading" class="mt-3" data-testid="queue-wait-loading">
+                    <div class="ui-chart-shell h-[15rem]">
+                      <ChartSkeleton />
+                    </div>
+                  </div>
+                  <div v-else-if="queueWaitSeries.length" class="mt-3">
                     <QueueWaitHistoryChart
                       :series="queueWaitSeries"
                       :aggregation="queueWaitAggregation"

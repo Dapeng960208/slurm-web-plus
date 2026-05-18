@@ -27,6 +27,16 @@ vi.mock('@/composables/GatewayAPI', async (importOriginal) => {
   }
 })
 
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  let reject!: (reason?: unknown) => void
+  const promise = new Promise<T>((promiseResolve, promiseReject) => {
+    resolve = promiseResolve
+    reject = promiseReject
+  })
+  return { promise, resolve, reject }
+}
+
 describe('ClusterAnalysisView.vue', () => {
   let router: RouterMock
 
@@ -594,6 +604,52 @@ describe('ClusterAnalysisView.vue', () => {
     expect(mockGatewayAPI.metrics_memory).not.toHaveBeenCalled()
     expect(mockGatewayAPI.metrics_gpus).not.toHaveBeenCalled()
     expect(mockGatewayAPI.analysis_node_hotspots).not.toHaveBeenCalled()
+  })
+
+  test('shows a queue wait chart skeleton while the selected time window is loading', async () => {
+    const wrapper = mount(ClusterAnalysisView, {
+      props: { cluster: 'foo' },
+      global: {
+        stubs: {
+          ClusterMainLayout: { template: '<div><slot /></div>' },
+          RouterLink: { template: '<a><slot /></a>' },
+          PartitionLinkChip: {
+            props: ['cluster', 'partition'],
+            template:
+              '<a data-testid="analysis-partition-link" :data-cluster="cluster" :data-partition="partition">{{ partition }}</a>'
+          },
+          QueueWaitHistoryChart: {
+            props: ['series', 'aggregation', 'windowStart', 'windowEnd'],
+            template:
+              '<div data-testid="queue-wait-chart">{{ aggregation }}|{{ windowStart }}|{{ windowEnd }}|{{ JSON.stringify(series) }}</div>'
+          }
+        }
+      }
+    })
+
+    await flushPromises()
+    const pendingHistory = deferred<Awaited<ReturnType<typeof mockGatewayAPI.jobs_history>>>()
+    mockGatewayAPI.jobs_history.mockImplementationOnce(() => pendingHistory.promise)
+
+    await wrapper
+      .get('[data-testid="queue-wait-range-selector"] [data-testid="metric-range-custom-button"]')
+      .trigger('click')
+    await wrapper.get('[data-testid="metric-range-quick-7d"]').trigger('click')
+    await wrapper.get('[data-testid="metric-range-apply"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="queue-wait-loading"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="queue-wait-chart"]').exists()).toBe(false)
+
+    pendingHistory.resolve({
+      total: 0,
+      page: 1,
+      page_size: 500,
+      jobs: []
+    })
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="queue-wait-loading"]').exists()).toBe(false)
   })
 
   test('keeps queue wait card range independent from the global toolbar range', async () => {
