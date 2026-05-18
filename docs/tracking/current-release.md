@@ -78,9 +78,11 @@
   - `queueWaitHistory` 已恢复 `minute/hour/day` 聚合，最近 1 小时默认按分钟桶展示全集群已完成作业平均排队时间
   - `ClusterAnalysisView` 的“最近一小时”重置会写入明确的 `start/end`，历史请求结束时间对应点击时刻
   - `PartitionView` 平均排队时间曲线固定按小时聚合当前队列已完成作业，并移除不一致的额外 surface 包裹
+  - GitHub `Frontend Tests` 暴露的新测试 fake timers 与 `vue-i18n` 性能标记冲突已修复，最近一小时测试改为真实时间边界断言
   - 本轮验证已通过：
     - `cd frontend && npx vitest run tests/composables/queueWaitHistory.spec.ts tests/views/ClusterAnalysisView.spec.ts tests/views/PartitionView.spec.ts`
     - `npm --prefix frontend run type-check`
+    - `cd frontend && npx vitest run`
 
 - 图表加载占位视觉优化已完成：
   - `ChartSkeleton` 已从粗柱状 skeleton 改为坐标轴、网格线、趋势线和节点组成的轻量图表骨架

@@ -16,6 +16,11 @@
 - 现象：`Cluster Analysis` 平均排队时间曲线默认最近 1 小时仍按小时聚合，无法看到 60 个分钟桶；点击“最近一小时”时只清空自定义窗口并回到 `range=hour`，没有把 `start=now-1h`、`end=now` 写入历史请求窗口。
 - 解决办法：恢复 `minute/hour/day` 聚合，最近 1 小时默认推断为 `minute`；重置最近一小时改为写入明确的本地 `datetime-local` 起止时间并在请求层转换为 ISO；队列详情页因产品口径固定为小时聚合，避免被全集群默认分钟规则影响。
 
+### 2026-05-18：Frontend Tests 全量环境中 fake timers 干扰 `vue-i18n` 性能标记
+- 时间：2026-05-18
+- 现象：GitHub Actions `Frontend Tests` run `26026644282` 中，`ClusterAnalysisView.spec.ts` 与 `PartitionView.spec.ts` 的两个“最近一小时”新测试在全量 Vitest 环境下使用 `vi.useFakeTimers()`，导致 `vue-i18n` 内部性能标记收到负时间戳并抛出 `TypeError: ... is not a valid timestamp`。
+- 解决办法：移除这两个视图测试的 fake timers，改为在点击前后读取真实 `Date.now()`，断言历史请求窗口长度为 1 小时且结束时间落在点击期间对应的分钟边界内，避免影响组件渲染期间的全局计时 API。
+
 ### 2026-05-18：节点热点持久化未启用时前端仍请求 `analysis/node-hotspots`
 - 时间：2026-05-18
 - 现象：在 `Cluster Analysis` 页面，浏览器网络面板出现 `analysis/node-hotspots?...` 返回 `501`，响应为 `Node hotspot persistence is unavailable`。现场集群启用了作业历史 persistence，但节点热点持久化采样链路未启用，前端只按 `persistence` 粗略判断，仍发起了预期会失败的请求。

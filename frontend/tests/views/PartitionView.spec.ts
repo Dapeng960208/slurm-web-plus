@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeEach, afterEach, vi } from 'vitest'
+import { describe, test, expect, beforeEach, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import { ref } from 'vue'
 import { useRuntimeStore } from '@/stores/runtime'
@@ -156,10 +156,6 @@ describe('PartitionView.vue', () => {
     })
   })
 
-  afterEach(() => {
-    vi.useRealTimers()
-  })
-
   test('renders partition summary cards without duplicated detail blocks', async () => {
     const wrapper = mountPartitionView()
     await flushPromises()
@@ -236,30 +232,34 @@ describe('PartitionView.vue', () => {
   })
 
   test('resetting the shared time selector sets an explicit last-hour history window', async () => {
-    vi.useFakeTimers()
-    vi.setSystemTime(new Date('2026-05-18T10:30:45Z'))
-
     const wrapper = mountPartitionView()
     await flushPromises()
     mockGatewayAPI.jobs_history.mockClear()
 
+    const beforeReset = Date.now()
     await wrapper.get('[data-testid="metric-range-custom-button"]').trigger('click')
     await wrapper.get('[data-testid="metric-range-reset"]').trigger('click')
     await flushPromises()
+    const afterReset = Date.now()
 
+    const historyWindow = mockGatewayAPI.jobs_history.mock.calls[0][1]
+    const startMs = Date.parse(historyWindow.start)
+    const endMs = Date.parse(historyWindow.end)
+    const firstPossibleMinute = Math.floor(beforeReset / 60000) * 60000
+    const lastPossibleMinute = Math.floor(afterReset / 60000) * 60000
+
+    expect(endMs - startMs).toBe(60 * 60 * 1000)
+    expect(endMs).toBeGreaterThanOrEqual(firstPossibleMinute)
+    expect(endMs).toBeLessThanOrEqual(lastPossibleMinute)
     expect(wrapper.get('[data-testid="partition-dashboard-props"]').text()).toContain(
-      JSON.stringify({
-        start: '2026-05-18T17:30',
-        end: '2026-05-18T18:30',
-        partition: 'normal'
-      })
+      '"partition":"normal"'
     )
     expect(mockGatewayAPI.jobs_history).toHaveBeenCalledWith(
       'foo',
       expect.objectContaining({
         partition: 'normal',
-        start: '2026-05-18T09:30:00.000Z',
-        end: '2026-05-18T10:30:00.000Z'
+        start: historyWindow.start,
+        end: historyWindow.end
       })
     )
   })

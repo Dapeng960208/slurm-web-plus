@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeEach, afterEach, vi } from 'vitest'
+import { describe, test, expect, beforeEach, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import ClusterAnalysisView from '@/views/ClusterAnalysisView.vue'
 import { init_plugins } from '../lib/common'
@@ -236,10 +236,6 @@ describe('ClusterAnalysisView.vue', () => {
     })
   })
 
-  afterEach(() => {
-    vi.useRealTimers()
-  })
-
   test('renders cluster analysis workspace, recommendations, and controller health panels', async () => {
     await router.push({ name: 'analysis', params: { cluster: 'foo' } })
     const wrapper = mount(ClusterAnalysisView, {
@@ -357,9 +353,6 @@ describe('ClusterAnalysisView.vue', () => {
   })
 
   test('sets an explicit last-hour queue wait window when resetting the range selector', async () => {
-    vi.useFakeTimers()
-    vi.setSystemTime(new Date('2026-05-18T10:30:45Z'))
-
     const wrapper = mount(ClusterAnalysisView, {
       props: { cluster: 'foo' },
       global: {
@@ -383,21 +376,25 @@ describe('ClusterAnalysisView.vue', () => {
     await flushPromises()
     mockGatewayAPI.jobs_history.mockClear()
 
+    const beforeReset = Date.now()
     await wrapper
       .get('[data-testid="queue-wait-range-selector"] [data-testid="metric-range-custom-button"]')
       .trigger('click')
     await wrapper.get('[data-testid="metric-range-reset"]').trigger('click')
     await flushPromises()
+    const afterReset = Date.now()
 
-    expect(mockGatewayAPI.jobs_history).toHaveBeenCalledWith(
-      'foo',
-      expect.objectContaining({
-        start: '2026-05-18T09:30:00.000Z',
-        end: '2026-05-18T10:30:00.000Z'
-      })
-    )
+    const historyWindow = mockGatewayAPI.jobs_history.mock.calls[0][1]
+    const startMs = Date.parse(historyWindow.start)
+    const endMs = Date.parse(historyWindow.end)
+    const firstPossibleMinute = Math.floor(beforeReset / 60000) * 60000
+    const lastPossibleMinute = Math.floor(afterReset / 60000) * 60000
+
+    expect(endMs - startMs).toBe(60 * 60 * 1000)
+    expect(endMs).toBeGreaterThanOrEqual(firstPossibleMinute)
+    expect(endMs).toBeLessThanOrEqual(lastPossibleMinute)
     expect(wrapper.get('[data-testid="queue-wait-chart"]').text()).toContain(
-      '2026-05-18T09:30:00.000Z|2026-05-18T10:30:00.000Z'
+      `${historyWindow.start}|${historyWindow.end}`
     )
   })
 
