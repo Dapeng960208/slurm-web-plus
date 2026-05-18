@@ -8,6 +8,7 @@
 - Agent `metrics` 透传队列并保持旧签名兼容。
 - Gateway 对 `stats` 与 `metrics` 原样透传 query。
 - 队列详情页图表复用同一套队列 query。
+- 队列详情页平均排队时间曲线复用同一个时间组件，并按当前队列过滤历史作业。
 - 作业与历史作业页面中的队列字段作为队列详情入口。
 - 现有默认行为、权限和错误路径不回归。
 
@@ -60,6 +61,10 @@
 
 - `/:cluster/partitions/:partition` 页面显示实时图表区块。
 - 传给 dashboard 图表的 query 固定带当前 `partition`。
+- 平均排队时间曲线会请求 `jobs/history`，请求固定携带当前 `partition`、`state=COMPLETED`、`sort=submit_time`、`order=desc`。
+- 平均排队时间曲线复用队列详情页时间组件；切换 `range` 或自定义 `start/end` 后，历史请求使用同一窗口。
+- `jobs/history` 多页返回时，前端会拉取全部页面后再按 `submit_time -> start_time` 聚合为秒级平均排队时间。
+- 当前用户无 `jobs-history:view:*` / `view-history-jobs` 权限，或历史接口失败、无样本时，实时图表仍显示，平均排队时间区域展示空态。
 - 队列详情页切换资源图表类型时，路由仍保持在 `partition`，不跳回 `dashboard`。
 - 顶部摘要卡片展示资源容量字段后，下方详情区不再重复展示节点数、总 CPU、已分配 CPU、总内存和 GPU。
 
@@ -82,6 +87,13 @@
 ```powershell
 cd frontend
 npx vitest run tests/views/PartitionView.spec.ts tests/views/JobView.spec.ts tests/views/JobHistoryView.spec.ts tests/views/JobsView.spec.ts tests/views/JobsHistoryView.spec.ts tests/components/dashboard/ChartResourcesHistory.spec.ts tests/components/dashboard/DashboardCharts.spec.ts
+```
+
+队列平均排队时间定向验证：
+
+```powershell
+cd frontend
+npx vitest run tests/views/PartitionView.spec.ts tests/composables/queueWaitHistory.spec.ts
 ```
 
 ## 6. 手工关注点

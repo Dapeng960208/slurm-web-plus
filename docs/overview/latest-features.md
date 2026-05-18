@@ -1,5 +1,17 @@
 # 最新功能
 
+## 本轮：队列详情页新增平均排队时间曲线
+
+本轮在 `/:cluster/partitions/:partition` 队列详情页补充队列平均排队时间曲线：
+
+- 曲线复用队列详情页已有时间范围组件，不新增第二套时间控件。
+- 数据来自 `jobs/history`，固定按当前队列过滤已完成作业，并按 `submit_time -> start_time` 计算秒级平均排队时间。
+- 历史作业会按所选时间窗跨页拉取后再聚合；历史不可用、无权限或无样本时只在该曲线区域展示空态，不影响实时资源与作业曲线。
+
+本轮新增验证：
+
+- `cd frontend && npx vitest run tests/views/PartitionView.spec.ts tests/composables/queueWaitHistory.spec.ts`
+
 ## 本轮：图表加载占位视觉已收口
 
 本轮针对 Dashboard 图表加载态“粗大渐变柱状图过重、观感粗糙”的问题做了共享组件优化：

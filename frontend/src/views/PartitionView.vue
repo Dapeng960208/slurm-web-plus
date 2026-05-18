@@ -7,7 +7,7 @@
 -->
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import ClusterMainLayout from '@/components/ClusterMainLayout.vue'
@@ -15,9 +15,23 @@ import PageHeader from '@/components/PageHeader.vue'
 import InfoAlert from '@/components/InfoAlert.vue'
 import MetricRangeSelector from '@/components/MetricRangeSelector.vue'
 import DashboardCharts from '@/components/dashboard/DashboardCharts.vue'
+import QueueWaitHistoryChart from '@/components/analysis/QueueWaitHistoryChart.vue'
 import { useClusterDataGetter } from '@/composables/DataGetter'
-import { getMBHumanUnit, getNodeGPU } from '@/composables/GatewayAPI'
-import type { ClusterNode, ClusterPartition } from '@/composables/GatewayAPI'
+import {
+  getMBHumanUnit,
+  getNodeGPU,
+  useGatewayAPI
+} from '@/composables/GatewayAPI'
+import type {
+  ClusterNode,
+  ClusterPartition,
+  DateTimeWindowQuery,
+  JobHistoryRecord
+} from '@/composables/GatewayAPI'
+import {
+  buildQueueWaitSeries,
+  inferQueueWaitAggregation
+} from '@/composables/queueWaitHistory'
 import { useRuntimeStore } from '@/stores/runtime'
 
 const { cluster, partition } = defineProps<{
@@ -26,9 +40,23 @@ const { cluster, partition } = defineProps<{
 }>()
 
 const { t } = useI18n()
+const gateway = useGatewayAPI()
 const runtimeStore = useRuntimeStore()
+const HISTORY_PAGE_SIZE = 500
 const { data: partitions } = useClusterDataGetter<ClusterPartition[]>(cluster, 'partitions')
 const { data: nodes } = useClusterDataGetter<ClusterNode[]>(cluster, 'nodes')
+const historyJobs = ref<JobHistoryRecord[]>([])
+const queueWaitLoading = ref(false)
+const queueWaitUnavailable = ref(false)
+const queueWaitChartWindow = ref<DateTimeWindowQuery | null>(null)
+let queueWaitRequestId = 0
+
+const clusterDetails = computed(() => runtimeStore.getCluster(cluster))
+const canViewHistory = computed(
+  () =>
+    Boolean(clusterDetails.value?.persistence) &&
+    runtimeStore.hasRoutePermission(cluster, 'jobs-history', 'view')
+)
 
 const partitionRecord = computed(() =>
   (partitions.value ?? []).find((item) => item.name === partition)
@@ -80,6 +108,19 @@ const partitionMetricsQuery = computed(() => {
   }
 })
 
+const queueWaitAggregation = computed(() =>
+  inferQueueWaitAggregation({
+    range: runtimeStore.dashboard.range,
+    start: runtimeStore.dashboard.start,
+    end: runtimeStore.dashboard.end
+  })
+)
+const queueWaitSeries = computed(() =>
+  buildQueueWaitSeries(historyJobs.value, queueWaitAggregation.value)
+)
+const queueWaitChartWindowStart = computed(() => queueWaitChartWindow.value?.start)
+const queueWaitChartWindowEnd = computed(() => queueWaitChartWindow.value?.end)
+
 function setRange(range: 'hour' | 'day' | 'week') {
   runtimeStore.dashboard.range = range
   runtimeStore.dashboard.clearWindow()
@@ -93,6 +134,97 @@ function resetMetricsWindow() {
   runtimeStore.dashboard.clearWindow()
   runtimeStore.dashboard.range = 'hour'
 }
+
+function rangeStartISO(range: 'hour' | 'day' | 'week'): string {
+  const now = Date.now()
+  const duration = {
+    hour: 60 * 60 * 1000,
+    day: 24 * 60 * 60 * 1000,
+    week: 7 * 24 * 60 * 60 * 1000
+  }[range]
+  return new Date(now - duration).toISOString()
+}
+
+function resolvedQueueWaitWindow(): DateTimeWindowQuery {
+  if (runtimeStore.dashboard.start && runtimeStore.dashboard.end) {
+    return {
+      start: new Date(runtimeStore.dashboard.start).toISOString(),
+      end: new Date(runtimeStore.dashboard.end).toISOString()
+    }
+  }
+  return {
+    start: rangeStartISO(runtimeStore.dashboard.range),
+    end: new Date().toISOString()
+  }
+}
+
+async function loadQueueWaitHistory() {
+  const requestId = ++queueWaitRequestId
+  if (!partitionRecord.value || !canViewHistory.value) {
+    historyJobs.value = []
+    queueWaitChartWindow.value = null
+    queueWaitLoading.value = false
+    queueWaitUnavailable.value = false
+    return
+  }
+
+  queueWaitLoading.value = true
+  queueWaitUnavailable.value = false
+  const window = resolvedQueueWaitWindow()
+  queueWaitChartWindow.value = window
+
+  try {
+    const firstPage = await gateway.jobs_history(cluster, {
+      partition,
+      state: 'COMPLETED',
+      sort: 'submit_time',
+      order: 'desc',
+      page: 1,
+      page_size: HISTORY_PAGE_SIZE,
+      start: window.start,
+      end: window.end
+    })
+
+    const jobs = [...firstPage.jobs]
+    const totalPages = Math.max(Math.ceil(firstPage.total / firstPage.page_size), 1)
+
+    for (let page = 2; page <= totalPages; page += 1) {
+      const nextPage = await gateway.jobs_history(cluster, {
+        partition,
+        state: 'COMPLETED',
+        sort: 'submit_time',
+        order: 'desc',
+        page,
+        page_size: HISTORY_PAGE_SIZE,
+        start: window.start,
+        end: window.end
+      })
+      jobs.push(...nextPage.jobs)
+    }
+
+    if (requestId !== queueWaitRequestId) return
+    historyJobs.value = jobs
+  } catch {
+    if (requestId !== queueWaitRequestId) return
+    historyJobs.value = []
+    queueWaitUnavailable.value = true
+  } finally {
+    if (requestId === queueWaitRequestId) {
+      queueWaitLoading.value = false
+    }
+  }
+}
+
+watch(
+  () =>
+    `${cluster}/${partition}/${partitionRecord.value?.name ?? ''}/${canViewHistory.value}/${
+      runtimeStore.dashboard.range
+    }/${runtimeStore.dashboard.start}/${runtimeStore.dashboard.end}`,
+  () => {
+    void loadQueueWaitHistory()
+  },
+  { immediate: true }
+)
 </script>
 
 <template>
@@ -181,6 +313,36 @@ function resetMetricsWindow() {
                 route-target-name="partition"
                 compact
               />
+              <div class="ui-metric-surface partition-queue-wait-panel" data-testid="partition-queue-wait-panel">
+                <div>
+                  <div class="ui-stat-label">{{ t('pages.partition.queueWait.title') }}</div>
+                  <div class="mt-1 text-sm text-[var(--color-brand-muted)]">
+                    {{ t('pages.partition.queueWait.description') }}
+                  </div>
+                </div>
+                <div v-if="queueWaitSeries.length" class="partition-queue-wait-chart">
+                  <QueueWaitHistoryChart
+                    :series="queueWaitSeries"
+                    :aggregation="queueWaitAggregation"
+                    :window-start="queueWaitChartWindowStart"
+                    :window-end="queueWaitChartWindowEnd"
+                  />
+                </div>
+                <div v-else class="text-sm text-[var(--color-brand-muted)]">
+                  <template v-if="queueWaitLoading">
+                    {{ t('pages.partition.queueWait.loading') }}
+                  </template>
+                  <template v-else-if="!canViewHistory">
+                    {{ t('pages.partition.queueWait.disabled') }}
+                  </template>
+                  <template v-else-if="queueWaitUnavailable">
+                    {{ t('pages.partition.queueWait.unavailable') }}
+                  </template>
+                  <template v-else>
+                    {{ t('pages.partition.queueWait.empty') }}
+                  </template>
+                </div>
+              </div>
             </section>
           </template>
         </div>
@@ -215,6 +377,17 @@ function resetMetricsWindow() {
 .partition-dashboard-charts {
   display: grid;
   gap: 0.85rem;
+}
+
+.partition-queue-wait-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  padding: 1rem;
+}
+
+.partition-queue-wait-chart {
+  min-height: 0;
 }
 
 :deep(.partition-chart-shell) {

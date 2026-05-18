@@ -53,6 +53,12 @@
   - 时间范围继续复用 dashboard 现有 `range / start / end`
   - query 固定带当前 `partition`
   - 图表切换资源类型时，仍需停留在当前队列详情路由，不得跳回 `dashboard`
+- 队列详情页需在同一图表区展示队列平均排队时间曲线：
+  - 复用同一个时间范围组件，不新增第二套时间控件。
+  - 数据来自 `GET /api/agents/<cluster>/jobs/history`，固定携带 `partition=<name>`、`state=COMPLETED`、`sort=submit_time`、`order=desc`。
+  - 口径与集群分析页一致，按 `submit_time -> start_time` 计算已完成作业排队等待秒数。
+  - `hour/day` 范围按小时聚合，`week` 范围按天聚合；自定义窗口按现有平均排队时间聚合推断规则处理。
+  - 历史结果需按时间窗跨页拉取全部匹配作业后再聚合，不能只使用第一页。
 - 队列详情页顶部摘要卡片负责展示节点数、总 CPU、已分配 CPU、总内存和 GPU；下方详情区不得重复展示这些资源容量字段，只保留名称、已分配节点、空闲节点等补充信息。
 - 以下页面中的 `partition` 展示统一改为可点击入口，跳转到 `/:cluster/partitions/:partition`：
   - `/:cluster/job/:id`
@@ -66,6 +72,7 @@
 - `stats` 依赖 Agent 已配置 `slurmrestd`。
 - `metrics` 依赖 Agent 已启用 metrics 数据源。
 - `partition` 为可选参数；未提供时不改变现有行为。
+- 队列平均排队时间曲线依赖持久化历史作业已启用，且当前用户具备 `jobs-history:view:*` 或 legacy `view-history-jobs` 权限。
 
 ## 4. 接口与参数
 
@@ -96,6 +103,7 @@
 
 - `stats` 复用现有 `slurmrestd.jobs(query=...)` 与 `slurmrestd.nodes_unfiltered(query=...)` 契约。
 - `metrics` 复用现有 `metrics_db.request(...)`，但需要兼容尚未升级到 `partition` 参数签名的实现。
+- 队列平均排队时间复用现有 `jobs/history` 的 `partition` 过滤能力，不新增后端接口。
 - 本轮不修改：
   - collector
   - metrics DB 核心实现
@@ -107,6 +115,7 @@
   - Agent 不得因多传 `partition` 直接报 `TypeError`。
   - Agent 允许继续走旧行为返回全局指标。
 - 这类兼容分支只用于避免合并顺序导致接口报错，不代表底层指标源已经完成队列过滤。
+- 如果持久化历史作业未启用、当前用户无历史权限、接口失败或当前时间窗没有样本，队列详情页保留实时曲线并在平均排队时间区域展示对应空态。
 
 ## 8. 相关测试入口
 

@@ -1193,6 +1193,15 @@ const en = {
           'Track live resource pressure and queue movement for partition {partition} in one compact workspace.',
         selectRange: 'Select partition metrics time range'
       },
+      queueWait: {
+        title: 'Average Queue Wait',
+        description:
+          'Average wait from submit time to start time for completed jobs in this partition, shown in seconds.',
+        loading: 'Loading completed job history...',
+        empty: 'No completed job history is available for this partition and time range.',
+        unavailable: 'Completed job history is currently unavailable for this partition.',
+        disabled: 'Completed job history is not enabled or not visible for this cluster.'
+      },
       nodeSets: 'Node sets',
       nodeSetsDescription: 'Node set expressions define which hosts contribute capacity to this partition.',
       nodeSetsEmpty: 'No node set expression is currently available for this partition.',

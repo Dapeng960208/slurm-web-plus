@@ -1132,6 +1132,14 @@ const zhCN = {
         description: '在一个工作区内查看队列 {partition} 的实时资源压力和队列变化。',
         selectRange: '选择队列指标时间范围'
       },
+      queueWait: {
+        title: '平均排队时间',
+        description: '统计该队列已完成作业从提交到启动的平均等待时间，数值单位为秒。',
+        loading: '正在加载已完成作业历史...',
+        empty: '该队列在当前时间范围内没有可用的已完成作业历史。',
+        unavailable: '当前无法获取该队列的已完成作业历史。',
+        disabled: '该集群未启用或当前不可见已完成作业历史。'
+      },
       nodeSets: '节点集合',
       nodeSetsDescription: '节点集合表达式用于说明该队列由哪些主机提供容量。',
       nodeSetsEmpty: '该队列当前没有可展示的节点集合表达式。',

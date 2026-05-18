@@ -41,6 +41,7 @@
 - 修复集群分析页平均排队时间曲线不显示的问题，并把等待时间统一改为 `submit_time -> start_time` 秒级口径，支持 `hour / day` 聚合切换
 - 集群分析页平均排队时间曲线已按等待时长强化颜色语义：`60` 秒内保持主题淡绿色，超过后连续过渡到橙色和红色
 - 队列详情页已补 dashboard 实时曲线，作业与历史作业相关页面中的队列字段统一改为可点击队列详情入口
+- 队列详情页新增平均排队时间曲线：复用页面时间范围组件，按当前 `partition` 从 `jobs/history` 拉取已完成作业并按 `submit_time -> start_time` 聚合为秒级曲线
 - 队列详情页已移除下方详情区与顶部摘要卡重复的资源容量字段，仅保留补充信息、节点集合和实时曲线
 - 集群分析页 `Partition Hotspots` 模块中的队列名称已统一改为可点击队列详情入口
 - 用户分析页新增运行/排队/失败/取消状态统计与曲线数据，移除冗余分析标题
@@ -76,6 +77,13 @@
   - 本轮定向验证已通过：
     - `cd frontend && npx vitest run tests/components/ChartSkeleton.spec.ts tests/components/dashboard/ChartResourcesHistory.spec.ts tests/components/dashboard/ChartJobsHistory.spec.ts tests/components/settings/SettingsCacheMetrics.spec.ts`
     - `npm --prefix frontend run type-check`
+
+- 队列详情页平均排队时间曲线已完成：
+  - `PartitionView` 复用现有 `MetricRangeSelector`，同一时间窗同时驱动实时曲线和平均排队时间曲线
+  - 历史作业请求固定携带当前 `partition`、`COMPLETED`、`submit_time desc`，并跨页拉取全部匹配记录后聚合
+  - 无历史权限、历史不可用或无样本时只在平均排队时间区域展示空态，不影响实时曲线
+  - 本轮定向验证已通过：
+    - `cd frontend && npx vitest run tests/views/PartitionView.spec.ts tests/composables/queueWaitHistory.spec.ts`
 
 - 管理写操作旧数据残留审查已完成：
   - `SlurmrestdFilteredCached.node_update/node_delete` 已清理 `nodes`、`nodes-unfiltered` 与单节点缓存
