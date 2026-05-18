@@ -39,11 +39,13 @@
 - 收口 `/:cluster/admin/ai`：模型配置改为表格、审计记录改为表格、统一搜索框样式，并将审计详情迁移到独立详情页
 - 集群分析页新增近 3 天节点热点概览、平均排队时长曲线，并把 `diag` 面板收口到 10 条核心字段
 - 集群分析页现在按 `capabilities.node_hotspots` 判断是否请求 `analysis/node-hotspots`，节点热点持久化不可用时不再产生预期内的 501 网络请求
-- 修复集群分析页平均排队时间曲线不显示的问题，并把等待时间统一改为 `submit_time -> start_time` 秒级口径，支持 `hour / day` 聚合切换
+- 修复集群分析页平均排队时间曲线不显示的问题，并把等待时间统一改为 `submit_time -> start_time` 秒级口径，支持 `minute / hour / day` 聚合切换
+- 修正集群分析页平均排队时间默认聚合：最近 1 小时按分钟桶聚合，并保留小时/天聚合切换；“最近一小时”会明确写入点击时刻起止时间
 - 集群分析页平均排队时间曲线已按等待时长强化颜色语义：`60` 秒内保持主题淡绿色，超过后连续过渡到橙色和红色
 - 集群分析页中文内存术语已校正：`memory_allocated` 展示为“内存分配量”，避免与 Slurm reservation 的“预留”语义混淆
 - 队列详情页已补 dashboard 实时曲线，作业与历史作业相关页面中的队列字段统一改为可点击队列详情入口
 - 队列详情页新增平均排队时间曲线：复用页面时间范围组件，按当前 `partition` 从 `jobs/history` 拉取已完成作业并按 `submit_time -> start_time` 聚合为秒级曲线
+- 队列详情页平均排队时间曲线固定按小时聚合并对齐同区实时曲线样式
 - 队列详情页已移除下方详情区与顶部摘要卡重复的资源容量字段，仅保留补充信息、节点集合和实时曲线
 - 集群分析页 `Partition Hotspots` 模块中的队列名称已统一改为可点击队列详情入口
 - 用户分析页新增运行/排队/失败/取消状态统计与曲线数据，移除冗余分析标题
@@ -71,6 +73,14 @@
 - 收口图表加载占位视觉：`ChartSkeleton` 改为轻量图表骨架，Dashboard `Resources Status`、`Jobs Queue` 与 Settings Cache metrics 不再显示粗大渐变柱状加载图
 
 ## 2. 已完成项
+
+- 平均排队延迟聚合与队列详情曲线修正已完成：
+  - `queueWaitHistory` 已恢复 `minute/hour/day` 聚合，最近 1 小时默认按分钟桶展示全集群已完成作业平均排队时间
+  - `ClusterAnalysisView` 的“最近一小时”重置会写入明确的 `start/end`，历史请求结束时间对应点击时刻
+  - `PartitionView` 平均排队时间曲线固定按小时聚合当前队列已完成作业，并移除不一致的额外 surface 包裹
+  - 本轮待验证：
+    - `cd frontend && npx vitest run tests/composables/queueWaitHistory.spec.ts tests/views/ClusterAnalysisView.spec.ts tests/views/PartitionView.spec.ts`
+    - `npm --prefix frontend run type-check`
 
 - 图表加载占位视觉优化已完成：
   - `ChartSkeleton` 已从粗柱状 skeleton 改为坐标轴、网格线、趋势线和节点组成的轻量图表骨架
@@ -219,7 +229,7 @@
   - `AccountView` 在当前账户 account-level association 暂未刷新时，会使用 `account/<name>` 的 `parent_account` 与 `qos` 合成账户级信息，确保刚创建的子账户仍可继续添加用户
   - `UserView` 编辑用户继续保持轻量 payload 调用方式，不要求页面手工拼接 `{"users": [...]}` 契约
   - `ClusterAnalysisView` 的平均排队时间图现在使用独立 `queueWaitRange / queueWaitCustomStart / queueWaitCustomEnd / queueWaitAggregation`
-  - 卡片时间范围切换会重新请求 `jobs_history`；卡片聚合粒度切换会立即重算 `hour / day` bucket；顶部全局时间范围不再覆盖卡片已经手动选择的独立时间范围
+  - 卡片时间范围切换会重新请求 `jobs_history`；卡片聚合粒度切换会立即重算 `minute / hour / day` bucket；顶部全局时间范围不再覆盖卡片已经手动选择的独立时间范围
   - 本轮定向验证：
     - `.venv\Scripts\python -m pytest slurmweb/tests/slurmrestd/test_slurmrestd_write_operations.py`
     - `cd frontend && npm exec vitest run tests/views/AccountView.spec.ts tests/views/UserView.spec.ts tests/views/ClusterAnalysisView.spec.ts`
@@ -238,7 +248,7 @@
 
 - Cluster Analysis 平均等待时间窗口与聚合行为已补一轮功能修复：
   - 历史作业不再固定只读 `jobs_history` 首页 `200` 条；当前会按所选时间窗跨页读取全部历史结果，再做平均等待时间聚合
-  - 解决了 `day / week / 自定义窗口` 下样本被首页截断，导致 `hour / day` 聚合结果看起来不按预期工作的前端问题
+  - 解决了 `day / week / 自定义窗口` 下样本被首页截断，导致 `minute / hour / day` 聚合结果看起来不按预期工作的前端问题
   - 本轮仅修复前端历史数据读取与聚合展示逻辑，未调整后端 `jobs/history` 接口契约
   - 本轮已补定向验证：
     - `cd frontend && npx vitest run tests/views/ClusterAnalysisView.spec.ts tests/composables/queueWaitHistory.spec.ts`

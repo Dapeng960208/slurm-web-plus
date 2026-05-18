@@ -30,7 +30,7 @@ import type {
 } from '@/composables/GatewayAPI'
 import {
   buildQueueWaitSeries,
-  inferQueueWaitAggregation
+  type QueueWaitAggregation
 } from '@/composables/queueWaitHistory'
 import { useRuntimeStore } from '@/stores/runtime'
 
@@ -108,13 +108,7 @@ const partitionMetricsQuery = computed(() => {
   }
 })
 
-const queueWaitAggregation = computed(() =>
-  inferQueueWaitAggregation({
-    range: runtimeStore.dashboard.range,
-    start: runtimeStore.dashboard.start,
-    end: runtimeStore.dashboard.end
-  })
-)
+const queueWaitAggregation = computed<QueueWaitAggregation>(() => 'hour')
 const queueWaitSeries = computed(() =>
   buildQueueWaitSeries(historyJobs.value, queueWaitAggregation.value)
 )
@@ -131,8 +125,13 @@ function applyMetricsWindow(window: { start: string; end: string }) {
 }
 
 function resetMetricsWindow() {
-  runtimeStore.dashboard.clearWindow()
   runtimeStore.dashboard.range = 'hour'
+  const end = new Date()
+  const start = new Date(end.getTime() - 60 * 60 * 1000)
+  runtimeStore.dashboard.setWindow({
+    start: formatDateTimeLocal(start),
+    end: formatDateTimeLocal(end)
+  })
 }
 
 function rangeStartISO(range: 'hour' | 'day' | 'week'): string {
@@ -143,6 +142,16 @@ function rangeStartISO(range: 'hour' | 'day' | 'week'): string {
     week: 7 * 24 * 60 * 60 * 1000
   }[range]
   return new Date(now - duration).toISOString()
+}
+
+function pad2(value: number): string {
+  return value.toString().padStart(2, '0')
+}
+
+function formatDateTimeLocal(date: Date): string {
+  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}T${pad2(
+    date.getHours()
+  )}:${pad2(date.getMinutes())}`
 }
 
 function resolvedQueueWaitWindow(): DateTimeWindowQuery {
@@ -313,11 +322,15 @@ watch(
                 route-target-name="partition"
                 compact
               />
-              <div class="ui-metric-surface partition-queue-wait-panel" data-testid="partition-queue-wait-panel">
-                <div>
-                  <div class="ui-stat-label">{{ t('pages.partition.queueWait.title') }}</div>
-                  <div class="mt-1 text-sm text-[var(--color-brand-muted)]">
-                    {{ t('pages.partition.queueWait.description') }}
+              <div class="partition-queue-wait-panel" data-testid="partition-queue-wait-panel">
+                <div class="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 pb-3 dark:border-gray-700">
+                  <div>
+                    <h3 class="text-base font-semibold text-gray-900 dark:text-gray-200">
+                      {{ t('pages.partition.queueWait.title') }}
+                    </h3>
+                    <div class="mt-1 text-sm text-[var(--color-brand-muted)]">
+                      {{ t('pages.partition.queueWait.description') }}
+                    </div>
                   </div>
                 </div>
                 <div v-if="queueWaitSeries.length" class="partition-queue-wait-chart">
@@ -383,7 +396,6 @@ watch(
   display: flex;
   flex-direction: column;
   gap: 0.85rem;
-  padding: 1rem;
 }
 
 .partition-queue-wait-chart {

@@ -58,7 +58,7 @@ const customEnd = ref('')
 const queueWaitRange = ref<MetricRange>('hour')
 const queueWaitCustomStart = ref('')
 const queueWaitCustomEnd = ref('')
-const queueWaitAggregation = ref<QueueWaitAggregation>('hour')
+const queueWaitAggregation = ref<QueueWaitAggregation>('minute')
 const queueWaitRangeInitialized = ref(false)
 const loading = ref(true)
 const refreshing = ref(false)
@@ -165,6 +165,13 @@ const queueWaitAggregationOptions = computed<
   Array<{ value: QueueWaitAggregation; label: string; ariaLabel: string }>
 >(() => [
   {
+    value: 'minute',
+    label: t('pages.analysis.historical.aggregationOptions.minute'),
+    ariaLabel: t('pages.analysis.historical.aggregationAria', {
+      value: t('pages.analysis.historical.aggregationOptions.minute')
+    })
+  },
+  {
     value: 'hour',
     label: t('pages.analysis.historical.aggregationOptions.hour'),
     ariaLabel: t('pages.analysis.historical.aggregationAria', {
@@ -248,9 +255,11 @@ function applyQueueWaitCustomWindow(window: DateTimeWindowQuery) {
 }
 
 function resetQueueWaitCustomWindow() {
-  queueWaitCustomStart.value = ''
-  queueWaitCustomEnd.value = ''
   queueWaitRange.value = 'hour'
+  const end = new Date()
+  const start = new Date(end.getTime() - 60 * 60 * 1000)
+  queueWaitCustomStart.value = formatDateTimeLocal(start)
+  queueWaitCustomEnd.value = formatDateTimeLocal(end)
 }
 
 function setQueueWaitAggregation(nextAggregation: QueueWaitAggregation) {
@@ -265,6 +274,16 @@ function rangeStartISO(range: MetricRange): string {
     week: 7 * 24 * 60 * 60 * 1000
   }[range]
   return new Date(now - duration).toISOString()
+}
+
+function pad2(value: number): string {
+  return value.toString().padStart(2, '0')
+}
+
+function formatDateTimeLocal(date: Date): string {
+  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}T${pad2(
+    date.getHours()
+  )}:${pad2(date.getMinutes())}`
 }
 
 function resolvedHistoryWindowQuery(): DateTimeWindowQuery {

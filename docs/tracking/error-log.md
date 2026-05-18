@@ -11,6 +11,11 @@
 
 ## 条目
 
+### 2026-05-18：平均排队时间最近一小时未设置明确起止时间且默认聚合粒度过粗
+- 时间：2026-05-18
+- 现象：`Cluster Analysis` 平均排队时间曲线默认最近 1 小时仍按小时聚合，无法看到 60 个分钟桶；点击“最近一小时”时只清空自定义窗口并回到 `range=hour`，没有把 `start=now-1h`、`end=now` 写入历史请求窗口。
+- 解决办法：恢复 `minute/hour/day` 聚合，最近 1 小时默认推断为 `minute`；重置最近一小时改为写入明确的本地 `datetime-local` 起止时间并在请求层转换为 ISO；队列详情页因产品口径固定为小时聚合，避免被全集群默认分钟规则影响。
+
 ### 2026-05-18：节点热点持久化未启用时前端仍请求 `analysis/node-hotspots`
 - 时间：2026-05-18
 - 现象：在 `Cluster Analysis` 页面，浏览器网络面板出现 `analysis/node-hotspots?...` 返回 `501`，响应为 `Node hotspot persistence is unavailable`。现场集群启用了作业历史 persistence，但节点热点持久化采样链路未启用，前端只按 `persistence` 粗略判断，仍发起了预期会失败的请求。
@@ -59,7 +64,7 @@
 ### 2026-05-15：移除平均排队时间分钟聚合后默认值和测试断言仍指向旧结构
 - 时间：2026-05-15
 - 现象：执行 `npm --prefix frontend run type-check` 时，`ClusterAnalysisView.vue` 报 `Argument of type '"minute"' is not assignable to parameter of type 'QueueWaitAggregation'`；执行 `cd frontend && npx vitest run tests/composables/queueWaitHistory.spec.ts tests/views/ClusterAnalysisView.spec.ts` 时，视图测试仍按旧 `minute` 默认聚合和未透传 `windowStart/windowEnd` 的字符串结构断言。
-- 解决办法：把 `queueWaitAggregation` 默认值改为 `hour`，删除用户可见的分钟聚合选项；同步更新 `queueWaitHistory` 推断规则和视图测试，让断言覆盖 `hour/day` 聚合、分钟按钮不存在，以及图表组件收到完整时间窗口。
+- 解决办法：当时把 `queueWaitAggregation` 默认值改为 `hour`，删除用户可见的分钟聚合选项；2026-05-18 已按新需求恢复 `minute/hour/day`，并让最近 1 小时默认按分钟桶聚合。
 
 ### 2026-05-15：合并表单远程搜索下拉框后推送 `main` 到 GitHub 失败
 - 时间：2026-05-15

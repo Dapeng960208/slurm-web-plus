@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeEach, vi } from 'vitest'
+import { describe, test, expect, beforeEach, afterEach, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import { ref } from 'vue'
 import { useRuntimeStore } from '@/stores/runtime'
@@ -156,6 +156,10 @@ describe('PartitionView.vue', () => {
     })
   })
 
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
   test('renders partition summary cards without duplicated detail blocks', async () => {
     const wrapper = mountPartitionView()
     await flushPromises()
@@ -185,6 +189,7 @@ describe('PartitionView.vue', () => {
     expect(wrapper.get('[data-testid="partition-queue-wait-panel"]').text()).toContain(
       'Average Queue Wait'
     )
+    expect(wrapper.get('[data-testid="partition-queue-wait-chart"]').text()).toContain('hour|')
     expect(mockGatewayAPI.jobs_history).toHaveBeenCalledWith(
       'foo',
       expect.objectContaining({
@@ -226,6 +231,35 @@ describe('PartitionView.vue', () => {
         partition: 'normal',
         start: new Date('2026-04-24T08:00').toISOString(),
         end: new Date('2026-04-24T12:00').toISOString()
+      })
+    )
+  })
+
+  test('resetting the shared time selector sets an explicit last-hour history window', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-05-18T10:30:45Z'))
+
+    const wrapper = mountPartitionView()
+    await flushPromises()
+    mockGatewayAPI.jobs_history.mockClear()
+
+    await wrapper.get('[data-testid="metric-range-custom-button"]').trigger('click')
+    await wrapper.get('[data-testid="metric-range-reset"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="partition-dashboard-props"]').text()).toContain(
+      JSON.stringify({
+        start: '2026-05-18T17:30',
+        end: '2026-05-18T18:30',
+        partition: 'normal'
+      })
+    )
+    expect(mockGatewayAPI.jobs_history).toHaveBeenCalledWith(
+      'foo',
+      expect.objectContaining({
+        partition: 'normal',
+        start: '2026-05-18T09:30:00.000Z',
+        end: '2026-05-18T10:30:00.000Z'
       })
     )
   })

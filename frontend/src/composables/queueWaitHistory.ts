@@ -8,7 +8,7 @@
 
 import type { JobHistoryRecord, MetricRange, MetricValue } from '@/composables/GatewayAPI'
 
-export type QueueWaitAggregation = 'hour' | 'day'
+export type QueueWaitAggregation = 'minute' | 'hour' | 'day'
 
 export function inferQueueWaitAggregation(options: {
   range: MetricRange
@@ -17,10 +17,12 @@ export function inferQueueWaitAggregation(options: {
 }): QueueWaitAggregation {
   const customDuration = resolveCustomWindowDuration(options.start, options.end)
   if (customDuration != null) {
+    if (customDuration <= 60 * 60 * 1000) return 'minute'
     if (customDuration <= 7 * 24 * 60 * 60 * 1000) return 'hour'
     return 'day'
   }
 
+  if (options.range === 'hour') return 'minute'
   return options.range === 'week' ? 'day' : 'hour'
 }
 
@@ -63,7 +65,9 @@ function parseTimestamp(value?: string | null): number {
 
 function bucketTimestamp(timestamp: number, aggregation: QueueWaitAggregation): number {
   const bucket = new Date(timestamp)
-  if (aggregation === 'hour') {
+  if (aggregation === 'minute') {
+    bucket.setUTCSeconds(0, 0)
+  } else if (aggregation === 'hour') {
     bucket.setUTCMinutes(0, 0, 0)
   } else {
     bucket.setUTCHours(0, 0, 0, 0)

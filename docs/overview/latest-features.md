@@ -1,5 +1,18 @@
 # 最新功能
 
+## 本轮：平均排队延迟聚合与队列详情曲线已修正
+
+本轮修正 `Cluster Analysis` 与队列详情页的平均排队时间曲线口径：
+
+- 集群分析页默认展示最近 1 小时全集群已完成作业的平均排队时间，并按分钟桶聚合；仍可切换为小时或天聚合。
+- “最近一小时”重置会明确写入点击时刻的 `start = now - 1h` 与 `end = now`，历史请求不再只依赖相对 range。
+- 队列详情页继续按当前队列过滤 `jobs/history`，曲线固定展示每小时平均排队时间，样式与同一区域实时图表保持一致。
+
+本轮新增验证：
+
+- `cd frontend && npx vitest run tests/views/ClusterAnalysisView.spec.ts tests/views/PartitionView.spec.ts tests/composables/queueWaitHistory.spec.ts`
+- `npm --prefix frontend run type-check`
+
 ## 本轮：节点热点能力不可用时不再发起无效请求
 
 本轮修复 `Cluster Analysis` 在节点热点持久化未启用时仍请求 `analysis/node-hotspots` 的问题：
@@ -99,9 +112,9 @@
 本轮修复 `Cluster Analysis` 平均排队时间曲线与页面时间组件混用的问题：
 
 - 页面页头右侧不再展示额外时间范围组件，平均排队时间曲线只使用卡片右上角自身的时间范围。
-- 聚合粒度收口为 `hour / day`：按小时展示每小时平均排队时间，按天展示每天平均排队时间。
+- 聚合粒度曾收口为 `hour / day`；当前版本已恢复 `minute / hour / day`，默认最近 1 小时按分钟桶展示。
 - 图表横轴现在固定使用卡片当前 `start/end` 时间窗口；即使窗口内只有一个有效样本，也不会再压缩成毫秒级单点时间轴。
-- 前端测试已覆盖页头无多余时间控件、卡片保留自身时间范围、分钟聚合按钮不再出现，以及图表组件接收完整窗口。
+- 前端测试已覆盖页头无多余时间控件、卡片保留自身时间范围、当前聚合按钮状态，以及图表组件接收完整窗口。
 
 ## 本轮：AI 集群状态分析已改为聚合上下文优先
 
@@ -192,7 +205,7 @@
 - `Cluster Analysis`
   - 平均排队时间图的时间范围与聚合粒度现在完全由卡片自身控制，不再跟顶部全局时间范围绑定
   - 卡片时间范围切换时会重新请求 `jobs_history`
-  - 卡片聚合粒度切换时会基于当前历史样本立即重算 `hour / day` bucket
+  - 卡片聚合粒度切换时会基于当前历史样本立即重算 `minute / hour / day` bucket
   - 顶部全局时间范围仍只影响 metrics / node hotspots / 页面级分析摘要，不会回写覆盖卡片已经手动选择的独立时间范围
 
 本轮新增验证：
@@ -254,7 +267,7 @@
 
 补充说明：
 
-- 本轮已额外修复 `Cluster Analysis` 平均等待时间曲线在 `day / week / 自定义窗口` 下只基于历史首页样本聚合的问题；现在会按当前时间窗跨页拉取全部历史作业后再做 `hour / day` 聚合。
+- 本轮已额外修复 `Cluster Analysis` 平均等待时间曲线在 `day / week / 自定义窗口` 下只基于历史首页样本聚合的问题；现在会按当前时间窗跨页拉取全部历史作业后再做 `minute / hour / day` 聚合。
 - “节点热点持久化存储并默认查数据库”的计划现已落地：
   - 新增 `node_metric_samples` 表，按 `cluster + node + sampled_at` 持久化 CPU / memory 使用率快照。
   - Agent 在数据库与 node metrics 同时可用时，会按 `persistence.snapshot_interval` 后台采样节点使用率并入库。
@@ -355,7 +368,7 @@
 本轮继续修正 `Cluster Analysis` 中“平均排队时间曲线没有明显显示”的问题：
 
 - 平均排队时间曲线现在统一按 `submit_time -> start_time` 计算排队时间，不再混用 `eligible_time`。
-- 曲线现在按秒展示平均排队时长，支持 `hour / day` 两种聚合粒度切换，并会按当前时间窗口自动选择默认粒度。
+- 曲线现在按秒展示平均排队时长，支持 `minute / hour / day` 聚合粒度切换，并会按当前时间窗口自动选择默认粒度。
 - 单个时间桶样本不再因为折线点被隐藏而看起来“没有图”。
 - 曲线默认使用与主题一致的淡绿色，并在超过 `60` 秒后随等待时长连续过渡到橙色、红色，便于识别高等待区间。
 

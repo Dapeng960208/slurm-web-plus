@@ -1134,7 +1134,7 @@ const zhCN = {
       },
       queueWait: {
         title: '平均排队时间',
-        description: '统计该队列已完成作业从提交到启动的平均等待时间，数值单位为秒。',
+        description: '按小时统计该队列已完成作业从提交到启动的平均排队时间，数值单位为秒。',
         loading: '正在加载已完成作业历史...',
         empty: '该队列在当前时间范围内没有可用的已完成作业历史。',
         unavailable: '当前无法获取该队列的已完成作业历史。',
@@ -1448,11 +1448,12 @@ const zhCN = {
         metricsDisabled: '该集群未启用指标采集，但仍可使用实时分析。',
         metricsUnavailable: '历史指标暂时不可用。',
         avgQueueWait: '平均排队时间',
-        avgQueueWaitDetail: '按提交时间到启动时间的平均等待时长分组展示，数值单位为秒。',
+        avgQueueWaitDetail: '统计全集群已完成作业从提交到启动的平均排队时间，数值单位为秒。',
         selectRange: '选择排队时间曲线时间范围',
         aggregationLabel: '聚合粒度',
         aggregationAria: '排队时间聚合粒度 {value}',
         aggregationOptions: {
+          minute: '分钟',
           hour: '小时',
           day: '天'
         },

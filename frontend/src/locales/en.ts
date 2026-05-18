@@ -1196,7 +1196,7 @@ const en = {
       queueWait: {
         title: 'Average Queue Wait',
         description:
-          'Average wait from submit time to start time for completed jobs in this partition, shown in seconds.',
+          'Hourly average wait from submit time to start time for completed jobs in this partition, shown in seconds.',
         loading: 'Loading completed job history...',
         empty: 'No completed job history is available for this partition and time range.',
         unavailable: 'Completed job history is currently unavailable for this partition.',
@@ -1530,11 +1530,12 @@ const en = {
         metricsUnavailable: 'Historical metrics are temporarily unavailable.',
         avgQueueWait: 'Average Queue Wait',
         avgQueueWaitDetail:
-          'Average wait from submit time to start time, grouped by the selected bucket and shown in seconds.',
+          'Cluster-wide average wait from submit time to start time, grouped by the selected bucket and shown in seconds.',
         selectRange: 'Select queue wait time range',
         aggregationLabel: 'Aggregation',
         aggregationAria: 'Queue wait aggregation {value}',
         aggregationOptions: {
+          minute: 'Minute',
           hour: 'Hour',
           day: 'Day'
         },

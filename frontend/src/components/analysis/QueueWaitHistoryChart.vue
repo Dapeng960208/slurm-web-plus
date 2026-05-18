@@ -35,6 +35,30 @@ const label = computed(() => t('pages.analysis.historical.avgQueueWait'))
 const secondsUnit = computed(() => t('pages.analysis.historical.secondsUnit'))
 let chart: Chart<'line'> | null = null
 
+const tooltipFormatByAggregation: Record<QueueWaitAggregation, string> = {
+  minute: 'yyyy-LL-dd HH:mm',
+  hour: 'yyyy-LL-dd HH:mm',
+  day: 'yyyy-LL-dd'
+}
+
+const displayFormatByAggregation: Record<QueueWaitAggregation, Record<string, string>> = {
+  minute: {
+    minute: 'HH:mm',
+    hour: 'HH:mm',
+    day: 'LL-dd'
+  },
+  hour: {
+    hour: 'HH:mm',
+    day: 'LL-dd',
+    week: 'LL-dd'
+  },
+  day: {
+    day: 'LL-dd',
+    week: 'LL-dd',
+    month: 'yyyy-LL'
+  }
+}
+
 function toPoints(values: MetricValue[]): Point[] {
   return values.map(([x, y]) => ({ x, y }))
 }
@@ -129,7 +153,8 @@ function updateChart() {
     xScale.max = max ?? undefined
     xScale.time = {
       ...xScale.time,
-      tooltipFormat: aggregation === 'day' ? 'yyyy-LL-dd' : 'yyyy-LL-dd HH:mm'
+      displayFormats: displayFormatByAggregation[aggregation],
+      tooltipFormat: tooltipFormatByAggregation[aggregation]
     }
   }
   const yScale = chart.options.scales?.y
@@ -190,7 +215,8 @@ onMounted(() => {
             maxRotation: 0
           },
           time: {
-            tooltipFormat: aggregation === 'day' ? 'yyyy-LL-dd' : 'yyyy-LL-dd HH:mm'
+            displayFormats: displayFormatByAggregation[aggregation],
+            tooltipFormat: tooltipFormatByAggregation[aggregation]
           }
         },
         y: {

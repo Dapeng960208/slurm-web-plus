@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeEach, vi } from 'vitest'
+import { describe, test, expect, beforeEach, afterEach, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import ClusterAnalysisView from '@/views/ClusterAnalysisView.vue'
 import { init_plugins } from '../lib/common'
@@ -236,6 +236,10 @@ describe('ClusterAnalysisView.vue', () => {
     })
   })
 
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
   test('renders cluster analysis workspace, recommendations, and controller health panels', async () => {
     await router.push({ name: 'analysis', params: { cluster: 'foo' } })
     const wrapper = mount(ClusterAnalysisView, {
@@ -278,13 +282,14 @@ describe('ClusterAnalysisView.vue', () => {
     expect(wrapper.get('[data-testid="queue-wait-range-selector"]').text()).toContain(
       'Time Range'
     )
-    expect(wrapper.find('[data-testid="queue-wait-aggregation-minute"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="queue-wait-aggregation-minute"]').exists()).toBe(true)
     expect(wrapper.text()).toContain('Node Hotspots')
     expect(wrapper.text()).toContain('Node cn1')
     expect(wrapper.text()).toContain('Jobs Submitted')
     expect(wrapper.text()).not.toContain('extra_field')
+    expect(wrapper.get('[data-testid="queue-wait-chart"]').text()).toContain('minute|')
     expect(wrapper.get('[data-testid="queue-wait-chart"]').text()).toContain(
-      `[[${new Date('2026-04-24T09:00:00Z').getTime()},600]]`
+      `[[${new Date('2026-04-24T09:10:00Z').getTime()},600]]`
     )
     expect(wrapper.get('[data-testid="queue-wait-chart"]').text()).toContain('T')
     expect(mockGatewayAPI.jobs_history).toHaveBeenCalledWith(
@@ -292,9 +297,11 @@ describe('ClusterAnalysisView.vue', () => {
       expect.objectContaining({
         state: 'COMPLETED',
         page_size: 500,
+        start: expect.stringMatching(/T/),
         end: expect.stringMatching(/T/)
       })
     )
+    expect(mockGatewayAPI.jobs_history.mock.calls[0][1]).not.toHaveProperty('partition')
     expect(mockGatewayAPI.analysis_ping).toHaveBeenCalledWith('foo')
     expect(mockGatewayAPI.analysis_diag).toHaveBeenCalledWith('foo')
     expect(mockGatewayAPI.analysis_node_hotspots).toHaveBeenCalledWith(
@@ -337,10 +344,60 @@ describe('ClusterAnalysisView.vue', () => {
       `[[${new Date('2026-04-24T09:00:00Z').getTime()},600]]`
     )
 
+    expect(wrapper.get('[data-testid="queue-wait-chart"]').text()).toContain('hour|')
+    expect(wrapper.get('[data-testid="queue-wait-chart"]').text()).toContain(
+      `[[${new Date('2026-04-24T09:00:00Z').getTime()},600]]`
+    )
+
     await wrapper.get('[data-testid="queue-wait-aggregation-day"]').trigger('click')
 
     expect(wrapper.get('[data-testid="queue-wait-chart"]').text()).toContain(
       `[[${new Date('2026-04-24T00:00:00Z').getTime()},600]]`
+    )
+  })
+
+  test('sets an explicit last-hour queue wait window when resetting the range selector', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-05-18T10:30:45Z'))
+
+    const wrapper = mount(ClusterAnalysisView, {
+      props: { cluster: 'foo' },
+      global: {
+        stubs: {
+          ClusterMainLayout: { template: '<div><slot /></div>' },
+          RouterLink: { template: '<a><slot /></a>' },
+          PartitionLinkChip: {
+            props: ['cluster', 'partition'],
+            template:
+              '<a data-testid="analysis-partition-link" :data-cluster="cluster" :data-partition="partition">{{ partition }}</a>'
+          },
+          QueueWaitHistoryChart: {
+            props: ['series', 'aggregation', 'windowStart', 'windowEnd'],
+            template:
+              '<div data-testid="queue-wait-chart">{{ aggregation }}|{{ windowStart }}|{{ windowEnd }}|{{ JSON.stringify(series) }}</div>'
+          }
+        }
+      }
+    })
+
+    await flushPromises()
+    mockGatewayAPI.jobs_history.mockClear()
+
+    await wrapper
+      .get('[data-testid="queue-wait-range-selector"] [data-testid="metric-range-custom-button"]')
+      .trigger('click')
+    await wrapper.get('[data-testid="metric-range-reset"]').trigger('click')
+    await flushPromises()
+
+    expect(mockGatewayAPI.jobs_history).toHaveBeenCalledWith(
+      'foo',
+      expect.objectContaining({
+        start: '2026-05-18T09:30:00.000Z',
+        end: '2026-05-18T10:30:00.000Z'
+      })
+    )
+    expect(wrapper.get('[data-testid="queue-wait-chart"]').text()).toContain(
+      '2026-05-18T09:30:00.000Z|2026-05-18T10:30:00.000Z'
     )
   })
 
@@ -472,10 +529,10 @@ describe('ClusterAnalysisView.vue', () => {
       })
     )
     expect(wrapper.get('[data-testid="queue-wait-chart"]').text()).toContain(
-      `[[${new Date('2026-04-24T09:00:00Z').getTime()},600]`
+      `[[${new Date('2026-04-24T09:10:00Z').getTime()},600]`
     )
     expect(wrapper.get('[data-testid="queue-wait-chart"]').text()).toContain(
-      `${new Date('2026-04-24T10:00:00Z').getTime()},1200`
+      `${new Date('2026-04-24T10:20:00Z').getTime()},1200`
     )
   })
 

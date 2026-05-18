@@ -117,6 +117,14 @@ const historyJobs: JobHistoryRecord[] = [
 ]
 
 describe('queueWaitHistory', () => {
+  test('builds minute averages in seconds using submit time as baseline', () => {
+    expect(buildQueueWaitSeries(historyJobs, 'minute')).toEqual([
+      [new Date('2026-04-24T09:10:00Z').getTime(), 600],
+      [new Date('2026-04-24T09:20:00Z').getTime(), 900],
+      [new Date('2026-04-24T10:50:00Z').getTime(), 1200]
+    ])
+  })
+
   test('builds hourly averages in seconds using submit time as baseline', () => {
     expect(buildQueueWaitSeries(historyJobs, 'hour')).toEqual([
       [new Date('2026-04-24T09:00:00Z').getTime(), 750],
@@ -124,10 +132,42 @@ describe('queueWaitHistory', () => {
     ])
   })
 
+  test('builds daily averages in seconds using submit time as baseline', () => {
+    expect(buildQueueWaitSeries(historyJobs, 'day')).toEqual([
+      [new Date('2026-04-24T00:00:00Z').getTime(), 900]
+    ])
+  })
+
+  test('ignores jobs without a valid submit-to-start wait sample', () => {
+    expect(
+      buildQueueWaitSeries(
+        [
+          ...historyJobs,
+          { ...historyJobs[0], id: 4, job_id: 4, submit_time: null },
+          {
+            ...historyJobs[0],
+            id: 5,
+            job_id: 5,
+            submit_time: '2026-04-24T09:30:00Z',
+            start_time: '2026-04-24T09:20:00Z'
+          }
+        ],
+        'day'
+      )
+    ).toEqual([[new Date('2026-04-24T00:00:00Z').getTime(), 900]])
+  })
+
   test('infers default aggregation from range or custom window span', () => {
-    expect(inferQueueWaitAggregation({ range: 'hour' })).toBe('hour')
+    expect(inferQueueWaitAggregation({ range: 'hour' })).toBe('minute')
     expect(inferQueueWaitAggregation({ range: 'day' })).toBe('hour')
     expect(inferQueueWaitAggregation({ range: 'week' })).toBe('day')
+    expect(
+      inferQueueWaitAggregation({
+        range: 'day',
+        start: '2026-04-24T09:00:00Z',
+        end: '2026-04-24T10:00:00Z'
+      })
+    ).toBe('minute')
     expect(
       inferQueueWaitAggregation({
         range: 'week',
