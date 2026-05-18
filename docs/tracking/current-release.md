@@ -78,7 +78,7 @@
   - `queueWaitHistory` 已恢复 `minute/hour/day` 聚合，最近 1 小时默认按分钟桶展示全集群已完成作业平均排队时间
   - `ClusterAnalysisView` 的“最近一小时”重置会写入明确的 `start/end`，历史请求结束时间对应点击时刻
   - `PartitionView` 平均排队时间曲线固定按小时聚合当前队列已完成作业，并移除不一致的额外 surface 包裹
-  - 本轮待验证：
+  - 本轮验证已通过：
     - `cd frontend && npx vitest run tests/composables/queueWaitHistory.spec.ts tests/views/ClusterAnalysisView.spec.ts tests/views/PartitionView.spec.ts`
     - `npm --prefix frontend run type-check`
 
