@@ -40,6 +40,7 @@
 - 集群分析页新增近 3 天节点热点概览、平均排队时长曲线，并把 `diag` 面板收口到 10 条核心字段
 - 修复集群分析页平均排队时间曲线不显示的问题，并把等待时间统一改为 `submit_time -> start_time` 秒级口径，支持 `hour / day` 聚合切换
 - 集群分析页平均排队时间曲线已按等待时长强化颜色语义：`60` 秒内保持主题淡绿色，超过后连续过渡到橙色和红色
+- 集群分析页中文内存术语已校正：`memory_allocated` 展示为“内存分配量”，避免与 Slurm reservation 的“预留”语义混淆
 - 队列详情页已补 dashboard 实时曲线，作业与历史作业相关页面中的队列字段统一改为可点击队列详情入口
 - 队列详情页新增平均排队时间曲线：复用页面时间范围组件，按当前 `partition` 从 `jobs/history` 拉取已完成作业并按 `submit_time -> start_time` 聚合为秒级曲线
 - 队列详情页已移除下方详情区与顶部摘要卡重复的资源容量字段，仅保留补充信息、节点集合和实时曲线
@@ -84,6 +85,11 @@
   - 无历史权限、历史不可用或无样本时只在平均排队时间区域展示空态，不影响实时曲线
   - 本轮定向验证已通过：
     - `cd frontend && npx vitest run tests/views/PartitionView.spec.ts tests/composables/queueWaitHistory.spec.ts`
+
+- 集群分析页中文内存术语校正已完成：
+  - `analysis.capacity.memory` 中文文案改为“内存分配量 / 已分配”，对应 `resources.memory_allocated`
+  - 本轮定向验证已通过：
+    - `cd frontend && npx vitest run tests/composables/ClusterAnalysis.spec.ts`
 
 - 管理写操作旧数据残留审查已完成：
   - `SlurmrestdFilteredCached.node_update/node_delete` 已清理 `nodes`、`nodes-unfiltered` 与单节点缓存

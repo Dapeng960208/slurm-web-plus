@@ -48,9 +48,9 @@ const zhCN = {
         unavailable: 'CPU 总量当前不可用。'
       },
       memory: {
-        label: '内存承诺量',
-        detail: '已承诺 {committed}，总量 {total}。',
-        unavailable: '当前遥测中没有可用的内存承诺量。'
+        label: '内存分配量',
+        detail: '已分配 {committed}，总量 {total}。',
+        unavailable: '当前遥测中没有可用的内存分配量。'
       },
       gpu: {
         label: 'GPU 忙碌度',
